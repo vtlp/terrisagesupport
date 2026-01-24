@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface AppHeaderProps {
   onMenuClick: () => void;
@@ -83,6 +84,8 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <ThemeToggle />
 
         <Button
           variant="ghost"
