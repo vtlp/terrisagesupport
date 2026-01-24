@@ -2,95 +2,109 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Terrisage Support UI Design System */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    /* Core Palette */
+    --primary: 68 100% 24%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 75 100% 9%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --accent: 71 73% 54%;
+    --accent-foreground: 75 100% 9%;
+    
+    /* Backgrounds */
+    --background: 60 13% 96%;
+    --foreground: 75 100% 9%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 75 100% 9%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
+    --popover-foreground: 75 100% 9%;
+    
+    /* Muted & Subtle */
+    --muted: 60 8% 92%;
+    --muted-foreground: 75 20% 40%;
+    
+    /* Borders & Inputs */
+    --border: 60 10% 88%;
+    --input: 60 10% 88%;
+    --ring: 68 100% 24%;
+    
+    /* Destructive */
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Semantic Colors */
+    --success: 142 70% 35%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    --info: 210 80% 50%;
+    --info-foreground: 0 0% 100%;
+    
+    /* Priority Colors (restrained) */
+    --priority-p1: 0 60% 50%;
+    --priority-p2: 25 80% 55%;
+    --priority-p3: 68 100% 24%;
+    --priority-p4: 75 20% 50%;
+    
+    /* Status Colors */
+    --status-open: 68 100% 24%;
+    --status-pending: 38 80% 50%;
+    --status-resolved: 142 70% 35%;
+    --status-closed: 75 20% 50%;
+    
+    /* Sidebar */
+    --sidebar-background: 75 100% 9%;
+    --sidebar-foreground: 60 13% 96%;
+    --sidebar-primary: 68 100% 24%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 71 73% 54%;
+    --sidebar-accent-foreground: 75 100% 9%;
+    --sidebar-border: 75 50% 15%;
+    --sidebar-ring: 71 73% 54%;
+    --sidebar-muted: 75 50% 20%;
+    
+    /* Radius */
     --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --primary: 71 73% 54%;
+    --primary-foreground: 75 100% 9%;
+    
+    --secondary: 75 50% 15%;
+    --secondary-foreground: 60 13% 96%;
+    
+    --accent: 68 100% 24%;
+    --accent-foreground: 0 0% 100%;
+    
+    --background: 75 100% 9%;
+    --foreground: 60 13% 96%;
+    
+    --card: 75 50% 12%;
+    --card-foreground: 60 13% 96%;
+    
+    --popover: 75 50% 12%;
+    --popover-foreground: 60 13% 96%;
+    
+    --muted: 75 50% 15%;
+    --muted-foreground: 60 10% 70%;
+    
+    --border: 75 50% 20%;
+    --input: 75 50% 20%;
+    --ring: 71 73% 54%;
+    
+    --sidebar-background: 75 100% 6%;
+    --sidebar-foreground: 60 13% 96%;
   }
 }
 
@@ -100,6 +114,140 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight text-secondary;
+  }
+}
+
+@layer components {
+  /* Pill Variants */
+  .pill {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .pill-status-open {
+    @apply bg-primary/15 text-primary;
+  }
+  
+  .pill-status-pending {
+    @apply bg-warning/15 text-warning;
+  }
+  
+  .pill-status-resolved {
+    @apply bg-success/15 text-success;
+  }
+  
+  .pill-status-closed {
+    @apply bg-muted text-muted-foreground;
+  }
+  
+  .pill-priority-p1 {
+    @apply bg-destructive/15 text-destructive font-semibold;
+  }
+  
+  .pill-priority-p2 {
+    @apply bg-warning/15 text-warning;
+  }
+  
+  .pill-priority-p3 {
+    @apply bg-primary/15 text-primary;
+  }
+  
+  .pill-priority-p4 {
+    @apply bg-muted text-muted-foreground;
+  }
+  
+  /* SLA Timer */
+  .sla-timer {
+    @apply inline-flex items-center gap-1 text-xs font-medium;
+  }
+  
+  .sla-timer-ok {
+    @apply text-success;
+  }
+  
+  .sla-timer-warning {
+    @apply text-warning;
+  }
+  
+  .sla-timer-breach {
+    @apply text-destructive;
+  }
+  
+  /* KPI Card */
+  .kpi-card {
+    @apply bg-card rounded-lg border border-border p-4 hover:shadow-md transition-shadow cursor-pointer;
+  }
+  
+  .kpi-card-value {
+    @apply text-3xl font-bold text-secondary;
+  }
+  
+  .kpi-card-label {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+  
+  /* Ticket Row */
+  .ticket-row {
+    @apply flex items-center gap-4 p-3 border-b border-border hover:bg-muted/50 cursor-pointer transition-colors;
+  }
+  
+  .ticket-row-selected {
+    @apply bg-accent/10 border-l-2 border-l-primary;
+  }
+  
+  /* Timeline */
+  .timeline-item {
+    @apply relative pl-6 pb-4 before:absolute before:left-2 before:top-2 before:bottom-0 before:w-px before:bg-border;
+  }
+  
+  .timeline-item:last-child::before {
+    @apply hidden;
+  }
+  
+  .timeline-dot {
+    @apply absolute left-0 top-1.5 w-4 h-4 rounded-full border-2 border-background;
+  }
+  
+  .timeline-customer {
+    @apply bg-info;
+  }
+  
+  .timeline-agent {
+    @apply bg-primary;
+  }
+  
+  .timeline-internal {
+    @apply bg-warning;
+  }
+  
+  .timeline-system {
+    @apply bg-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
   }
 }
