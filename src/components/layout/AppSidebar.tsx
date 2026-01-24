@@ -1,24 +1,23 @@
 import { useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Ticket,
-  Search,
-  BookOpen,
+  Building2,
+  ClipboardCheck,
+  FileUp,
+  Plug,
+  Calendar,
   FileText,
-  BarChart3,
   Settings,
+  ChevronDown,
+  ChevronRight,
   Users,
   GitBranch,
   Clock,
-  Tags,
   History,
-  Plug,
-  ChevronDown,
-  ChevronRight,
-  Inbox,
-  AlertTriangle,
-  AlertCircle,
-  List,
+  Ticket,
+  Search,
+  BookOpen,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -47,21 +46,22 @@ interface AppSidebarProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const ticketSubItems = [
-  { title: 'My Queue', url: '/tickets/my-queue', icon: Inbox },
-  { title: 'Unassigned', url: '/tickets/unassigned', icon: List },
-  { title: 'Breaching Soon', url: '/tickets/breaching-soon', icon: AlertTriangle },
-  { title: 'Breached Today', url: '/tickets/breached-today', icon: AlertCircle },
-  { title: 'All Tickets', url: '/tickets', icon: Ticket },
+const accountsSubItems = [
+  { title: 'All Accounts', url: '/accounts', icon: Building2 },
+  { title: 'Onboarding Tracker', url: '/onboarding', icon: ClipboardCheck },
+];
+
+const operationsSubItems = [
+  { title: 'Imports & Data Health', url: '/imports', icon: FileUp },
+  { title: 'Integrations', url: '/integrations', icon: Plug },
+  { title: 'Activation & Reviews', url: '/activation', icon: Calendar },
 ];
 
 const adminSubItems = [
   { title: 'Teams & Users', url: '/admin/users', icon: Users },
   { title: 'Queues & Routing', url: '/admin/queues', icon: GitBranch },
   { title: 'SLA Policies', url: '/admin/sla', icon: Clock },
-  { title: 'Categories & Tags', url: '/admin/categories', icon: Tags },
   { title: 'Audit Log', url: '/admin/audit', icon: History },
-  { title: 'Integrations', url: '/admin/integrations', icon: Plug },
 ];
 
 export function AppSidebar({ open }: AppSidebarProps) {
@@ -69,8 +69,13 @@ export function AppSidebar({ open }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   
-  const [ticketsOpen, setTicketsOpen] = useState(
-    location.pathname.startsWith('/tickets')
+  const [accountsOpen, setAccountsOpen] = useState(
+    location.pathname.startsWith('/accounts') || location.pathname.startsWith('/onboarding')
+  );
+  const [operationsOpen, setOperationsOpen] = useState(
+    location.pathname.startsWith('/imports') || 
+    location.pathname.startsWith('/integrations') || 
+    location.pathname.startsWith('/activation')
   );
   const [adminOpen, setAdminOpen] = useState(
     location.pathname.startsWith('/admin')
@@ -106,6 +111,69 @@ export function AppSidebar({ open }: AppSidebarProps) {
     </SidebarMenuItem>
   );
 
+  const CollapsibleNav = ({
+    label,
+    icon: Icon,
+    items,
+    open,
+    onOpenChange,
+    activePaths,
+  }: {
+    label: string;
+    icon: React.ElementType;
+    items: { title: string; url: string; icon: React.ElementType }[];
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    activePaths: string[];
+  }) => (
+    <Collapsible open={open} onOpenChange={onOpenChange}>
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            className={cn(
+              'text-sidebar-foreground hover:bg-sidebar-muted w-full justify-between',
+              isGroupActive(activePaths) &&
+                'bg-sidebar-muted border-l-2 border-sidebar-accent'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4" />
+              {!collapsed && <span>{label}</span>}
+            </div>
+            {!collapsed &&
+              (open ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              ))}
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {items.map((item) => (
+              <SidebarMenuSubItem key={item.url}>
+                <SidebarMenuSubButton
+                  asChild
+                  isActive={isActive(item.url)}
+                  className={cn(
+                    'text-sidebar-foreground hover:bg-sidebar-muted',
+                    isActive(item.url) &&
+                      'bg-sidebar-primary text-sidebar-primary-foreground'
+                  )}
+                >
+                  <Link to={item.url}>
+                    <item.icon className="h-3.5 w-3.5" />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+
   return (
     <Sidebar
       collapsible="icon"
@@ -115,6 +183,7 @@ export function AppSidebar({ open }: AppSidebarProps) {
       )}
     >
       <SidebarContent className="py-4">
+        {/* Main */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -123,122 +192,76 @@ export function AppSidebar({ open }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Accounts & Onboarding */}
         <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/60 text-xs uppercase tracking-wider">
+            {!collapsed && 'Accounts'}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <Collapsible open={ticketsOpen} onOpenChange={setTicketsOpen}>
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton
-                      className={cn(
-                        'text-sidebar-foreground hover:bg-sidebar-muted w-full justify-between',
-                        isGroupActive(['/tickets']) &&
-                          'bg-sidebar-muted border-l-2 border-sidebar-accent'
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Ticket className="h-4 w-4" />
-                        {!collapsed && <span>Tickets</span>}
-                      </div>
-                      {!collapsed &&
-                        (ticketsOpen ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        ))}
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {ticketSubItems.map((item) => (
-                        <SidebarMenuSubItem key={item.url}>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={isActive(item.url)}
-                            className={cn(
-                              'text-sidebar-foreground hover:bg-sidebar-muted',
-                              isActive(item.url) &&
-                                'bg-sidebar-primary text-sidebar-primary-foreground'
-                            )}
-                          >
-                            <Link to={item.url}>
-                              <item.icon className="h-3.5 w-3.5" />
-                              <span>{item.title}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
+              <CollapsibleNav
+                label="Accounts"
+                icon={Building2}
+                items={accountsSubItems}
+                open={accountsOpen}
+                onOpenChange={setAccountsOpen}
+                activePaths={['/accounts', '/onboarding']}
+              />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Operations */}
         <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/60 text-xs uppercase tracking-wider">
+            {!collapsed && 'Operations'}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <CollapsibleNav
+                label="Operations"
+                icon={ClipboardCheck}
+                items={operationsSubItems}
+                open={operationsOpen}
+                onOpenChange={setOperationsOpen}
+                activePaths={['/imports', '/integrations', '/activation']}
+              />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Tools */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/60 text-xs uppercase tracking-wider">
+            {!collapsed && 'Tools'}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <NavItem to="/support-actions" icon={FileText} label="Support Actions" />
+              <NavItem to="/tickets" icon={Ticket} label="Tickets" />
               <NavItem to="/search" icon={Search} label="Search" />
               <NavItem to="/knowledge" icon={BookOpen} label="Knowledge Base" />
-              <NavItem to="/macros" icon={FileText} label="Macros" />
               <NavItem to="/reports" icon={BarChart3} label="Reports" />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Admin */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/60 text-xs uppercase tracking-wider">
             {!collapsed && 'Administration'}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <Collapsible open={adminOpen} onOpenChange={setAdminOpen}>
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton
-                      className={cn(
-                        'text-sidebar-foreground hover:bg-sidebar-muted w-full justify-between',
-                        isGroupActive(['/admin']) &&
-                          'bg-sidebar-muted border-l-2 border-sidebar-accent'
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        {!collapsed && <span>Admin</span>}
-                      </div>
-                      {!collapsed &&
-                        (adminOpen ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        ))}
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {adminSubItems.map((item) => (
-                        <SidebarMenuSubItem key={item.url}>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={isActive(item.url)}
-                            className={cn(
-                              'text-sidebar-foreground hover:bg-sidebar-muted',
-                              isActive(item.url) &&
-                                'bg-sidebar-primary text-sidebar-primary-foreground'
-                            )}
-                          >
-                            <Link to={item.url}>
-                              <item.icon className="h-3.5 w-3.5" />
-                              <span>{item.title}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
+              <CollapsibleNav
+                label="Admin"
+                icon={Settings}
+                items={adminSubItems}
+                open={adminOpen}
+                onOpenChange={setAdminOpen}
+                activePaths={['/admin']}
+              />
+              <NavItem to="/settings" icon={Settings} label="Settings" />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

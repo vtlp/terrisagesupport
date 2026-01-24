@@ -5,6 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/Dashboard";
+import Accounts from "@/pages/Accounts";
+import AccountDetail from "@/pages/AccountDetail";
+import Onboarding from "@/pages/Onboarding";
+import Imports from "@/pages/Imports";
+import Integrations from "@/pages/Integrations";
+import Activation from "@/pages/Activation";
+import SupportActions from "@/pages/SupportActions";
+import Settings from "@/pages/Settings";
 import Tickets from "@/pages/Tickets";
 import NewTicket from "@/pages/NewTicket";
 import Knowledge from "@/pages/Knowledge";
@@ -27,7 +35,21 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route element={<AppLayout />}>
+            {/* Main */}
             <Route path="/" element={<Dashboard />} />
+            
+            {/* Accounts */}
+            <Route path="/accounts" element={<Accounts />} />
+            <Route path="/accounts/:accountId" element={<AccountDetail />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            
+            {/* Operations */}
+            <Route path="/imports" element={<Imports />} />
+            <Route path="/integrations" element={<Integrations />} />
+            <Route path="/activation" element={<Activation />} />
+            
+            {/* Tools */}
+            <Route path="/support-actions" element={<SupportActions />} />
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/tickets/:ticketId" element={<Tickets />} />
             <Route path="/tickets/my-queue" element={<Tickets />} />
@@ -39,10 +61,13 @@ const App = () => (
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/macros" element={<Macros />} />
             <Route path="/reports" element={<Reports />} />
+            
+            {/* Admin */}
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/queues" element={<AdminQueues />} />
             <Route path="/admin/sla" element={<AdminSLA />} />
             <Route path="/admin/audit" element={<AdminAudit />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
