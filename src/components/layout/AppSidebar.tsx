@@ -18,6 +18,10 @@ import {
   Search,
   BookOpen,
   BarChart3,
+  PhoneCall,
+  Video,
+  Briefcase,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -52,14 +56,14 @@ const accountsSubItems = [
 ];
 
 const operationsSubItems = [
-  { title: 'Imports & Data Health', url: '/imports', icon: FileUp },
+  { title: 'Imports and Data Health', url: '/imports', icon: FileUp },
   { title: 'Integrations', url: '/integrations', icon: Plug },
-  { title: 'Activation & Reviews', url: '/activation', icon: Calendar },
+  { title: 'Activation and Reviews', url: '/activation', icon: Calendar },
 ];
 
 const adminSubItems = [
-  { title: 'Teams & Users', url: '/admin/users', icon: Users },
-  { title: 'Queues & Routing', url: '/admin/queues', icon: GitBranch },
+  { title: 'Teams and Users', url: '/admin/users', icon: Users },
+  { title: 'Queues and Routing', url: '/admin/queues', icon: GitBranch },
   { title: 'SLA Policies', url: '/admin/sla', icon: Clock },
   { title: 'Audit Log', url: '/admin/audit', icon: History },
 ];
@@ -192,7 +196,20 @@ export function AppSidebar({ open }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Accounts & Onboarding */}
+        {/* Pipeline */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/60 text-xs uppercase tracking-wider">
+            {!collapsed && 'Pipeline'}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <NavItem to="/enquiries" icon={PhoneCall} label="Enquiries" />
+              <NavItem to="/demos" icon={Video} label="Demos and Calendar" />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Accounts and Onboarding */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/60 text-xs uppercase tracking-wider">
             {!collapsed && 'Accounts'}
@@ -241,7 +258,21 @@ export function AppSidebar({ open }: AppSidebarProps) {
               <NavItem to="/tickets" icon={Ticket} label="Tickets" />
               <NavItem to="/search" icon={Search} label="Search" />
               <NavItem to="/knowledge" icon={BookOpen} label="Knowledge Base" />
+              <NavItem to="/macros" icon={Zap} label="Macros" />
               <NavItem to="/reports" icon={BarChart3} label="Reports" />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Strategy */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/60 text-xs uppercase tracking-wider">
+            {!collapsed && 'Strategy'}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <NavItem to="/playbooks" icon={Briefcase} label="Playbooks" />
+              <NavItem to="/technical" icon={Settings} label="Technical View" />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

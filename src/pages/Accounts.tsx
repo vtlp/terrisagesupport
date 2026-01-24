@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Building2, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, Search, Building2, CheckCircle2, AlertTriangle, Clock, Play, Calendar, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -19,37 +19,46 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { onboardingAccounts } from '@/data/onboardingData';
+import { toast } from 'sonner';
 import { 
   COHORT_LABELS, 
   ONBOARDING_STATUS_LABELS, 
   ACTIVATION_STATUS_LABELS,
   type OnboardingStatus,
   type ActivationStatus,
-  type Cohort,
 } from '@/types/onboarding';
 import { format } from 'date-fns';
 
 const statusColors: Record<OnboardingStatus, string> = {
   not_started: 'bg-muted text-muted-foreground',
   in_progress: 'bg-primary/10 text-primary',
-  completed: 'bg-green-100 text-green-800',
+  completed: 'bg-accent/20 text-primary',
   stalled: 'bg-destructive/10 text-destructive',
 };
 
 const activationColors: Record<ActivationStatus, string> = {
   pending: 'bg-muted text-muted-foreground',
-  pass: 'bg-green-100 text-green-800',
+  pass: 'bg-accent/20 text-primary',
   at_risk: 'bg-amber-100 text-amber-800',
   failed: 'bg-destructive/10 text-destructive',
 };
 
 export default function Accounts() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState<string>('all');
   const [cohortFilter, setCohortFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showNewAccount, setShowNewAccount] = useState(false);
 
   const cities = [...new Set(onboardingAccounts.map(a => a.city))];
 
@@ -69,6 +78,24 @@ export default function Accounts() {
     completed: onboardingAccounts.filter(a => a.onboardingStatus === 'completed').length,
   };
 
+  const handleStartOnboarding = (accountId: string, accountName: string) => {
+    toast.success('Onboarding started', {
+      description: `Checklist assigned to ${accountName}`,
+    });
+  };
+
+  const handleStartImport = (accountId: string, accountName: string) => {
+    toast.success('Import started', {
+      description: `Import flow initiated for ${accountName}`,
+    });
+  };
+
+  const handleScheduleDemo = (accountId: string, accountName: string) => {
+    toast.success('Demo scheduled', {
+      description: `Calendar invite queued for ${accountName}`,
+    });
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
@@ -79,10 +106,23 @@ export default function Accounts() {
             Manage onboarding and account maintenance
           </p>
         </div>
-        <Button className="bg-primary hover:bg-primary/90">
-          <Plus className="h-4 w-4 mr-2" />
-          New Account
-        </Button>
+        <Dialog open={showNewAccount} onOpenChange={setShowNewAccount}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-2" />
+              New Account
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create Account</DialogTitle>
+            </DialogHeader>
+            <NewAccountForm onSuccess={() => { 
+              setShowNewAccount(false); 
+              toast.success('Account created', { description: 'Ready for onboarding' }); 
+            }} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats Cards */}
@@ -126,7 +166,7 @@ export default function Accounts() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <CheckCircle2 className="h-5 w-5 text-primary" />
               <span className="text-2xl font-bold">{stats.completed}</span>
             </div>
           </CardContent>
@@ -180,8 +220,8 @@ export default function Accounts() {
         </Select>
       </div>
 
-      {/* Accounts Table */}
-      <Card className="border-border">
+      {/* Accounts Table - Desktop */}
+      <Card className="border-border hidden md:block">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
@@ -194,6 +234,7 @@ export default function Accounts() {
                   <TableHead className="font-medium">Status</TableHead>
                   <TableHead className="font-medium">48h Activation</TableHead>
                   <TableHead className="font-medium">Next Action</TableHead>
+                  <TableHead className="font-medium text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -238,6 +279,34 @@ export default function Accounts() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        {account.onboardingStatus === 'not_started' && (
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => handleStartOnboarding(account.id, account.name)}
+                          >
+                            <Play className="h-3 w-3 mr-1" />
+                            Start
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleStartImport(account.id, account.name)}
+                        >
+                          <FileUp className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleScheduleDemo(account.id, account.name)}
+                        >
+                          <Calendar className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -246,7 +315,7 @@ export default function Accounts() {
         </CardContent>
       </Card>
 
-      {/* Mobile Cards (visible on small screens) */}
+      {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {filteredAccounts.map((account) => (
           <Card key={account.id} className="border-border">
@@ -262,7 +331,7 @@ export default function Accounts() {
                   {ONBOARDING_STATUS_LABELS[account.onboardingStatus]}
                 </Badge>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                 <div>
                   <span className="text-muted-foreground">City:</span>{' '}
                   <span>{account.city}</span>
@@ -282,10 +351,79 @@ export default function Accounts() {
                   <span>{account.onboardingOwnerName || '—'}</span>
                 </div>
               </div>
+              <div className="flex gap-2">
+                {account.onboardingStatus === 'not_started' && (
+                  <Button 
+                    size="sm" 
+                    className="flex-1 bg-primary"
+                    onClick={() => handleStartOnboarding(account.id, account.name)}
+                  >
+                    Start Onboarding
+                  </Button>
+                )}
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handleStartImport(account.id, account.name)}
+                >
+                  <FileUp className="h-3 w-3" />
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handleScheduleDemo(account.id, account.name)}
+                >
+                  <Calendar className="h-3 w-3" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
     </div>
+  );
+}
+
+function NewAccountForm({ onSuccess }: { onSuccess: () => void }) {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSuccess();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="text-sm font-medium">Account Name</label>
+        <Input placeholder="Company or agency name" required />
+      </div>
+      <div>
+        <label className="text-sm font-medium">City</label>
+        <Input placeholder="City" required />
+      </div>
+      <div>
+        <label className="text-sm font-medium">Cohort</label>
+        <Select>
+          <SelectTrigger>
+            <SelectValue placeholder="Select cohort" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="channel_partner">Channel Partner / Consultant</SelectItem>
+            <SelectItem value="broker_agency">Broker / Agency</SelectItem>
+            <SelectItem value="builder_venture">Builder / Venture</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <label className="text-sm font-medium">Contact Name</label>
+        <Input placeholder="Primary contact" required />
+      </div>
+      <div>
+        <label className="text-sm font-medium">Contact Phone</label>
+        <Input placeholder="+91 XXXXX XXXXX" required />
+      </div>
+      <Button type="submit" className="w-full bg-primary">
+        Create Account
+      </Button>
+    </form>
   );
 }

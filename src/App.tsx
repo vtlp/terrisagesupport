@@ -23,6 +23,10 @@ import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminQueues from "@/pages/admin/AdminQueues";
 import AdminSLA from "@/pages/admin/AdminSLA";
 import AdminAudit from "@/pages/admin/AdminAudit";
+import Enquiries from "@/pages/Enquiries";
+import Demos from "@/pages/Demos";
+import Playbooks from "@/pages/Playbooks";
+import TechnicalView from "@/pages/TechnicalView";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +41,10 @@ const App = () => (
           <Route element={<AppLayout />}>
             {/* Main */}
             <Route path="/" element={<Dashboard />} />
+            
+            {/* Pipeline */}
+            <Route path="/enquiries" element={<Enquiries />} />
+            <Route path="/demos" element={<Demos />} />
             
             {/* Accounts */}
             <Route path="/accounts" element={<Accounts />} />
@@ -61,6 +69,10 @@ const App = () => (
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/macros" element={<Macros />} />
             <Route path="/reports" element={<Reports />} />
+            
+            {/* Strategy */}
+            <Route path="/playbooks" element={<Playbooks />} />
+            <Route path="/technical" element={<TechnicalView />} />
             
             {/* Admin */}
             <Route path="/admin/users" element={<AdminUsers />} />

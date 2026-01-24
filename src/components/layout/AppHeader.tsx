@@ -1,4 +1,4 @@
-import { Bell, Search, Menu, ChevronDown } from 'lucide-react';
+import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Calendar, Building2, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -10,12 +10,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface AppHeaderProps {
   onMenuClick: () => void;
 }
 
 export function AppHeader({ onMenuClick }: AppHeaderProps) {
+  const navigate = useNavigate();
+  
   return (
     <header className="h-14 bg-secondary border-b border-sidebar-border flex items-center justify-between px-4 shrink-0">
       {/* Left section */}
@@ -30,10 +34,10 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
         </Button>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">U</span>
+            <span className="text-primary-foreground font-bold text-sm">T</span>
           </div>
           <span className="text-secondary-foreground font-semibold hidden sm:inline">
-            UpYard Support
+            Terrisage Support
           </span>
         </div>
       </div>
@@ -52,10 +56,39 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
 
       {/* Right section */}
       <div className="flex items-center gap-2">
+        {/* Quick Create */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" className="bg-primary hover:bg-primary/90 hidden sm:flex">
+              <Plus className="h-4 w-4 mr-1" />
+              Quick Create
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => navigate('/enquiries')}>
+              <PhoneCall className="h-4 w-4 mr-2" />
+              New Enquiry
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/demos')}>
+              <Calendar className="h-4 w-4 mr-2" />
+              Schedule Demo
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/accounts')}>
+              <Building2 className="h-4 w-4 mr-2" />
+              Create Account
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/imports')}>
+              <FileUp className="h-4 w-4 mr-2" />
+              Start Import
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Button
           variant="ghost"
           size="icon"
           className="text-secondary-foreground hover:bg-sidebar-muted relative"
+          onClick={() => toast.info('3 items due in next 24 hours')}
         >
           <Bell className="h-5 w-5" />
           <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 bg-accent text-accent-foreground text-xs">
