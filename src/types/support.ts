@@ -28,6 +28,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  primaryPhone?: string;
+  secondaryPhone?: string;
   avatar?: string;
   role: 'admin' | 'manager' | 'user';
   teams: string[];
