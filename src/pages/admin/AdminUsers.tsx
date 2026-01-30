@@ -40,7 +40,7 @@ import { mockUsers } from '@/data/mockData';
 import { toast } from 'sonner';
 import type { User } from '@/types/support';
 
-const availableTeams = ['support-leads', 'tier-1', 'tier-2', 'onboarding', 'technical'];
+const availableTeams = ['sales', 'technical/support', 'onboarding'];
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>(mockUsers);
@@ -48,7 +48,7 @@ export default function AdminUsers() {
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-    role: 'agent' as 'admin' | 'agent' | 'manager',
+    role: 'user' as 'admin' | 'user' | 'manager',
     teams: [] as string[],
   });
 
@@ -85,7 +85,7 @@ export default function AdminUsers() {
     };
 
     setUsers((prev) => [...prev, user]);
-    setNewUser({ name: '', email: '', role: 'agent', teams: [] });
+    setNewUser({ name: '', email: '', role: 'user', teams: [] });
     setIsDialogOpen(false);
     toast.success('User added successfully');
   };
@@ -135,7 +135,7 @@ export default function AdminUsers() {
                 <Label htmlFor="role">Role</Label>
                 <Select
                   value={newUser.role}
-                  onValueChange={(value: 'admin' | 'agent' | 'manager') =>
+                  onValueChange={(value: 'admin' | 'user' | 'manager') =>
                     setNewUser((prev) => ({ ...prev, role: value }))
                   }
                 >
@@ -143,7 +143,7 @@ export default function AdminUsers() {
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="agent">Agent</SelectItem>
+                    <SelectItem value="user">User</SelectItem>
                     <SelectItem value="manager">Manager</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
