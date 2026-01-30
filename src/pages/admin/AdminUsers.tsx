@@ -45,7 +45,15 @@ const availableTeams = ['sales', 'technical/support', 'onboarding', 'tier-1', 't
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    role: 'user' as 'admin' | 'user' | 'manager',
+    teams: [] as string[],
+  });
+  const [editUser, setEditUser] = useState({
     name: '',
     email: '',
     role: 'user' as 'admin' | 'user' | 'manager',
@@ -62,6 +70,15 @@ export default function AdminUsers() {
 
   const handleTeamToggle = (team: string) => {
     setNewUser((prev) => ({
+      ...prev,
+      teams: prev.teams.includes(team)
+        ? prev.teams.filter((t) => t !== team)
+        : [...prev.teams, team],
+    }));
+  };
+
+  const handleEditTeamToggle = (team: string) => {
+    setEditUser((prev) => ({
       ...prev,
       teams: prev.teams.includes(team)
         ? prev.teams.filter((t) => t !== team)
@@ -88,6 +105,35 @@ export default function AdminUsers() {
     setNewUser({ name: '', email: '', role: 'user', teams: [] });
     setIsDialogOpen(false);
     toast.success('User added successfully');
+  };
+
+  const handleEditClick = (user: User) => {
+    setEditingUser(user);
+    setEditUser({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      teams: [...user.teams],
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingUser || !editUser.name || !editUser.email) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === editingUser.id
+          ? { ...u, name: editUser.name, email: editUser.email, role: editUser.role, teams: editUser.teams }
+          : u
+      )
+    );
+    setIsEditDialogOpen(false);
+    setEditingUser(null);
+    toast.success('User updated successfully');
   };
 
   return (
@@ -238,7 +284,9 @@ export default function AdminUsers() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditClick(user)}>
+                        Edit
+                      </DropdownMenuItem>
                       <DropdownMenuItem>View permissions</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive">
                         Deactivate
@@ -251,6 +299,80 @@ export default function AdminUsers() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update team member details and permissions
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input
+                id="edit-name"
+                placeholder="Enter full name"
+                value={editUser.name}
+                onChange={(e) => setEditUser((prev) => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-email">Email Address</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                placeholder="user@terrisage.com"
+                value={editUser.email}
+                onChange={(e) => setEditUser((prev) => ({ ...prev, email: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-role">Role</Label>
+              <Select
+                value={editUser.role}
+                onValueChange={(value: 'admin' | 'user' | 'manager') =>
+                  setEditUser((prev) => ({ ...prev, role: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Teams</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {availableTeams.map((team) => (
+                  <div key={team} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-${team}`}
+                      checked={editUser.teams.includes(team)}
+                      onCheckedChange={() => handleEditTeamToggle(team)}
+                    />
+                    <Label htmlFor={`edit-${team}`} className="text-sm font-normal cursor-pointer">
+                      {team}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
