@@ -50,12 +50,16 @@ export default function AdminUsers() {
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
+    primaryPhone: '',
+    secondaryPhone: '',
     role: 'user' as 'admin' | 'user' | 'manager',
     teams: [] as string[],
   });
   const [editUser, setEditUser] = useState({
     name: '',
     email: '',
+    primaryPhone: '',
+    secondaryPhone: '',
     role: 'user' as 'admin' | 'user' | 'manager',
     teams: [] as string[],
   });
@@ -96,13 +100,15 @@ export default function AdminUsers() {
       id: `u${Date.now()}`,
       name: newUser.name,
       email: newUser.email,
+      primaryPhone: newUser.primaryPhone || undefined,
+      secondaryPhone: newUser.secondaryPhone || undefined,
       role: newUser.role,
       teams: newUser.teams,
       avatar: undefined,
     };
 
     setUsers((prev) => [...prev, user]);
-    setNewUser({ name: '', email: '', role: 'user', teams: [] });
+    setNewUser({ name: '', email: '', primaryPhone: '', secondaryPhone: '', role: 'user', teams: [] });
     setIsDialogOpen(false);
     toast.success('User added successfully');
   };
@@ -112,6 +118,8 @@ export default function AdminUsers() {
     setEditUser({
       name: user.name,
       email: user.email,
+      primaryPhone: user.primaryPhone || '',
+      secondaryPhone: user.secondaryPhone || '',
       role: user.role,
       teams: [...user.teams],
     });
@@ -127,7 +135,15 @@ export default function AdminUsers() {
     setUsers((prev) =>
       prev.map((u) =>
         u.id === editingUser.id
-          ? { ...u, name: editUser.name, email: editUser.email, role: editUser.role, teams: editUser.teams }
+          ? {
+              ...u,
+              name: editUser.name,
+              email: editUser.email,
+              primaryPhone: editUser.primaryPhone || undefined,
+              secondaryPhone: editUser.secondaryPhone || undefined,
+              role: editUser.role,
+              teams: editUser.teams,
+            }
           : u
       )
     );
@@ -176,6 +192,28 @@ export default function AdminUsers() {
                   value={newUser.email}
                   onChange={(e) => setNewUser((prev) => ({ ...prev, email: e.target.value }))}
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="primaryPhone">Primary Phone</Label>
+                  <Input
+                    id="primaryPhone"
+                    type="tel"
+                    placeholder="+91 98765 43210"
+                    value={newUser.primaryPhone}
+                    onChange={(e) => setNewUser((prev) => ({ ...prev, primaryPhone: e.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="secondaryPhone">Secondary Phone</Label>
+                  <Input
+                    id="secondaryPhone"
+                    type="tel"
+                    placeholder="+91 98765 43211"
+                    value={newUser.secondaryPhone}
+                    onChange={(e) => setNewUser((prev) => ({ ...prev, secondaryPhone: e.target.value }))}
+                  />
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="role">Role</Label>
@@ -328,6 +366,28 @@ export default function AdminUsers() {
                 value={editUser.email}
                 onChange={(e) => setEditUser((prev) => ({ ...prev, email: e.target.value }))}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-primaryPhone">Primary Phone</Label>
+                <Input
+                  id="edit-primaryPhone"
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={editUser.primaryPhone}
+                  onChange={(e) => setEditUser((prev) => ({ ...prev, primaryPhone: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-secondaryPhone">Secondary Phone</Label>
+                <Input
+                  id="edit-secondaryPhone"
+                  type="tel"
+                  placeholder="+91 98765 43211"
+                  value={editUser.secondaryPhone}
+                  onChange={(e) => setEditUser((prev) => ({ ...prev, secondaryPhone: e.target.value }))}
+                />
+              </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-role">Role</Label>

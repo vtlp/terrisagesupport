@@ -1,10 +1,10 @@
 import type { Ticket, Account, User, Queue, TimelineEvent, DashboardMetrics, QueueStats, KBArticle, Macro, AuditLogEntry } from '@/types/support';
 
 export const mockUsers: User[] = [
-  { id: 'u1', name: 'Sarah Chen', email: 'sarah@terrisage.com', role: 'admin', teams: ['sales'], avatar: undefined },
-  { id: 'u2', name: 'James Wilson', email: 'james@terrisage.com', role: 'user', teams: ['technical/support'], avatar: undefined },
-  { id: 'u3', name: 'Emma Thompson', email: 'emma@terrisage.com', role: 'user', teams: ['onboarding'], avatar: undefined },
-  { id: 'u4', name: 'Michael Brown', email: 'michael@terrisage.com', role: 'manager', teams: ['sales', 'technical/support'], avatar: undefined },
+  { id: 'u1', name: 'Sarah Chen', email: 'sarah@terrisage.com', primaryPhone: '+91 98765 43210', secondaryPhone: '+91 98765 43211', role: 'admin', teams: ['sales'], avatar: undefined },
+  { id: 'u2', name: 'James Wilson', email: 'james@terrisage.com', primaryPhone: '+91 87654 32109', role: 'user', teams: ['technical/support'], avatar: undefined },
+  { id: 'u3', name: 'Emma Thompson', email: 'emma@terrisage.com', primaryPhone: '+91 76543 21098', secondaryPhone: '+91 76543 21099', role: 'user', teams: ['onboarding'], avatar: undefined },
+  { id: 'u4', name: 'Michael Brown', email: 'michael@terrisage.com', primaryPhone: '+91 65432 10987', role: 'manager', teams: ['sales', 'technical/support'], avatar: undefined },
 ];
 
 export const mockQueues: Queue[] = [
