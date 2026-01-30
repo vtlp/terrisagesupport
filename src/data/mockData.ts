@@ -1,10 +1,10 @@
 import type { Ticket, Account, User, Queue, TimelineEvent, DashboardMetrics, QueueStats, KBArticle, Macro, AuditLogEntry } from '@/types/support';
 
 export const mockUsers: User[] = [
-  { id: 'u1', name: 'Sarah Chen', email: 'sarah@terrisage.com', role: 'admin', teams: ['support-leads'], avatar: undefined },
-  { id: 'u2', name: 'James Wilson', email: 'james@terrisage.com', role: 'agent', teams: ['tier-1'], avatar: undefined },
-  { id: 'u3', name: 'Emma Thompson', email: 'emma@terrisage.com', role: 'agent', teams: ['tier-1'], avatar: undefined },
-  { id: 'u4', name: 'Michael Brown', email: 'michael@terrisage.com', role: 'manager', teams: ['support-leads', 'tier-2'], avatar: undefined },
+  { id: 'u1', name: 'Sarah Chen', email: 'sarah@terrisage.com', role: 'admin', teams: ['sales'], avatar: undefined },
+  { id: 'u2', name: 'James Wilson', email: 'james@terrisage.com', role: 'user', teams: ['technical/support'], avatar: undefined },
+  { id: 'u3', name: 'Emma Thompson', email: 'emma@terrisage.com', role: 'user', teams: ['onboarding'], avatar: undefined },
+  { id: 'u4', name: 'Michael Brown', email: 'michael@terrisage.com', role: 'manager', teams: ['sales', 'technical/support'], avatar: undefined },
 ];
 
 export const mockQueues: Queue[] = [

@@ -29,7 +29,7 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
-  role: 'admin' | 'manager' | 'agent';
+  role: 'admin' | 'manager' | 'user';
   teams: string[];
 }
 
