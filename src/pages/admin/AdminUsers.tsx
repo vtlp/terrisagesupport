@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Plus, Search, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,9 +18,40 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { mockUsers } from '@/data/mockData';
+import { toast } from 'sonner';
+import type { User } from '@/types/support';
+
+const availableTeams = ['support-leads', 'tier-1', 'tier-2', 'onboarding', 'technical'];
 
 export default function AdminUsers() {
+  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    role: 'agent' as 'admin' | 'agent' | 'manager',
+    teams: [] as string[],
+  });
+
   const getInitials = (name: string) =>
     name
       .split(' ')
@@ -28,17 +60,121 @@ export default function AdminUsers() {
       .toUpperCase()
       .slice(0, 2);
 
+  const handleTeamToggle = (team: string) => {
+    setNewUser((prev) => ({
+      ...prev,
+      teams: prev.teams.includes(team)
+        ? prev.teams.filter((t) => t !== team)
+        : [...prev.teams, team],
+    }));
+  };
+
+  const handleAddUser = () => {
+    if (!newUser.name || !newUser.email) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    const user: User = {
+      id: `u${Date.now()}`,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      teams: newUser.teams,
+      avatar: undefined,
+    };
+
+    setUsers((prev) => [...prev, user]);
+    setNewUser({ name: '', email: '', role: 'agent', teams: [] });
+    setIsDialogOpen(false);
+    toast.success('User added successfully');
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-secondary">Teams & Users</h1>
+          <h1 className="text-2xl font-bold text-foreground">Teams & Users</h1>
           <p className="text-muted-foreground">Manage support team members and permissions</p>
         </div>
-        <Button className="bg-primary hover:bg-primary/90">
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-2" />
+              Add User
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add New User</DialogTitle>
+              <DialogDescription>
+                Create a new support team member account
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  placeholder="Enter full name"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser((prev) => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="user@terrisage.com"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser((prev) => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="role">Role</Label>
+                <Select
+                  value={newUser.role}
+                  onValueChange={(value: 'admin' | 'agent' | 'manager') =>
+                    setNewUser((prev) => ({ ...prev, role: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="agent">Agent</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Teams</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {availableTeams.map((team) => (
+                    <div key={team} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={team}
+                        checked={newUser.teams.includes(team)}
+                        onCheckedChange={() => handleTeamToggle(team)}
+                      />
+                      <Label htmlFor={team} className="text-sm font-normal cursor-pointer">
+                        {team}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddUser}>Add User</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="bg-card rounded-lg border border-border">
@@ -60,7 +196,7 @@ export default function AdminUsers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockUsers.map((user) => (
+            {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -81,7 +217,7 @@ export default function AdminUsers() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap">
                     {user.teams.map((team) => (
                       <Badge key={team} variant="secondary" className="bg-accent/20 text-accent-foreground">
                         {team}
@@ -101,7 +237,7 @@ export default function AdminUsers() {
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-card">
+                    <DropdownMenuContent align="end">
                       <DropdownMenuItem>Edit</DropdownMenuItem>
                       <DropdownMenuItem>View permissions</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive">
