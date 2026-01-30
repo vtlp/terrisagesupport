@@ -40,7 +40,7 @@ import { mockUsers } from '@/data/mockData';
 import { toast } from 'sonner';
 import type { User } from '@/types/support';
 
-const availableTeams = ['sales', 'technical/support', 'onboarding'];
+const availableTeams = ['sales', 'technical/support', 'onboarding', 'tier-1', 'tier-2'];
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>(mockUsers);
