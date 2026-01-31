@@ -325,7 +325,6 @@ export default function AdminUsers() {
                       <DropdownMenuItem onClick={() => handleEditClick(user)}>
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem>View permissions</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive">
                         Deactivate
                       </DropdownMenuItem>
