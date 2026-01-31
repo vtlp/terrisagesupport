@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Plus, GitBranch, Edit, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,8 +17,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { mockQueues } from '@/data/mockData';
+import { RoutingConfigDialog } from '@/components/admin/RoutingConfigDialog';
 
 export default function AdminQueues() {
+  const [routingDialogOpen, setRoutingDialogOpen] = useState(false);
+
   const categoryLabels: Record<string, string> = {
     listings_inventory: 'Listings',
     billing_plan: 'Billing',
@@ -117,12 +121,17 @@ export default function AdminQueues() {
             Tickets are automatically routed to queues based on category and product.
             Priority escalation rules can be configured per queue.
           </p>
-          <Button variant="outline" className="mt-4">
+          <Button variant="outline" className="mt-4" onClick={() => setRoutingDialogOpen(true)}>
             <Edit className="h-4 w-4 mr-2" />
             Configure Routing
           </Button>
         </div>
       </div>
+
+      <RoutingConfigDialog
+        open={routingDialogOpen}
+        onOpenChange={setRoutingDialogOpen}
+      />
     </div>
   );
 }
