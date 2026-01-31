@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Search, Ticket, Building, User, Home, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Ticket, Building } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { mockTickets, mockAccounts } from '@/data/mockData';
 import { StatusPill } from '@/components/tickets/StatusPill';
@@ -9,6 +9,7 @@ import { PriorityPill } from '@/components/tickets/PriorityPill';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function SearchPage() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
 
@@ -79,6 +80,7 @@ export default function SearchPage() {
                   <div
                     key={ticket.id}
                     className="p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/tickets/${ticket.id}`)}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-mono text-xs text-muted-foreground">
@@ -109,6 +111,7 @@ export default function SearchPage() {
                   <div
                     key={account.id}
                     className="p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/accounts/${account.id}`)}
                   >
                     <h4 className="font-medium">{account.name}</h4>
                     <p className="text-sm text-muted-foreground">
@@ -127,6 +130,7 @@ export default function SearchPage() {
               <div
                 key={ticket.id}
                 className="p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                onClick={() => navigate(`/tickets/${ticket.id}`)}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-mono text-xs text-muted-foreground">
@@ -151,6 +155,7 @@ export default function SearchPage() {
               <div
                 key={account.id}
                 className="p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                onClick={() => navigate(`/accounts/${account.id}`)}
               >
                 <h4 className="font-medium">{account.name}</h4>
                 <p className="text-sm text-muted-foreground">
