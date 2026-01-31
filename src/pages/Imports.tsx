@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, AlertTriangle, CheckCircle2, Clock, RefreshCw, FileUp } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, Clock, RefreshCw, FileUp, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -22,11 +22,13 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { importJobs, onboardingAccounts } from '@/data/onboardingData';
 import { format } from 'date-fns';
+import { StartImportDialog } from '@/components/imports/StartImportDialog';
 
 export default function Imports() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const filteredJobs = importJobs.filter(job => {
     const account = onboardingAccounts.find(a => a.id === job.accountId);
@@ -63,11 +65,19 @@ export default function Imports() {
             Track import jobs and data quality
           </p>
         </div>
-        <Button variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setImportDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Start Import
+          </Button>
+          <Button variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      <StartImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
