@@ -16,11 +16,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { mockQueues } from '@/data/mockData';
+import { mockQueues as initialQueues } from '@/data/mockData';
 import { RoutingConfigDialog } from '@/components/admin/RoutingConfigDialog';
+import { QueueFormDialog } from '@/components/admin/QueueFormDialog';
+import type { Queue } from '@/types/support';
 
 export default function AdminQueues() {
   const [routingDialogOpen, setRoutingDialogOpen] = useState(false);
+  const [queueDialogOpen, setQueueDialogOpen] = useState(false);
+  const [editingQueue, setEditingQueue] = useState<Queue | null>(null);
+  const [queues, setQueues] = useState<Queue[]>(initialQueues);
 
   const categoryLabels: Record<string, string> = {
     listings_inventory: 'Listings',
@@ -33,6 +38,34 @@ export default function AdminQueues() {
     other: 'Other',
   };
 
+  const handleNewQueue = () => {
+    setEditingQueue(null);
+    setQueueDialogOpen(true);
+  };
+
+  const handleEditQueue = (queue: Queue) => {
+    setEditingQueue(queue);
+    setQueueDialogOpen(true);
+  };
+
+  const handleSaveQueue = (queueData: Partial<Queue>) => {
+    if (editingQueue) {
+      // Update existing queue
+      setQueues(prev =>
+        prev.map(q =>
+          q.id === editingQueue.id ? { ...q, ...queueData } as Queue : q
+        )
+      );
+    } else {
+      // Add new queue
+      setQueues(prev => [...prev, queueData as Queue]);
+    }
+  };
+
+  const handleDeleteQueue = (queueId: string) => {
+    setQueues(prev => prev.filter(q => q.id !== queueId));
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
@@ -42,7 +75,7 @@ export default function AdminQueues() {
             Configure ticket queues and automatic routing rules
           </p>
         </div>
-        <Button className="bg-primary hover:bg-primary/90">
+        <Button className="bg-primary hover:bg-primary/90" onClick={handleNewQueue}>
           <Plus className="h-4 w-4 mr-2" />
           New Queue
         </Button>
@@ -63,12 +96,17 @@ export default function AdminQueues() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockQueues.map((queue) => (
+              {queues.map((queue) => (
                 <TableRow key={queue.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <GitBranch className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{queue.name}</span>
+                      <div>
+                        <span className="font-medium">{queue.name}</span>
+                        {queue.description && (
+                          <p className="text-xs text-muted-foreground">{queue.description}</p>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -101,9 +139,16 @@ export default function AdminQueues() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card">
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>View routing rules</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem onClick={() => handleEditQueue(queue)}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setRoutingDialogOpen(true)}>
+                          View routing rules
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDeleteQueue(queue.id)}
+                        >
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -131,6 +176,13 @@ export default function AdminQueues() {
       <RoutingConfigDialog
         open={routingDialogOpen}
         onOpenChange={setRoutingDialogOpen}
+      />
+
+      <QueueFormDialog
+        open={queueDialogOpen}
+        onOpenChange={setQueueDialogOpen}
+        queue={editingQueue}
+        onSave={handleSaveQueue}
       />
     </div>
   );
