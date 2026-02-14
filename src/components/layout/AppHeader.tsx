@@ -18,7 +18,8 @@ import { useUser } from '@/context/UserContext';
 import { UserRole } from '@/types/core';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
-import { seedEnquiries, seedTickets } from '@/data/seedData';
+import { seedEnquiries, seedTickets, seedAccounts, seedCalendarEvents } from '@/data/seedData';
+import { EnquiryStage, TicketPriority, TicketStatus, AccountStatus, CalendarEventStatus } from '@/types/core';
 
 interface AppHeaderProps {
   onMenuClick: () => void;
@@ -29,6 +30,12 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
   const { currentUser, setCurrentUser, isAdmin } = useUser();
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
+
+  // Compute attention count
+  const attentionCount =
+    seedEnquiries.filter(e => e.stage === EnquiryStage.NEW_ENQUIRY).length +
+    seedTickets.filter(t => (t.priority === TicketPriority.URGENT || t.priority === TicketPriority.HIGH) && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length +
+    seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;
 
   const toggleRole = () => {
     setCurrentUser({
@@ -100,11 +107,11 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
           variant="ghost"
           size="icon"
           className="text-secondary-foreground hover:bg-sidebar-muted relative"
-          onClick={() => toast.info('3 items due in next 24 hours')}
+          onClick={() => toast.info(`${attentionCount} items need attention`)}
         >
           <Bell className="h-5 w-5" />
           <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 bg-accent text-accent-foreground text-xs">
-            3
+            {attentionCount}
           </Badge>
         </Button>
 
