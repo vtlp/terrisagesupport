@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,8 @@ import { toast } from 'sonner';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useUser } from '@/context/UserContext';
 import { UserRole } from '@/types/core';
+import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
+import { seedEnquiries } from '@/data/seedData';
 
 interface AppHeaderProps {
   onMenuClick: () => void;
@@ -23,6 +26,7 @@ interface AppHeaderProps {
 export function AppHeader({ onMenuClick }: AppHeaderProps) {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, isAdmin } = useUser();
+  const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
 
   const toggleRole = () => {
     setCurrentUser({
@@ -77,7 +81,7 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => navigate('/enquiries')}>
+            <DropdownMenuItem onClick={() => setCreateEnquiryOpen(true)}>
               <PhoneCall className="h-4 w-4 mr-2" />
               New Enquiry
             </DropdownMenuItem>
@@ -130,6 +134,13 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <CreateEnquiryDialog
+        open={createEnquiryOpen}
+        onOpenChange={setCreateEnquiryOpen}
+        onCreated={(enquiry) => {
+          seedEnquiries.unshift(enquiry);
+        }}
+      />
     </header>
   );
 }
