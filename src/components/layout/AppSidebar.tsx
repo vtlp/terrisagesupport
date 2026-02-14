@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/collapsible';
 import { useState } from 'react';
 import { useUser } from '@/context/UserContext';
+import { seedEnquiries, seedTickets, seedAccounts } from '@/data/seedData';
+import { EnquiryStage, TicketPriority, TicketStatus, AccountStatus } from '@/types/core';
 
 interface AppSidebarProps {
   open: boolean;
@@ -32,11 +34,23 @@ const adminSubItems = [
   { title: 'Assignment Rules', url: '/admin/queues', icon: GitBranch },
 ];
 
+// Notification counts
+function useNotificationCounts() {
+  const newEnquiries = seedEnquiries.filter(e => e.stage === EnquiryStage.NEW_ENQUIRY).length;
+  const urgentTickets = seedTickets.filter(t =>
+    (t.priority === TicketPriority.URGENT || t.priority === TicketPriority.HIGH) &&
+    t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED
+  ).length;
+  const stalledAccounts = seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;
+  return { newEnquiries, urgentTickets, stalledAccounts };
+}
+
 export function AppSidebar({ open }: AppSidebarProps) {
   const location = useLocation();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { isAdmin } = useUser();
+  const counts = useNotificationCounts();
 
   const [pipelineOpen, setPipelineOpen] = useState(
     location.pathname.startsWith('/enquiries')
@@ -51,9 +65,9 @@ export function AppSidebar({ open }: AppSidebarProps) {
     paths.some((p) => location.pathname.startsWith(p));
 
   const NavItem = ({
-    to, icon: Icon, label,
+    to, icon: Icon, label, badge,
   }: {
-    to: string; icon: React.ElementType; label: string;
+    to: string; icon: React.ElementType; label: string; badge?: number;
   }) => (
     <SidebarMenuItem>
       <SidebarMenuButton
@@ -64,20 +78,31 @@ export function AppSidebar({ open }: AppSidebarProps) {
           isActive(to) && 'bg-sidebar-primary text-sidebar-primary-foreground'
         )}
       >
-        <Link to={to}>
-          <Icon className="h-4 w-4" />
-          {!collapsed && <span>{label}</span>}
+        <Link to={to} className="flex items-center justify-between w-full">
+          <span className="flex items-center gap-2">
+            <Icon className="h-4 w-4" />
+            {!collapsed && <span>{label}</span>}
+          </span>
+          {!collapsed && badge !== undefined && badge > 0 && (
+            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1.5">
+              {badge}
+            </span>
+          )}
+          {collapsed && badge !== undefined && badge > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-destructive" />
+          )}
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
 
   const CollapsibleGroup = ({
-    label, icon: Icon, items, open: groupOpen, onOpenChange, activePaths,
+    label, icon: Icon, items, open: groupOpen, onOpenChange, activePaths, badge,
   }: {
     label: string; icon: React.ElementType;
     items: { title: string; url: string; icon: React.ElementType }[];
     open: boolean; onOpenChange: (v: boolean) => void; activePaths: string[];
+    badge?: number;
   }) => (
     <Collapsible open={groupOpen} onOpenChange={onOpenChange}>
       <SidebarMenuItem>
@@ -92,7 +117,14 @@ export function AppSidebar({ open }: AppSidebarProps) {
               <Icon className="h-4 w-4" />
               {!collapsed && <span>{label}</span>}
             </div>
-            {!collapsed && (groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
+            <div className="flex items-center gap-1">
+              {!collapsed && badge !== undefined && badge > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1.5">
+                  {badge}
+                </span>
+              )}
+              {!collapsed && (groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
+            </div>
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -142,10 +174,11 @@ export function AppSidebar({ open }: AppSidebarProps) {
                 open={pipelineOpen}
                 onOpenChange={setPipelineOpen}
                 activePaths={['/enquiries']}
+                badge={counts.newEnquiries}
               />
 
-              <NavItem to="/accounts" icon={Building2} label="Accounts" />
-              <NavItem to="/tickets" icon={Ticket} label="Support Tickets" />
+              <NavItem to="/accounts" icon={Building2} label="Accounts" badge={counts.stalledAccounts} />
+              <NavItem to="/tickets" icon={Ticket} label="Support Tickets" badge={counts.urgentTickets} />
               <NavItem to="/knowledge" icon={BookOpen} label="Knowledge Base" />
               {isAdmin && (
                 <NavItem to="/marketing" icon={Megaphone} label="Marketing" />
