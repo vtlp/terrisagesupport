@@ -638,7 +638,12 @@ export default function AccountDetail() {
 
         {/* ═══ 4. DATA INGESTION ═══ */}
         <TabsContent value="ingestion" className="mt-4 space-y-4">
-          {!showIngestionWizard && <Button onClick={() => setShowIngestionWizard(true)}><Plus className="h-4 w-4 mr-1" /> New Import</Button>}
+          <div className="flex flex-wrap gap-2">
+            {!showIngestionWizard && <Button onClick={() => setShowIngestionWizard(true)}><Plus className="h-4 w-4 mr-1" /> New Import</Button>}
+            <Button variant="outline" onClick={() => handleExport('account-data-csv')}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+            <Button variant="outline" onClick={() => handleExport('account-data-pdf')}><Download className="h-4 w-4 mr-1" /> Export PDF</Button>
+            <Button variant="outline" onClick={() => handleExport('import-history')}><FileSpreadsheet className="h-4 w-4 mr-1" /> Export Import Log</Button>
+          </div>
           {showIngestionWizard && <DataIngestionWizard accountId={account.account_id} onClose={() => setShowIngestionWizard(false)} />}
           <Card>
             <CardHeader><CardTitle className="text-base">Import History</CardTitle></CardHeader>
