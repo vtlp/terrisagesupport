@@ -16,6 +16,7 @@ import {
   Plus, Search, ArrowLeft, ExternalLink, CalendarIcon, Tag,
   Clock, AlertTriangle, User, Building2, Ticket,
 } from 'lucide-react';
+import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
 
 const priorityColors: Record<TicketPriority, string> = {
   [TicketPriority.LOW]: 'bg-muted text-muted-foreground',
@@ -65,6 +66,7 @@ export default function Tickets() {
   const [assignedTo, setAssignedTo] = useState<string | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [noteRefresh, setNoteRefresh] = useState(0);
+  const [createTicketOpen, setCreateTicketOpen] = useState(false);
 
   // Sync detail state when selection changes
   const currentStatus = ticketStatus ?? selected?.status ?? TicketStatus.NEW;
@@ -128,12 +130,20 @@ export default function Tickets() {
 
   return (
     <div className="flex h-full">
+      <CreateTicketDialog
+        open={createTicketOpen}
+        onOpenChange={setCreateTicketOpen}
+        onCreated={(ticket) => {
+          seedTickets.unshift(ticket);
+          navigate(`/tickets/${ticket.ticket_id}`);
+        }}
+      />
       {/* ── List Panel ── */}
       <div className={`w-full md:w-96 flex-shrink-0 border-r border-border overflow-auto ${selected ? 'hidden md:block' : ''}`}>
         <div className="p-4 border-b border-border space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-foreground">Support Tickets</h2>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Ticket</Button>
+            <Button size="sm" onClick={() => setCreateTicketOpen(true)}><Plus className="h-4 w-4 mr-1" />New Ticket</Button>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

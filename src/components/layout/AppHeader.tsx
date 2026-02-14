@@ -17,7 +17,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useUser } from '@/context/UserContext';
 import { UserRole } from '@/types/core';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
-import { seedEnquiries } from '@/data/seedData';
+import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
+import { seedEnquiries, seedTickets } from '@/data/seedData';
 
 interface AppHeaderProps {
   onMenuClick: () => void;
@@ -27,6 +28,7 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, isAdmin } = useUser();
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
+  const [createTicketOpen, setCreateTicketOpen] = useState(false);
 
   const toggleRole = () => {
     setCurrentUser({
@@ -85,7 +87,7 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
               <PhoneCall className="h-4 w-4 mr-2" />
               New Enquiry
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/tickets')}>
+            <DropdownMenuItem onClick={() => setCreateTicketOpen(true)}>
               <Ticket className="h-4 w-4 mr-2" />
               New Support Ticket
             </DropdownMenuItem>
@@ -139,6 +141,14 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
         onOpenChange={setCreateEnquiryOpen}
         onCreated={(enquiry) => {
           seedEnquiries.unshift(enquiry);
+        }}
+      />
+      <CreateTicketDialog
+        open={createTicketOpen}
+        onOpenChange={setCreateTicketOpen}
+        onCreated={(ticket) => {
+          seedTickets.unshift(ticket);
+          navigate(`/tickets/${ticket.ticket_id}`);
         }}
       />
     </header>
