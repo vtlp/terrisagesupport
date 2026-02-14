@@ -48,16 +48,16 @@ const verificationIcons: Record<VerificationStatus, React.ReactNode> = {
 };
 
 const ticketPriorityColors: Record<TicketPriority, string> = {
-  [TicketPriority.LOW]: 'bg-muted text-muted-foreground',
-  [TicketPriority.MEDIUM]: 'bg-primary/15 text-primary',
-  [TicketPriority.HIGH]: 'bg-warning/15 text-warning',
-  [TicketPriority.URGENT]: 'bg-destructive/15 text-destructive',
+  [TicketPriority.P1]: 'bg-destructive/15 text-destructive',
+  [TicketPriority.P2]: 'bg-warning/15 text-warning',
+  [TicketPriority.P3]: 'bg-primary/15 text-primary',
+  [TicketPriority.P4]: 'bg-muted text-muted-foreground',
 };
 
 const ticketStatusColors: Record<TicketStatus, string> = {
-  [TicketStatus.NEW]: 'bg-primary/15 text-primary',
-  [TicketStatus.IN_PROGRESS]: 'bg-warning/15 text-warning',
-  [TicketStatus.WAITING_ON_CLIENT]: 'bg-muted text-muted-foreground',
+  [TicketStatus.OPEN]: 'bg-primary/15 text-primary',
+  [TicketStatus.PENDING_INTERNAL]: 'bg-info/15 text-info',
+  [TicketStatus.PENDING_CUSTOMER]: 'bg-warning/15 text-warning',
   [TicketStatus.RESOLVED]: 'bg-success/15 text-success',
   [TicketStatus.CLOSED]: 'bg-muted text-muted-foreground',
 };

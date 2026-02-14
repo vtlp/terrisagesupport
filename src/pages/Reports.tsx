@@ -346,7 +346,7 @@ export default function Reports() {
                   <div className="bg-muted rounded-lg p-4 text-center">
                     <p className="text-xs text-muted-foreground">Urgent/High</p>
                     <p className="text-2xl font-bold text-destructive">
-                      {seedTickets.filter(t => t.priority === TicketPriority.URGENT || t.priority === TicketPriority.HIGH).length}
+                      {seedTickets.filter(t => t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2).length}
                     </p>
                   </div>
                   <div className="bg-muted rounded-lg p-4 text-center">

@@ -38,7 +38,7 @@ const adminSubItems = [
 function useNotificationCounts() {
   const newEnquiries = seedEnquiries.filter(e => e.stage === EnquiryStage.NEW_ENQUIRY).length;
   const urgentTickets = seedTickets.filter(t =>
-    (t.priority === TicketPriority.URGENT || t.priority === TicketPriority.HIGH) &&
+    (t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2) &&
     t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED
   ).length;
   const stalledAccounts = seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;

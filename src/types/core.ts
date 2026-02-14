@@ -98,19 +98,53 @@ export enum EntityType {
 }
 
 export enum TicketPriority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  URGENT = 'URGENT',
+  P1 = 'P1',
+  P2 = 'P2',
+  P3 = 'P3',
+  P4 = 'P4',
 }
 
 export enum TicketStatus {
-  NEW = 'NEW',
-  IN_PROGRESS = 'IN_PROGRESS',
-  WAITING_ON_CLIENT = 'WAITING_ON_CLIENT',
+  OPEN = 'OPEN',
+  PENDING_CUSTOMER = 'PENDING_CUSTOMER',
+  PENDING_INTERNAL = 'PENDING_INTERNAL',
   RESOLVED = 'RESOLVED',
   CLOSED = 'CLOSED',
 }
+
+export enum TicketType {
+  INCIDENT = 'INCIDENT',
+  QUESTION = 'QUESTION',
+  TASK = 'TASK',
+  FEEDBACK = 'FEEDBACK',
+}
+
+export enum TicketCategory {
+  LISTINGS_INVENTORY = 'LISTINGS_INVENTORY',
+  BILLING_PLAN = 'BILLING_PLAN',
+  API_INTEGRATIONS = 'API_INTEGRATIONS',
+  ONBOARDING_MIGRATION = 'ONBOARDING_MIGRATION',
+  SECURITY_ACCESS = 'SECURITY_ACCESS',
+  COMPLIANCE_LEGAL = 'COMPLIANCE_LEGAL',
+  PERFORMANCE_RELIABILITY = 'PERFORMANCE_RELIABILITY',
+  OTHER = 'OTHER',
+}
+
+// Legacy mapping helpers (for backward compat during transition)
+export const LegacyTicketPriority = {
+  LOW: TicketPriority.P4,
+  MEDIUM: TicketPriority.P3,
+  HIGH: TicketPriority.P2,
+  URGENT: TicketPriority.P1,
+} as const;
+
+export const LegacyTicketStatus = {
+  NEW: TicketStatus.OPEN,
+  IN_PROGRESS: TicketStatus.PENDING_INTERNAL,
+  WAITING_ON_CLIENT: TicketStatus.PENDING_CUSTOMER,
+  RESOLVED: TicketStatus.RESOLVED,
+  CLOSED: TicketStatus.CLOSED,
+} as const;
 
 export enum KBBucket {
   SALES_CONTENT = 'SALES_CONTENT',
@@ -150,6 +184,17 @@ export enum IngestionStatus {
   FAILED = 'FAILED',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
+}
+
+// ── Timeline Event Types ─────────────────────────
+export enum TimelineEventType {
+  CUSTOMER_MESSAGE = 'CUSTOMER_MESSAGE',
+  AGENT_REPLY = 'AGENT_REPLY',
+  INTERNAL_NOTE = 'INTERNAL_NOTE',
+  STATUS_CHANGE = 'STATUS_CHANGE',
+  ASSIGNMENT = 'ASSIGNMENT',
+  PRIORITY_CHANGE = 'PRIORITY_CHANGE',
+  SYSTEM = 'SYSTEM',
 }
 
 // ── Interfaces ─────────────────────────────────
@@ -244,6 +289,8 @@ export interface Account {
   owner_name: string;
   owner_phone: string;
   owner_email: string;
+  whatsapp_enabled: boolean;
+  account_overview_text: string;
   verification_pan_status: VerificationStatus;
   verification_identity_status: VerificationStatus;
   overview_fields: Record<string, unknown>;
@@ -266,19 +313,40 @@ export interface Account {
 
 export interface SupportTicket {
   ticket_id: string;
-  linked_entity_type: EntityType | null;
-  linked_entity_id: string | null;
   subject: string;
   description: string;
-  tags: string[];
-  market_field: string;
-  priority: TicketPriority;
   status: TicketStatus;
+  priority: TicketPriority;
+  type: TicketType;
+  category: TicketCategory;
+  account_id: string | null;
+  requester_name: string;
+  requester_email: string;
   assigned_to_user_id: string | null;
-  attachments: string[]; // document_ids
-  notes_thread: string[]; // note_ids
+  queue: string;
+  tags: string[];
+  sla_first_response: string | null;
+  sla_resolution: string | null;
+  first_response_at: string | null;
+  resolved_at: string | null;
+  timeline: TimelineEntry[];
+  attachments: string[];
+  notes_thread: string[];
+  // Legacy fields for backward compat
+  linked_entity_type: EntityType | null;
+  linked_entity_id: string | null;
+  market_field: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface TimelineEntry {
+  id: string;
+  type: TimelineEventType;
+  content: string;
+  user_id: string | null;
+  created_at: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface KnowledgeBaseItem {
@@ -290,6 +358,25 @@ export interface KnowledgeBaseItem {
   tags: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface KBFolder {
+  folder_id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+}
+
+export interface KBFile {
+  file_id: string;
+  folder_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  file_url: string;
+  tags: string[];
+  uploaded_by_user_id: string;
+  created_at: string;
 }
 
 export interface MarketingLog {
