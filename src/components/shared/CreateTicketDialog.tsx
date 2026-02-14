@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
-import { TicketPriority, TicketStatus, EntityType, type SupportTicket } from '@/types/core';
-import { seedAccounts, seedEnquiries } from '@/data/seedData';
+import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, TimelineEventType, type SupportTicket } from '@/types/core';
+import { seedAccounts } from '@/data/seedData';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
 import { toast } from 'sonner';
 
@@ -23,19 +23,16 @@ interface CreateTicketDialogProps {
 export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTicketDialogProps) {
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<TicketPriority>(TicketPriority.MEDIUM);
-  const [linkedType, setLinkedType] = useState<string>('none');
-  const [linkedId, setLinkedId] = useState<string>('');
+  const [priority, setPriority] = useState<TicketPriority>(TicketPriority.P3);
+  const [type, setType] = useState<TicketType>(TicketType.INCIDENT);
+  const [category, setCategory] = useState<TicketCategory>(TicketCategory.OTHER);
+  const [accountId, setAccountId] = useState<string>('none');
   const [assignedTo, setAssignedTo] = useState<string | null>(null);
   const [market, setMarket] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-
-  const linkedEntities = linkedType === EntityType.ACCOUNT
-    ? seedAccounts.map(a => ({ id: a.account_id, name: a.account_name }))
-    : linkedType === EntityType.ENQUIRY
-    ? seedEnquiries.map(e => ({ id: e.enquiry_id, name: e.company_name }))
-    : [];
+  const [requesterName, setRequesterName] = useState('');
+  const [requesterEmail, setRequesterEmail] = useState('');
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -44,28 +41,42 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
   };
 
   const reset = () => {
-    setSubject(''); setDescription(''); setPriority(TicketPriority.MEDIUM);
-    setLinkedType('none'); setLinkedId(''); setAssignedTo(null);
+    setSubject(''); setDescription(''); setPriority(TicketPriority.P3);
+    setType(TicketType.INCIDENT); setCategory(TicketCategory.OTHER);
+    setAccountId('none'); setAssignedTo(null);
     setMarket(''); setTagInput(''); setTags([]);
+    setRequesterName(''); setRequesterEmail('');
   };
 
   const handleSubmit = () => {
     if (!subject.trim()) { toast.error('Subject is required'); return; }
+    const now = new Date().toISOString();
     const ticket: SupportTicket = {
       ticket_id: `TKT${Date.now()}`,
       subject: subject.trim(),
       description: description.trim(),
       priority,
-      status: TicketStatus.NEW,
-      linked_entity_type: linkedType !== 'none' ? (linkedType as EntityType) : null,
-      linked_entity_id: linkedId || null,
+      status: TicketStatus.OPEN,
+      type,
+      category,
+      account_id: accountId !== 'none' ? accountId : null,
+      requester_name: requesterName || 'Unknown',
+      requester_email: requesterEmail,
       assigned_to_user_id: assignedTo,
-      market_field: market,
+      queue: 'Ticket Routing',
       tags,
+      sla_first_response: new Date(Date.now() + (priority === TicketPriority.P1 ? 3600000 : priority === TicketPriority.P2 ? 14400000 : 86400000)).toISOString(),
+      sla_resolution: new Date(Date.now() + (priority === TicketPriority.P1 ? 28800000 : priority === TicketPriority.P2 ? 86400000 : 259200000)).toISOString(),
+      first_response_at: null,
+      resolved_at: null,
+      timeline: [{ id: `TL_${Date.now()}`, type: TimelineEventType.SYSTEM, content: `Ticket created: ${subject.trim()}`, user_id: 'U001', created_at: now }],
       attachments: [],
       notes_thread: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      linked_entity_type: accountId !== 'none' ? EntityType.ACCOUNT : null,
+      linked_entity_id: accountId !== 'none' ? accountId : null,
+      market_field: market,
+      created_at: now,
+      updated_at: now,
     };
     onCreated(ticket);
     toast.success('Ticket created');
@@ -79,7 +90,7 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
         <DialogHeader>
           <DialogTitle>Create Support Ticket</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
           <div className="space-y-1.5">
             <Label>Subject *</Label>
             <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Brief description of the issue" />
@@ -94,42 +105,54 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
               <Select value={priority} onValueChange={v => setPriority(v as TicketPriority)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent className="bg-card">
-                  {Object.values(TicketPriority).map(p => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
+                  {Object.values(TicketPriority).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Assigned To</Label>
-              <AssignmentSelect value={assignedTo} onChange={setAssignedTo} />
+              <Label>Type</Label>
+              <Select value={type} onValueChange={v => setType(v as TicketType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-card">
+                  {Object.values(TicketType).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Link To</Label>
-              <Select value={linkedType} onValueChange={v => { setLinkedType(v); setLinkedId(''); }}>
+              <Label>Category</Label>
+              <Select value={category} onValueChange={v => setCategory(v as TicketCategory)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent className="bg-card">
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value={EntityType.ACCOUNT}>Account</SelectItem>
-                  <SelectItem value={EntityType.ENQUIRY}>Enquiry</SelectItem>
+                  {Object.values(TicketCategory).map(c => <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            {linkedType !== 'none' && (
-              <div className="space-y-1.5">
-                <Label>{linkedType === EntityType.ACCOUNT ? 'Account' : 'Enquiry'}</Label>
-                <Select value={linkedId} onValueChange={setLinkedId}>
-                  <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent className="bg-card max-h-48">
-                    {linkedEntities.map(e => (
-                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <Label>Account</Label>
+              <Select value={accountId} onValueChange={setAccountId}>
+                <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectContent className="bg-card max-h-48">
+                  <SelectItem value="none">None</SelectItem>
+                  {seedAccounts.map(a => <SelectItem key={a.account_id} value={a.account_id}>{a.account_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Requester Name</Label>
+              <Input value={requesterName} onChange={e => setRequesterName(e.target.value)} placeholder="Name" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Requester Email</Label>
+              <Input value={requesterEmail} onChange={e => setRequesterEmail(e.target.value)} placeholder="Email" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Assigned To</Label>
+            <AssignmentSelect value={assignedTo} onChange={setAssignedTo} />
           </div>
           <div className="space-y-1.5">
             <Label>Market</Label>

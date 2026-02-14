@@ -5,50 +5,56 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { seedTickets, getUserName, seedNotes, seedCalendarEvents, seedAccounts, seedEnquiries } from '@/data/seedData';
-import { TicketPriority, TicketStatus, EntityType, CalendarEventStatus } from '@/types/core';
+import { seedTickets, getUserName, seedNotes, seedCalendarEvents, seedAccounts, seedEnquiries, getAccountName } from '@/data/seedData';
+import { TicketPriority, TicketStatus, EntityType, CalendarEventStatus, TimelineEventType } from '@/types/core';
 import { NotesPanel } from '@/components/shared/NotesPanel';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import {
   Plus, Search, ArrowLeft, ExternalLink, CalendarIcon, Tag,
-  Clock, AlertTriangle, User, Building2, Ticket,
+  Clock, User, Building2, Ticket, AlertTriangle, MessageSquare,
+  ArrowRightLeft, Shield,
 } from 'lucide-react';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
 
 const priorityColors: Record<TicketPriority, string> = {
-  [TicketPriority.LOW]: 'bg-muted text-muted-foreground',
-  [TicketPriority.MEDIUM]: 'bg-primary/15 text-primary',
-  [TicketPriority.HIGH]: 'bg-warning/15 text-warning',
-  [TicketPriority.URGENT]: 'bg-destructive/15 text-destructive',
+  [TicketPriority.P1]: 'bg-destructive/15 text-destructive font-semibold',
+  [TicketPriority.P2]: 'bg-warning/15 text-warning',
+  [TicketPriority.P3]: 'bg-primary/15 text-primary',
+  [TicketPriority.P4]: 'bg-muted text-muted-foreground',
 };
 
 const statusColors: Record<TicketStatus, string> = {
-  [TicketStatus.NEW]: 'bg-primary/15 text-primary',
-  [TicketStatus.IN_PROGRESS]: 'bg-warning/15 text-warning',
-  [TicketStatus.WAITING_ON_CLIENT]: 'bg-muted text-muted-foreground',
+  [TicketStatus.OPEN]: 'bg-primary/15 text-primary',
+  [TicketStatus.PENDING_CUSTOMER]: 'bg-warning/15 text-warning',
+  [TicketStatus.PENDING_INTERNAL]: 'bg-info/15 text-info',
   [TicketStatus.RESOLVED]: 'bg-success/15 text-success',
   [TicketStatus.CLOSED]: 'bg-muted text-muted-foreground',
 };
 
-function getLinkedEntityName(type: EntityType | null, id: string | null): string | null {
-  if (!type || !id) return null;
-  if (type === EntityType.ACCOUNT) {
-    return seedAccounts.find(a => a.account_id === id)?.account_name ?? id;
-  }
-  if (type === EntityType.ENQUIRY) {
-    return seedEnquiries.find(e => e.enquiry_id === id)?.company_name ?? id;
-  }
-  return id;
-}
+const statusLabels: Record<TicketStatus, string> = {
+  [TicketStatus.OPEN]: 'Open',
+  [TicketStatus.PENDING_CUSTOMER]: 'Pending Customer',
+  [TicketStatus.PENDING_INTERNAL]: 'Pending Internal',
+  [TicketStatus.RESOLVED]: 'Resolved',
+  [TicketStatus.CLOSED]: 'Closed',
+};
 
-function getLinkedEntityPath(type: EntityType | null, id: string | null): string | null {
-  if (!type || !id) return null;
-  if (type === EntityType.ACCOUNT) return `/accounts/${id}`;
-  if (type === EntityType.ENQUIRY) return `/enquiries/${id}`;
-  return null;
+function SLATimer({ deadline, label }: { deadline: string | null; label: string }) {
+  if (!deadline) return null;
+  const now = new Date();
+  const dl = new Date(deadline);
+  const diff = dl.getTime() - now.getTime();
+  const isBreached = diff < 0;
+  const isWarning = diff > 0 && diff < 3600000;
+  return (
+    <div className={`sla-timer ${isBreached ? 'sla-timer-breach' : isWarning ? 'sla-timer-warning' : 'sla-timer-ok'}`}>
+      <Clock className="h-3 w-3" />
+      <span>{label}: {isBreached ? 'Breached' : formatDistanceToNow(dl, { addSuffix: false })} left</span>
+    </div>
+  );
 }
 
 export default function Tickets() {
@@ -60,7 +66,6 @@ export default function Tickets() {
 
   const selected = ticketId ? seedTickets.find(t => t.ticket_id === ticketId) ?? null : null;
 
-  // Detail state (only when selected)
   const [ticketStatus, setTicketStatus] = useState<TicketStatus | null>(null);
   const [ticketPriority, setTicketPriority] = useState<TicketPriority | null>(null);
   const [assignedTo, setAssignedTo] = useState<string | null>(null);
@@ -68,9 +73,8 @@ export default function Tickets() {
   const [noteRefresh, setNoteRefresh] = useState(0);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
 
-  // Sync detail state when selection changes
-  const currentStatus = ticketStatus ?? selected?.status ?? TicketStatus.NEW;
-  const currentPriority = ticketPriority ?? selected?.priority ?? TicketPriority.MEDIUM;
+  const currentStatus = ticketStatus ?? selected?.status ?? TicketStatus.OPEN;
+  const currentPriority = ticketPriority ?? selected?.priority ?? TicketPriority.P3;
   const currentAssigned = assignedTo ?? selected?.assigned_to_user_id ?? null;
 
   const filtered = seedTickets.filter(t => {
@@ -84,7 +88,6 @@ export default function Tickets() {
   const notes = selected
     ? seedNotes.filter(n => n.entity_type === EntityType.TICKET && n.entity_id === selected.ticket_id)
     : [];
-  // noteRefresh used to force re-read after mutation
   void noteRefresh;
 
   const handleAddNote = (text: string) => {
@@ -143,7 +146,7 @@ export default function Tickets() {
         <div className="p-4 border-b border-border space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-foreground">Support Tickets</h2>
-            <Button size="sm" onClick={() => setCreateTicketOpen(true)}><Plus className="h-4 w-4 mr-1" />New Ticket</Button>
+            <Button size="sm" onClick={() => setCreateTicketOpen(true)}><Plus className="h-4 w-4 mr-1" />New</Button>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -154,7 +157,7 @@ export default function Tickets() {
               <SelectTrigger className="flex-1"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                {Object.values(TicketStatus).map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
+                {Object.values(TicketStatus).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -178,7 +181,7 @@ export default function Tickets() {
                 <Badge className={`flex-shrink-0 ${priorityColors[t.priority]}`}>{t.priority}</Badge>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Badge className={statusColors[t.status]}>{t.status.replace(/_/g, ' ')}</Badge>
+                <Badge className={statusColors[t.status]}>{statusLabels[t.status]}</Badge>
                 <span>{getUserName(t.assigned_to_user_id)}</span>
                 <span className="ml-auto">{format(new Date(t.updated_at), 'dd MMM')}</span>
               </div>
@@ -201,7 +204,6 @@ export default function Tickets() {
       <div className={`flex-1 min-w-0 overflow-auto ${!selected ? 'hidden md:flex' : 'flex'}`}>
         {selected ? (
           <div className="p-4 md:p-6 w-full space-y-6">
-            {/* Mobile back button */}
             <div className="md:hidden">
               <Button variant="ghost" size="sm" onClick={() => navigate('/tickets')}>
                 <ArrowLeft className="h-4 w-4 mr-1" /> Back to list
@@ -209,26 +211,37 @@ export default function Tickets() {
             </div>
 
             {/* Header */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Ticket className="h-3 w-3" />
                 <span>{selected.ticket_id}</span>
                 <span>•</span>
                 <span>Created {format(new Date(selected.created_at), 'dd MMM yyyy, HH:mm')}</span>
               </div>
-              <h1 className="text-xl font-bold text-foreground">{selected.subject}</h1>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <h1 className="text-xl font-bold text-foreground">{selected.subject}</h1>
+                <div className="flex gap-2">
+                  <Badge className={priorityColors[selected.priority]}>{selected.priority}</Badge>
+                  <Badge className={statusColors[selected.status]}>{statusLabels[selected.status]}</Badge>
+                </div>
+              </div>
               <p className="text-sm text-muted-foreground">{selected.description}</p>
+              {/* SLA Timers */}
+              <div className="flex gap-4 flex-wrap">
+                <SLATimer deadline={selected.sla_first_response} label="First Response" />
+                <SLATimer deadline={selected.sla_resolution} label="Resolution" />
+              </div>
             </div>
 
-            {/* Controls row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground font-medium">Status</label>
                 <Select value={currentStatus} onValueChange={(v) => setTicketStatus(v as TicketStatus)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.values(TicketStatus).map(s => (
-                      <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+                      <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -245,55 +258,55 @@ export default function Tickets() {
                 </Select>
               </div>
               <div className="space-y-1">
+                <label className="text-xs text-muted-foreground font-medium">Queue</label>
+                <Input value={selected.queue} readOnly className="bg-muted/50" />
+              </div>
+              <div className="space-y-1">
                 <label className="text-xs text-muted-foreground font-medium">Assigned To</label>
-                <AssignmentSelect
-                  value={currentAssigned}
-                  onChange={setAssignedTo}
-                />
+                <AssignmentSelect value={currentAssigned} onChange={setAssignedTo} />
               </div>
             </div>
 
             {/* Info cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Linked Entity */}
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Linked Entity</CardTitle></CardHeader>
-                <CardContent>
-                  {selected.linked_entity_type && selected.linked_entity_id ? (
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Account & Requester</CardTitle></CardHeader>
+                <CardContent className="text-sm space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Account:</span>
+                    {selected.account_id ? (
+                      <Link to={`/accounts/${selected.account_id}`} className="text-primary hover:underline inline-flex items-center gap-1">
+                        {getAccountName(selected.account_id)} <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    ) : <span>—</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <User className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Requester:</span>
+                    <span>{selected.requester_name}</span>
+                  </div>
+                  {selected.requester_email && (
                     <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <Badge variant="outline" className="mr-2">{selected.linked_entity_type}</Badge>
-                        {(() => {
-                          const path = getLinkedEntityPath(selected.linked_entity_type, selected.linked_entity_id);
-                          const name = getLinkedEntityName(selected.linked_entity_type, selected.linked_entity_id);
-                          return path ? (
-                            <Link to={path} className="text-sm text-primary hover:underline inline-flex items-center gap-1">
-                              {name} <ExternalLink className="h-3 w-3" />
-                            </Link>
-                          ) : <span className="text-sm">{name}</span>;
-                        })()}
-                      </div>
+                      <span className="text-muted-foreground ml-5">Email:</span>
+                      <span>{selected.requester_email}</span>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No linked entity</p>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Meta info */}
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Details</CardTitle></CardHeader>
-                <CardContent className="text-sm space-y-1">
+                <CardContent className="text-sm space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Updated:</span>
-                    <span>{format(new Date(selected.updated_at), 'dd MMM yyyy, HH:mm')}</span>
+                    <Shield className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Type:</span>
+                    <Badge variant="outline" className="text-xs">{selected.type}</Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <User className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Market:</span>
-                    <span>{selected.market_field}</span>
+                    <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Category:</span>
+                    <span className="text-xs">{selected.category.replace(/_/g, ' ')}</span>
                   </div>
                   {selected.tags.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
@@ -306,6 +319,29 @@ export default function Tickets() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Timeline */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Timeline</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-0">
+                  {selected.timeline.map(entry => (
+                    <div key={entry.id} className="timeline-item">
+                      <div className={`timeline-dot ${
+                        entry.type === TimelineEventType.CUSTOMER_MESSAGE ? 'timeline-customer' :
+                        entry.type === TimelineEventType.AGENT_REPLY ? 'timeline-agent' :
+                        entry.type === TimelineEventType.INTERNAL_NOTE ? 'timeline-internal' :
+                        'timeline-system'
+                      }`} />
+                      <div className="text-sm">{entry.content}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {entry.user_id ? getUserName(entry.user_id) : 'System'} • {format(new Date(entry.created_at), 'dd MMM, HH:mm')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Schedule follow-up */}
             <div>
@@ -326,10 +362,7 @@ export default function Tickets() {
               )}
             </div>
 
-            {/* Notes */}
             <NotesPanel notes={notes} onAddNote={handleAddNote} />
-
-            {/* Attachments */}
             <AttachmentUploader
               attachments={selected.attachments.map(id => ({ file_name: id, file_url: '#' }))}
               onUpload={() => {}}

@@ -36,7 +36,7 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
   // Compute attention count
   const attentionCount =
     seedEnquiries.filter(e => e.stage === EnquiryStage.NEW_ENQUIRY).length +
-    seedTickets.filter(t => (t.priority === TicketPriority.URGENT || t.priority === TicketPriority.HIGH) && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length +
+    seedTickets.filter(t => (t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2) && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length +
     seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;
 
   const toggleRole = () => {

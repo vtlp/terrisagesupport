@@ -73,10 +73,10 @@ export default function Dashboard() {
   const deactivated = seedAccounts.filter(a => a.status === AccountStatus.DEACTIVATED).length;
 
   // ── Ticket counters ──
-  const openTickets = seedTickets.filter(t => t.status === TicketStatus.NEW).length;
-  const inProgressTickets = seedTickets.filter(t => t.status === TicketStatus.IN_PROGRESS).length;
+  const openTickets = seedTickets.filter(t => t.status === TicketStatus.OPEN).length;
+  const pendingTickets = seedTickets.filter(t => t.status === TicketStatus.PENDING_CUSTOMER || t.status === TicketStatus.PENDING_INTERNAL).length;
   const urgentHigh = seedTickets.filter(t =>
-    t.priority === TicketPriority.URGENT || t.priority === TicketPriority.HIGH
+    t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2
   ).length;
 
   // ── Attention items ──
@@ -156,7 +156,7 @@ export default function Dashboard() {
           <CardContent className="px-4 sm:px-6 pb-4">
             <div className="grid grid-cols-3 gap-2">
               <Stat value={openTickets} label="Open" />
-              <Stat value={inProgressTickets} label="In Progress" />
+              <Stat value={pendingTickets} label="Pending" />
               <Stat value={urgentHigh} label="Urgent/High" color="text-destructive" />
             </div>
           </CardContent>
