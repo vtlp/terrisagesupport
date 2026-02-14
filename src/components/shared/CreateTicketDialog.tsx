@@ -65,8 +65,16 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
       assigned_to_user_id: assignedTo,
       queue: 'Ticket Routing',
       tags,
-      sla_first_response: new Date(Date.now() + (priority === TicketPriority.P1 ? 3600000 : priority === TicketPriority.P2 ? 14400000 : 86400000)).toISOString(),
-      sla_resolution: new Date(Date.now() + (priority === TicketPriority.P1 ? 28800000 : priority === TicketPriority.P2 ? 86400000 : 259200000)).toISOString(),
+      sla_first_response: new Date(Date.now() + (
+        priority === TicketPriority.P1 ? 1 * 3600000 :
+        priority === TicketPriority.P2 ? 4 * 3600000 :
+        priority === TicketPriority.P3 ? 8 * 3600000 : 24 * 3600000
+      )).toISOString(),
+      sla_resolution: new Date(Date.now() + (
+        priority === TicketPriority.P1 ? 4 * 3600000 :
+        priority === TicketPriority.P2 ? 8 * 3600000 :
+        priority === TicketPriority.P3 ? 24 * 3600000 : 72 * 3600000
+      )).toISOString(),
       first_response_at: null,
       resolved_at: null,
       timeline: [{ id: `TL_${Date.now()}`, type: TimelineEventType.SYSTEM, content: `Ticket created: ${subject.trim()}`, user_id: 'U001', created_at: now }],
@@ -155,7 +163,7 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
             <AssignmentSelect value={assignedTo} onChange={setAssignedTo} />
           </div>
           <div className="space-y-1.5">
-            <Label>Market</Label>
+            <Label>City</Label>
             <Input value={market} onChange={e => setMarket(e.target.value)} placeholder="e.g. Mumbai, Delhi" />
           </div>
           <div className="space-y-1.5">
