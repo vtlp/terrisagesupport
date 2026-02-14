@@ -9,6 +9,8 @@ import Dashboard from "@/pages/Dashboard";
 import Accounts from "@/pages/Accounts";
 import AccountDetail from "@/pages/AccountDetail";
 import Enquiries from "@/pages/Enquiries";
+import EnquiryDetail from "@/pages/EnquiryDetail";
+import EnquiryPipelineDashboard from "@/pages/EnquiryPipelineDashboard";
 import Tickets from "@/pages/Tickets";
 import Knowledge from "@/pages/Knowledge";
 import Marketing from "@/pages/Marketing";
@@ -31,7 +33,8 @@ const App = () => (
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/enquiries" element={<Enquiries />} />
-              <Route path="/enquiries/:enquiryId" element={<Enquiries />} />
+              <Route path="/enquiries/dashboard" element={<EnquiryPipelineDashboard />} />
+              <Route path="/enquiries/:enquiryId" element={<EnquiryDetail />} />
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/accounts/:accountId" element={<AccountDetail />} />
               <Route path="/tickets" element={<Tickets />} />
