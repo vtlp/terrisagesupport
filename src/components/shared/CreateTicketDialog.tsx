@@ -64,6 +64,7 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
       tags,
       attachments: [],
       notes_thread: [],
+      due_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
