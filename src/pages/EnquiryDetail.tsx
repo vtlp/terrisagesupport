@@ -21,7 +21,6 @@ import { NotesPanel } from '@/components/shared/NotesPanel';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
-import { StageChangeModal } from '@/components/shared/StageChangeModal';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useUser } from '@/context/UserContext';
@@ -91,8 +90,6 @@ export default function EnquiryDetail() {
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [showOnboardingPack, setShowOnboardingPack] = useState(false);
   const [showDemoOutcome, setShowDemoOutcome] = useState(false);
-  const [showStageChange, setShowStageChange] = useState(false);
-  const [pendingStage, setPendingStage] = useState<EnquiryStage | null>(null);
 
   if (!enquiry) {
     return (
@@ -126,47 +123,21 @@ export default function EnquiryDetail() {
   };
 
   const handleStageChange = (newStage: EnquiryStage) => {
-    if (newStage === EnquiryStage.DEMO_SCHEDULED) {
+    if (newStage === EnquiryStage.CONTACTED && enquiry.stage === EnquiryStage.NEW_ENQUIRY) {
+      update({ stage: newStage });
+      toast.info('Set an outcome for this enquiry');
+    } else if (newStage === EnquiryStage.DEMO_SCHEDULED) {
       const missing = canScheduleDemo();
       if (missing.length > 0) {
         toast.error(`Prerequisites missing: ${missing.join(', ')}`);
         return;
       }
       setShowDemoSchedule(true);
-      return;
-    }
-    if (newStage === EnquiryStage.DEMO_COMPLETED) {
+    } else if (newStage === EnquiryStage.DEMO_COMPLETED) {
       setShowDemoOutcome(true);
-      return;
+    } else {
+      update({ stage: newStage });
     }
-    if (newStage === EnquiryStage.ACCOUNT_CREATED) {
-      const err = canConvert();
-      if (err) { toast.error(err); return; }
-      setShowConvertDialog(true);
-      return;
-    }
-    // For CONTACTED or beyond: show stage change modal for outcome enforcement
-    if (newStage !== EnquiryStage.NEW_ENQUIRY) {
-      setPendingStage(newStage);
-      setShowStageChange(true);
-      return;
-    }
-    update({ stage: newStage });
-  };
-
-  const handleStageChangeConfirm = (outcome: EnquiryOutcome, note: string, niReason?: NotInterestedReason) => {
-    if (!pendingStage) return;
-    update({
-      stage: pendingStage,
-      outcome,
-      ...(niReason ? { not_interested_reason: niReason } : {}),
-    });
-    if (note.trim()) {
-      handleAddNote(note);
-    }
-    toast.success(`Stage updated to ${stageLabels[pendingStage]}`);
-    setShowStageChange(false);
-    setPendingStage(null);
   };
 
   const handleOutcomeChange = (outcome: EnquiryOutcome) => {
@@ -699,20 +670,6 @@ export default function EnquiryDetail() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Stage Change Enforcement Modal */}
-      {pendingStage && (
-        <StageChangeModal
-          open={showStageChange}
-          onOpenChange={(open) => {
-            setShowStageChange(open);
-            if (!open) setPendingStage(null);
-          }}
-          targetStage={pendingStage}
-          currentOutcome={enquiry.outcome}
-          onConfirm={handleStageChangeConfirm}
-        />
-      )}
     </div>
   );
 }
