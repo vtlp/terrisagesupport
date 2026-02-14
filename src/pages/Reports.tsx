@@ -1,206 +1,189 @@
 import { useState } from 'react';
-import { Download, BarChart3, TrendingUp, PieChart, Users, Target, Ticket } from 'lucide-react';
+import { Download, BarChart3, TrendingUp, Users, Activity, Zap, Clock, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent,
 } from '@/components/ui/chart';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  PieChart as RPieChart, Pie, Cell, ResponsiveContainer,
-  FunnelChart, Funnel, LabelList,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  PieChart as RPieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+  LineChart, Line,
 } from 'recharts';
-import { seedEnquiries, seedAccounts, seedTickets, seedMarketingLogs } from '@/data/seedData';
-import {
-  EnquiryStage, EnquirySource, TenancyType, AccountStatus,
-  TicketStatus, TicketPriority, MarketingCostType,
-} from '@/types/core';
+import { seedAccounts } from '@/data/seedData';
+import { AccountStatus, TenancyType } from '@/types/core';
 
-// ── Computed Data ──────────────────────────────
+// ── CRM Client Usage Analytics ─────────────────
 
-// Enquiry funnel
-const stageCounts = Object.values(EnquiryStage).map(stage => ({
-  stage: stage.replace(/_/g, ' '),
-  value: seedEnquiries.filter(e => e.stage === stage).length,
+// Simulated usage data per account
+const usageData = seedAccounts.map(a => ({
+  name: a.account_name,
+  city: a.city,
+  tenancy: a.tenancy_type,
+  status: a.status,
+  dau: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 12) + 3 : a.status === AccountStatus.ONBOARDING_IN_PROGRESS ? Math.floor(Math.random() * 5) + 1 : 0,
+  wau: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 25) + 10 : a.status === AccountStatus.ONBOARDING_IN_PROGRESS ? Math.floor(Math.random() * 10) + 2 : 0,
+  mau: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 40) + 15 : a.status === AccountStatus.ONBOARDING_IN_PROGRESS ? Math.floor(Math.random() * 20) + 5 : 0,
+  leadsCreated: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 200) + 30 : Math.floor(Math.random() * 20),
+  followUps: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 150) + 20 : Math.floor(Math.random() * 10),
+  conversions: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 30) + 5 : 0,
+  tasksCompleted: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 80) + 10 : Math.floor(Math.random() * 5),
+  lastActive: a.status === AccountStatus.DEACTIVATED ? 'Inactive' : `${Math.floor(Math.random() * 48) + 1}h ago`,
+  inactivityDays: a.status === AccountStatus.DEACTIVATED ? 60 + Math.floor(Math.random() * 60) : a.status === AccountStatus.STALLED_ONBOARDING ? 7 + Math.floor(Math.random() * 14) : 0,
+  sessions: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 200) + 50 : Math.floor(Math.random() * 30),
 }));
 
-const funnelData = [
-  { name: 'Total Enquiries', value: seedEnquiries.length, fill: 'hsl(var(--primary))' },
-  { name: 'Contacted', value: seedEnquiries.filter(e => e.stage !== EnquiryStage.NEW_ENQUIRY).length, fill: 'hsl(var(--info))' },
-  { name: 'Demo Scheduled', value: seedEnquiries.filter(e => [EnquiryStage.DEMO_SCHEDULED, EnquiryStage.DEMO_COMPLETED, EnquiryStage.ACCOUNT_CREATED].includes(e.stage)).length, fill: 'hsl(var(--warning))' },
-  { name: 'Demo Completed', value: seedEnquiries.filter(e => [EnquiryStage.DEMO_COMPLETED, EnquiryStage.ACCOUNT_CREATED].includes(e.stage)).length, fill: 'hsl(var(--accent))' },
-  { name: 'Converted', value: seedEnquiries.filter(e => e.stage === EnquiryStage.ACCOUNT_CREATED).length, fill: 'hsl(var(--success))' },
+const activeAccounts = usageData.filter(a => a.status === AccountStatus.LIVE || a.status === AccountStatus.ONBOARDING_IN_PROGRESS);
+
+// Feature adoption data
+const featureAdoption = [
+  { feature: 'Lead Capture', adoption: 92 },
+  { feature: 'Follow-ups', adoption: 78 },
+  { feature: 'Integrations', adoption: 45 },
+  { feature: 'Reports', adoption: 62 },
+  { feature: 'Bulk Import', adoption: 38 },
+  { feature: 'Inventory Mgmt', adoption: 28 },
 ];
 
-// Source breakdown
-const sourceData = Object.values(EnquirySource).map(src => ({
-  name: src.replace(/_/g, ' '),
-  value: seedEnquiries.filter(e => e.source === src).length,
-}));
+// Engagement trend (weekly)
+const engagementTrend = [
+  { week: 'W1 Jan', activeUsers: 28, sessions: 340 },
+  { week: 'W2 Jan', activeUsers: 32, sessions: 420 },
+  { week: 'W3 Jan', activeUsers: 35, sessions: 450 },
+  { week: 'W4 Jan', activeUsers: 38, sessions: 510 },
+  { week: 'W1 Feb', activeUsers: 42, sessions: 580 },
+  { week: 'W2 Feb', activeUsers: 45, sessions: 620 },
+];
 
 // Tenancy breakdown
-const tenancyData = [
-  { name: 'Agency/Brokerage', value: seedEnquiries.filter(e => e.tenancy_type === TenancyType.AGENCY_BROKERAGE_CONSULTANCY).length },
-  { name: 'Builder/Developer', value: seedEnquiries.filter(e => e.tenancy_type === TenancyType.BUILDER_DEVELOPER).length },
-  { name: 'Not Set', value: seedEnquiries.filter(e => !e.tenancy_type).length },
+const tenancyUsage = [
+  { name: 'Agency', value: usageData.filter(a => a.tenancy === TenancyType.AGENCY_BROKERAGE_CONSULTANCY && a.status === AccountStatus.LIVE).length },
+  { name: 'Builder', value: usageData.filter(a => a.tenancy === TenancyType.BUILDER_DEVELOPER && a.status === AccountStatus.LIVE).length },
 ];
 
-// Account status
-const accountStatusData = Object.values(AccountStatus).map(s => ({
-  name: s.replace(/_/g, ' '),
-  value: seedAccounts.filter(a => a.status === s).length,
-}));
+// City usage
+const cityUsageMap = new Map<string, number>();
+activeAccounts.forEach(a => cityUsageMap.set(a.city, (cityUsageMap.get(a.city) ?? 0) + a.sessions));
+const cityUsage = [...cityUsageMap.entries()].map(([city, sessions]) => ({ city, sessions })).sort((a, b) => b.sessions - a.sessions);
 
-// Ticket stats
-const ticketStatusData = Object.values(TicketStatus).map(s => ({
-  name: s.replace(/_/g, ' '),
-  value: seedTickets.filter(t => t.status === s).length,
-}));
-const ticketPriorityData = Object.values(TicketPriority).map(p => ({
-  name: p,
-  value: seedTickets.filter(t => t.priority === p).length,
-}));
-
-// City distribution
-const cityMap = new Map<string, number>();
-seedEnquiries.forEach(e => cityMap.set(e.city, (cityMap.get(e.city) ?? 0) + 1));
-const cityData = [...cityMap.entries()]
-  .map(([city, count]) => ({ city, count }))
-  .sort((a, b) => b.count - a.count);
-
-// Marketing cost by type
-const costByMonth = [
-  { month: 'Jan', online: seedMarketingLogs.filter(l => l.cost_type === MarketingCostType.ONLINE && l.created_at.startsWith('2025-01')).reduce((s, l) => s + (l.cost_amount ?? 0), 0), offline: seedMarketingLogs.filter(l => l.cost_type === MarketingCostType.OFFLINE && l.created_at.startsWith('2025-01')).reduce((s, l) => s + (l.cost_amount ?? 0), 0) },
-  { month: 'Feb', online: seedMarketingLogs.filter(l => l.cost_type === MarketingCostType.ONLINE && l.created_at.startsWith('2025-02')).reduce((s, l) => s + (l.cost_amount ?? 0), 0), offline: seedMarketingLogs.filter(l => l.cost_type === MarketingCostType.OFFLINE && l.created_at.startsWith('2025-02')).reduce((s, l) => s + (l.cost_amount ?? 0), 0) },
-];
-
-const PIE_COLORS = [
-  'hsl(var(--primary))', 'hsl(var(--info))', 'hsl(var(--warning))',
-  'hsl(var(--accent))', 'hsl(var(--success))', 'hsl(var(--destructive))',
-  'hsl(var(--muted-foreground))',
-];
-
+const PIE_COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(var(--info))', 'hsl(var(--warning))'];
 const chartConfig = {
   value: { label: 'Count', color: 'hsl(var(--primary))' },
-  online: { label: 'Online', color: 'hsl(var(--info))' },
-  offline: { label: 'Offline', color: 'hsl(var(--warning))' },
+  adoption: { label: 'Adoption %', color: 'hsl(var(--primary))' },
+  activeUsers: { label: 'Active Users', color: 'hsl(var(--primary))' },
+  sessions: { label: 'Sessions', color: 'hsl(var(--info))' },
 };
 
 export default function Reports() {
-  const [tab, setTab] = useState('pipeline');
+  const [tab, setTab] = useState('overview');
+  const [tenancyFilter, setTenancyFilter] = useState<string>('all');
 
-  const converted = seedEnquiries.filter(e => e.stage === EnquiryStage.ACCOUNT_CREATED).length;
-  const conversionRate = ((converted / seedEnquiries.length) * 100).toFixed(1);
+  const filtered = tenancyFilter === 'all' ? activeAccounts : activeAccounts.filter(a => a.tenancy === tenancyFilter);
+  const totalSessions = filtered.reduce((s, a) => s + a.sessions, 0);
+  const avgDau = filtered.length ? Math.round(filtered.reduce((s, a) => s + a.dau, 0) / filtered.length) : 0;
+  const inactiveAlerts = usageData.filter(a => a.inactivityDays > 7 && a.status !== AccountStatus.DEACTIVATED);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Reports</h1>
-          <p className="text-muted-foreground">Pipeline KPIs, conversion funnels & operational insights</p>
+          <p className="text-muted-foreground text-sm">CRM client usage analytics & engagement insights</p>
         </div>
-        <Button variant="outline" size="sm">
-          <Download className="h-4 w-4 mr-2" />Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={tenancyFilter} onValueChange={setTenancyFilter}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Types" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value={TenancyType.AGENCY_BROKERAGE_CONSULTANCY}>Agency</SelectItem>
+              <SelectItem value={TenancyType.BUILDER_DEVELOPER}>Builder</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1" />Export</Button>
+        </div>
       </div>
 
-      {/* Top KPI Strip */}
+      {/* KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card><CardContent className="p-3">
-          <p className="text-xs text-muted-foreground">Total Enquiries</p>
-          <p className="text-2xl font-bold text-foreground">{seedEnquiries.length}</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-3">
-          <p className="text-xs text-muted-foreground">Converted</p>
-          <p className="text-2xl font-bold text-success">{converted}</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-3">
-          <p className="text-xs text-muted-foreground">Conversion Rate</p>
-          <p className="text-2xl font-bold text-foreground">{conversionRate}%</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-3">
           <p className="text-xs text-muted-foreground">Active Accounts</p>
-          <p className="text-2xl font-bold text-foreground">{seedAccounts.filter(a => a.status === AccountStatus.LIVE).length}</p>
+          <p className="text-2xl font-bold text-foreground">{filtered.length}</p>
         </CardContent></Card>
         <Card><CardContent className="p-3">
-          <p className="text-xs text-muted-foreground">Open Tickets</p>
-          <p className="text-2xl font-bold text-foreground">{seedTickets.filter(t => ![TicketStatus.RESOLVED, TicketStatus.CLOSED].includes(t.status)).length}</p>
+          <p className="text-xs text-muted-foreground">Avg DAU / Account</p>
+          <p className="text-2xl font-bold text-primary">{avgDau}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-3">
+          <p className="text-xs text-muted-foreground">Total Sessions</p>
+          <p className="text-2xl font-bold text-foreground">{totalSessions.toLocaleString()}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-3">
+          <p className="text-xs text-muted-foreground">Total Leads Created</p>
+          <p className="text-2xl font-bold text-success">{filtered.reduce((s, a) => s + a.leadsCreated, 0).toLocaleString()}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-3">
+          <p className="text-xs text-muted-foreground">Inactivity Alerts</p>
+          <p className="text-2xl font-bold text-destructive">{inactiveAlerts.length}</p>
         </CardContent></Card>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="pipeline"><TrendingUp className="h-4 w-4 mr-1" />Pipeline</TabsTrigger>
-          <TabsTrigger value="accounts"><Users className="h-4 w-4 mr-1" />Accounts</TabsTrigger>
-          <TabsTrigger value="tickets"><Ticket className="h-4 w-4 mr-1" />Tickets</TabsTrigger>
-          <TabsTrigger value="geography"><Target className="h-4 w-4 mr-1" />Geography</TabsTrigger>
+          <TabsTrigger value="overview"><Activity className="h-4 w-4 mr-1" />Usage</TabsTrigger>
+          <TabsTrigger value="adoption"><Zap className="h-4 w-4 mr-1" />Feature Adoption</TabsTrigger>
+          <TabsTrigger value="engagement"><TrendingUp className="h-4 w-4 mr-1" />Engagement</TabsTrigger>
+          <TabsTrigger value="alerts"><AlertTriangle className="h-4 w-4 mr-1" />Alerts</TabsTrigger>
         </TabsList>
 
-        {/* ─── Pipeline Tab ─── */}
-        <TabsContent value="pipeline" className="space-y-6">
+        {/* Usage Tab */}
+        <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Conversion Funnel */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Conversion Funnel</CardTitle>
-              </CardHeader>
+            {/* Account Usage Table */}
+            <Card className="lg:col-span-2">
+              <CardHeader className="pb-2"><CardTitle className="text-base">Account Usage Summary</CardTitle></CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {funnelData.map((item, i) => (
-                    <div key={item.name} className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground w-32 text-right">{item.name}</span>
-                      <div className="flex-1 bg-muted rounded-full h-6 relative overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all flex items-center justify-end pr-2"
-                          style={{
-                            width: `${(item.value / funnelData[0].value) * 100}%`,
-                            backgroundColor: item.fill,
-                          }}
-                        >
-                          <span className="text-xs font-semibold text-primary-foreground">{item.value}</span>
-                        </div>
-                      </div>
-                      {i > 0 && (
-                        <span className="text-xs text-muted-foreground w-12">
-                          {((item.value / funnelData[i - 1].value) * 100).toFixed(0)}%
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left">
+                        <th className="py-2 pr-3 font-medium text-muted-foreground">Account</th>
+                        <th className="py-2 px-3 font-medium text-muted-foreground">City</th>
+                        <th className="py-2 px-3 font-medium text-muted-foreground text-right">DAU</th>
+                        <th className="py-2 px-3 font-medium text-muted-foreground text-right">WAU</th>
+                        <th className="py-2 px-3 font-medium text-muted-foreground text-right">Leads</th>
+                        <th className="py-2 px-3 font-medium text-muted-foreground text-right">Conversions</th>
+                        <th className="py-2 px-3 font-medium text-muted-foreground">Last Active</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map(a => (
+                        <tr key={a.name} className="border-b border-border/50 hover:bg-muted/30">
+                          <td className="py-2 pr-3 font-medium truncate max-w-[180px]">{a.name}</td>
+                          <td className="py-2 px-3 text-muted-foreground">{a.city}</td>
+                          <td className="py-2 px-3 text-right">{a.dau}</td>
+                          <td className="py-2 px-3 text-right">{a.wau}</td>
+                          <td className="py-2 px-3 text-right">{a.leadsCreated}</td>
+                          <td className="py-2 px-3 text-right">{a.conversions}</td>
+                          <td className="py-2 px-3"><Badge variant="outline" className="text-xs">{a.lastActive}</Badge></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Stage Distribution Bar */}
+            {/* By Tenancy Pie */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Enquiries by Stage</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[250px]">
-                <ChartContainer config={chartConfig} className="h-full w-full">
-                  <BarChart data={stageCounts}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="stage" tick={{ fontSize: 10 }} />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            {/* Source Pie */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">By Source</CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-base">Live Accounts by Type</CardTitle></CardHeader>
               <CardContent className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <RPieChart>
-                    <Pie data={sourceData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                      {sourceData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    <Pie data={tenancyUsage} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                      {tenancyUsage.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
                     </Pie>
                     <Tooltip />
                   </RPieChart>
@@ -208,195 +191,149 @@ export default function Reports() {
               </CardContent>
             </Card>
 
-            {/* Tenancy Pie */}
+            {/* By City */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">By Tenancy Type</CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-base">Sessions by City</CardTitle></CardHeader>
               <CardContent className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RPieChart>
-                    <Pie data={tenancyData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                      {tenancyData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip />
-                  </RPieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ─── Accounts Tab ─── */}
-        <TabsContent value="accounts" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Account Status Distribution</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[280px]">
                 <ChartContainer config={chartConfig} className="h-full w-full">
-                  <BarChart data={accountStatusData} layout="vertical">
+                  <BarChart data={cityUsage} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={120} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    <YAxis dataKey="city" type="category" width={100} tick={{ fontSize: 11 }} />
+                    <ChartTooltip content={<ChartTooltipContent nameKey="city" />} />
+                    <Bar dataKey="sessions" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ChartContainer>
               </CardContent>
             </Card>
+          </div>
+        </TabsContent>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Account KPIs</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {[
-                  { label: 'Total Accounts', value: seedAccounts.length },
-                  { label: 'Live', value: seedAccounts.filter(a => a.status === AccountStatus.LIVE).length },
-                  { label: 'Onboarding', value: seedAccounts.filter(a => a.status === AccountStatus.ONBOARDING_IN_PROGRESS).length },
-                  { label: 'Stalled', value: seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length },
-                  { label: 'Deactivated', value: seedAccounts.filter(a => a.status === AccountStatus.DEACTIVATED).length },
-                ].map(kpi => (
-                  <div key={kpi.label} className="flex justify-between items-center py-1 border-b border-border last:border-0">
-                    <span className="text-sm text-muted-foreground">{kpi.label}</span>
-                    <span className="font-bold text-foreground">{kpi.value}</span>
+        {/* Feature Adoption */}
+        <TabsContent value="adoption" className="space-y-6">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Feature Adoption Rates</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {featureAdoption.map(f => (
+                  <div key={f.feature} className="flex items-center gap-3">
+                    <span className="text-sm w-32 text-right text-muted-foreground">{f.feature}</span>
+                    <div className="flex-1 bg-muted rounded-full h-6 relative overflow-hidden">
+                      <div className="h-full rounded-full transition-all flex items-center justify-end pr-2 bg-primary" style={{ width: `${f.adoption}%` }}>
+                        <span className="text-xs font-semibold text-primary-foreground">{f.adoption}%</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
-
-            {/* Marketing Cost Trend */}
-            <Card className="lg:col-span-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Marketing Spend by Month</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[250px]">
-                <ChartContainer config={chartConfig} className="h-full w-full">
-                  <BarChart data={costByMonth}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="online" fill="hsl(var(--info))" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="offline" fill="hsl(var(--warning))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ─── Tickets Tab ─── */}
-        <TabsContent value="tickets" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Tickets by Status</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[250px]">
-                <ChartContainer config={chartConfig} className="h-full w-full">
-                  <BarChart data={ticketStatusData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Tickets by Priority</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RPieChart>
-                    <Pie data={ticketPriorityData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                      <Cell fill="hsl(var(--destructive))" />
-                      <Cell fill="hsl(var(--warning))" />
-                      <Cell fill="hsl(var(--primary))" />
-                      <Cell fill="hsl(var(--muted-foreground))" />
-                    </Pie>
-                    <Tooltip />
-                  </RPieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Ticket KPIs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-muted rounded-lg p-4 text-center">
-                    <p className="text-xs text-muted-foreground">Total</p>
-                    <p className="text-2xl font-bold text-foreground">{seedTickets.length}</p>
-                  </div>
-                  <div className="bg-muted rounded-lg p-4 text-center">
-                    <p className="text-xs text-muted-foreground">Resolved</p>
-                    <p className="text-2xl font-bold text-success">
-                      {seedTickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED).length}
-                    </p>
-                  </div>
-                  <div className="bg-muted rounded-lg p-4 text-center">
-                    <p className="text-xs text-muted-foreground">Urgent/High</p>
-                    <p className="text-2xl font-bold text-destructive">
-                      {seedTickets.filter(t => t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2).length}
-                    </p>
-                  </div>
-                  <div className="bg-muted rounded-lg p-4 text-center">
-                    <p className="text-xs text-muted-foreground">Resolution Rate</p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {((seedTickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED).length / seedTickets.length) * 100).toFixed(0)}%
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ─── Geography Tab ─── */}
-        <TabsContent value="geography" className="space-y-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Enquiries by City</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[350px]">
-              <ChartContainer config={chartConfig} className="h-full w-full">
-                <BarChart data={cityData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="city" type="category" width={100} tick={{ fontSize: 11 }} />
-                  <ChartTooltip content={<ChartTooltipContent nameKey="city" />} />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ChartContainer>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">City Heat Map</CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Feature Activity Funnel</CardTitle></CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {cityData.map(({ city, count }) => {
-                  const max = cityData[0].count;
-                  const intensity = Math.max(0.2, count / max);
-                  return (
-                    <Badge key={city} variant="outline"
-                      className="text-sm px-3 py-1.5"
-                      style={{ backgroundColor: `hsl(var(--primary) / ${intensity})`, color: intensity > 0.5 ? 'hsl(var(--primary-foreground))' : undefined }}>
-                      {city} — {count}
-                    </Badge>
-                  );
-                })}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'Leads Created', total: filtered.reduce((s, a) => s + a.leadsCreated, 0), color: 'text-primary' },
+                  { label: 'Follow-ups Logged', total: filtered.reduce((s, a) => s + a.followUps, 0), color: 'text-info' },
+                  { label: 'Tasks Completed', total: filtered.reduce((s, a) => s + a.tasksCompleted, 0), color: 'text-warning' },
+                  { label: 'Conversions', total: filtered.reduce((s, a) => s + a.conversions, 0), color: 'text-success' },
+                ].map(item => (
+                  <div key={item.label} className="bg-muted rounded-lg p-4 text-center">
+                    <p className="text-xs text-muted-foreground">{item.label}</p>
+                    <p className={`text-2xl font-bold ${item.color}`}>{item.total.toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Engagement Trend */}
+        <TabsContent value="engagement" className="space-y-6">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Weekly Active Users & Sessions</CardTitle></CardHeader>
+            <CardContent className="h-[300px]">
+              <ChartContainer config={chartConfig} className="h-full w-full">
+                <LineChart data={engagementTrend}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line type="monotone" dataKey="activeUsers" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="sessions" stroke="hsl(var(--info))" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">DAU/WAU Ratio</p>
+                <p className="text-2xl font-bold text-foreground">{filtered.length ? ((filtered.reduce((s, a) => s + a.dau, 0) / filtered.reduce((s, a) => s + a.wau, 0)) * 100).toFixed(0) : 0}%</p>
+                <p className="text-xs text-muted-foreground mt-1">Stickiness metric</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">WAU/MAU Ratio</p>
+                <p className="text-2xl font-bold text-foreground">{filtered.length ? ((filtered.reduce((s, a) => s + a.wau, 0) / filtered.reduce((s, a) => s + a.mau, 0)) * 100).toFixed(0) : 0}%</p>
+                <p className="text-xs text-muted-foreground mt-1">Weekly engagement</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Avg Sessions / Account</p>
+                <p className="text-2xl font-bold text-foreground">{filtered.length ? Math.round(totalSessions / filtered.length) : 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">This month</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Alerts */}
+        <TabsContent value="alerts" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Inactivity Alerts</CardTitle></CardHeader>
+            <CardContent>
+              {inactiveAlerts.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No inactivity alerts — all accounts are engaged!</p>
+              ) : (
+                <div className="space-y-2">
+                  {inactiveAlerts.map(a => (
+                    <div key={a.name} className="flex items-center justify-between p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium">{a.name}</p>
+                        <p className="text-xs text-muted-foreground">{a.city} • {a.tenancy === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder'}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge className="bg-destructive/15 text-destructive">{a.inactivityDays}d inactive</Badge>
+                        <p className="text-xs text-muted-foreground mt-0.5">Last: {a.lastActive}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4 text-warning" /> Low Engagement</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {activeAccounts.filter(a => a.dau < 3 && a.status === AccountStatus.LIVE).map(a => (
+                  <div key={a.name} className="flex items-center justify-between p-3 bg-warning/5 border border-warning/20 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">{a.name}</p>
+                      <p className="text-xs text-muted-foreground">{a.city}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-warning">{a.dau} DAU</p>
+                      <p className="text-xs text-muted-foreground">{a.sessions} sessions</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

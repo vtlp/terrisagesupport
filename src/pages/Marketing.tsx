@@ -9,11 +9,18 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
+  ChartContainer, ChartTooltip, ChartTooltipContent,
+} from '@/components/ui/chart';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  PieChart as RPieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+} from 'recharts';
+import {
   Target, Users, Phone, Megaphone, DollarSign, MapPin, Search,
-  TrendingUp, Award, UserPlus, PhoneCall, Database, Calendar, CreditCard,
+  TrendingUp, Award, UserPlus, PhoneCall, Database, Calendar, CreditCard, BarChart3, Ticket,
 } from 'lucide-react';
-import { seedMarketingLogs } from '@/data/seedData';
-import { MarketingObjectType, MarketingCostType, TenancyType } from '@/types/core';
+import { seedMarketingLogs, seedEnquiries, seedAccounts, seedTickets } from '@/data/seedData';
+import { MarketingObjectType, MarketingCostType, TenancyType, EnquiryStage, EnquirySource, AccountStatus, TicketStatus, TicketPriority } from '@/types/core';
 
 const objectTypeLabel: Record<MarketingObjectType, string> = {
   [MarketingObjectType.REFERRAL]: 'Referral',
@@ -112,8 +119,9 @@ export default function Marketing() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview"><Target className="h-4 w-4 mr-1" />Overview</TabsTrigger>
+          <TabsTrigger value="pipeline"><BarChart3 className="h-4 w-4 mr-1" />Pipeline KPIs</TabsTrigger>
           <TabsTrigger value="activity"><Megaphone className="h-4 w-4 mr-1" />Activity Log</TabsTrigger>
           <TabsTrigger value="costs"><DollarSign className="h-4 w-4 mr-1" />Costs</TabsTrigger>
         </TabsList>
@@ -241,6 +249,95 @@ export default function Marketing() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ─── Pipeline KPIs Tab ─── */}
+        <TabsContent value="pipeline" className="space-y-6">
+          {(() => {
+            const funnelData = [
+              { name: 'Total Enquiries', value: seedEnquiries.length, fill: 'hsl(var(--primary))' },
+              { name: 'Contacted', value: seedEnquiries.filter(e => e.stage !== EnquiryStage.NEW_ENQUIRY).length, fill: 'hsl(var(--info))' },
+              { name: 'Demo Scheduled', value: seedEnquiries.filter(e => [EnquiryStage.DEMO_SCHEDULED, EnquiryStage.DEMO_COMPLETED, EnquiryStage.ACCOUNT_CREATED].includes(e.stage)).length, fill: 'hsl(var(--warning))' },
+              { name: 'Demo Completed', value: seedEnquiries.filter(e => [EnquiryStage.DEMO_COMPLETED, EnquiryStage.ACCOUNT_CREATED].includes(e.stage)).length, fill: 'hsl(var(--accent))' },
+              { name: 'Converted', value: seedEnquiries.filter(e => e.stage === EnquiryStage.ACCOUNT_CREATED).length, fill: 'hsl(var(--success))' },
+            ];
+            const sourceData = Object.values(EnquirySource).map(src => ({
+              name: src.replace(/_/g, ' '),
+              value: seedEnquiries.filter(e => e.source === src).length,
+            }));
+            const converted = seedEnquiries.filter(e => e.stage === EnquiryStage.ACCOUNT_CREATED).length;
+            const convRate = ((converted / seedEnquiries.length) * 100).toFixed(1);
+            const openTickets = seedTickets.filter(t => ![TicketStatus.RESOLVED, TicketStatus.CLOSED].includes(t.status)).length;
+            const p1p2 = seedTickets.filter(t => t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2).length;
+            const PIE_COLORS = ['hsl(var(--primary))', 'hsl(var(--info))', 'hsl(var(--warning))', 'hsl(var(--accent))', 'hsl(var(--success))'];
+            const pipelineConfig = { value: { label: 'Count', color: 'hsl(var(--primary))' } };
+            return (
+              <>
+                {/* KPI strip */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">Enquiries</p><p className="text-2xl font-bold text-foreground">{seedEnquiries.length}</p></CardContent></Card>
+                  <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">Converted</p><p className="text-2xl font-bold text-success">{converted}</p></CardContent></Card>
+                  <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">Conversion Rate</p><p className="text-2xl font-bold text-foreground">{convRate}%</p></CardContent></Card>
+                  <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">Open Tickets</p><p className="text-2xl font-bold text-foreground">{openTickets}</p></CardContent></Card>
+                  <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">P1/P2 Tickets</p><p className="text-2xl font-bold text-destructive">{p1p2}</p></CardContent></Card>
+                </div>
+
+                {/* Conversion Funnel */}
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">Conversion Funnel</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {funnelData.map((item, i) => (
+                        <div key={item.name} className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground w-32 text-right">{item.name}</span>
+                          <div className="flex-1 bg-muted rounded-full h-6 relative overflow-hidden">
+                            <div className="h-full rounded-full transition-all flex items-center justify-end pr-2" style={{ width: `${(item.value / funnelData[0].value) * 100}%`, backgroundColor: item.fill }}>
+                              <span className="text-xs font-semibold text-primary-foreground">{item.value}</span>
+                            </div>
+                          </div>
+                          {i > 0 && <span className="text-xs text-muted-foreground w-12">{((item.value / funnelData[i - 1].value) * 100).toFixed(0)}%</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Source + Ops */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-base">Enquiries by Source</CardTitle></CardHeader>
+                    <CardContent className="h-[250px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RPieChart>
+                          <Pie data={sourceData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                            {sourceData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip />
+                        </RPieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-base">Operational KPIs</CardTitle></CardHeader>
+                    <CardContent className="space-y-3">
+                      {[
+                        { label: 'Live Accounts', value: seedAccounts.filter(a => a.status === AccountStatus.LIVE).length },
+                        { label: 'Onboarding', value: seedAccounts.filter(a => a.status === AccountStatus.ONBOARDING_IN_PROGRESS).length },
+                        { label: 'Stalled', value: seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length, color: 'text-destructive' },
+                        { label: 'Avg Team Size (Enquiries)', value: Math.round(seedEnquiries.filter(e => e.team_size_estimate).reduce((s, e) => s + (e.team_size_estimate ?? 0), 0) / Math.max(1, seedEnquiries.filter(e => e.team_size_estimate).length)) },
+                      ].map(kpi => (
+                        <div key={kpi.label} className="flex justify-between items-center py-1 border-b border-border last:border-0">
+                          <span className="text-sm text-muted-foreground">{kpi.label}</span>
+                          <span className={`font-bold ${kpi.color ?? 'text-foreground'}`}>{kpi.value}</span>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
+            );
+          })()}
         </TabsContent>
 
         {/* ─── Activity Log Tab ─── */}

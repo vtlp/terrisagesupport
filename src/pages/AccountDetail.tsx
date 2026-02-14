@@ -7,8 +7,9 @@ import {
 import {
   EntityType, VerificationStatus, AccountStatus, CalendarEventStatus,
   TicketPriority, TicketStatus, ImportType, IngestionStatus, TenancyType,
+  TicketType, TicketCategory, TimelineEventType,
 } from '@/types/core';
-import type { ChecklistItem, Account } from '@/types/core';
+import type { ChecklistItem, Account, SupportTicket } from '@/types/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,12 +22,15 @@ import { Switch } from '@/components/ui/switch';
 import { NotesPanel } from '@/components/shared/NotesPanel';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import {
   CheckCircle2, Circle, Clock, Shield, ShieldCheck, ShieldX, ShieldAlert,
   Upload, FileSpreadsheet, ArrowRight, Plus, Wifi, WifiOff,
   CalendarIcon, Ticket, Pencil, Save, X, Phone, Mail, User, Building2, MapPin,
+  Download, Send, AlertTriangle,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // ── Color Maps ────────────────────────────────
 const statusColors: Record<AccountStatus, string> = {
@@ -199,6 +203,10 @@ export default function AccountDetail() {
   const [integrations, setIntegrations] = useState(account?.integrations ?? {});
   const [showIngestionWizard, setShowIngestionWizard] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
+  const [showSeatRequest, setShowSeatRequest] = useState(false);
+  const [seatCount, setSeatCount] = useState('');
+  const [seatReason, setSeatReason] = useState('');
+  const [seatUrgency, setSeatUrgency] = useState<'normal' | 'urgent'>('normal');
 
   // Editable overview fields
   const [editingOverview, setEditingOverview] = useState(false);
@@ -213,6 +221,124 @@ export default function AccountDetail() {
   if (!account) {
     return <div className="p-6 text-center text-muted-foreground">Account not found</div>;
   }
+
+  // ── Go-Live Automation ─────────────────────
+  const handleStatusChange = (newStatus: AccountStatus) => {
+    const prevStatus = accountStatus;
+    setAccountStatus(newStatus);
+
+    if (newStatus === AccountStatus.LIVE && prevStatus !== AccountStatus.LIVE) {
+      // Check idempotency — don't create duplicate go-live events
+      const existing = seedCalendarEvents.find(e =>
+        e.entity_type === EntityType.ACCOUNT && e.entity_id === account.account_id && e.title.includes('7-day go-live checkup')
+      );
+      if (!existing) {
+        const checkupDate = new Date();
+        checkupDate.setDate(checkupDate.getDate() + 7);
+        checkupDate.setHours(10, 0, 0, 0);
+        seedCalendarEvents.push({
+          event_id: `CE_GL_${Date.now()}`,
+          entity_type: EntityType.ACCOUNT,
+          entity_id: account.account_id,
+          title: `7-day go-live checkup — ${account.account_name}`,
+          scheduled_at: checkupDate.toISOString(),
+          created_by_user_id: 'U001',
+          notes: 'Auto-generated: verify account health, usage, and satisfaction after go-live.',
+          status: CalendarEventStatus.UPCOMING,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        seedNotes.push({
+          note_id: `N_GL_${Date.now()}`,
+          entity_type: EntityType.ACCOUNT,
+          entity_id: account.account_id,
+          note_text: `[System] Account marked LIVE. 7-day go-live checkup event auto-created for ${format(checkupDate, 'dd MMM yyyy')}.`,
+          created_by_user_id: 'U001',
+          created_at: new Date().toISOString(),
+        });
+        toast.success('🎉 Account is now LIVE! 7-day go-live checkup event created.');
+      } else {
+        toast.success('Account status changed to LIVE.');
+      }
+    }
+  };
+
+  // ── Seat Request Workflow ──────────────────
+  const handleSeatRequest = () => {
+    if (!seatCount || !seatReason.trim()) {
+      toast.error('Please fill in seat count and reason');
+      return;
+    }
+    const priority = seatUrgency === 'urgent' ? TicketPriority.P1 : TicketPriority.P2;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 3);
+
+    // Create ticket
+    const ticketId = `TKT_SR_${Date.now()}`;
+    const newTicket: SupportTicket = {
+      ticket_id: ticketId,
+      subject: `Seat expansion request — ${account.account_name} (+${seatCount} seats)`,
+      description: seatReason,
+      status: TicketStatus.OPEN,
+      priority,
+      type: TicketType.TASK,
+      category: TicketCategory.BILLING_PLAN,
+      account_id: account.account_id,
+      requester_name: ownerName,
+      requester_email: ownerEmail,
+      assigned_to_user_id: 'U001',
+      queue: 'Seat Requests',
+      tags: ['seat-expansion'],
+      sla_first_response: new Date(Date.now() + 4 * 3600000).toISOString(),
+      sla_resolution: dueDate.toISOString(),
+      first_response_at: null,
+      resolved_at: null,
+      timeline: [{ id: `TL_${ticketId}_1`, type: TimelineEventType.SYSTEM, content: `Seat expansion request created: +${seatCount} seats`, user_id: null, created_at: new Date().toISOString() }],
+      attachments: [],
+      notes_thread: [],
+      linked_entity_type: EntityType.ACCOUNT,
+      linked_entity_id: account.account_id,
+      market_field: city,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    seedTickets.unshift(newTicket);
+
+    // Create calendar event
+    seedCalendarEvents.push({
+      event_id: `CE_SR_${Date.now()}`,
+      entity_type: EntityType.ACCOUNT,
+      entity_id: account.account_id,
+      title: `Seat request follow-up — ${account.account_name}`,
+      scheduled_at: dueDate.toISOString(),
+      created_by_user_id: 'U001',
+      notes: `Follow up on seat expansion request (+${seatCount} seats). Ticket: ${ticketId}`,
+      status: CalendarEventStatus.UPCOMING,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    // System note
+    seedNotes.push({
+      note_id: `N_SR_${Date.now()}`,
+      entity_type: EntityType.ACCOUNT,
+      entity_id: account.account_id,
+      note_text: `[System] Seat expansion request created: +${seatCount} seats. Ticket ${ticketId} assigned to queue "Seat Requests". Due: ${format(dueDate, 'dd MMM yyyy')}.`,
+      created_by_user_id: 'U001',
+      created_at: new Date().toISOString(),
+    });
+
+    setShowSeatRequest(false);
+    setSeatCount('');
+    setSeatReason('');
+    setSeatUrgency('normal');
+    toast.success(`Seat request created! Ticket ${ticketId} + follow-up event in 3 days.`);
+  };
+
+  // ── Export helpers ──────────────────────────
+  const handleExport = (type: string) => {
+    toast.success(`Exporting ${type}... (simulated)`);
+  };
 
   const notes = seedNotes.filter(n => n.entity_type === EntityType.ACCOUNT && n.entity_id === account.account_id);
   const events = getCalendarEventsForEntity(EntityType.ACCOUNT, account.account_id);
@@ -276,7 +402,7 @@ export default function AccountDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={accountStatus} onValueChange={(v) => setAccountStatus(v as AccountStatus)}>
+            <Select value={accountStatus} onValueChange={(v) => handleStatusChange(v as AccountStatus)}>
               <SelectTrigger className="w-[160px] h-9">
                 <Badge className={`${statusColors[accountStatus]} text-xs`}>{statusLabels[accountStatus]}</Badge>
               </SelectTrigger>
@@ -415,7 +541,7 @@ export default function AccountDetail() {
                 <CardContent className="space-y-3">
                   <div>
                     <Label className="text-xs text-muted-foreground">Account Status</Label>
-                    <Select value={accountStatus} onValueChange={v => setAccountStatus(v as AccountStatus)}>
+                    <Select value={accountStatus} onValueChange={v => handleStatusChange(v as AccountStatus)}>
                       <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {Object.values(AccountStatus).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
