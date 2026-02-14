@@ -13,7 +13,7 @@ import {
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
 import { seedEnquiries, seedTickets, seedAccounts } from '@/data/seedData';
 import { EnquiryStage, TicketPriority, TicketStatus, AccountStatus } from '@/types/core';
@@ -47,10 +47,17 @@ function useNotificationCounts() {
 
 export function AppSidebar({ open }: AppSidebarProps) {
   const location = useLocation();
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === 'collapsed';
   const { isAdmin } = useUser();
   const counts = useNotificationCounts();
+
+  // Auto-close mobile sidebar on navigation
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [location.pathname, isMobile, setOpenMobile]);
 
   const [pipelineOpen, setPipelineOpen] = useState(
     location.pathname.startsWith('/enquiries')

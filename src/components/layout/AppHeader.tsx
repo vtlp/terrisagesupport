@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket } from 'lucide-react';
+import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,12 +23,13 @@ import { seedEnquiries, seedTickets, seedAccounts, seedCalendarEvents } from '@/
 import { EnquiryStage, TicketPriority, TicketStatus, AccountStatus, CalendarEventStatus } from '@/types/core';
 
 interface AppHeaderProps {
-  onMenuClick: () => void;
+  onMenuClick?: () => void;
 }
 
 export function AppHeader({ onMenuClick }: AppHeaderProps) {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, isAdmin } = useUser();
+  const { toggleSidebar } = useSidebar();
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
 
@@ -52,7 +54,7 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={onMenuClick}
+          onClick={toggleSidebar}
           className="text-secondary-foreground hover:bg-sidebar-muted lg:hidden"
         >
           <Menu className="h-5 w-5" />
