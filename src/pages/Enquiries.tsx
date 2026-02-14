@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useNavigate } from 'react-router-dom';
 import { seedEnquiries, seedCalendarEvents, seedNotes, getUserName } from '@/data/seedData';
 import { EnquiryStage, EnquirySource, EnquiryOutcome, TenancyType, CalendarEventStatus, EntityType } from '@/types/core';
+import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 import { format, isToday } from 'date-fns';
 
 const stageColors: Record<EnquiryStage, string> = {
@@ -49,6 +50,7 @@ export default function Enquiries() {
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [tenancyFilter, setTenancyFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Counters
   const total = seedEnquiries.length;
@@ -93,7 +95,7 @@ export default function Enquiries() {
           <h1 className="text-2xl font-semibold text-foreground">Inquiry Pipeline</h1>
           <p className="text-sm text-muted-foreground mt-1">Capture and convert leads into accounts</p>
         </div>
-        <Button className="bg-primary hover:bg-primary/90">
+        <Button className="bg-primary hover:bg-primary/90" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Enquiry
         </Button>
@@ -224,6 +226,13 @@ export default function Enquiries() {
           );
         })}
       </div>
+      <CreateEnquiryDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={(enquiry) => {
+          seedEnquiries.unshift(enquiry);
+        }}
+      />
     </div>
   );
 }
