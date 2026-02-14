@@ -64,6 +64,7 @@ export default function Tickets() {
   const [ticketPriority, setTicketPriority] = useState<TicketPriority | null>(null);
   const [assignedTo, setAssignedTo] = useState<string | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
+  const [noteRefresh, setNoteRefresh] = useState(0);
 
   // Sync detail state when selection changes
   const currentStatus = ticketStatus ?? selected?.status ?? TicketStatus.NEW;
@@ -81,6 +82,8 @@ export default function Tickets() {
   const notes = selected
     ? seedNotes.filter(n => n.entity_type === EntityType.TICKET && n.entity_id === selected.ticket_id)
     : [];
+  // noteRefresh used to force re-read after mutation
+  void noteRefresh;
 
   const handleAddNote = (text: string) => {
     if (!selected) return;
@@ -92,6 +95,7 @@ export default function Tickets() {
       created_by_user_id: 'U001',
       created_at: new Date().toISOString(),
     });
+    setNoteRefresh(prev => prev + 1);
   };
 
   const handleCreateEvent = (data: { title: string; date: Date; time: string; notes: string }) => {
