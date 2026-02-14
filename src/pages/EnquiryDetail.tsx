@@ -90,6 +90,11 @@ export default function EnquiryDetail() {
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [showOnboardingPack, setShowOnboardingPack] = useState(false);
   const [showDemoOutcome, setShowDemoOutcome] = useState(false);
+  const [showStageModal, setShowStageModal] = useState(false);
+  const [pendingStage, setPendingStage] = useState<EnquiryStage | null>(null);
+  const [stageOutcome, setStageOutcome] = useState<EnquiryOutcome | null>(null);
+  const [stageNiReason, setStageNiReason] = useState<NotInterestedReason | null>(null);
+  const [stageNiText, setStageNiText] = useState('');
 
   if (!enquiry) {
     return (
@@ -123,9 +128,22 @@ export default function EnquiryDetail() {
   };
 
   const handleStageChange = (newStage: EnquiryStage) => {
-    if (newStage === EnquiryStage.CONTACTED && enquiry.stage === EnquiryStage.NEW_ENQUIRY) {
-      update({ stage: newStage });
-      toast.info('Set an outcome for this enquiry');
+    if (isConverted) return;
+    // Prevent backward movement
+    const stageOrder = Object.values(EnquiryStage);
+    const currentIdx = stageOrder.indexOf(enquiry.stage);
+    const newIdx = stageOrder.indexOf(newStage);
+    if (newIdx <= currentIdx) {
+      toast.error('Cannot move to a previous stage');
+      return;
+    }
+    // Open guided modal for transitions that require input
+    if (newStage === EnquiryStage.CONTACTED) {
+      setPendingStage(newStage);
+      setStageOutcome(null);
+      setStageNiReason(null);
+      setStageNiText('');
+      setShowStageModal(true);
     } else if (newStage === EnquiryStage.DEMO_SCHEDULED) {
       const missing = canScheduleDemo();
       if (missing.length > 0) {
@@ -135,9 +153,44 @@ export default function EnquiryDetail() {
       setShowDemoSchedule(true);
     } else if (newStage === EnquiryStage.DEMO_COMPLETED) {
       setShowDemoOutcome(true);
+    } else if (newStage === EnquiryStage.ACCOUNT_CREATED) {
+      const err = canConvert();
+      if (err) {
+        toast.error(err);
+        return;
+      }
+      setShowConvertDialog(true);
     } else {
       update({ stage: newStage });
     }
+  };
+
+  const handleStageModalConfirm = () => {
+    if (pendingStage === EnquiryStage.CONTACTED) {
+      if (!stageOutcome) {
+        toast.error('Please select an outcome before proceeding');
+        return;
+      }
+      if (stageOutcome === EnquiryOutcome.NOT_INTERESTED && !stageNiReason) {
+        toast.error('Please select a reason for Not Interested');
+        return;
+      }
+      update({
+        stage: EnquiryStage.CONTACTED,
+        outcome: stageOutcome,
+        not_interested_reason: stageOutcome === EnquiryOutcome.NOT_INTERESTED ? stageNiReason : null,
+        not_interested_text: stageOutcome === EnquiryOutcome.NOT_INTERESTED ? stageNiText : '',
+      });
+      toast.success('Stage updated to Contacted');
+      if (stageOutcome === EnquiryOutcome.SCHEDULE_DEMO) {
+        const missing = canScheduleDemo();
+        if (missing.length > 0) {
+          toast.warning(`Fill prerequisites before scheduling: ${missing.join(', ')}`);
+        }
+      }
+    }
+    setShowStageModal(false);
+    setPendingStage(null);
   };
 
   const handleOutcomeChange = (outcome: EnquiryOutcome) => {
@@ -388,60 +441,46 @@ export default function EnquiryDetail() {
             </Card>
           )}
 
-          {/* Stage + Outcome Controls */}
+          {/* Stage Stepper */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Stage & Outcome</CardTitle>
+              <CardTitle className="text-base">Pipeline Stage</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Stage</Label>
-                  <Select value={enquiry.stage} onValueChange={v => handleStageChange(v as EnquiryStage)} disabled={isConverted}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.values(EnquiryStage).map(s => (
-                        <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Outcome</Label>
-                  <Select value={enquiry.outcome ?? 'none'} onValueChange={v => handleOutcomeChange(v as EnquiryOutcome)} disabled={isConverted}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">—</SelectItem>
-                      {Object.values(EnquiryOutcome).map(o => (
-                        <SelectItem key={o} value={o}>{outcomeLabels[o]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Visual stepper */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-2">
+                {Object.values(EnquiryStage).map((s, i, arr) => {
+                  const currentIdx = arr.indexOf(enquiry.stage);
+                  const isPast = i < currentIdx;
+                  const isCurrent = i === currentIdx;
+                  const isNext = i === currentIdx + 1;
+                  return (
+                    <div key={s} className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                          isCurrent ? 'bg-primary text-primary-foreground border-primary' :
+                          isPast ? 'bg-success/15 text-success border-success/30' :
+                          'bg-muted text-muted-foreground border-border'
+                        } ${isNext && !isConverted ? 'cursor-pointer hover:border-primary hover:text-primary' : ''} ${(!isNext || isConverted) ? 'cursor-default' : ''}`}
+                        onClick={() => isNext && !isConverted && handleStageChange(s)}
+                        disabled={!isNext || isConverted}
+                      >
+                        {isPast && <CheckCircle2 className="h-3 w-3 inline mr-1" />}
+                        {stageLabels[s]}
+                      </button>
+                      {i < arr.length - 1 && <span className={`text-xs ${isPast ? 'text-success' : 'text-muted-foreground'}`}>→</span>}
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Not Interested Reasons */}
-              {enquiry.outcome === EnquiryOutcome.NOT_INTERESTED && (
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Reason</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.values(NotInterestedReason).map(r => (
-                      <Badge
-                        key={r}
-                        variant={enquiry.not_interested_reason === r ? 'default' : 'outline'}
-                        className="cursor-pointer"
-                        onClick={() => update({ not_interested_reason: r })}
-                      >
-                        {niReasonLabels[r]}
-                      </Badge>
-                    ))}
-                  </div>
-                  {enquiry.not_interested_reason === NotInterestedReason.OTHER && (
-                    <Textarea
-                      placeholder="Provide details..."
-                      value={enquiry.not_interested_text}
-                      onChange={e => update({ not_interested_text: e.target.value })}
-                    />
+              {/* Current outcome display */}
+              {enquiry.outcome && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Label className="text-xs text-muted-foreground">Outcome:</Label>
+                  <Badge variant="outline">{outcomeLabels[enquiry.outcome]}</Badge>
+                  {enquiry.outcome === EnquiryOutcome.NOT_INTERESTED && enquiry.not_interested_reason && (
+                    <Badge variant="outline" className="text-destructive border-destructive/30">{niReasonLabels[enquiry.not_interested_reason]}</Badge>
                   )}
                 </div>
               )}
@@ -668,6 +707,71 @@ export default function EnquiryDetail() {
               <Button onClick={handleConvertToAccount}>Convert Now</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stage Transition Modal */}
+      <Dialog open={showStageModal} onOpenChange={v => { if (!v) { setShowStageModal(false); setPendingStage(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move to "{pendingStage ? stageLabels[pendingStage] : ''}"</DialogTitle>
+            <DialogDescription>Complete the required fields to advance this enquiry.</DialogDescription>
+          </DialogHeader>
+          {pendingStage === EnquiryStage.CONTACTED && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Outcome <span className="text-destructive">*</span></Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {Object.values(EnquiryOutcome).map(o => (
+                    <button
+                      key={o}
+                      className={`flex items-center gap-2 p-3 rounded-lg border text-sm text-left transition-colors ${
+                        stageOutcome === o ? 'border-primary bg-primary/5 text-foreground' : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => setStageOutcome(o)}
+                    >
+                      {o === EnquiryOutcome.INTERESTED && <CheckCircle2 className="h-4 w-4 text-success flex-shrink-0" />}
+                      {o === EnquiryOutcome.CALL_LATER && <Calendar className="h-4 w-4 text-primary flex-shrink-0" />}
+                      {o === EnquiryOutcome.SCHEDULE_DEMO && <ClipboardCheck className="h-4 w-4 text-primary flex-shrink-0" />}
+                      {o === EnquiryOutcome.NOT_INTERESTED && <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />}
+                      {o === EnquiryOutcome.WRONG_OR_BOUNCED_NUMBER && <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />}
+                      {outcomeLabels[o]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {stageOutcome === EnquiryOutcome.NOT_INTERESTED && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Reason <span className="text-destructive">*</span></Label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.values(NotInterestedReason).map(r => (
+                      <Badge
+                        key={r}
+                        variant={stageNiReason === r ? 'default' : 'outline'}
+                        className="cursor-pointer"
+                        onClick={() => setStageNiReason(r)}
+                      >
+                        {niReasonLabels[r]}
+                      </Badge>
+                    ))}
+                  </div>
+                  {stageNiReason === NotInterestedReason.OTHER && (
+                    <Textarea
+                      placeholder="Provide details..."
+                      value={stageNiText}
+                      onChange={e => setStageNiText(e.target.value)}
+                    />
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="ghost" onClick={() => { setShowStageModal(false); setPendingStage(null); }}>Cancel</Button>
+                <Button onClick={handleStageModalConfirm}>Confirm Transition</Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
