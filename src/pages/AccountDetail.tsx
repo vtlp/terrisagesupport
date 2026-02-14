@@ -3,16 +3,19 @@ import { useParams, Link } from 'react-router-dom';
 import {
   seedAccounts, seedNotes, seedTickets, seedDocuments, seedIngestionJobs,
   getCalendarEventsForEntity, getNextUpcomingEvent, seedCalendarEvents, getUserName,
+  seedSeatRequests, seedCRMUsage,
 } from '@/data/seedData';
 import {
   EntityType, VerificationStatus, AccountStatus, CalendarEventStatus,
   TicketPriority, TicketStatus, ImportType, IngestionStatus,
+  SeatRequestUrgency,
 } from '@/types/core';
-import type { ChecklistItem, Account } from '@/types/core';
+import type { ChecklistItem, Account, SeatRequest, SupportTicket } from '@/types/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,10 +23,11 @@ import { NotesPanel } from '@/components/shared/NotesPanel';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import {
   CheckCircle2, Circle, Clock, AlertTriangle, Shield, ShieldCheck, ShieldX, ShieldAlert,
   Upload, FileSpreadsheet, ArrowRight, Plus, ExternalLink, Wifi, WifiOff,
-  CalendarIcon, Ticket,
+  CalendarIcon, Ticket, Download, UserPlus,
 } from 'lucide-react';
 
 const statusColors: Record<AccountStatus, string> = {
@@ -211,6 +215,9 @@ export default function AccountDetail() {
   const [integrations, setIntegrations] = useState(account?.integrations ?? {});
   const [showIngestionWizard, setShowIngestionWizard] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
+  const [showSeatRequest, setShowSeatRequest] = useState(false);
+  const [seatForm, setSeatForm] = useState({ seats: 1, reason: '', urgency: SeatRequestUrgency.NORMAL, notes: '' });
+  const [exportHistory, setExportHistory] = useState<{ type: string; format: string; date: string }[]>([]);
 
   if (!account) {
     return <div className="p-6 text-center text-muted-foreground">Account not found</div>;
@@ -336,6 +343,8 @@ export default function AccountDetail() {
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="ingestion">Data Ingestion</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="exports">Exports</TabsTrigger>
+          <TabsTrigger value="requests">Requests</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
           <TabsTrigger value="documents">Docs ({documents.length})</TabsTrigger>
           <TabsTrigger value="calendar">Calendar ({events.length})</TabsTrigger>
@@ -540,7 +549,197 @@ export default function AccountDetail() {
           </div>
         </TabsContent>
 
-        {/* 6. Notes */}
+        {/* 6. Exports */}
+        <TabsContent value="exports" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Export Data</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { type: 'Account Profile', desc: 'Overview, contacts, status', formats: ['JSON', 'PDF'] },
+                { type: 'Linked Enquiries', desc: 'Enquiries that led to this account', formats: ['CSV', 'JSON'] },
+                { type: 'Support Tickets', desc: 'All tickets for this account', formats: ['CSV', 'JSON'] },
+                { type: 'Notes & Timeline', desc: 'Full notes history and events', formats: ['PDF', 'JSON'] },
+                { type: 'Usage Analytics', desc: 'CRM usage snapshots', formats: ['CSV'] },
+              ].map(exp => (
+                <div key={exp.type} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{exp.type}</p>
+                    <p className="text-xs text-muted-foreground">{exp.desc}</p>
+                  </div>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    {exp.formats.map(fmt => (
+                      <Button key={fmt} variant="outline" size="sm" className="text-xs h-7"
+                        onClick={() => {
+                          setExportHistory(prev => [{ type: exp.type, format: fmt, date: new Date().toISOString() }, ...prev]);
+                          toast.success(`${exp.type} exported as ${fmt}`);
+                        }}>
+                        <Download className="h-3 w-3 mr-1" />{fmt}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {exportHistory.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Export History</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {exportHistory.map((h, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded">
+                      <span className="text-foreground">{h.type} ({h.format})</span>
+                      <span className="text-xs text-muted-foreground">{format(new Date(h.date), 'dd MMM, HH:mm')}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* 7. Requests (Seat Request) */}
+        <TabsContent value="requests" className="mt-4 space-y-4">
+          <Button onClick={() => setShowSeatRequest(true)}>
+            <UserPlus className="h-4 w-4 mr-1" /> Request Additional Seats
+          </Button>
+
+          {/* Existing seat requests */}
+          {seedSeatRequests.filter(sr => sr.account_id === account.account_id).length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Seat Request History</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {seedSeatRequests.filter(sr => sr.account_id === account.account_id).map(sr => (
+                  <div key={sr.id} className="p-3 border border-border rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-foreground">+{sr.seats_requested} seats</span>
+                      <Badge variant="outline" className={sr.urgency === SeatRequestUrgency.URGENT ? 'text-destructive border-destructive/30' : ''}>
+                        {sr.urgency}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{sr.reason}</p>
+                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                      <span>Ticket: {sr.ticket_id}</span>
+                      <span>Event: {sr.event_id}</span>
+                      <span>{format(new Date(sr.created_at), 'dd MMM yyyy')}</span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Seat Request Dialog */}
+          <Dialog open={showSeatRequest} onOpenChange={setShowSeatRequest}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Request Additional Seats</DialogTitle>
+                <DialogDescription>This will create a support ticket (due in 3 days) and a check-up calendar event (in 2 days).</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Seats requested</Label>
+                  <Input type="number" min={1} value={seatForm.seats} onChange={e => setSeatForm(p => ({ ...p, seats: parseInt(e.target.value) || 1 }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Reason</Label>
+                  <Input value={seatForm.reason} onChange={e => setSeatForm(p => ({ ...p, reason: e.target.value }))} placeholder="e.g. Team expansion for new project" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Urgency</Label>
+                  <Select value={seatForm.urgency} onValueChange={v => setSeatForm(p => ({ ...p, urgency: v as SeatRequestUrgency }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SeatRequestUrgency.NORMAL}>Normal</SelectItem>
+                      <SelectItem value={SeatRequestUrgency.URGENT}>Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Notes (optional)</Label>
+                  <Input value={seatForm.notes} onChange={e => setSeatForm(p => ({ ...p, notes: e.target.value }))} placeholder="Any additional details..." />
+                </div>
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button variant="ghost" size="sm" onClick={() => setShowSeatRequest(false)}>Cancel</Button>
+                  <Button size="sm" disabled={!seatForm.reason.trim()} onClick={() => {
+                    const ticketId = `TKT_${Date.now()}`;
+                    const eventId = `CE_SR_${Date.now()}`;
+                    const now = new Date();
+                    const dueDate = new Date(now); dueDate.setDate(dueDate.getDate() + 3);
+                    const checkDate = new Date(now); checkDate.setDate(checkDate.getDate() + 2);
+
+                    // Create ticket
+                    const newTicket: SupportTicket = {
+                      ticket_id: ticketId,
+                      linked_entity_type: EntityType.ACCOUNT,
+                      linked_entity_id: account.account_id,
+                      subject: `Seat increase request — ${account.account_name}`,
+                      description: `Request for ${seatForm.seats} additional seats. Reason: ${seatForm.reason}`,
+                      tags: ['seats', 'billing'],
+                      market_field: account.city,
+                      priority: seatForm.urgency === SeatRequestUrgency.URGENT ? TicketPriority.HIGH : TicketPriority.MEDIUM,
+                      status: TicketStatus.NEW,
+                      assigned_to_user_id: 'UDEV',
+                      attachments: [],
+                      notes_thread: [],
+                      due_at: dueDate.toISOString(),
+                      created_at: now.toISOString(),
+                      updated_at: now.toISOString(),
+                    };
+                    seedTickets.push(newTicket);
+
+                    // Create calendar event
+                    seedCalendarEvents.push({
+                      event_id: eventId,
+                      entity_type: EntityType.ACCOUNT,
+                      entity_id: account.account_id,
+                      title: `Check seat increase progress — ${account.account_name}`,
+                      scheduled_at: checkDate.toISOString(),
+                      created_by_user_id: 'U001',
+                      notes: `Follow up on seat request: +${seatForm.seats} seats`,
+                      status: CalendarEventStatus.UPCOMING,
+                      created_at: now.toISOString(),
+                      updated_at: now.toISOString(),
+                    });
+
+                    // Create seat request record
+                    seedSeatRequests.push({
+                      id: `SR_${Date.now()}`,
+                      account_id: account.account_id,
+                      seats_requested: seatForm.seats,
+                      reason: seatForm.reason,
+                      urgency: seatForm.urgency,
+                      requested_by_user_id: 'U001',
+                      notes: seatForm.notes,
+                      ticket_id: ticketId,
+                      event_id: eventId,
+                      created_at: now.toISOString(),
+                    });
+
+                    // System note
+                    seedNotes.push({
+                      note_id: `N_SR_${Date.now()}`,
+                      entity_type: EntityType.ACCOUNT,
+                      entity_id: account.account_id,
+                      note_text: `Seat request submitted: +${seatForm.seats} seats. Ticket created: ${ticketId}. Due in 3 days.`,
+                      created_by_user_id: 'U001',
+                      created_at: now.toISOString(),
+                    });
+
+                    toast.success(`Seat request submitted. Ticket ${ticketId} created, due in 3 days.`);
+                    setSeatForm({ seats: 1, reason: '', urgency: SeatRequestUrgency.NORMAL, notes: '' });
+                    setShowSeatRequest(false);
+                  }}>
+                    Submit Request
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        {/* 8. Notes */}
         <TabsContent value="notes" className="mt-4">
           <NotesPanel notes={notes} onAddNote={handleAddNote} />
         </TabsContent>
