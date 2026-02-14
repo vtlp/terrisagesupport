@@ -152,6 +152,24 @@ export enum IngestionStatus {
   COMPLETED = 'COMPLETED',
 }
 
+export enum KBFileType {
+  PDF = 'pdf',
+  XLSX = 'xlsx',
+  CSV = 'csv',
+  DOCX = 'docx',
+  PPTX = 'pptx',
+  PNG = 'png',
+  JPG = 'jpg',
+  JSON = 'json',
+  TXT = 'txt',
+  OTHER = 'other',
+}
+
+export enum SeatRequestUrgency {
+  NORMAL = 'NORMAL',
+  URGENT = 'URGENT',
+}
+
 // ── Interfaces ─────────────────────────────────
 
 export interface User {
@@ -249,6 +267,7 @@ export interface Account {
   overview_fields: Record<string, unknown>;
   onboarding_pack_id: string | null;
   onboarding_checklist: ChecklistItem[];
+  checklist_template_id: string | null;
   notes_thread: string[]; // note_ids
   documents: string[]; // document_ids
   next_calendar_event_id: string | null;
@@ -260,6 +279,7 @@ export interface Account {
   };
   data_ingestion_jobs: string[]; // job_ids
   created_from_enquiry_id: string | null;
+  live_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -277,6 +297,7 @@ export interface SupportTicket {
   assigned_to_user_id: string | null;
   attachments: string[]; // document_ids
   notes_thread: string[]; // note_ids
+  due_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -290,6 +311,94 @@ export interface KnowledgeBaseItem {
   tags: string[];
   created_at: string;
   updated_at: string;
+}
+
+// ── KB Folder & File System ──────────────────
+
+export interface KBFolder {
+  id: string;
+  name: string;
+  parent_folder_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KBFile {
+  id: string;
+  folder_id: string;
+  title: string;
+  file_type: KBFileType;
+  storage_url: string;
+  tags: string[];
+  description: string;
+  version: number;
+  size_bytes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── KB Checklist Templates ───────────────────
+
+export interface KBChecklistTemplateItem {
+  id: string;
+  label: string;
+  default_due_offset_days: number;
+  guidance_text: string;
+}
+
+export interface KBChecklistTemplate {
+  id: string;
+  name: string;
+  tenancy_type: TenancyType | 'BOTH';
+  items: KBChecklistTemplateItem[];
+  version: number;
+  updated_at: string;
+}
+
+export interface AccountChecklistInstance {
+  account_id: string;
+  template_id: string;
+  template_version: number;
+  items: {
+    item_id: string;
+    label: string;
+    status: 'not_started' | 'in_progress' | 'done' | 'blocked' | 'archived';
+    completed_at: string | null;
+    completed_by_user_id: string | null;
+  }[];
+  template_updated: boolean;
+}
+
+// ── CRM Usage Snapshot ───────────────────────
+
+export interface CRMUsageSnapshot {
+  account_id: string;
+  period: string; // e.g. '2025-01', '2025-W05'
+  dau: number;
+  wau: number;
+  mau: number;
+  leads_created: number;
+  leads_updated: number;
+  projects_actions: number;
+  tasks_created: number;
+  tasks_completed: number;
+  logins: number;
+  inactivity_streak_days: number;
+}
+
+// ── Seat Request ─────────────────────────────
+
+export interface SeatRequest {
+  id: string;
+  account_id: string;
+  seats_requested: number;
+  reason: string;
+  urgency: SeatRequestUrgency;
+  requested_by_user_id: string;
+  notes: string;
+  ticket_id: string;
+  event_id: string;
+  created_at: string;
 }
 
 export interface MarketingLog {
