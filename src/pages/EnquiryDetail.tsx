@@ -29,6 +29,17 @@ import {
   Send, UserCheck, ClipboardCheck, FileText, AlertTriangle, CheckCircle2, XCircle,
 } from 'lucide-react';
 
+const PORTAL_OPTIONS = ['MagicBricks', '99acres', 'Housing.com', 'NoBroker', 'Square Yards', 'CommonFloor', 'Other'];
+const CURRENT_SYSTEM_OPTIONS = ['CRM', 'Spreadsheet', 'Other'];
+const COUNTRY_CODES = [
+  { code: '+91', label: '🇮🇳 +91 India' },
+  { code: '+1', label: '🇺🇸 +1 USA' },
+  { code: '+44', label: '🇬🇧 +44 UK' },
+  { code: '+971', label: '🇦🇪 +971 UAE' },
+  { code: '+65', label: '🇸🇬 +65 Singapore' },
+  { code: '+61', label: '🇦🇺 +61 Australia' },
+];
+
 const stageLabels: Record<EnquiryStage, string> = {
   [EnquiryStage.NEW_ENQUIRY]: 'New Enquiry',
   [EnquiryStage.CONTACTED]: 'Contacted',
@@ -91,10 +102,26 @@ export default function EnquiryDetail() {
   const [showOnboardingPack, setShowOnboardingPack] = useState(false);
   const [showDemoOutcome, setShowDemoOutcome] = useState(false);
   const [showStageModal, setShowStageModal] = useState(false);
+  const [showRevertConfirm, setShowRevertConfirm] = useState(false);
   const [pendingStage, setPendingStage] = useState<EnquiryStage | null>(null);
   const [stageOutcome, setStageOutcome] = useState<EnquiryOutcome | null>(null);
   const [stageNiReason, setStageNiReason] = useState<NotInterestedReason | null>(null);
   const [stageNiText, setStageNiText] = useState('');
+  const [calendarFilter, setCalendarFilter] = useState<'my' | 'all'>('my');
+
+  // Country codes
+  const [phoneCC, setPhoneCC] = useState('+91');
+  const [phoneAltCC, setPhoneAltCC] = useState('+91');
+  const [consentGiven, setConsentGiven] = useState(false);
+
+  // Current system
+  const [currentSystemType, setCurrentSystemType] = useState<string>(() => {
+    if (!initial) return 'Other';
+    const text = initial.current_system_text.toLowerCase();
+    if (text.includes('crm')) return 'CRM';
+    if (text.includes('spreadsheet') || text.includes('excel') || text.includes('sheet')) return 'Spreadsheet';
+    return 'Other';
+  });
 
   if (!enquiry) {
     return (
@@ -106,7 +133,10 @@ export default function EnquiryDetail() {
   }
 
   const notes = seedNotes.filter(n => enquiry.notes_thread.includes(n.note_id));
-  const events = getCalendarEventsForEntity(EntityType.ENQUIRY, enquiry.enquiry_id);
+  const allEntityEvents = getCalendarEventsForEntity(EntityType.ENQUIRY, enquiry.enquiry_id);
+  const events = calendarFilter === 'my'
+    ? allEntityEvents.filter(e => e.created_by_user_id === currentUser.user_id)
+    : allEntityEvents;
   const nextEvent = getNextUpcomingEvent(EntityType.ENQUIRY, enquiry.enquiry_id);
 
   const update = (patch: Partial<Enquiry>) => setEnquiry(prev => prev ? { ...prev, ...patch, updated_at: new Date().toISOString() } : prev);
@@ -129,15 +159,20 @@ export default function EnquiryDetail() {
 
   const handleStageChange = (newStage: EnquiryStage) => {
     if (isConverted) return;
-    // Prevent backward movement
     const stageOrder = Object.values(EnquiryStage);
     const currentIdx = stageOrder.indexOf(enquiry.stage);
     const newIdx = stageOrder.indexOf(newStage);
-    if (newIdx <= currentIdx) {
-      toast.error('Cannot move to a previous stage');
+
+    // Allow backward movement with confirmation
+    if (newIdx < currentIdx) {
+      setPendingStage(newStage);
+      setShowRevertConfirm(true);
       return;
     }
-    // Open guided modal for transitions that require input
+
+    if (newIdx <= currentIdx) return;
+
+    // Forward transitions
     if (newStage === EnquiryStage.CONTACTED) {
       setPendingStage(newStage);
       setStageOutcome(null);
@@ -165,6 +200,25 @@ export default function EnquiryDetail() {
     }
   };
 
+  const handleRevertConfirm = () => {
+    if (!pendingStage) return;
+    update({ stage: pendingStage });
+    // Log system note
+    const newNote: Note = {
+      note_id: `N_RV_${Date.now()}`,
+      entity_type: EntityType.ENQUIRY,
+      entity_id: enquiry.enquiry_id,
+      note_text: `[System] Stage reverted to "${stageLabels[pendingStage]}" for damage control.`,
+      created_by_user_id: currentUser.user_id,
+      created_at: new Date().toISOString(),
+    };
+    seedNotes.push(newNote);
+    update({ notes_thread: [...enquiry.notes_thread, newNote.note_id], stage: pendingStage });
+    toast.warning(`Stage reverted to ${stageLabels[pendingStage]}`);
+    setShowRevertConfirm(false);
+    setPendingStage(null);
+  };
+
   const handleStageModalConfirm = () => {
     if (pendingStage === EnquiryStage.CONTACTED) {
       if (!stageOutcome) {
@@ -182,6 +236,15 @@ export default function EnquiryDetail() {
         not_interested_text: stageOutcome === EnquiryOutcome.NOT_INTERESTED ? stageNiText : '',
       });
       toast.success('Stage updated to Contacted');
+
+      // CALL_LATER triggers calendar event
+      if (stageOutcome === EnquiryOutcome.CALL_LATER) {
+        setShowStageModal(false);
+        setPendingStage(null);
+        setShowCalendarForm(true);
+        return;
+      }
+
       if (stageOutcome === EnquiryOutcome.SCHEDULE_DEMO) {
         const missing = canScheduleDemo();
         if (missing.length > 0) {
@@ -195,7 +258,11 @@ export default function EnquiryDetail() {
 
   const handleOutcomeChange = (outcome: EnquiryOutcome) => {
     update({ outcome });
-    if (outcome === EnquiryOutcome.INTERESTED || outcome === EnquiryOutcome.CALL_LATER) {
+    if (outcome === EnquiryOutcome.CALL_LATER) {
+      setShowCalendarForm(true);
+      return;
+    }
+    if (outcome === EnquiryOutcome.INTERESTED) {
       toast.info('Consider creating a follow-up calendar event and sending WhatsApp content');
     }
     if (outcome === EnquiryOutcome.SCHEDULE_DEMO) {
@@ -242,6 +309,21 @@ export default function EnquiryDetail() {
   };
 
   const handleCalendarEventCreated = (data: { title: string; date: Date; time: string; notes: string }) => {
+    const scheduled = new Date(data.date);
+    const [h, m] = data.time.split(':');
+    scheduled.setHours(parseInt(h), parseInt(m));
+    seedCalendarEvents.push({
+      event_id: `CE_${Date.now()}`,
+      entity_type: EntityType.ENQUIRY,
+      entity_id: enquiry.enquiry_id,
+      title: data.title,
+      scheduled_at: scheduled.toISOString(),
+      created_by_user_id: currentUser.user_id,
+      notes: data.notes || undefined,
+      status: CalendarEventStatus.UPCOMING,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
     toast.success(`Calendar event "${data.title}" created`);
     setShowCalendarForm(false);
   };
@@ -261,6 +343,13 @@ export default function EnquiryDetail() {
   };
 
   const isConverted = enquiry.stage === EnquiryStage.ACCOUNT_CREATED;
+
+  const handleCurrentSystemChange = (val: string) => {
+    setCurrentSystemType(val);
+    if (val !== 'Other') {
+      update({ current_system_text: val });
+    }
+  };
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -294,12 +383,34 @@ export default function EnquiryDetail() {
                   <Input value={enquiry.contact_name} onChange={e => update({ contact_name: e.target.value })} disabled={isConverted} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> Phone</Label>
-                  <Input value={enquiry.contact_phone} onChange={e => update({ contact_phone: e.target.value })} disabled={isConverted} />
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> Phone
+                  </Label>
+                  <div className="flex gap-1">
+                    <Select value={phoneCC} onValueChange={setPhoneCC} disabled={isConverted}>
+                      <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {COUNTRY_CODES.map(cc => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input value={enquiry.contact_phone} onChange={e => update({ contact_phone: e.target.value })} disabled={isConverted} className="flex-1" />
+                    <div className="flex items-center gap-1.5 px-2 border rounded-md">
+                      <Switch checked={enquiry.whatsapp_enabled} onCheckedChange={v => update({ whatsapp_enabled: v })} disabled={isConverted} />
+                      <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Alt Phone</Label>
-                  <Input value={enquiry.contact_phone_alt} onChange={e => update({ contact_phone_alt: e.target.value })} disabled={isConverted} />
+                  <div className="flex gap-1">
+                    <Select value={phoneAltCC} onValueChange={setPhoneAltCC} disabled={isConverted}>
+                      <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {COUNTRY_CODES.map(cc => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input value={enquiry.contact_phone_alt} onChange={e => update({ contact_phone_alt: e.target.value })} disabled={isConverted} className="flex-1" />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> Email</Label>
@@ -309,10 +420,12 @@ export default function EnquiryDetail() {
                   <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> City</Label>
                   <Input value={enquiry.city} onChange={e => update({ city: e.target.value })} disabled={isConverted} />
                 </div>
-                <div className="flex items-center gap-3 pt-5">
-                  <Switch checked={enquiry.whatsapp_enabled} onCheckedChange={v => update({ whatsapp_enabled: v })} disabled={isConverted} />
-                  <Label className="text-sm flex items-center gap-1"><MessageSquare className="h-3 w-3" /> WhatsApp</Label>
-                </div>
+              </div>
+
+              {/* Consent Checkbox */}
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox checked={consentGiven} onCheckedChange={(v) => setConsentGiven(!!v)} disabled={isConverted} />
+                <Label className="text-sm text-muted-foreground">Contact consent received</Label>
               </div>
 
               {/* Tenancy Type */}
@@ -352,7 +465,17 @@ export default function EnquiryDetail() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Current System</Label>
-                    <Input value={enquiry.current_system_text} onChange={e => update({ current_system_text: e.target.value })} disabled={isConverted} />
+                    <div className="flex gap-2">
+                      <Select value={currentSystemType} onValueChange={handleCurrentSystemChange} disabled={isConverted}>
+                        <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CURRENT_SYSTEM_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {currentSystemType === 'Other' && (
+                        <Input value={enquiry.current_system_text} onChange={e => update({ current_system_text: e.target.value })} disabled={isConverted} placeholder="Specify..." className="flex-1" />
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -376,7 +499,7 @@ export default function EnquiryDetail() {
                   </div>
                 </div>
 
-                {/* Conditional: Sales Focus */}
+                {/* Sales Focus */}
                 {enquiry.focus_area.includes(FocusArea.SALES) && (
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Sales Focus</Label>
@@ -398,7 +521,7 @@ export default function EnquiryDetail() {
                   </div>
                 )}
 
-                {/* Conditional: Property Types */}
+                {/* Property Types */}
                 {enquiry.sales_focus.some(sf => sf === SalesFocus.PRIMARY_ONLY || sf === SalesFocus.PRIMARY_AND_SECONDARY) && (
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Primary Property Types</Label>
@@ -420,15 +543,26 @@ export default function EnquiryDetail() {
                   </div>
                 )}
 
-                {/* Portals */}
+                {/* Portals — Multi-select checkboxes */}
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Portals in Use</Label>
-                  <Input
-                    value={enquiry.portals_in_use.join(', ')}
-                    onChange={e => update({ portals_in_use: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                    placeholder="MagicBricks, 99acres, Housing.com..."
-                    disabled={isConverted}
-                  />
+                  <div className="flex flex-wrap gap-3">
+                    {PORTAL_OPTIONS.map(portal => (
+                      <label key={portal} className="flex items-center gap-1.5 text-sm">
+                        <Checkbox
+                          checked={enquiry.portals_in_use.includes(portal)}
+                          onCheckedChange={(checked) => {
+                            const arr = checked
+                              ? [...enquiry.portals_in_use, portal]
+                              : enquiry.portals_in_use.filter(p => p !== portal);
+                            update({ portals_in_use: arr });
+                          }}
+                          disabled={isConverted}
+                        />
+                        {portal}
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 {enquiry.approx_onboarding_date && (
@@ -447,13 +581,13 @@ export default function EnquiryDetail() {
               <CardTitle className="text-base">Pipeline Stage</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Visual stepper */}
               <div className="flex items-center gap-1 overflow-x-auto pb-2">
                 {Object.values(EnquiryStage).map((s, i, arr) => {
                   const currentIdx = arr.indexOf(enquiry.stage);
                   const isPast = i < currentIdx;
                   const isCurrent = i === currentIdx;
                   const isNext = i === currentIdx + 1;
+                  const isClickable = (isNext || isPast) && !isConverted;
                   return (
                     <div key={s} className="flex items-center gap-1 flex-shrink-0">
                       <button
@@ -461,9 +595,9 @@ export default function EnquiryDetail() {
                           isCurrent ? 'bg-primary text-primary-foreground border-primary' :
                           isPast ? 'bg-success/15 text-success border-success/30' :
                           'bg-muted text-muted-foreground border-border'
-                        } ${isNext && !isConverted ? 'cursor-pointer hover:border-primary hover:text-primary' : ''} ${(!isNext || isConverted) ? 'cursor-default' : ''}`}
-                        onClick={() => isNext && !isConverted && handleStageChange(s)}
-                        disabled={!isNext || isConverted}
+                        } ${isClickable ? 'cursor-pointer hover:border-primary hover:text-primary' : 'cursor-default'}`}
+                        onClick={() => isClickable && handleStageChange(s)}
+                        disabled={!isClickable}
                       >
                         {isPast && <CheckCircle2 className="h-3 w-3 inline mr-1" />}
                         {stageLabels[s]}
@@ -485,7 +619,6 @@ export default function EnquiryDetail() {
                 </div>
               )}
 
-              {/* Demo Outcome display */}
               {enquiry.demo_outcome && (
                 <div className="flex items-center gap-2">
                   <Label className="text-xs text-muted-foreground">Demo Outcome:</Label>
@@ -493,7 +626,6 @@ export default function EnquiryDetail() {
                 </div>
               )}
 
-              {/* Onboarding Pack Status */}
               {enquiry.onboarding_pack_sent && (
                 <div className="flex items-center gap-2 text-sm">
                   <CheckCircle2 className="h-4 w-4 text-success" />
@@ -511,7 +643,7 @@ export default function EnquiryDetail() {
           </Card>
         </div>
 
-        {/* Right Sidebar — Actions + Calendar */}
+        {/* Right Sidebar */}
         <div className="space-y-4">
           {/* Next Action */}
           {nextEvent && (
@@ -587,9 +719,17 @@ export default function EnquiryDetail() {
             </Card>
           )}
 
-          {/* Calendar Events */}
+          {/* Enquiry Calendar */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">Calendar Events</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Enquiry Calendar</CardTitle>
+                <div className="flex gap-1">
+                  <Button variant={calendarFilter === 'my' ? 'default' : 'outline'} size="sm" className="text-xs h-6 px-2" onClick={() => setCalendarFilter('my')}>My</Button>
+                  <Button variant={calendarFilter === 'all' ? 'default' : 'outline'} size="sm" className="text-xs h-6 px-2" onClick={() => setCalendarFilter('all')}>All</Button>
+                </div>
+              </div>
+            </CardHeader>
             <CardContent className="space-y-2">
               {events.length === 0 && <p className="text-sm text-muted-foreground">No events.</p>}
               {events.map(e => (
@@ -636,7 +776,7 @@ export default function EnquiryDetail() {
             <DialogDescription>Schedule a follow-up or next action</DialogDescription>
           </DialogHeader>
           <CalendarEventForm
-            defaultTitle={`Follow-up — ${enquiry.company_name}`}
+            defaultTitle={`Call back — ${enquiry.company_name}`}
             onSubmit={handleCalendarEventCreated}
             onCancel={() => setShowCalendarForm(false)}
           />
@@ -772,6 +912,22 @@ export default function EnquiryDetail() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Revert Stage Confirmation */}
+      <Dialog open={showRevertConfirm} onOpenChange={v => { if (!v) { setShowRevertConfirm(false); setPendingStage(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revert Stage</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to revert to "{pendingStage ? stageLabels[pendingStage] : ''}"? This is for damage control only.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="ghost" onClick={() => { setShowRevertConfirm(false); setPendingStage(null); }}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRevertConfirm}>Revert Stage</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

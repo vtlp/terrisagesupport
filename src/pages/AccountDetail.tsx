@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   seedAccounts, seedNotes, seedTickets, seedDocuments, seedIngestionJobs,
-  getCalendarEventsForEntity, getNextUpcomingEvent, seedCalendarEvents, getUserName,
+  getCalendarEventsForEntity, getNextUpcomingEvent, seedCalendarEvents, getUserName, seedEnquiries,
 } from '@/data/seedData';
 import {
   EntityType, VerificationStatus, AccountStatus, CalendarEventStatus,
@@ -19,10 +19,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { NotesPanel } from '@/components/shared/NotesPanel';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import {
   CheckCircle2, Circle, Clock, Shield, ShieldCheck, ShieldX, ShieldAlert,
@@ -191,6 +192,18 @@ function DataIngestionWizard({ accountId, onClose }: { accountId: string; onClos
   );
 }
 
+// Custom integration type
+interface CustomIntegration {
+  id: string;
+  name: string;
+  apiKey: string;
+  endpoint: string;
+  description: string;
+  connected: boolean;
+}
+
+const PORTAL_INTEGRATIONS = ['MagicBricks', '99acres', 'Housing.com', 'NoBroker', 'Square Yards', 'CommonFloor'];
+
 // ── Main Component ─────────────────────────────
 export default function AccountDetail() {
   const { accountId } = useParams();
@@ -218,9 +231,43 @@ export default function AccountDetail() {
   const [overviewText, setOverviewText] = useState(account?.account_overview_text ?? '');
   const [tenancyType, setTenancyType] = useState<TenancyType>(account?.tenancy_type ?? TenancyType.AGENCY_BROKERAGE_CONSULTANCY);
 
+  // Verification note dialog
+  const [verificationNoteDialog, setVerificationNoteDialog] = useState(false);
+  const [verificationNoteText, setVerificationNoteText] = useState('');
+  const [pendingVerification, setPendingVerification] = useState<{ type: 'pan' | 'id'; value: VerificationStatus } | null>(null);
+
+  // Export CSV dialog
+  const [exportDialog, setExportDialog] = useState(false);
+  const [exportType, setExportType] = useState('all');
+
+  // Custom integrations
+  const [customIntegrations, setCustomIntegrations] = useState<CustomIntegration[]>(
+    PORTAL_INTEGRATIONS.map((name, i) => ({
+      id: `INT_${i}`,
+      name,
+      apiKey: '',
+      endpoint: '',
+      description: `${name} portal integration`,
+      connected: false,
+    }))
+  );
+  const [showAddIntegration, setShowAddIntegration] = useState(false);
+  const [newIntName, setNewIntName] = useState('');
+  const [newIntApiKey, setNewIntApiKey] = useState('');
+  const [newIntEndpoint, setNewIntEndpoint] = useState('');
+  const [newIntDescription, setNewIntDescription] = useState('');
+
+  // Note refresh
+  const [noteRefresh, setNoteRefresh] = useState(0);
+
   if (!account) {
     return <div className="p-6 text-center text-muted-foreground">Account not found</div>;
   }
+
+  // Source enquiry for carry-over fields
+  const sourceEnquiry = account.created_from_enquiry_id
+    ? seedEnquiries.find(e => e.enquiry_id === account.created_from_enquiry_id)
+    : null;
 
   // ── Go-Live Automation ─────────────────────
   const handleStatusChange = (newStatus: AccountStatus) => {
@@ -228,7 +275,6 @@ export default function AccountDetail() {
     setAccountStatus(newStatus);
 
     if (newStatus === AccountStatus.LIVE && prevStatus !== AccountStatus.LIVE) {
-      // Check idempotency — don't create duplicate go-live events
       const existing = seedCalendarEvents.find(e =>
         e.entity_type === EntityType.ACCOUNT && e.entity_id === account.account_id && e.title.includes('7-day go-live checkup')
       );
@@ -237,30 +283,49 @@ export default function AccountDetail() {
         checkupDate.setDate(checkupDate.getDate() + 7);
         checkupDate.setHours(10, 0, 0, 0);
         seedCalendarEvents.push({
-          event_id: `CE_GL_${Date.now()}`,
-          entity_type: EntityType.ACCOUNT,
-          entity_id: account.account_id,
-          title: `7-day go-live checkup — ${account.account_name}`,
-          scheduled_at: checkupDate.toISOString(),
-          created_by_user_id: 'U001',
-          notes: 'Auto-generated: verify account health, usage, and satisfaction after go-live.',
-          status: CalendarEventStatus.UPCOMING,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          event_id: `CE_GL_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
+          title: `7-day go-live checkup — ${account.account_name}`, scheduled_at: checkupDate.toISOString(),
+          created_by_user_id: 'U001', notes: 'Auto-generated: verify account health, usage, and satisfaction after go-live.',
+          status: CalendarEventStatus.UPCOMING, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         });
         seedNotes.push({
-          note_id: `N_GL_${Date.now()}`,
-          entity_type: EntityType.ACCOUNT,
-          entity_id: account.account_id,
+          note_id: `N_GL_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
           note_text: `[System] Account marked LIVE. 7-day go-live checkup event auto-created for ${format(checkupDate, 'dd MMM yyyy')}.`,
-          created_by_user_id: 'U001',
-          created_at: new Date().toISOString(),
+          created_by_user_id: 'U001', created_at: new Date().toISOString(),
         });
         toast.success('🎉 Account is now LIVE! 7-day go-live checkup event created.');
       } else {
         toast.success('Account status changed to LIVE.');
       }
     }
+  };
+
+  // ── Verification with mandatory note ───────
+  const handleVerificationChange = (type: 'pan' | 'id', value: VerificationStatus) => {
+    setPendingVerification({ type, value });
+    setVerificationNoteText('');
+    setVerificationNoteDialog(true);
+  };
+
+  const confirmVerificationChange = () => {
+    if (!verificationNoteText.trim()) {
+      toast.error('A note is required when changing verification status');
+      return;
+    }
+    if (!pendingVerification) return;
+    const prefix = pendingVerification.type === 'pan' ? 'PAN Verification' : 'Identity Verification';
+    if (pendingVerification.type === 'pan') setPanStatus(pendingVerification.value);
+    else setIdStatus(pendingVerification.value);
+
+    seedNotes.push({
+      note_id: `N_VER_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
+      note_text: `[${prefix}] Status changed to ${pendingVerification.value.replace(/_/g, ' ')}: ${verificationNoteText.trim()}`,
+      created_by_user_id: 'U001', created_at: new Date().toISOString(),
+    });
+    setNoteRefresh(prev => prev + 1);
+    toast.success(`${prefix} status updated`);
+    setVerificationNoteDialog(false);
+    setPendingVerification(null);
   };
 
   // ── Seat Request Workflow ──────────────────
@@ -272,75 +337,62 @@ export default function AccountDetail() {
     const priority = seatUrgency === 'urgent' ? TicketPriority.P1 : TicketPriority.P2;
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 3);
-
-    // Create ticket
     const ticketId = `TKT_SR_${Date.now()}`;
     const newTicket: SupportTicket = {
-      ticket_id: ticketId,
-      subject: `Seat expansion request — ${account.account_name} (+${seatCount} seats)`,
-      description: seatReason,
-      status: TicketStatus.OPEN,
-      priority,
-      type: TicketType.TASK,
-      category: TicketCategory.BILLING_PLAN,
-      account_id: account.account_id,
-      requester_name: ownerName,
-      requester_email: ownerEmail,
-      assigned_to_user_id: 'U001',
-      queue: 'Seat Requests',
-      tags: ['seat-expansion'],
-      sla_first_response: new Date(Date.now() + 4 * 3600000).toISOString(),
-      sla_resolution: dueDate.toISOString(),
-      first_response_at: null,
-      resolved_at: null,
+      ticket_id: ticketId, subject: `Seat expansion request — ${account.account_name} (+${seatCount} seats)`,
+      description: seatReason, status: TicketStatus.OPEN, priority, type: TicketType.TASK, category: TicketCategory.BILLING_PLAN,
+      account_id: account.account_id, requester_name: ownerName, requester_email: ownerEmail, assigned_to_user_id: 'U001',
+      queue: 'Seat Requests', tags: ['seat-expansion'],
+      sla_first_response: new Date(Date.now() + 4 * 3600000).toISOString(), sla_resolution: dueDate.toISOString(),
+      first_response_at: null, resolved_at: null,
       timeline: [{ id: `TL_${ticketId}_1`, type: TimelineEventType.SYSTEM, content: `Seat expansion request created: +${seatCount} seats`, user_id: null, created_at: new Date().toISOString() }],
-      attachments: [],
-      notes_thread: [],
-      linked_entity_type: EntityType.ACCOUNT,
-      linked_entity_id: account.account_id,
-      market_field: city,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      attachments: [], notes_thread: [], linked_entity_type: EntityType.ACCOUNT, linked_entity_id: account.account_id,
+      market_field: city, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     };
     seedTickets.unshift(newTicket);
-
-    // Create calendar event
     seedCalendarEvents.push({
-      event_id: `CE_SR_${Date.now()}`,
-      entity_type: EntityType.ACCOUNT,
-      entity_id: account.account_id,
-      title: `Seat request follow-up — ${account.account_name}`,
-      scheduled_at: dueDate.toISOString(),
-      created_by_user_id: 'U001',
-      notes: `Follow up on seat expansion request (+${seatCount} seats). Ticket: ${ticketId}`,
-      status: CalendarEventStatus.UPCOMING,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      event_id: `CE_SR_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
+      title: `Seat request follow-up — ${account.account_name}`, scheduled_at: dueDate.toISOString(),
+      created_by_user_id: 'U001', notes: `Follow up on seat expansion request (+${seatCount} seats). Ticket: ${ticketId}`,
+      status: CalendarEventStatus.UPCOMING, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     });
-
-    // System note
     seedNotes.push({
-      note_id: `N_SR_${Date.now()}`,
-      entity_type: EntityType.ACCOUNT,
-      entity_id: account.account_id,
+      note_id: `N_SR_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
       note_text: `[System] Seat expansion request created: +${seatCount} seats. Ticket ${ticketId} assigned to queue "Seat Requests". Due: ${format(dueDate, 'dd MMM yyyy')}.`,
-      created_by_user_id: 'U001',
-      created_at: new Date().toISOString(),
+      created_by_user_id: 'U001', created_at: new Date().toISOString(),
     });
-
-    setShowSeatRequest(false);
-    setSeatCount('');
-    setSeatReason('');
-    setSeatUrgency('normal');
+    setShowSeatRequest(false); setSeatCount(''); setSeatReason(''); setSeatUrgency('normal');
     toast.success(`Seat request created! Ticket ${ticketId} + follow-up event in 3 days.`);
   };
 
   // ── Export helpers ──────────────────────────
   const handleExport = (type: string) => {
     toast.success(`Exporting ${type}... (simulated)`);
+    setExportDialog(false);
+  };
+
+  // ── Custom Integration ─────────────────────
+  const handleAddIntegration = () => {
+    if (!newIntName.trim()) { toast.error('Integration name required'); return; }
+    setCustomIntegrations(prev => [...prev, {
+      id: `INT_${Date.now()}`,
+      name: newIntName.trim(),
+      apiKey: newIntApiKey,
+      endpoint: newIntEndpoint,
+      description: newIntDescription,
+      connected: false,
+    }]);
+    setNewIntName(''); setNewIntApiKey(''); setNewIntEndpoint(''); setNewIntDescription('');
+    setShowAddIntegration(false);
+    toast.success('Integration added');
+  };
+
+  const toggleCustomIntegration = (id: string) => {
+    setCustomIntegrations(prev => prev.map(i => i.id === id ? { ...i, connected: !i.connected } : i));
   };
 
   const notes = seedNotes.filter(n => n.entity_type === EntityType.ACCOUNT && n.entity_id === account.account_id);
+  void noteRefresh;
   const events = getCalendarEventsForEntity(EntityType.ACCOUNT, account.account_id);
   const nextEvent = getNextUpcomingEvent(EntityType.ACCOUNT, account.account_id);
   const tickets = seedTickets.filter(t => t.account_id === account.account_id || t.linked_entity_id === account.account_id);
@@ -357,6 +409,7 @@ export default function AccountDetail() {
 
   const handleAddNote = (text: string) => {
     seedNotes.push({ note_id: `N${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id, note_text: text, created_by_user_id: 'U001', created_at: new Date().toISOString() });
+    setNoteRefresh(prev => prev + 1);
   };
 
   const handleCreateEvent = (data: { title: string; date: Date; time: string; notes: string }) => {
@@ -384,12 +437,87 @@ export default function AccountDetail() {
   };
 
   const handleSaveOverview = () => {
-    // In a real app, persist to backend
     setEditingOverview(false);
   };
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
+      {/* Verification Note Dialog */}
+      <Dialog open={verificationNoteDialog} onOpenChange={v => { if (!v) { setVerificationNoteDialog(false); setPendingVerification(null); } }}>
+        <DialogContent className="bg-card">
+          <DialogHeader>
+            <DialogTitle>Verification Status Change</DialogTitle>
+            <DialogDescription>
+              A note is required when changing {pendingVerification?.type === 'pan' ? 'PAN' : 'Identity'} verification status to {pendingVerification?.value.replace(/_/g, ' ')}.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea placeholder="Add your note..." value={verificationNoteText} onChange={e => setVerificationNoteText(e.target.value)} rows={3} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setVerificationNoteDialog(false); setPendingVerification(null); }}>Cancel</Button>
+            <Button onClick={confirmVerificationChange}>Save & Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export CSV Dialog */}
+      <Dialog open={exportDialog} onOpenChange={setExportDialog}>
+        <DialogContent className="bg-card">
+          <DialogHeader>
+            <DialogTitle>Export CSV</DialogTitle>
+            <DialogDescription>Choose what to export</DialogDescription>
+          </DialogHeader>
+          <RadioGroup value={exportType} onValueChange={setExportType} className="space-y-2">
+            {[
+              { value: 'leads', label: 'Leads Only' },
+              { value: 'properties', label: 'Properties Only' },
+              { value: 'enquiries', label: 'Enquiries Only' },
+              { value: 'all', label: 'All' },
+            ].map(opt => (
+              <div key={opt.value} className="flex items-center gap-2">
+                <RadioGroupItem value={opt.value} id={opt.value} />
+                <Label htmlFor={opt.value}>{opt.label}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialog(false)}>Cancel</Button>
+            <Button onClick={() => handleExport(exportType)}>Export</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Integration Dialog */}
+      <Dialog open={showAddIntegration} onOpenChange={setShowAddIntegration}>
+        <DialogContent className="bg-card">
+          <DialogHeader>
+            <DialogTitle>Add Integration</DialogTitle>
+            <DialogDescription>Connect a new portal or service</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Integration Name *</Label>
+              <Input value={newIntName} onChange={e => setNewIntName(e.target.value)} placeholder="e.g. MagicBricks API" />
+            </div>
+            <div className="space-y-1">
+              <Label>API Key</Label>
+              <Input value={newIntApiKey} onChange={e => setNewIntApiKey(e.target.value)} placeholder="API key..." type="password" />
+            </div>
+            <div className="space-y-1">
+              <Label>Endpoint URL</Label>
+              <Input value={newIntEndpoint} onChange={e => setNewIntEndpoint(e.target.value)} placeholder="https://api.example.com/v1" />
+            </div>
+            <div className="space-y-1">
+              <Label>Description</Label>
+              <Textarea value={newIntDescription} onChange={e => setNewIntDescription(e.target.value)} placeholder="What does this integration do?" rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddIntegration(false)}>Cancel</Button>
+            <Button onClick={handleAddIntegration}>Add Integration</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Header ────────────────────────────── */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -419,7 +547,6 @@ export default function AccountDetail() {
           </div>
         </div>
 
-        {/* Next Action chip */}
         {nextEvent && (
           <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border border-primary/20 rounded-lg text-sm">
             <Clock className="h-4 w-4 text-primary flex-shrink-0" />
@@ -446,7 +573,6 @@ export default function AccountDetail() {
         {/* ═══ 1. OVERVIEW ═══ */}
         <TabsContent value="overview" className="mt-4 space-y-4">
           <div className="grid md:grid-cols-3 gap-4">
-            {/* Account Summary — main info */}
             <Card className="md:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center justify-between">
@@ -464,21 +590,14 @@ export default function AccountDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-0">
-                {/* Owner Details */}
                 <FieldRow label="Owner Name" icon={<User className="h-4 w-4" />}>
-                  {editingOverview ? (
-                    <Input value={ownerName} onChange={e => setOwnerName(e.target.value)} className="h-8 text-sm" />
-                  ) : ownerName || '—'}
+                  {editingOverview ? <Input value={ownerName} onChange={e => setOwnerName(e.target.value)} className="h-8 text-sm" /> : ownerName || '—'}
                 </FieldRow>
                 <FieldRow label="Phone" icon={<Phone className="h-4 w-4" />}>
-                  {editingOverview ? (
-                    <Input value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="h-8 text-sm" />
-                  ) : ownerPhone || '—'}
+                  {editingOverview ? <Input value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="h-8 text-sm" /> : ownerPhone || '—'}
                 </FieldRow>
                 <FieldRow label="Email" icon={<Mail className="h-4 w-4" />}>
-                  {editingOverview ? (
-                    <Input value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} className="h-8 text-sm" />
-                  ) : (
+                  {editingOverview ? <Input value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} className="h-8 text-sm" /> : (
                     ownerEmail ? <a href={`mailto:${ownerEmail}`} className="text-primary hover:underline">{ownerEmail}</a> : '—'
                   )}
                 </FieldRow>
@@ -489,9 +608,7 @@ export default function AccountDetail() {
                   </div>
                 </FieldRow>
                 <FieldRow label="City" icon={<MapPin className="h-4 w-4" />}>
-                  {editingOverview ? (
-                    <Input value={city} onChange={e => setCity(e.target.value)} className="h-8 text-sm" />
-                  ) : city || '—'}
+                  {editingOverview ? <Input value={city} onChange={e => setCity(e.target.value)} className="h-8 text-sm" /> : city || '—'}
                 </FieldRow>
                 <FieldRow label="Tenancy Type" icon={<Building2 className="h-4 w-4" />}>
                   {editingOverview ? (
@@ -516,7 +633,6 @@ export default function AccountDetail() {
               </CardContent>
             </Card>
 
-            {/* Quick Stats */}
             <div className="space-y-4">
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-base">Quick Stats</CardTitle></CardHeader>
@@ -535,7 +651,6 @@ export default function AccountDetail() {
                 </CardContent>
               </Card>
 
-              {/* Status controls */}
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-base">Status Controls</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
@@ -543,27 +658,21 @@ export default function AccountDetail() {
                     <Label className="text-xs text-muted-foreground">Account Status</Label>
                     <Select value={accountStatus} onValueChange={v => handleStatusChange(v as AccountStatus)}>
                       <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.values(AccountStatus).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
-                      </SelectContent>
+                      <SelectContent>{Object.values(AccountStatus).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">PAN Verification</Label>
-                    <Select value={panStatus} onValueChange={v => setPanStatus(v as VerificationStatus)}>
+                    <Select value={panStatus} onValueChange={v => handleVerificationChange('pan', v as VerificationStatus)}>
                       <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.values(VerificationStatus).map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
-                      </SelectContent>
+                      <SelectContent>{Object.values(VerificationStatus).map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">ID Verification</Label>
-                    <Select value={idStatus} onValueChange={v => setIdStatus(v as VerificationStatus)}>
+                    <Select value={idStatus} onValueChange={v => handleVerificationChange('id', v as VerificationStatus)}>
                       <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.values(VerificationStatus).map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
-                      </SelectContent>
+                      <SelectContent>{Object.values(VerificationStatus).map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </CardContent>
@@ -571,14 +680,12 @@ export default function AccountDetail() {
             </div>
           </div>
 
-          {/* About / Description */}
+          {/* About */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">About / Description</CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base">About / Description</CardTitle></CardHeader>
             <CardContent>
               {editingOverview ? (
-                <Textarea value={overviewText} onChange={e => setOverviewText(e.target.value)} placeholder="Account overview, business context, special notes..." rows={4} />
+                <Textarea value={overviewText} onChange={e => setOverviewText(e.target.value)} placeholder="Account overview..." rows={4} />
               ) : (
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                   {overviewText || 'No description added yet. Click Edit above to add account context.'}
@@ -586,6 +693,26 @@ export default function AccountDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* From Enquiry Section */}
+          {sourceEnquiry && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-base">From Enquiry</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                  <div><span className="text-xs text-muted-foreground block">Team Size</span>{sourceEnquiry.team_size_estimate ?? '—'}</div>
+                  <div><span className="text-xs text-muted-foreground block">Focus Area</span>{sourceEnquiry.focus_area.join(', ') || '—'}</div>
+                  <div><span className="text-xs text-muted-foreground block">Sales Focus</span>{sourceEnquiry.sales_focus.map(s => s.replace(/_/g, ' ')).join(', ') || '—'}</div>
+                  <div><span className="text-xs text-muted-foreground block">Property Types</span>{sourceEnquiry.primary_property_types.join(', ') || '—'}</div>
+                  <div><span className="text-xs text-muted-foreground block">Current System</span>{sourceEnquiry.current_system_text || '—'}</div>
+                  <div><span className="text-xs text-muted-foreground block">Portals</span>{sourceEnquiry.portals_in_use.join(', ') || '—'}</div>
+                  <div><span className="text-xs text-muted-foreground block">Onboarding Date</span>{sourceEnquiry.approx_onboarding_date || '—'}</div>
+                  <div><span className="text-xs text-muted-foreground block">Phone</span>{sourceEnquiry.contact_phone || '—'}</div>
+                  <div><span className="text-xs text-muted-foreground block">Email</span>{sourceEnquiry.contact_email || '—'}</div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ═══ 2. ONBOARDING ═══ */}
@@ -615,17 +742,17 @@ export default function AccountDetail() {
         </TabsContent>
 
         {/* ═══ 3. VERIFICATION ═══ */}
-        <TabsContent value="verification" className="mt-4">
+        <TabsContent value="verification" className="mt-4 space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
-            {[{ label: 'PAN Verification', status: panStatus, setStatus: setPanStatus, icon: verificationIcons[panStatus] },
-              { label: 'Identity Verification', status: idStatus, setStatus: setIdStatus, icon: verificationIcons[idStatus] }].map(v => (
+            {[{ label: 'PAN Verification', status: panStatus, type: 'pan' as const, icon: verificationIcons[panStatus] },
+              { label: 'Identity Verification', status: idStatus, type: 'id' as const, icon: verificationIcons[idStatus] }].map(v => (
               <Card key={v.label}>
                 <CardHeader><CardTitle className="text-base flex items-center gap-2">{v.icon} {v.label}</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <Badge className={verificationColors[v.status]}>{v.status.replace(/_/g, ' ')}</Badge>
                   <div>
                     <Label className="text-xs text-muted-foreground">Update Status</Label>
-                    <Select value={v.status} onValueChange={val => v.setStatus(val as VerificationStatus)}>
+                    <Select value={v.status} onValueChange={val => handleVerificationChange(v.type, val as VerificationStatus)}>
                       <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>{Object.values(VerificationStatus).map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
                     </Select>
@@ -634,14 +761,22 @@ export default function AccountDetail() {
               </Card>
             ))}
           </div>
+          {/* Verification Notes */}
+          <Card>
+            <CardContent className="pt-6">
+              <NotesPanel
+                notes={notes.filter(n => n.note_text.includes('[PAN Verification]') || n.note_text.includes('[Identity Verification]'))}
+                compact
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ═══ 4. DATA INGESTION ═══ */}
         <TabsContent value="ingestion" className="mt-4 space-y-4">
           <div className="flex flex-wrap gap-2">
             {!showIngestionWizard && <Button onClick={() => setShowIngestionWizard(true)}><Plus className="h-4 w-4 mr-1" /> New Import</Button>}
-            <Button variant="outline" onClick={() => handleExport('account-data-csv')}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
-            <Button variant="outline" onClick={() => handleExport('account-data-pdf')}><Download className="h-4 w-4 mr-1" /> Export PDF</Button>
+            <Button variant="outline" onClick={() => setExportDialog(true)}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
             <Button variant="outline" onClick={() => handleExport('import-history')}><FileSpreadsheet className="h-4 w-4 mr-1" /> Export Import Log</Button>
           </div>
           {showIngestionWizard && <DataIngestionWizard accountId={account.account_id} onClose={() => setShowIngestionWizard(false)} />}
@@ -669,7 +804,8 @@ export default function AccountDetail() {
         </TabsContent>
 
         {/* ═══ 5. INTEGRATIONS ═══ */}
-        <TabsContent value="integrations" className="mt-4">
+        <TabsContent value="integrations" className="mt-4 space-y-4">
+          {/* Built-in integrations */}
           <div className="grid md:grid-cols-3 gap-4">
             {(['meta', 'google', 'website'] as const).map(key => {
               const connected = integrations[key]?.connected ?? false;
@@ -689,6 +825,32 @@ export default function AccountDetail() {
                 </Card>
               );
             })}
+          </div>
+
+          {/* Custom Portal Integrations */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Portal Integrations</h3>
+            <Button size="sm" onClick={() => setShowAddIntegration(true)}><Plus className="h-3 w-3 mr-1" /> Add Integration</Button>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4">
+            {customIntegrations.map(int => (
+              <Card key={int.id}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm">{int.name}</span>
+                    {int.connected ? <Wifi className="h-4 w-4 text-success" /> : <WifiOff className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                  <Badge className={int.connected ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}>{int.connected ? 'Connected' : 'Not Connected'}</Badge>
+                  {int.apiKey && (
+                    <p className="text-xs text-muted-foreground font-mono">Key: ••••{int.apiKey.slice(-4) || '••••'}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">{int.description}</p>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => toggleCustomIntegration(int.id)}>
+                    {int.connected ? 'Disconnect' : 'Connect'}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
 
