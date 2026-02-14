@@ -6,7 +6,7 @@ import {
 } from '@/data/seedData';
 import {
   EntityType, VerificationStatus, AccountStatus, CalendarEventStatus,
-  TicketPriority, TicketStatus, ImportType, IngestionStatus, TenancyType,
+  TicketPriority, TicketStatus, ImportType, IngestionStatus,
 } from '@/types/core';
 import type { ChecklistItem, Account } from '@/types/core';
 import { Badge } from '@/components/ui/badge';
@@ -342,114 +342,45 @@ export default function AccountDetail() {
           <TabsTrigger value="tickets">Tickets ({tickets.length})</TabsTrigger>
         </TabsList>
 
-        {/* 1. Overview — Rich Account Summary */}
-        <TabsContent value="overview" className="mt-4 space-y-4">
-          {/* Account Summary Panel */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Account Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {account.account_overview_text ? (
-                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{account.account_overview_text}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground/60 italic mb-4">No description added yet.</p>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                <div className="flex justify-between sm:block">
-                  <span className="text-muted-foreground">Owner</span>
-                  <span className="font-medium sm:ml-0 sm:block">{account.owner_name}</span>
-                </div>
-                <div className="flex justify-between sm:block">
-                  <span className="text-muted-foreground">Phone</span>
-                  <span className="font-medium sm:ml-0 sm:block">{account.owner_phone}</span>
-                </div>
-                <div className="flex justify-between sm:block">
-                  <span className="text-muted-foreground">Email</span>
-                  <span className="font-medium sm:ml-0 sm:block">{account.owner_email}</span>
-                </div>
-                <div className="flex justify-between sm:block">
-                  <span className="text-muted-foreground">WhatsApp</span>
-                  <span className="font-medium sm:ml-0 sm:block">{account.whatsapp_enabled ? 'Enabled' : 'Disabled'}</span>
-                </div>
-                <div className="flex justify-between sm:block">
-                  <span className="text-muted-foreground">Tenancy Type</span>
-                  <span className="font-medium sm:ml-0 sm:block">{account.tenancy_type === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency / Brokerage' : 'Builder / Developer'}</span>
-                </div>
-                <div className="flex justify-between sm:block">
-                  <span className="text-muted-foreground">City</span>
-                  <span className="font-medium sm:ml-0 sm:block">{account.city}</span>
-                </div>
-                {(account.overview_fields as Record<string, unknown>).team_size && (
-                  <div className="flex justify-between sm:block">
-                    <span className="text-muted-foreground">Team Size</span>
-                    <span className="font-medium sm:ml-0 sm:block">{String((account.overview_fields as Record<string, unknown>).team_size)}</span>
-                  </div>
-                )}
-                {(account.overview_fields as Record<string, unknown>).focus && (
-                  <div className="flex justify-between sm:block">
-                    <span className="text-muted-foreground">Focus Area</span>
-                    <span className="font-medium sm:ml-0 sm:block">{String((account.overview_fields as Record<string, unknown>).focus)}</span>
-                  </div>
-                )}
-                {(account.overview_fields as Record<string, unknown>).current_system && (
-                  <div className="flex justify-between sm:block">
-                    <span className="text-muted-foreground">Current System</span>
-                    <span className="font-medium sm:ml-0 sm:block">{String((account.overview_fields as Record<string, unknown>).current_system)}</span>
-                  </div>
-                )}
-                {(account.overview_fields as Record<string, unknown>).approx_onboarding_date && (
-                  <div className="flex justify-between sm:block">
-                    <span className="text-muted-foreground">Onboarding Date</span>
-                    <span className="font-medium sm:ml-0 sm:block">{String((account.overview_fields as Record<string, unknown>).approx_onboarding_date)}</span>
-                  </div>
-                )}
-                {Array.isArray((account.overview_fields as Record<string, unknown>).portals) && ((account.overview_fields as Record<string, unknown>).portals as string[]).length > 0 && (
-                  <div className="flex justify-between sm:block">
-                    <span className="text-muted-foreground">Portals in Use</span>
-                    <span className="font-medium sm:ml-0 sm:block">{((account.overview_fields as Record<string, unknown>).portals as string[]).join(', ')}</span>
-                  </div>
-                )}
-                <div className="flex justify-between sm:block">
-                  <span className="text-muted-foreground">Created</span>
-                  <span className="font-medium sm:ml-0 sm:block">{format(new Date(account.created_at), 'dd MMM yyyy')}</span>
-                </div>
+        {/* 1. Overview */}
+        <TabsContent value="overview" className="mt-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Account Details</CardTitle></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div><span className="text-muted-foreground">Owner: </span>{account.owner_name}</div>
+                <div><span className="text-muted-foreground">Phone: </span>{account.owner_phone}</div>
+                <div><span className="text-muted-foreground">Email: </span>{account.owner_email}</div>
+                <div><span className="text-muted-foreground">Created: </span>{format(new Date(account.created_at), 'dd MMM yyyy')}</div>
                 {account.created_from_enquiry_id && (
-                  <div className="flex justify-between sm:block">
-                    <span className="text-muted-foreground">From Enquiry</span>
-                    <Link to={`/enquiries/${account.created_from_enquiry_id}`} className="text-primary hover:underline font-medium sm:block">
+                  <div>
+                    <span className="text-muted-foreground">From Enquiry: </span>
+                    <Link to={`/enquiries/${account.created_from_enquiry_id}`} className="text-primary hover:underline">
                       {account.created_from_enquiry_id}
                     </Link>
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{progress}%</div>
-                <div className="text-xs text-muted-foreground mt-1">Onboarding</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{tickets.length}</div>
-                <div className="text-xs text-muted-foreground mt-1">Tickets</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{jobs.length}</div>
-                <div className="text-xs text-muted-foreground mt-1">Imports</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{documents.length}</div>
-                <div className="text-xs text-muted-foreground mt-1">Documents</div>
+              <CardHeader><CardTitle className="text-base">Quick Stats</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                <div className="text-center p-3 bg-muted/50 rounded-md">
+                  <div className="text-lg font-bold">{progress}%</div>
+                  <div className="text-xs text-muted-foreground">Onboarding</div>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-md">
+                  <div className="text-lg font-bold">{tickets.length}</div>
+                  <div className="text-xs text-muted-foreground">Tickets</div>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-md">
+                  <div className="text-lg font-bold">{jobs.length}</div>
+                  <div className="text-xs text-muted-foreground">Imports</div>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-md">
+                  <div className="text-lg font-bold">{documents.length}</div>
+                  <div className="text-xs text-muted-foreground">Documents</div>
+                </div>
               </CardContent>
             </Card>
           </div>

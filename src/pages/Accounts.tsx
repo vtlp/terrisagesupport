@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Building2, Plus } from 'lucide-react';
-import { CreateAccountDialog } from '@/components/shared/CreateAccountDialog';
-import { Button } from '@/components/ui/button';
+import { Search, Building2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +33,6 @@ export default function Accounts() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [tenancyFilter, setTenancyFilter] = useState<string>('all');
-  const [showCreate, setShowCreate] = useState(false);
 
   const filtered = seedAccounts.filter(a => {
     const matchSearch = a.account_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -62,15 +59,9 @@ export default function Accounts() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <CreateAccountDialog open={showCreate} onOpenChange={setShowCreate} />
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Accounts</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage accounts and onboarding</p>
-        </div>
-        <Button onClick={() => setShowCreate(true)} className="gap-1.5">
-          <Plus className="h-4 w-4" /> New Account
-        </Button>
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">Accounts</h1>
+        <p className="text-sm text-muted-foreground mt-1">Manage accounts and onboarding</p>
       </div>
 
       {/* Buckets */}
