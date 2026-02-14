@@ -7,8 +7,8 @@
 
 @layer base {
   :root {
-    /* Core Palette */
-    --primary: 68 100% 24%;
+    /* Core Palette — #667A00, #283000, #C1DE33, #F6F6F2 */
+    --primary: 73 100% 24%;
     --primary-foreground: 0 0% 100%;
     
     --secondary: 75 100% 9%;
@@ -17,8 +17,8 @@
     --accent: 71 73% 54%;
     --accent-foreground: 75 100% 9%;
     
-    /* Backgrounds */
-    --background: 60 13% 96%;
+    /* Backgrounds — #F6F6F2 */
+    --background: 60 17% 96%;
     --foreground: 75 100% 9%;
     
     --card: 0 0% 100%;
@@ -28,13 +28,13 @@
     --popover-foreground: 75 100% 9%;
     
     /* Muted & Subtle */
-    --muted: 60 8% 92%;
-    --muted-foreground: 75 20% 40%;
+    --muted: 60 10% 92%;
+    --muted-foreground: 75 15% 42%;
     
     /* Borders & Inputs */
     --border: 60 10% 88%;
     --input: 60 10% 88%;
-    --ring: 68 100% 24%;
+    --ring: 73 100% 24%;
     
     /* Destructive */
     --destructive: 0 72% 45%;
@@ -50,28 +50,28 @@
     --info: 210 80% 50%;
     --info-foreground: 0 0% 100%;
     
-    /* Priority Colors (restrained) */
+    /* Priority Colors */
     --priority-p1: 0 60% 50%;
     --priority-p2: 25 80% 55%;
-    --priority-p3: 68 100% 24%;
-    --priority-p4: 75 20% 50%;
+    --priority-p3: 73 100% 24%;
+    --priority-p4: 75 15% 50%;
     
     /* Status Colors */
-    --status-open: 68 100% 24%;
+    --status-open: 73 100% 24%;
     --status-pending: 38 80% 50%;
     --status-resolved: 142 70% 35%;
-    --status-closed: 75 20% 50%;
+    --status-closed: 75 15% 50%;
     
     /* Sidebar */
     --sidebar-background: 75 100% 9%;
-    --sidebar-foreground: 60 13% 96%;
-    --sidebar-primary: 68 100% 24%;
+    --sidebar-foreground: 60 17% 96%;
+    --sidebar-primary: 73 100% 24%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 71 73% 54%;
     --sidebar-accent-foreground: 75 100% 9%;
-    --sidebar-border: 75 50% 15%;
+    --sidebar-border: 75 40% 16%;
     --sidebar-ring: 71 73% 54%;
-    --sidebar-muted: 75 50% 20%;
+    --sidebar-muted: 75 40% 18%;
     
     /* Radius */
     --radius: 0.5rem;
@@ -79,32 +79,51 @@
 
   .dark {
     --primary: 71 73% 54%;
-    --primary-foreground: 75 100% 9%;
+    --primary-foreground: 75 100% 6%;
     
-    --secondary: 75 50% 15%;
-    --secondary-foreground: 60 13% 96%;
+    --secondary: 75 40% 14%;
+    --secondary-foreground: 60 17% 96%;
     
-    --accent: 68 100% 24%;
+    --accent: 73 100% 24%;
     --accent-foreground: 0 0% 100%;
     
-    --background: 75 100% 9%;
-    --foreground: 60 13% 96%;
+    --background: 75 100% 7%;
+    --foreground: 60 17% 92%;
     
-    --card: 75 50% 12%;
-    --card-foreground: 60 13% 96%;
+    --card: 75 40% 10%;
+    --card-foreground: 60 17% 92%;
     
-    --popover: 75 50% 12%;
-    --popover-foreground: 60 13% 96%;
+    --popover: 75 40% 10%;
+    --popover-foreground: 60 17% 92%;
     
-    --muted: 75 50% 15%;
-    --muted-foreground: 60 10% 70%;
+    --muted: 75 30% 15%;
+    --muted-foreground: 60 10% 65%;
     
-    --border: 75 50% 20%;
-    --input: 75 50% 20%;
+    --border: 75 30% 18%;
+    --input: 75 30% 18%;
     --ring: 71 73% 54%;
     
-    --sidebar-background: 75 100% 6%;
-    --sidebar-foreground: 60 13% 96%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --success: 142 60% 40%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 85% 55%;
+    --warning-foreground: 0 0% 100%;
+    
+    --info: 210 75% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --sidebar-background: 75 100% 5%;
+    --sidebar-foreground: 60 17% 92%;
+    --sidebar-primary: 71 73% 54%;
+    --sidebar-primary-foreground: 75 100% 6%;
+    --sidebar-accent: 73 100% 24%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 75 30% 14%;
+    --sidebar-ring: 71 73% 54%;
+    --sidebar-muted: 75 30% 12%;
   }
 }
 
@@ -116,10 +135,18 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Smooth theme transitions */
+  body,
+  .dark body {
+    transition: background-color 0.3s ease, color 0.2s ease;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight text-secondary;
+    @apply font-semibold tracking-tight text-foreground;
   }
 }
 
@@ -180,11 +207,11 @@
   
   /* KPI Card */
   .kpi-card {
-    @apply bg-card rounded-lg border border-border p-4 hover:shadow-md transition-shadow cursor-pointer;
+    @apply bg-card rounded-lg border border-border p-4 hover:shadow-md transition-all duration-200 cursor-pointer;
   }
   
   .kpi-card-value {
-    @apply text-3xl font-bold text-secondary;
+    @apply text-3xl font-bold text-foreground;
   }
   
   .kpi-card-label {
