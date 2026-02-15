@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Search, Building2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -30,9 +30,17 @@ const tenancyLabels: Record<TenancyType, string> = {
 };
 
 export default function Accounts() {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [tenancyFilter, setTenancyFilter] = useState<string>('all');
+
+  useEffect(() => {
+    const status = searchParams.get('status');
+    if (status === 'STALLED_ONBOARDING') {
+      setStatusFilter(AccountStatus.STALLED_ONBOARDING);
+    }
+  }, [searchParams]);
 
   const filtered = seedAccounts.filter(a => {
     const matchSearch = a.account_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -64,7 +72,6 @@ export default function Accounts() {
         <p className="text-sm text-muted-foreground mt-1">Manage accounts and onboarding</p>
       </div>
 
-      {/* Buckets */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {buckets.map(b => (
           <Card key={b.label}>
@@ -76,7 +83,6 @@ export default function Accounts() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -99,7 +105,6 @@ export default function Accounts() {
         </Select>
       </div>
 
-      {/* Desktop Table */}
       <div className="hidden md:block">
         <Card>
           <Table>
@@ -143,7 +148,6 @@ export default function Accounts() {
         </Card>
       </div>
 
-      {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {filtered.map(a => (
           <Link key={a.account_id} to={`/accounts/${a.account_id}`}>

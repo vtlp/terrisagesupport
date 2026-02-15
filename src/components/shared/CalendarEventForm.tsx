@@ -13,13 +13,14 @@ interface CalendarEventFormProps {
   onSubmit: (data: { title: string; date: Date; time: string; notes: string }) => void;
   onCancel: () => void;
   defaultTitle?: string;
+  defaultDescription?: string;
 }
 
-export function CalendarEventForm({ onSubmit, onCancel, defaultTitle = '' }: CalendarEventFormProps) {
+export function CalendarEventForm({ onSubmit, onCancel, defaultTitle = '', defaultDescription = '' }: CalendarEventFormProps) {
   const [title, setTitle] = useState(defaultTitle);
   const [date, setDate] = useState<Date | undefined>();
   const [time, setTime] = useState('10:00');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(defaultDescription);
 
   const handleSubmit = () => {
     if (title && date) {

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Search, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useNavigate } from 'react-router-dom';
 import { seedEnquiries, seedCalendarEvents, seedNotes, getUserName } from '@/data/seedData';
 import { EnquiryStage, EnquirySource, EnquiryOutcome, TenancyType, CalendarEventStatus, EntityType } from '@/types/core';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
@@ -46,11 +46,21 @@ const outcomeLabels: Record<EnquiryOutcome, string> = {
 
 export default function Enquiries() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [tenancyFilter, setTenancyFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [outcomeFilter, setOutcomeFilter] = useState<string>('all');
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Read URL query params for pre-filtering
+  useEffect(() => {
+    const status = searchParams.get('status');
+    if (status === 'follow_up_needed') {
+      setStageFilter(EnquiryStage.NEW_ENQUIRY);
+    }
+  }, [searchParams]);
 
   // Counters
   const total = seedEnquiries.length;
@@ -72,7 +82,8 @@ export default function Enquiries() {
     const matchStage = stageFilter === 'all' || e.stage === stageFilter;
     const matchTenancy = tenancyFilter === 'all' || e.tenancy_type === tenancyFilter;
     const matchSource = sourceFilter === 'all' || e.source === sourceFilter;
-    return matchSearch && matchStage && matchTenancy && matchSource;
+    const matchOutcome = outcomeFilter === 'all' || e.outcome === outcomeFilter;
+    return matchSearch && matchStage && matchTenancy && matchSource && matchOutcome;
   });
 
   const getNextAction = (enquiryId: string) => {
@@ -92,7 +103,7 @@ export default function Enquiries() {
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Inquiry Pipeline</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Enquiry Pipeline</h1>
           <p className="text-sm text-muted-foreground mt-1">Capture and convert leads into accounts</p>
         </div>
         <Button className="bg-primary hover:bg-primary/90" onClick={() => setCreateOpen(true)}>
@@ -101,7 +112,7 @@ export default function Enquiries() {
         </Button>
       </div>
 
-      {/* Counters — NOT clickable */}
+      {/* Counters */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {[
           { label: 'Total', value: total },
@@ -121,7 +132,7 @@ export default function Enquiries() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex flex-col md:flex-row gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search name, city, phone..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
@@ -146,6 +157,13 @@ export default function Enquiries() {
           <SelectContent>
             <SelectItem value="all">All Sources</SelectItem>
             {Object.values(EnquirySource).map(s => <SelectItem key={s} value={s}>{sourceLabels[s]}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Outcome" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Outcomes</SelectItem>
+            {Object.values(EnquiryOutcome).map(o => <SelectItem key={o} value={o}>{outcomeLabels[o]}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

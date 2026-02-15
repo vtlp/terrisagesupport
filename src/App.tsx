@@ -12,6 +12,7 @@ import AccountDetail from "@/pages/AccountDetail";
 import Enquiries from "@/pages/Enquiries";
 import EnquiryDetail from "@/pages/EnquiryDetail";
 import EnquiryPipelineDashboard from "@/pages/EnquiryPipelineDashboard";
+import CalendarPage from "@/pages/CalendarPage";
 import Tickets from "@/pages/Tickets";
 import Knowledge from "@/pages/Knowledge";
 import Marketing from "@/pages/Marketing";
@@ -36,6 +37,7 @@ const App = () => (
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/enquiries" element={<Enquiries />} />
                 <Route path="/enquiries/dashboard" element={<EnquiryPipelineDashboard />} />
+                <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/enquiries/:enquiryId" element={<EnquiryDetail />} />
                 <Route path="/accounts" element={<Accounts />} />
                 <Route path="/accounts/:accountId" element={<AccountDetail />} />

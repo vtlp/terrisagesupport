@@ -22,6 +22,7 @@ import {
   Phone, X, Save,
 } from 'lucide-react';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
+import { getCityOptions, getTagOptions } from '@/data/lookupData';
 import { toast } from 'sonner';
 
 const priorityColors: Record<TicketPriority, string> = {
@@ -502,11 +503,17 @@ export default function Tickets() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">City:</span>
-                    <Input value={editCity} onChange={e => setEditCity(e.target.value)} className="h-7 text-sm border-none p-0 bg-transparent w-auto flex-1" placeholder="City" />
+                    <Select value={editCity} onValueChange={setEditCity}>
+                      <SelectTrigger className="h-7 text-xs border-none bg-transparent w-auto"><SelectValue placeholder="City" /></SelectTrigger>
+                      <SelectContent className="max-h-48">
+                        <SelectItem value="">None</SelectItem>
+                        {getCityOptions().map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                {/* Tags — editable */}
+                {/* Tags — editable with lookup suggestions */}
                 <div className="flex items-center gap-2 flex-wrap pt-1">
                   <Tag className="h-3 w-3 text-muted-foreground" />
                   {editTags.map(tag => (
@@ -515,12 +522,19 @@ export default function Tickets() {
                       <X className="h-3 w-3 cursor-pointer" onClick={() => setEditTags(editTags.filter(x => x !== tag))} />
                     </Badge>
                   ))}
-                  <div className="flex gap-1">
+                </div>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {getTagOptions().filter(t => !editTags.includes(t)).map(tag => (
+                    <Badge key={tag} variant="secondary" className="text-[10px] cursor-pointer hover:bg-primary/15" onClick={() => setEditTags([...editTags, tag])}>
+                      + {tag}
+                    </Badge>
+                  ))}
+                  <div className="flex gap-1 ml-1">
                     <Input
                       value={tagInput}
                       onChange={e => setTagInput(e.target.value)}
-                      placeholder="Add tag..."
-                      className="h-6 text-xs w-24 border-dashed"
+                      placeholder="Custom…"
+                      className="h-6 text-xs w-20 border-dashed"
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
                     />
                   </div>

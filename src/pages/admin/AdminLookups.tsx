@@ -6,11 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, X, Pencil, Check, ListChecks, Tag, MapPin, Globe } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface LookupItem {
-  id: string;
-  value: string;
-}
+import { defaultSources, defaultTags, defaultMarkets, defaultPortals, type LookupItem } from '@/data/lookupData';
 
 function LookupEditor({ title, icon: Icon, items: initial, description }: {
   title: string;
@@ -111,49 +107,6 @@ function LookupEditor({ title, icon: Icon, items: initial, description }: {
   );
 }
 
-const defaultSources: LookupItem[] = [
-  { id: 'S1', value: 'Call (Direct)' },
-  { id: 'S2', value: 'Landing Page' },
-  { id: 'S3', value: 'Meta Ads' },
-  { id: 'S4', value: 'Champion / Partner' },
-  { id: 'S5', value: 'CP Request (Projects)' },
-];
-
-const defaultTags: LookupItem[] = [
-  { id: 'T1', value: 'export' },
-  { id: 'T2', value: 'integration' },
-  { id: 'T3', value: 'billing' },
-  { id: 'T4', value: 'onboarding' },
-  { id: 'T5', value: 'login' },
-  { id: 'T6', value: 'performance' },
-  { id: 'T7', value: 'mobile' },
-  { id: 'T8', value: 'data-import' },
-  { id: 'T9', value: 'leads' },
-  { id: 'T10', value: 'google' },
-];
-
-const defaultMarkets: LookupItem[] = [
-  { id: 'M1', value: 'Mumbai' },
-  { id: 'M2', value: 'Pune' },
-  { id: 'M3', value: 'Delhi' },
-  { id: 'M4', value: 'Bangalore' },
-  { id: 'M5', value: 'Chennai' },
-  { id: 'M6', value: 'Hyderabad' },
-  { id: 'M7', value: 'Kolkata' },
-  { id: 'M8', value: 'Ahmedabad' },
-  { id: 'M9', value: 'Jaipur' },
-  { id: 'M10', value: 'Kochi' },
-];
-
-const defaultPortals: LookupItem[] = [
-  { id: 'P1', value: 'MagicBricks' },
-  { id: 'P2', value: '99acres' },
-  { id: 'P3', value: 'Housing.com' },
-  { id: 'P4', value: 'NoBroker' },
-  { id: 'P5', value: 'CommonFloor' },
-  { id: 'P6', value: 'Square Yards' },
-];
-
 export default function AdminLookups() {
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -184,7 +137,7 @@ export default function AdminLookups() {
             title="Ticket Tags"
             icon={Tag}
             items={defaultTags}
-            description="Tags available for categorizing support tickets. Users can also add custom tags."
+            description="Tags available for categorising support tickets. Users can also add custom tags."
           />
         </TabsContent>
 

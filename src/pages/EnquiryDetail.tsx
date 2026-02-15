@@ -31,6 +31,7 @@ import {
 
 const PORTAL_OPTIONS = ['MagicBricks', '99acres', 'Housing.com', 'NoBroker', 'Square Yards', 'CommonFloor', 'Other'];
 const CURRENT_SYSTEM_OPTIONS = ['CRM', 'Spreadsheet', 'Other'];
+import { getCityOptions } from '@/data/lookupData';
 const COUNTRY_CODES = [
   { code: '+91', label: '🇮🇳 +91 India' },
   { code: '+1', label: '🇺🇸 +1 USA' },
@@ -202,13 +203,12 @@ export default function EnquiryDetail() {
 
   const handleRevertConfirm = () => {
     if (!pendingStage) return;
-    update({ stage: pendingStage });
-    // Log system note
+    // Log system note for revert
     const newNote: Note = {
       note_id: `N_RV_${Date.now()}`,
       entity_type: EntityType.ENQUIRY,
       entity_id: enquiry.enquiry_id,
-      note_text: `[System] Stage reverted to "${stageLabels[pendingStage]}" for damage control.`,
+      note_text: `[System] Stage reverted to "${stageLabels[pendingStage]}" by ${currentUser.full_name} at ${format(new Date(), 'dd MMM yyyy, HH:mm')}. Reason: damage control.`,
       created_by_user_id: currentUser.user_id,
       created_at: new Date().toISOString(),
     };
@@ -235,6 +235,17 @@ export default function EnquiryDetail() {
         not_interested_reason: stageOutcome === EnquiryOutcome.NOT_INTERESTED ? stageNiReason : null,
         not_interested_text: stageOutcome === EnquiryOutcome.NOT_INTERESTED ? stageNiText : '',
       });
+      // Timeline note for stage update
+      const stageNote: Note = {
+        note_id: `N_ST_${Date.now()}`,
+        entity_type: EntityType.ENQUIRY,
+        entity_id: enquiry.enquiry_id,
+        note_text: `[System] Stage updated to "Contacted" by ${currentUser.full_name} at ${format(new Date(), 'dd MMM yyyy, HH:mm')}`,
+        created_by_user_id: currentUser.user_id,
+        created_at: new Date().toISOString(),
+      };
+      seedNotes.push(stageNote);
+      update({ notes_thread: [...enquiry.notes_thread, stageNote.note_id] });
       toast.success('Stage updated to Contacted');
 
       // CALL_LATER triggers calendar event
@@ -269,6 +280,8 @@ export default function EnquiryDetail() {
       const missing = canScheduleDemo();
       if (missing.length > 0) {
         toast.warning(`Fill prerequisites before scheduling: ${missing.join(', ')}`);
+      } else {
+        setShowDemoSchedule(true);
       }
     }
     if (outcome === EnquiryOutcome.NOT_INTERESTED) {
@@ -418,7 +431,12 @@ export default function EnquiryDetail() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> City</Label>
-                  <Input value={enquiry.city} onChange={e => update({ city: e.target.value })} disabled={isConverted} />
+                  <Select value={enquiry.city} onValueChange={v => update({ city: v })} disabled={isConverted}>
+                    <SelectTrigger><SelectValue placeholder="Select city…" /></SelectTrigger>
+                    <SelectContent className="max-h-48">
+                      {getCityOptions().map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -611,7 +629,9 @@ export default function EnquiryDetail() {
               {/* Current outcome display */}
               {enquiry.outcome && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Label className="text-xs text-muted-foreground">Outcome:</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    {enquiry.stage === EnquiryStage.CONTACTED ? 'Latest Contact Outcome:' : 'Outcome:'}
+                  </Label>
                   <Badge variant="outline">{outcomeLabels[enquiry.outcome]}</Badge>
                   {enquiry.outcome === EnquiryOutcome.NOT_INTERESTED && enquiry.not_interested_reason && (
                     <Badge variant="outline" className="text-destructive border-destructive/30">{niReasonLabels[enquiry.not_interested_reason]}</Badge>
