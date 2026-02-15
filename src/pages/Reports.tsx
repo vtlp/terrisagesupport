@@ -40,12 +40,12 @@ const activeAccounts = usageData.filter(a => a.status === AccountStatus.LIVE || 
 
 // Feature adoption data
 const featureAdoption = [
-  { feature: 'Lead Capture', adoption: 92 },
-  { feature: 'Follow-ups', adoption: 78 },
-  { feature: 'Integrations', adoption: 45 },
-  { feature: 'Reports', adoption: 62 },
-  { feature: 'Bulk Import', adoption: 38 },
-  { feature: 'Inventory Mgmt', adoption: 28 },
+  { feature: 'Enquiry Capture', adoption: 92 },
+  { feature: 'Convert to Lead Button', adoption: 78 },
+  { feature: 'Creating Manual Leads', adoption: 65 },
+  { feature: 'Creating Tasks', adoption: 58 },
+  { feature: 'Task Types Usage', adoption: 42 },
+  { feature: 'Channel Partner Section', adoption: 35 },
 ];
 
 // Engagement trend (weekly)

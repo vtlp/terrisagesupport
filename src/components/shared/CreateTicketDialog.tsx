@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, TimelineEventType, type SupportTicket } from '@/types/core';
 import { seedAccounts } from '@/data/seedData';
+import { getCityOptions, getTagOptions } from '@/data/lookupData';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
 import { toast } from 'sonner';
 
@@ -29,10 +30,13 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
   const [accountId, setAccountId] = useState<string>('none');
   const [assignedTo, setAssignedTo] = useState<string | null>(null);
   const [market, setMarket] = useState('');
-  const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [requesterName, setRequesterName] = useState('');
   const [requesterEmail, setRequesterEmail] = useState('');
+
+  const cities = getCityOptions();
+  const availableTags = getTagOptions();
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -40,11 +44,15 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
     setTagInput('');
   };
 
+  const toggleTag = (tag: string) => {
+    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
   const reset = () => {
     setSubject(''); setDescription(''); setPriority(TicketPriority.P3);
     setType(TicketType.INCIDENT); setCategory(TicketCategory.OTHER);
     setAccountId('none'); setAssignedTo(null);
-    setMarket(''); setTagInput(''); setTags([]);
+    setMarket(''); setTags([]); setTagInput('');
     setRequesterName(''); setRequesterEmail('');
   };
 
@@ -164,13 +172,31 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
           </div>
           <div className="space-y-1.5">
             <Label>City</Label>
-            <Input value={market} onChange={e => setMarket(e.target.value)} placeholder="e.g. Mumbai, Delhi" />
+            <Select value={market} onValueChange={setMarket}>
+              <SelectTrigger><SelectValue placeholder="Select city…" /></SelectTrigger>
+              <SelectContent className="bg-card max-h-48">
+                <SelectItem value="">None</SelectItem>
+                {cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label>Tags</Label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {availableTags.map(tag => (
+                <Badge
+                  key={tag}
+                  variant={tags.includes(tag) ? 'default' : 'outline'}
+                  className="cursor-pointer text-xs"
+                  onClick={() => toggleTag(tag)}
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
             <div className="flex gap-2">
               <Input value={tagInput} onChange={e => setTagInput(e.target.value)}
-                placeholder="Add tag…"
+                placeholder="Add custom tag…"
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
               <Button type="button" variant="outline" size="sm" onClick={addTag}>Add</Button>
             </div>
