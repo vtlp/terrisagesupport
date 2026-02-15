@@ -1,141 +1,186 @@
+# Implementation Plan: Multi-Module Enhancements (9 Items)
 
-
-# Implementation Plan: Tickets, Dashboard, Enquiry, and Accounts Enhancements
-
-This plan covers all requested changes across four modules plus a universal voice-to-text addition and calendar event entity filtering.
+This plan covers ticket tag/city lookups, Indian city master list, dashboard navigation, enquiry filters and stage logic, calendar module separation, account billing tab, and reports feature adoption updates.
 
 ---
 
-## 1. Support Tickets Module
+## 1. Tags and Cities from Admin Lookups
 
-### 1.1 Show City (replace "Market" label)
-- In `Tickets.tsx` detail panel and `CreateTicketDialog.tsx`, rename the "Market" field label to "City" throughout. The underlying `market_field` data stays the same.
+### 1.1 Shared Lookup Data
 
-### 1.2 Practical SLA Defaults
-- Update `CreateTicketDialog.tsx` SLA calculation to use realistic business-hour windows:
-  - P1: First Response = 1 hour, Resolution = 4 hours
-  - P2: First Response = 4 hours, Resolution = 8 hours
-  - P3: First Response = 8 hours, Resolution = 24 hours
-  - P4: First Response = 24 hours, Resolution = 72 hours
-- Fix the `SLATimer` display: when breached, show "Breached" (no "left"); when active, show the time remaining clearly.
+- Create a new file `src/data/lookupData.ts` that exports the default tags, markets/cities, portals, and sources arrays. Both `AdminLookups.tsx` and consuming pages (`CreateTicketDialog.tsx`, `Tickets.tsx`, `EnquiryDetail.tsx`, city dropdowns everywhere) will import from this single source of truth.
 
-### 1.3 Merge "Account & Requester" + "Details" into one "Account Details" card
-- Combine the two info cards into a single card titled "Account Details" containing: Account link, Requester name, Email, Type, Category, Tags, and City -- all in one clean block.
+### 1.2 Ticket Creation -- Tags from Lookups
 
-### 1.4 Editable Ticket Fields
-- Make subject, description, type, category, tags, city, requester name, and requester email editable inline.
-- Add local state for each editable field. Non-editable fields: Ticket ID, created_at, timeline entries.
+- In `CreateTicketDialog.tsx`, replace the free-text tag input with a **selectable tag list** (checkboxes or clickable badges) sourced from `lookupData.ts` default tags, plus retain the ability to type a custom tag.
 
-### 1.5 Call and WhatsApp CTAs
-- Add a "Call" button (tel: link) and a "WhatsApp" button (wa.me link) next to the requester's contact info, using the requester email/phone or linked account's phone.
+### 1.3 City Dropdowns from Lookups
 
-### 1.6 Update/Cancel + Close Ticket with Comments
-- Add "Update" and "Cancel" buttons in the top-right of ticket detail. "Update" persists edits; "Cancel" reverts to original values.
-- Add unsaved-changes validation -- warn before navigating away.
-- "Close Ticket" button opens a dialog requiring closing comments before setting status to CLOSED and adding a timeline entry.
-
-### 1.7 Collapsible Left Panel
-- Add a toggle button to collapse/expand the 384px ticket list panel. When collapsed, the detail view takes full width. Store state locally.
+- Replace all free-text city inputs (`CreateTicketDialog.tsx` city field, `Tickets.tsx` edit city, `EnquiryDetail.tsx` city, `CreateEnquiryDialog.tsx`) with a `<Select>` dropdown populated from the shared markets/cities list.
 
 ---
 
-## 2. Dashboard
+## 2. Comprehensive Indian Cities List
 
-### 2.1 Calendar Events Section
-- Add a new card below the existing KPI row: "Today's Calendar" and "This Week" tabs.
-- Filter `seedCalendarEvents` for events with `UPCOMING` status.
-- Default view: "My Events" (filtered by current user's `user_id`).
-- Add a toggle/dropdown: "My Events" vs "All Team" to see events for all users.
-- Each event row shows: title, entity type badge, scheduled time, and a link to the parent entity.
+### 2.1 Update Markets in `lookupData.ts`
 
----
-
-## 3. Enquiry Module
-
-### 3.1 WhatsApp Toggle Adjacent to Phone + Country Code
-- Move the WhatsApp toggle to sit inline next to the primary phone number field.
-- Add a country code dropdown (defaulted to "+91 India") before each phone input (primary and alt).
-- Add a "Consent" checkbox below the phone section: "Contact consent received".
-- Store `consent_given` as a boolean field on the enquiry (add to local state; the type can be extended later).
-
-### 3.2 Allow Backward Stage Movement
-- Remove the forward-only restriction in `handleStageChange`. Allow clicking any previous stage pill.
-- When moving backward, show a confirmation dialog: "Are you sure you want to revert to [stage]? This is for damage control only."
-- Log a timeline/system note on revert.
-
-### 3.3 "Call Later" Outcome Triggers Calendar Event
-- When outcome is set to `CALL_LATER` (in stage modal or direct outcome change), automatically open the CalendarEventForm dialog with a pre-filled title "Call back -- [company name]".
-
-### 3.4 Portals as Selectable Options + Current System Dropdown
-- Replace the free-text "Portals in Use" input with a multi-select checkbox list of common portals: MagicBricks, 99acres, Housing.com, NoBroker, Square Yards, CommonFloor, Other.
-- Replace the "Current System" free-text with a dropdown: CRM, Spreadsheet, Other (with a text input for "Other" to capture details).
-
-### 3.5 Enquiry Calendar Tab (renamed from "Calendar Events")
-- Rename the right-sidebar "Calendar Events" section to "Enquiry Calendar".
-- Only show events where `entity_type === ENQUIRY` and `entity_id === current enquiry`.
-- Add a filter toggle: "My Events" / "All Team" (filter by `created_by_user_id`).
+- Replace the current 10-city list with a comprehensive list of tier-1 and tier-2 cities across every Indian state.
+- **Top 10 (most popular, shown first)**: Mumbai, Delhi, Bangalore, Hyderabad, Pune, Chennai, Kolkata, Ahmedabad, Jaipur, Lucknow
+- **Remaining cities in alphabetical order**: Agra, Amritsar, Bhopal, Bhubaneswar, Chandigarh, Coimbatore, Dehradun, Faridabad, Ghaziabad, Goa (Panaji), Gurgaon, Guwahati, Indore, Kanpur, Kochi, Ludhiana, Madurai, Mangalore, Meerut, Mysore, Nagpur, Nashik, Noida, Patna, Raipur, Rajkot, Ranchi, Surat, Thane, Thiruvananthapuram, Udaipur, Vadodara, Varanasi, Vijayawada, Visakhapatnam, and more.
+- Update `AdminLookups.tsx` to import from the shared file instead of its own hardcoded defaults.
 
 ---
 
-## 4. Accounts Module
+## 3. Dashboard Navigation Links
 
-### 4.1 Verification Tab: Mandatory Note on Status Change
-- In the Verification tab, when PAN or Identity status is changed via the dropdown, intercept the change and show a dialog requiring a note before the status update is saved.
-- The note is saved to `seedNotes` linked to the account with a prefix like "[PAN Verification] Status changed to VERIFIED: [user note]".
+### 3.1 Clickable Bucket Headers
 
-### 4.2 Data Tab: Simplify Exports
-- Remove "Export PDF" button.
-- Change "Export CSV" to open a dialog with radio options: "Leads Only", "Properties Only", "Enquiries Only", "All".
-- Keep "Export Import Log" as-is.
+- Make the "Enquiries" card header in Dashboard link to `/enquiries`.
+- Make the "Onboarding Pipeline" card header link to `/accounts`.
+- Make the "Tickets & Issues" card header link to `/tickets`.
 
-### 4.3 Integrations Tab: Add Custom Integrations
-- Add an "Add Integration" button that opens a form with fields: Integration Name, API Key, Endpoint URL, Description, and Status toggle.
-- Store integrations in local state as an array of objects.
-- Display each integration as a card with: name, status badge, API key (masked), and Connect/Disconnect toggle.
-- Pre-populate with common portal names: MagicBricks, 99acres, Housing.com, NoBroker, etc.
+### 3.2 Attention Cards with Filtered Navigation
 
-### 4.4 Universal Voice-to-Text Mic on All Notes
-- Update `NotesPanel.tsx` to include a microphone icon button next to the textarea.
-- On click, use the browser's `SpeechRecognition` Web API (with fallback message if unsupported) to transcribe speech and append to the note textarea.
-- Since `NotesPanel` is shared across Enquiry, Account, and Ticket detail views, this applies universally.
-
-### 4.5 Carry Over All Enquiry Fields to Account
-- When an account is created from an enquiry conversion, ensure these fields are mapped and visible in the Account Overview:
-  - `team_size_estimate`, `focus_area`, `sales_focus`, `primary_property_types`, `current_system_text`, `portals_in_use`, `approx_onboarding_date`, `contact_phone`, `contact_phone_alt`, `contact_email`
-- Display these under the Account Overview in a "From Enquiry" sub-section (read-only) if `created_from_enquiry_id` is present.
+- "Accounts Attention" card: on click, navigate to `/accounts?status=STALLED_ONBOARDING`.
+- "Enquiries Attention" card: on click, navigate to `/enquiries?status=follow_up_needed`.
+- Update `Accounts.tsx` and `Enquiries.tsx` to read URL query parameters and pre-set filters on mount.
 
 ---
 
-## 5. Calendar Event Entity Filtering (Universal Rule)
+## 4. Enquiry Pipeline Outcome Filter and British English
 
-- All calendar views filter events by entity context:
-  - Enquiry Calendar: only shows events with `entity_type === ENQUIRY` and matching `entity_id`
-  - Account Calendar: only shows events with `entity_type === ACCOUNT` and matching `entity_id`
-  - Dashboard Calendar: shows all events, filterable by "My Events" / "All Team"
-- This is already partially in place; the plan ensures strict filtering and consistent labeling.
+### 4.1 Add Outcome Filter
+
+- In `Enquiries.tsx`, add an "Outcome" filter dropdown alongside the existing stage, tenancy, and source filters. Options: All Outcomes, Interested, Call Later, Schedule Demo, Not Interested, Wrong/Bounced Number.
+
+### 4.2 British English Spellings
+
+- Audit all user-facing text across the application and update American spellings to British English where applicable (e.g., "Customize" to "Customise", "Organization" to "Organisation", "Canceled" to "Cancelled", "Categorize" to "Categorise"). This will be applied across all files with visible text.
+
+---
+
+## 5. Latest Contact Outcome Label in Pipeline Stage
+
+- In `EnquiryDetail.tsx`, under the Pipeline Stage card, when the enquiry is at CONTACTED stage and has an outcome set, display a labelled section: **"Latest Contact Outcome"** showing the outcome badge and any associated reason, replacing the current generic "Outcome:" label.
+
+---
+
+## 6. Schedule Demo Outcome Auto-Opens Demo Scheduler
+
+- In `EnquiryDetail.tsx`, when the outcome is changed to `SCHEDULE_DEMO` (via `handleOutcomeChange` or the stage modal), automatically open the demo scheduler (`setShowDemoSchedule(true)`) with:
+  - Pre-filled title: "Demo -- [company name]"
+  - Pre-filled description with contact email as invitee reference
+- Update `CalendarEventForm.tsx` to accept optional `defaultDescription` prop for pre-population.
+
+---
+
+## 7. Stage Update Creates Timeline Note
+
+- In `EnquiryDetail.tsx`, whenever a stage is updated (forward or backward), automatically create a system note with a timestamp entry like: `[System] Stage updated to "Contacted" by [user name] at [timestamp]`.
+- This applies to all stage transitions: forward progression, backward revert, and stage modal confirmations. The note is pushed to `seedNotes` and the enquiry's `notes_thread`.
+
+---
+
+## 8. Reports Feature Adoption Update
+
+- In `Reports.tsx`, update the `featureAdoption` array to reflect the requested features:
+  - "Enquiry Capture" (replaces current "Lead Capture")
+  - "Convert to Lead Button"
+  - "Creating Manual Leads"
+  - "Creating Tasks"
+  - "Task Types Usage"
+  - "Channel Partner Section"
+- Remove the old items (Follow-ups, Integrations, Reports, Bulk Import, Inventory Mgmt) and replace with the above list.
+
+---
+
+## 9. Separate Calendar Module from Inquiry Pipeline
+
+### 9.1 New Route and Page
+
+- Create `src/pages/CalendarPage.tsx` -- a standalone full calendar page.
+- Add route `/calendar` in `App.tsx`.
+
+### 9.2 Calendar Page Content
+
+- Full month calendar grid (reuse the calendar grid pattern from `EnquiryPipelineDashboard.tsx`).
+- **Entity filter**: All Events, Enquiries, Accounts, Tickets, Marketing, Others.
+- **Team member filter**: Dropdown to select "My Calendar" or any individual team member (populated from `seedUsers`). Admins can view any team member's calendar.
+- Below the calendar grid, a **list view** of events for the selected month, sorted chronologically.
+- No KPI buckets or funnel -- purely calendar-focused.
+
+### 9.3 Update Sidebar Navigation
+
+- Remove the "Calendar & Dashboard" sub-item from the Inquiry Pipeline collapsible group.
+- The Inquiry Pipeline group will only contain "All Enquiries" (or become a single non-collapsible nav item since there is only one sub-item).
+- Add a new top-level nav item "Calendar" with the `CalendarDays` icon, positioned after "Inquiry Pipeline".
+
+### 9.4 Clean Up
+
+- Remove or repurpose `EnquiryPipelineDashboard.tsx` since its functionality is now in `CalendarPage.tsx`.
+- Remove the `/enquiries/dashboard` route.
+
+---
+
+## 10. Account Billing Tab
+
+### 10.1 Add Billing Tab
+
+- In `AccountDetail.tsx`, add a new "Billing" tab after the existing tabs.
+
+### 10.2 Billing Tab Content
+
+- **Payment Plan Selection**: Radio group with three options:
+  - Quarterly (4 months) -- billed 3 times/year
+  - Half-Yearly (6 months) -- billed 2 times/year
+  - Annual (12 months) -- single payment, billed in advance
+- **Billing Details Fields** (manually entered):
+  - Plan Amount (currency input)
+  - Billing Start Date
+  - Next Payment Due Date (auto-calculated based on plan)
+  - Payment Status: Paid / Pending / Overdue
+  - Invoice Number (text input)
+  - Notes/Remarks (textarea)
+- **Payment History Table**: Shows past payments with date, amount, invoice number, status, and receipt attachment.
+- **Attachment Upload**: Ability to attach receipts or invoices per payment entry.
+- **Add Payment** button to log a new payment entry manually.
+- Designed so that quarterly and half-yearly options can be easily removed later, leaving only annual.
 
 ---
 
 ## Technical Details
 
+### Files Created
+
+
+| File                         | Purpose                                             |
+| ---------------------------- | --------------------------------------------------- |
+| `src/data/lookupData.ts`     | Shared lookup data (tags, cities, portals, sources) |
+| `src/pages/CalendarPage.tsx` | Standalone full calendar page                       |
+
+
 ### Files Modified
 
-| File | Changes |
-|------|---------|
-| `src/pages/Tickets.tsx` | Editable fields, merged info card, collapsible panel, close dialog, Update/Cancel buttons, Call/WhatsApp CTAs, city label, SLA fixes |
-| `src/components/shared/CreateTicketDialog.tsx` | Rename Market to City, update SLA defaults |
-| `src/pages/Dashboard.tsx` | Add calendar events section with My/All toggle |
-| `src/pages/EnquiryDetail.tsx` | WhatsApp inline, country code, consent checkbox, backward stages, call-later auto-calendar, portals multi-select, current system dropdown, rename calendar section |
-| `src/pages/AccountDetail.tsx` | Verification note dialog, export dialog, integrations form, enquiry fields carry-over |
-| `src/components/shared/NotesPanel.tsx` | Voice-to-text mic button using Web Speech API |
 
-### New State/Types
-- `consent_given: boolean` on enquiry local state
-- `customIntegrations: Array<{name, apiKey, endpoint, description, connected}>` on account local state
-- `isListCollapsed: boolean` on Tickets page
-- `editingTicket: boolean` and field-level state on Tickets page
-- `closeTicketDialog: boolean` and `closingComment: string` on Tickets page
+| File                                            | Changes                                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `src/pages/admin/AdminLookups.tsx`              | Import from shared lookupData instead of hardcoded defaults                                                   |
+| `src/components/shared/CreateTicketDialog.tsx`  | Tags from lookups, city dropdown, British English                                                             |
+| `src/pages/Tickets.tsx`                         | City dropdown from lookups, tags from lookups                                                                 |
+| `src/pages/EnquiryDetail.tsx`                   | City dropdown, "Latest Contact Outcome" label, Schedule Demo auto-open, stage timeline notes, British English |
+| `src/components/shared/CreateEnquiryDialog.tsx` | City dropdown from lookups                                                                                    |
+| `src/pages/Enquiries.tsx`                       | Outcome filter, URL query param filtering, British English                                                    |
+| `src/pages/Accounts.tsx`                        | URL query param filtering for status                                                                          |
+| `src/pages/Dashboard.tsx`                       | Clickable bucket headers, attention card navigation                                                           |
+| `src/pages/Reports.tsx`                         | Updated feature adoption list                                                                                 |
+| `src/pages/AccountDetail.tsx`                   | New Billing tab                                                                                               |
+| `src/components/shared/CalendarEventForm.tsx`   | Accept defaultDescription prop                                                                                |
+| `src/components/layout/AppSidebar.tsx`          | Separate Calendar nav item, simplify Inquiry Pipeline                                                         |
+| `src/App.tsx`                                   | Add `/calendar` route, remove `/enquiries/dashboard`                                                          |
 
-### No New Files Required
-All changes fit within existing components and pages.
 
+### State Additions
+
+- `billingPlan`, `payments[]`, `billingDetails` on AccountDetail local state
+- `outcomeFilter` on Enquiries page
+- `entityFilter`, `teamMemberFilter` on CalendarPage
