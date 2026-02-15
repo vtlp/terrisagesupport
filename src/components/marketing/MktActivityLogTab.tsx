@@ -5,7 +5,7 @@ import { getUserName } from '@/data/seedData';
 import { MktActivityType } from '@/types/marketing';
 import {
   PlusCircle, RefreshCw, Link2, DollarSign, Pencil,
-  Globe, FileText, Calendar,
+  Globe, FileText, Calendar, CheckCircle, AlertTriangle,
 } from 'lucide-react';
 
 const typeConfig: Record<MktActivityType, { icon: React.ElementType; color: string; label: string }> = {
@@ -18,6 +18,8 @@ const typeConfig: Record<MktActivityType, { icon: React.ElementType; color: stri
   OFFLINE_LOGGED: { icon: Globe, color: 'bg-warning', label: 'Offline Logged' },
   CREATIVE_UPDATED: { icon: FileText, color: 'bg-primary', label: 'Creative Updated' },
   CONTENT_SCHEDULED: { icon: Calendar, color: 'bg-success', label: 'Content Scheduled' },
+  SYNC_COMPLETED: { icon: CheckCircle, color: 'bg-success', label: 'Sync Completed' },
+  SYNC_FAILED: { icon: AlertTriangle, color: 'bg-destructive', label: 'Sync Failed' },
 };
 
 export default function MktActivityLogTab() {
@@ -29,7 +31,7 @@ export default function MktActivityLogTab() {
       <Card>
         <CardContent className="p-5">
           <div className="space-y-0">
-            {sorted.map((log, i) => {
+            {sorted.map((log) => {
               const cfg = typeConfig[log.type];
               const Icon = cfg.icon;
               return (
@@ -42,15 +44,12 @@ export default function MktActivityLogTab() {
                           <Icon className="h-2.5 w-2.5 mr-1" />{cfg.label}
                         </Badge>
                         {log.linked_campaign_id && (
-                          <span className="text-[10px] text-muted-foreground">
-                            {getCampaignName(log.linked_campaign_id)}
-                          </span>
+                          <span className="text-[10px] text-muted-foreground">{getCampaignName(log.linked_campaign_id)}</span>
                         )}
                       </div>
                       <p className="text-sm text-foreground">{log.description}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {getUserName(log.user_id)}
-                        {log.city && ` · ${log.city}`}
+                        {getUserName(log.user_id)}{log.city && ` · ${log.city}`}
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">
@@ -60,9 +59,7 @@ export default function MktActivityLogTab() {
                 </div>
               );
             })}
-            {sorted.length === 0 && (
-              <p className="text-center text-muted-foreground py-12">No activity logged yet</p>
-            )}
+            {sorted.length === 0 && <p className="text-center text-muted-foreground py-12">No activity logged yet</p>}
           </div>
         </CardContent>
       </Card>
