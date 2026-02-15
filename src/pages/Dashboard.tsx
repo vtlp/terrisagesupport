@@ -58,6 +58,7 @@ const entityTypeColors: Record<string, string> = {
 
 export default function Dashboard() {
   const { currentUser, isAdmin } = useUser();
+  const navigate = useNavigate();
   const [calendarScope, setCalendarScope] = useState<'my' | 'all'>('my');
 
   // ── Enquiry counters ──
@@ -147,10 +148,12 @@ export default function Dashboard() {
       {/* ─── Top 3 Buckets ─── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Enquiries */}
-        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+        <Link to="/enquiries" className="block">
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
           <CardHeader className="pb-1 pt-4 px-4 sm:px-6">
             <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
               <PhoneCall className="h-4 w-4 text-primary" /> Enquiries
+              <ArrowRight className="h-3.5 w-3.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 sm:px-6 pb-4">
@@ -164,12 +167,15 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        </Link>
 
         {/* Onboarding Pipeline */}
-        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+        <Link to="/accounts" className="block">
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
           <CardHeader className="pb-1 pt-4 px-4 sm:px-6">
             <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
               <Building2 className="h-4 w-4 text-primary" /> Onboarding Pipeline
+              <ArrowRight className="h-3.5 w-3.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 sm:px-6 pb-4">
@@ -181,12 +187,15 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        </Link>
 
         {/* Tickets */}
-        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+        <Link to="/tickets" className="block">
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
           <CardHeader className="pb-1 pt-4 px-4 sm:px-6">
             <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
               <Ticket className="h-4 w-4 text-primary" /> Tickets & Issues
+              <ArrowRight className="h-3.5 w-3.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 sm:px-6 pb-4">
@@ -197,6 +206,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        </Link>
       </div>
 
       {/* ─── Calendar Events Section ─── */}
@@ -285,7 +295,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-warning/20">
+        <Card className="shadow-sm border-warning/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/accounts?status=STALLED_ONBOARDING')}>
           <CardHeader className="pb-1 pt-4 px-4">
             <CardTitle className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
               <AlertTriangle className="h-3.5 w-3.5 text-warning" /> Accounts Attention
@@ -297,7 +307,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-destructive/20">
+        <Card className="shadow-sm border-destructive/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/enquiries?status=follow_up_needed')}>
           <CardHeader className="pb-1 pt-4 px-4">
             <CardTitle className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
               <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Enquiries Attention

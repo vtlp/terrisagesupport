@@ -260,6 +260,54 @@ export default function AccountDetail() {
   // Note refresh
   const [noteRefresh, setNoteRefresh] = useState(0);
 
+  // Billing state
+  type BillingCycle = 'quarterly' | 'half_yearly' | 'annual';
+  interface PaymentEntry {
+    id: string;
+    date: string;
+    amount: number;
+    invoiceNumber: string;
+    status: 'paid' | 'pending' | 'overdue';
+    receiptFileName?: string;
+    remarks?: string;
+  }
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
+  const [planAmount, setPlanAmount] = useState('');
+  const [billingStartDate, setBillingStartDate] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [billingRemarks, setBillingRemarks] = useState('');
+  const [payments, setPayments] = useState<PaymentEntry[]>([]);
+  const [showAddPayment, setShowAddPayment] = useState(false);
+  const [newPaymentAmount, setNewPaymentAmount] = useState('');
+  const [newPaymentDate, setNewPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [newPaymentInvoice, setNewPaymentInvoice] = useState('');
+  const [newPaymentStatus, setNewPaymentStatus] = useState<'paid' | 'pending'>('paid');
+  const [newPaymentRemarks, setNewPaymentRemarks] = useState('');
+  const [newPaymentReceipt, setNewPaymentReceipt] = useState('');
+
+  const billingCycleLabels: Record<BillingCycle, string> = {
+    quarterly: 'Quarterly (every 4 months)',
+    half_yearly: 'Half-Yearly (every 6 months)',
+    annual: 'Annual (single payment)',
+  };
+  const billingCycleMonths: Record<BillingCycle, number> = { quarterly: 4, half_yearly: 6, annual: 12 };
+
+  const nextPaymentDue = billingStartDate
+    ? format(new Date(new Date(billingStartDate).setMonth(new Date(billingStartDate).getMonth() + billingCycleMonths[billingCycle])), 'dd MMM yyyy')
+    : '—';
+
+  const handleAddPayment = () => {
+    if (!newPaymentAmount || !newPaymentDate) { toast.error('Amount and date are required'); return; }
+    setPayments(prev => [...prev, {
+      id: `PAY_${Date.now()}`, date: newPaymentDate, amount: parseFloat(newPaymentAmount),
+      invoiceNumber: newPaymentInvoice, status: newPaymentStatus, remarks: newPaymentRemarks,
+      receiptFileName: newPaymentReceipt || undefined,
+    }]);
+    setNewPaymentAmount(''); setNewPaymentInvoice(''); setNewPaymentRemarks(''); setNewPaymentReceipt('');
+    setShowAddPayment(false);
+    toast.success('Payment entry added');
+  };
+
   if (!account) {
     return <div className="p-6 text-center text-muted-foreground">Account not found</div>;
   }
@@ -564,6 +612,7 @@ export default function AccountDetail() {
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="ingestion">Data</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
           <TabsTrigger value="documents">Docs ({documents.length})</TabsTrigger>
           <TabsTrigger value="calendar">Calendar ({events.length})</TabsTrigger>
@@ -902,6 +951,133 @@ export default function AccountDetail() {
               </Card>
             ))}
           </div>
+        </TabsContent>
+
+        {/* ═══ BILLING ═══ */}
+        <TabsContent value="billing" className="mt-4 space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-base">Payment Plan</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <RadioGroup value={billingCycle} onValueChange={v => setBillingCycle(v as BillingCycle)}>
+                  {(['quarterly', 'half_yearly', 'annual'] as BillingCycle[]).map(c => (
+                    <div key={c} className="flex items-center space-x-2">
+                      <RadioGroupItem value={c} id={`billing-${c}`} />
+                      <Label htmlFor={`billing-${c}`} className="text-sm cursor-pointer">{billingCycleLabels[c]}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-base">Billing Details</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Plan Amount (₹)</Label>
+                    <Input value={planAmount} onChange={e => setPlanAmount(e.target.value)} placeholder="e.g. 50000" type="number" className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Billing Start Date</Label>
+                    <Input value={billingStartDate} onChange={e => setBillingStartDate(e.target.value)} type="date" className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Next Payment Due</Label>
+                    <div className="text-sm font-medium pt-1">{nextPaymentDue}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Invoice Number</Label>
+                    <Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} placeholder="INV-001" className="h-8" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Remarks</Label>
+                  <Textarea value={billingRemarks} onChange={e => setBillingRemarks(e.target.value)} placeholder="Additional billing notes..." rows={2} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Payment History */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center justify-between">
+                Payment History
+                <Button size="sm" onClick={() => setShowAddPayment(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add Payment</Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {showAddPayment && (
+                <Card className="mb-4 border-primary/20">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Amount (₹)</Label>
+                        <Input value={newPaymentAmount} onChange={e => setNewPaymentAmount(e.target.value)} type="number" placeholder="50000" className="h-8" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Date</Label>
+                        <Input value={newPaymentDate} onChange={e => setNewPaymentDate(e.target.value)} type="date" className="h-8" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Invoice No.</Label>
+                        <Input value={newPaymentInvoice} onChange={e => setNewPaymentInvoice(e.target.value)} placeholder="INV-001" className="h-8" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Status</Label>
+                        <Select value={newPaymentStatus} onValueChange={v => setNewPaymentStatus(v as 'paid' | 'pending')}>
+                          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Remarks</Label>
+                        <Input value={newPaymentRemarks} onChange={e => setNewPaymentRemarks(e.target.value)} placeholder="Payment notes..." className="h-8" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Receipt (file name)</Label>
+                        <Input value={newPaymentReceipt} onChange={e => setNewPaymentReceipt(e.target.value)} placeholder="receipt.pdf" className="h-8" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleAddPayment}>Save Payment</Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowAddPayment(false)}>Cancel</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {payments.length === 0 && !showAddPayment ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No payments recorded yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {payments.map(p => (
+                    <div key={p.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-md text-sm">
+                      <div className="space-y-0.5">
+                        <div className="font-medium">₹{p.amount.toLocaleString('en-IN')}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(p.date), 'dd MMM yyyy')}
+                          {p.invoiceNumber && ` · ${p.invoiceNumber}`}
+                          {p.remarks && ` · ${p.remarks}`}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {p.receiptFileName && <Badge variant="outline" className="text-xs"><Download className="h-3 w-3 mr-1" />{p.receiptFileName}</Badge>}
+                        <Badge className={p.status === 'paid' ? 'bg-success/15 text-success' : p.status === 'overdue' ? 'bg-destructive/15 text-destructive' : 'bg-warning/15 text-warning'}>
+                          {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ═══ 9. TICKETS ═══ */}
