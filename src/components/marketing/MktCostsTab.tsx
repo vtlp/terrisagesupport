@@ -17,8 +17,12 @@ import { EnquiryStage } from '@/types/core';
 import { toast } from '@/hooks/use-toast';
 
 const typeLabel: Record<CostType, string> = {
-  ONLINE: 'Online', OFFLINE: 'Offline', TOOLING: 'Tooling',
-  AGENCY: 'Agency', CREATIVE: 'Creative', EVENT: 'Event',
+  ONLINE_ADS: 'Online Ads', OFFLINE_EVENT: 'Offline Event', TOOLING: 'Tooling',
+  AGENCY_FEE: 'Agency Fee', CREATIVE: 'Creative', TRAVEL: 'Travel', OTHER: 'Other',
+};
+const channelLabel: Record<CampaignChannel, string> = {
+  META: 'Meta', GOOGLE: 'Google', YOUTUBE: 'YouTube', LINKEDIN: 'LinkedIn', X: 'X',
+  REDDIT: 'Reddit', WHATSAPP: 'WhatsApp', EMAIL: 'Email', REFERRAL: 'Referral', OFFLINE: 'Offline',
 };
 
 export default function MktCostsTab() {
@@ -34,19 +38,15 @@ export default function MktCostsTab() {
   const cpl = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
   const cpa = totalAccounts > 0 ? Math.round(totalSpend / totalAccounts) : 0;
 
-  // Spend by channel chart data
   const spendByChannel = useMemo(() => {
     const map: Record<string, number> = {};
-    items.forEach(i => {
-      const ch = i.channel || 'Other';
-      map[ch] = (map[ch] || 0) + i.amount;
-    });
+    items.forEach(i => { const ch = i.channel ? channelLabel[i.channel] : 'Other'; map[ch] = (map[ch] || 0) + i.amount; });
     return Object.entries(map).map(([name, amount]) => ({ name, amount }));
   }, [items]);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ date: '', type: CostType.ONLINE, channel: null, linked_campaign_id: null, vendor: '', amount: 0, notes: '' });
+    setForm({ date: '', type: CostType.ONLINE_ADS, channel: null, linked_campaign_id: null, vendor: '', amount: 0, notes: '' });
     setDrawerOpen(true);
   };
   const openEdit = (i: CostItem) => { setEditing(i); setForm({ ...i }); setDrawerOpen(true); };
@@ -59,7 +59,7 @@ export default function MktCostsTab() {
     } else {
       const nc: CostItem = {
         cost_item_id: `CST${String(items.length + 1).padStart(3, '0')}`,
-        date: form.date || '', type: form.type || CostType.ONLINE,
+        date: form.date || '', type: form.type || CostType.ONLINE_ADS,
         channel: form.channel || null, linked_campaign_id: form.linked_campaign_id || null,
         vendor: form.vendor || '', amount: form.amount || 0, notes: form.notes || '',
         attachment_url: null, created_at: new Date().toISOString(),
@@ -72,17 +72,15 @@ export default function MktCostsTab() {
 
   return (
     <div className="space-y-6">
-      {/* Analytics summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Spend</p><p className="text-2xl font-bold text-foreground">₹{(totalSpend / 1000).toFixed(0)}K</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total Spend</p><p className="text-2xl font-bold text-foreground">₹{(totalSpend / 1000).toFixed(0)}K</p><Badge variant="outline" className="text-[9px] mt-1">Manual</Badge></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Planned Budget</p><p className="text-2xl font-bold text-foreground">₹{(totalPlanned / 1000).toFixed(0)}K</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Variance</p><p className={`text-2xl font-bold ${totalSpend <= totalPlanned ? 'text-success' : 'text-destructive'}`}>₹{((totalPlanned - totalSpend) / 1000).toFixed(0)}K</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">CPL</p><p className="text-2xl font-bold text-foreground">₹{cpl.toLocaleString()}</p><p className="text-[10px] text-muted-foreground italic">Source: Inquiry</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">CPA</p><p className="text-2xl font-bold text-foreground">₹{cpa.toLocaleString()}</p><p className="text-[10px] text-muted-foreground italic">Source: Inquiry</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">ROAS</p><p className="text-2xl font-bold text-foreground">{totalSpend > 0 ? ((totalAccounts * 25000) / totalSpend).toFixed(1) : '0'}x</p><p className="text-[10px] text-muted-foreground italic">Estimated</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">CPL</p><p className="text-2xl font-bold text-foreground">₹{cpl.toLocaleString()}</p><Badge variant="outline" className="text-[9px] mt-1 bg-info/10 text-info">Source: Inquiry</Badge></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">CPA</p><p className="text-2xl font-bold text-foreground">₹{cpa.toLocaleString()}</p><Badge variant="outline" className="text-[9px] mt-1 bg-info/10 text-info">Source: Inquiry</Badge></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">ROAS</p><p className="text-2xl font-bold text-foreground">{totalSpend > 0 ? ((totalAccounts * 25000) / totalSpend).toFixed(1) : '0'}x</p><Badge variant="outline" className="text-[9px] mt-1 bg-warning/10 text-warning">Computed</Badge></CardContent></Card>
       </div>
 
-      {/* Chart */}
       <Card>
         <CardContent className="p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Spend by Channel</h3>
@@ -100,7 +98,6 @@ export default function MktCostsTab() {
         </CardContent>
       </Card>
 
-      {/* Ledger */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Cost Ledger</h3>
         <Button onClick={openCreate} size="sm"><Plus className="h-4 w-4 mr-1" />Add Cost</Button>
@@ -110,14 +107,9 @@ export default function MktCostsTab() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Channel</TableHead>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="w-8"></TableHead>
+                <TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Channel</TableHead>
+                <TableHead>Campaign</TableHead><TableHead>Vendor</TableHead><TableHead className="text-right">Amount</TableHead>
+                <TableHead>Notes</TableHead><TableHead className="w-8"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -125,14 +117,12 @@ export default function MktCostsTab() {
                 <TableRow key={i.cost_item_id} className="hover:bg-muted/30 cursor-pointer" onClick={() => openEdit(i)}>
                   <TableCell className="text-xs">{i.date}</TableCell>
                   <TableCell><Badge variant="outline" className="text-xs">{typeLabel[i.type]}</Badge></TableCell>
-                  <TableCell className="text-xs">{i.channel || '—'}</TableCell>
+                  <TableCell className="text-xs">{i.channel ? channelLabel[i.channel] : '—'}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{getCampaignName(i.linked_campaign_id)}</TableCell>
                   <TableCell className="text-sm font-medium">{i.vendor}</TableCell>
                   <TableCell className="text-right text-sm font-semibold">₹{i.amount.toLocaleString()}</TableCell>
                   <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{i.notes}</TableCell>
-                  <TableCell onClick={ev => ev.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(i)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  </TableCell>
+                  <TableCell onClick={ev => ev.stopPropagation()}><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(i)}><Pencil className="h-3.5 w-3.5" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -140,7 +130,6 @@ export default function MktCostsTab() {
         </CardContent>
       </Card>
 
-      {/* Drawer */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto bg-card">
           <SheetHeader><SheetTitle>{editing ? 'Edit Cost Item' : 'Add Cost Item'}</SheetTitle></SheetHeader>
@@ -162,7 +151,7 @@ export default function MktCostsTab() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-card">
                     <SelectItem value="none">None</SelectItem>
-                    {Object.values(CampaignChannel).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {Object.values(CampaignChannel).map(c => <SelectItem key={c} value={c}>{channelLabel[c]}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
