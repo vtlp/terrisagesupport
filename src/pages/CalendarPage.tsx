@@ -44,7 +44,7 @@ const eventTypeColors: Record<CalendarEventType, string> = {
 };
 
 const ENTITY_FILTERS = [
-  { value: 'all', label: 'All Events' },
+  { value: 'all', label: 'All Sources' },
   { value: EntityType.ENQUIRY, label: 'Enquiries' },
   { value: EntityType.ACCOUNT, label: 'Accounts' },
   { value: EntityType.TICKET, label: 'Tickets' },
