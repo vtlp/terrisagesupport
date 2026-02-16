@@ -11,6 +11,7 @@ import {
 } from '@/types/core';
 import type { ChecklistItem, Account, SupportTicket, AccountSeat } from '@/types/core';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -268,6 +269,10 @@ export default function AccountDetail() {
   const [newSeatEmail, setNewSeatEmail] = useState('');
   const [newSeatPhone, setNewSeatPhone] = useState('');
   const [newSeatRole, setNewSeatRole] = useState('Agent');
+  const [newSeatPermissions, setNewSeatPermissions] = useState<string[]>([]);
+
+  const hasSuperUser = seats.some(s => s.role === 'Super User');
+  const isBuilder = tenancyType === TenancyType.BUILDER_DEVELOPER;
 
   const handleAddSeat = () => {
     if (!newSeatName) { toast.error('Name is required'); return; }
@@ -278,12 +283,13 @@ export default function AccountDetail() {
       email: newSeatEmail,
       phone: newSeatPhone,
       role: newSeatRole,
+      permissions: newSeatRole === 'Agent' ? newSeatPermissions : [],
       onboarded: false,
       onboarded_at: null,
       created_at: new Date().toISOString(),
     };
     setSeats(prev => [...prev, newSeat]);
-    setNewSeatName(''); setNewSeatEmail(''); setNewSeatPhone(''); setNewSeatRole('Agent');
+    setNewSeatName(''); setNewSeatEmail(''); setNewSeatPhone(''); setNewSeatRole('Agent'); setNewSeatPermissions([]);
     setShowAddSeat(false);
     toast.success(`Seat added for ${newSeat.name}`);
   };
@@ -308,6 +314,7 @@ export default function AccountDetail() {
     remarks?: string;
   }
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
+  const [perSeatPrice, setPerSeatPrice] = useState('');
   const [planAmount, setPlanAmount] = useState('');
   const [billingStartDate, setBillingStartDate] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -872,6 +879,7 @@ export default function AccountDetail() {
                         <th className="text-left py-2 px-2 font-medium text-muted-foreground">Email</th>
                         <th className="text-left py-2 px-2 font-medium text-muted-foreground hidden sm:table-cell">Phone</th>
                         <th className="text-left py-2 px-2 font-medium text-muted-foreground">Role</th>
+                        <th className="text-left py-2 px-2 font-medium text-muted-foreground">Permissions</th>
                         <th className="text-left py-2 px-2 font-medium text-muted-foreground">Status</th>
                         <th className="text-left py-2 px-2 font-medium text-muted-foreground hidden md:table-cell">Onboarded</th>
                       </tr>
@@ -883,6 +891,21 @@ export default function AccountDetail() {
                           <td className="py-2.5 px-2 text-muted-foreground">{seat.email || '—'}</td>
                           <td className="py-2.5 px-2 text-muted-foreground hidden sm:table-cell">{seat.phone || '—'}</td>
                           <td className="py-2.5 px-2"><Badge variant="outline" className="text-xs">{seat.role}</Badge></td>
+                          <td className="py-2.5 px-2">
+                            {seat.role === 'Super User' || seat.role === 'Admin' ? (
+                              <span className="text-xs text-muted-foreground italic">Full access</span>
+                            ) : seat.permissions && seat.permissions.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {seat.permissions.map(p => (
+                                  <Badge key={p} variant="secondary" className="text-[10px] px-1.5 py-0">
+                                    {p === 'org_wide_access' ? 'Org-wide' : p === 'agent_network_access' ? 'Agent Network' : p === 'publish_access' ? 'Publish' : p}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="py-2.5 px-2">
                             <Badge
                               className={`text-xs cursor-pointer ${seat.onboarded ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}`}
@@ -926,16 +949,55 @@ export default function AccountDetail() {
               </div>
               <div className="space-y-1">
                 <Label>Role</Label>
-                <Select value={newSeatRole} onValueChange={setNewSeatRole}>
+                <Select value={newSeatRole} onValueChange={v => { setNewSeatRole(v); if (v !== 'Agent') setNewSeatPermissions([]); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="Super User" disabled={hasSuperUser}>
+                      Super User {hasSuperUser ? '(already assigned)' : ''}
+                    </SelectItem>
                     <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Manager">Manager</SelectItem>
                     <SelectItem value="Agent">Agent</SelectItem>
-                    <SelectItem value="Viewer">Viewer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {newSeatRole === 'Agent' && (
+                <div className="space-y-2 rounded-md border border-border p-3">
+                  <Label className="text-xs font-medium text-muted-foreground">Permissions</Label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={newSeatPermissions.includes('org_wide_access')}
+                        onCheckedChange={checked => {
+                          setNewSeatPermissions(prev => checked ? [...prev, 'org_wide_access'] : prev.filter(p => p !== 'org_wide_access'));
+                        }}
+                      />
+                      Organization-wide Access
+                    </label>
+                    {!isBuilder && (
+                      <>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={newSeatPermissions.includes('agent_network_access')}
+                            onCheckedChange={checked => {
+                              setNewSeatPermissions(prev => checked ? [...prev, 'agent_network_access'] : prev.filter(p => p !== 'agent_network_access'));
+                            }}
+                          />
+                          Agent Network Access
+                        </label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={newSeatPermissions.includes('publish_access')}
+                            onCheckedChange={checked => {
+                              setNewSeatPermissions(prev => checked ? [...prev, 'publish_access'] : prev.filter(p => p !== 'publish_access'));
+                            }}
+                          />
+                          Publish Access
+                        </label>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddSeat(false)}>Cancel</Button>
@@ -1126,6 +1188,21 @@ export default function AccountDetail() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base">Billing Details</CardTitle></CardHeader>
               <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Number of Seats</Label>
+                    <div className="text-sm font-medium pt-1">{seats.length}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Per Seat Price (₹)</Label>
+                    <Input value={perSeatPrice} onChange={e => setPerSeatPrice(e.target.value)} placeholder="e.g. 500" type="number" className="h-8" />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <Label className="text-xs text-muted-foreground">Total Seat Cost (₹)</Label>
+                    <div className="text-sm font-bold pt-1">{perSeatPrice ? `₹${(seats.length * parseFloat(perSeatPrice || '0')).toLocaleString('en-IN')}` : '—'}</div>
+                  </div>
+                </div>
+                <div className="border-t border-border/50 pt-3 mt-1" />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Plan Amount (₹)</Label>
