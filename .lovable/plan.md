@@ -1,43 +1,82 @@
 
 
-# Fix: Make Company Name and Account Name Editable
+# Plan: Add Seats / Users List to Account Detail
 
-## Problem
+## What's Missing
 
-Two fields are currently rendered as static, non-editable text:
+Currently, the Account section has a "Seat Expansion Request" workflow (to request additional seats), but there is no actual list of the users/seats being onboarded. There is no way to:
+- Record who the individual users are (name, email, phone, role)
+- Track whether each user has been onboarded or is still pending
+- See a count of active vs pending seats at a glance
 
-1. **Enquiry Detail** (line 402): `company_name` is displayed as a static `<CardTitle>` -- every other field on the page (contact name, phone, email, city, tenancy type) is an editable `<Input>`, but the company name is not.
-2. **Account Detail** (line 573): `account_name` is displayed as a static `<h1>` -- even when the "Edit" toggle on the Account Summary card is active, the account name remains read-only.
-
-This also matters because the company name from the enquiry becomes the account name upon conversion. If the agent types it wrong during enquiry creation, there is currently no way to fix it.
-
----
-
-## Fix 1: Enquiry Detail -- Editable Company Name
-
-**File: `src/pages/EnquiryDetail.tsx`**
-
-Replace the static `<CardTitle>{enquiry.company_name}</CardTitle>` at line 402 with an editable `<Input>` that:
-- Is bound to `enquiry.company_name` via the existing `update()` helper
-- Is disabled when the enquiry is converted (same `isConverted` rule as all other fields)
-- Is styled to look like a heading (larger text, no visible border when not focused) so the visual hierarchy is maintained
+The Enquiry captures a `team_size_estimate` (a number), but once an account is created, there is no structured record of the actual people.
 
 ---
 
-## Fix 2: Account Detail -- Editable Account Name
+## Changes (4 Steps)
+
+### Step 1: Data Model -- Add `AccountSeat` interface
+
+**File: `src/types/core.ts`**
+
+Add a new interface:
+
+```text
+AccountSeat {
+  seat_id: string
+  account_id: string
+  name: string
+  email: string
+  phone: string
+  role: string              (e.g. "Admin", "Agent", "Manager")
+  onboarded: boolean        (whether this user has been set up)
+  onboarded_at: string | null
+  created_at: string
+}
+```
+
+Add `seats: AccountSeat[]` field to the `Account` interface.
+
+---
+
+### Step 2: Seed Data -- Add sample seats to existing accounts
+
+**File: `src/data/seedData.ts`**
+
+Add 2-4 sample seats per account (mix of onboarded and pending) so the UI has data to display immediately.
+
+---
+
+### Step 3: Account Detail -- Add "Seats" tab
 
 **File: `src/pages/AccountDetail.tsx`**
 
-Two changes:
+Add a new **"Seats"** tab (between "Onboarding" and "Verification") with:
 
-**A. Add `accountName` state** (around line 226, alongside the existing `ownerName`, `ownerPhone`, etc.):
-- `const [accountName, setAccountName] = useState(account?.account_name ?? '')`
+**A. Summary Row**
+- Total seats count, onboarded count, pending count -- displayed as small stat cards
 
-**B. Make the header editable** (line 573):
-- When `editingOverview` is true: replace the static `<h1>` with an `<Input>` bound to `accountName`, styled as a heading-sized input
-- When `editingOverview` is false: keep the current static `<h1>` display
+**B. Seats Table**
+- Columns: Name, Email, Phone, Role, Status (Onboarded / Pending), Onboarded Date
+- Each row shows a badge: green for "Onboarded", amber for "Pending"
 
-This way, the account name is editable alongside all other overview fields when the agent clicks "Edit" on the Account Summary card.
+**C. "Add Seat" Button**
+- Opens a small dialog/form to add a new seat (name, email, phone, role)
+- New seats default to `onboarded: false`
+
+**D. Toggle Onboarded**
+- A button or checkbox on each row to mark a user as onboarded (sets `onboarded: true` and `onboarded_at` to now)
+
+**E. Connection to Seat Expansion**
+- The existing "Request Seat Expansion" workflow remains as-is -- it creates a ticket for approval. The Seats tab is the actual roster of users.
+
+---
+
+### Step 4: Wire up the Enquiry-to-Account conversion
+
+**File: `src/pages/EnquiryDetail.tsx`**
+
+When an enquiry is converted to an account, initialize `seats` as an empty array. The `team_size_estimate` from the enquiry can be shown as a reference note, but actual seat entries are added manually in the Account Seats tab.
 
 ---
 
@@ -45,6 +84,8 @@ This way, the account name is editable alongside all other overview fields when 
 
 | File | Change |
 |------|--------|
-| `src/pages/EnquiryDetail.tsx` | Replace static `<CardTitle>` with editable `<Input>` for company name, disabled when converted |
-| `src/pages/AccountDetail.tsx` | Add `accountName` state; toggle header between `<h1>` and `<Input>` based on edit mode |
+| `src/types/core.ts` | Add `AccountSeat` interface; add `seats` to `Account` |
+| `src/data/seedData.ts` | Add sample seat data to existing accounts |
+| `src/pages/AccountDetail.tsx` | Add "Seats" tab with table, add/toggle functionality, summary stats |
+| `src/pages/EnquiryDetail.tsx` | Initialize `seats: []` on account conversion |
 
