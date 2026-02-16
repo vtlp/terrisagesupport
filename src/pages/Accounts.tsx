@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, Building2 } from 'lucide-react';
+import { Search, Building2, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -114,6 +114,7 @@ export default function Accounts() {
                 <TableHead>City</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Owner</TableHead>
+                <TableHead>Seats</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Next Action</TableHead>
                 <TableHead>Notes</TableHead>
@@ -130,6 +131,15 @@ export default function Accounts() {
                     <TableCell>{a.city}</TableCell>
                     <TableCell>{tenancyLabels[a.tenancy_type]}</TableCell>
                     <TableCell className="text-sm">{a.owner_name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 text-sm">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-medium">{a.seats.filter(s => s.is_active).length}</span>
+                        {a.seats.filter(s => !s.is_active).length > 0 && (
+                          <span className="text-xs text-muted-foreground">({a.seats.length})</span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell><Badge className={statusColors[a.status]}>{statusLabels[a.status]}</Badge></TableCell>
                     <TableCell className="text-sm">
                       {nextEvent ? (
@@ -157,7 +167,10 @@ export default function Accounts() {
                   <div className="font-medium">{a.account_name}</div>
                   <Badge className={statusColors[a.status]}>{statusLabels[a.status]}</Badge>
                 </div>
-                <div className="text-xs text-muted-foreground">{a.city} • {tenancyLabels[a.tenancy_type]} • {a.owner_name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {a.city} • {tenancyLabels[a.tenancy_type]} • {a.owner_name}
+                  <span className="ml-1">• <Users className="inline h-3 w-3" /> {a.seats.filter(s => s.is_active).length}</span>
+                </div>
               </CardContent>
             </Card>
           </Link>

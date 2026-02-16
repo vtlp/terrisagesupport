@@ -12,7 +12,7 @@ import {
 } from '@/types/core';
 
 // ── Seat Helpers ──────────────────────────────
-function makeSeats(accountId: string, members: { name: string; email: string; phone: string; role: string; permissions?: string[]; onboarded: boolean }[]): AccountSeat[] {
+function makeSeats(accountId: string, members: { name: string; email: string; phone: string; role: string; permissions?: string[]; is_active?: boolean; onboarded: boolean }[]): AccountSeat[] {
   return members.map((m, i) => ({
     seat_id: `SEAT_${accountId}_${i + 1}`,
     account_id: accountId,
@@ -21,6 +21,7 @@ function makeSeats(accountId: string, members: { name: string; email: string; ph
     phone: m.phone,
     role: m.role,
     permissions: m.permissions ?? [],
+    is_active: m.is_active ?? true,
     onboarded: m.onboarded,
     onboarded_at: m.onboarded ? '2025-01-25T10:00:00Z' : null,
     created_at: '2025-01-20T10:00:00Z',

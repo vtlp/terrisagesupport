@@ -424,6 +424,7 @@ export interface AccountSeat {
   phone: string;
   role: string;
   permissions: string[];
+  is_active: boolean;
   onboarded: boolean;
   onboarded_at: string | null;
   created_at: string;
