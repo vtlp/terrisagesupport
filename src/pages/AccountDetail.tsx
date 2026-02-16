@@ -30,8 +30,10 @@ import {
   CheckCircle2, Circle, Clock, Shield, ShieldCheck, ShieldX, ShieldAlert,
   Upload, FileSpreadsheet, ArrowRight, Plus, Wifi, WifiOff,
   CalendarIcon, Ticket, Pencil, Save, X, Phone, Mail, User, Building2, MapPin,
-  Download, Send, AlertTriangle,
+  Download, Send, AlertTriangle, MoreHorizontal, UserX, UserCheck, Trash2, Users,
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
 // ── Color Maps ────────────────────────────────
@@ -271,7 +273,19 @@ export default function AccountDetail() {
   const [newSeatRole, setNewSeatRole] = useState('Agent');
   const [newSeatPermissions, setNewSeatPermissions] = useState<string[]>([]);
 
-  const hasSuperUser = seats.some(s => s.role === 'Super User');
+  // Edit seat state
+  const [editingSeat, setEditingSeat] = useState<AccountSeat | null>(null);
+  const [editSeatName, setEditSeatName] = useState('');
+  const [editSeatEmail, setEditSeatEmail] = useState('');
+  const [editSeatPhone, setEditSeatPhone] = useState('');
+  const [editSeatRole, setEditSeatRole] = useState('Agent');
+  const [editSeatPermissions, setEditSeatPermissions] = useState<string[]>([]);
+
+  // Remove seat confirmation
+  const [removingSeatId, setRemovingSeatId] = useState<string | null>(null);
+
+  const activeSeats = seats.filter(s => s.is_active);
+  const hasSuperUser = seats.some(s => s.role === 'Super User' && s.is_active);
   const isBuilder = tenancyType === TenancyType.BUILDER_DEVELOPER;
 
   const handleAddSeat = () => {
@@ -284,6 +298,7 @@ export default function AccountDetail() {
       phone: newSeatPhone,
       role: newSeatRole,
       permissions: newSeatRole === 'Agent' ? newSeatPermissions : [],
+      is_active: true,
       onboarded: false,
       onboarded_at: null,
       created_at: new Date().toISOString(),
@@ -301,6 +316,47 @@ export default function AccountDetail() {
       onboarded_at: !s.onboarded ? new Date().toISOString() : null,
     } : s));
   };
+
+  const deactivateSeat = (seatId: string) => {
+    setSeats(prev => prev.map(s => s.seat_id === seatId ? { ...s, is_active: false } : s));
+    toast.success('Seat deactivated');
+  };
+
+  const reactivateSeat = (seatId: string) => {
+    setSeats(prev => prev.map(s => s.seat_id === seatId ? { ...s, is_active: true } : s));
+    toast.success('Seat reactivated');
+  };
+
+  const removeSeat = (seatId: string) => {
+    setSeats(prev => prev.filter(s => s.seat_id !== seatId));
+    setRemovingSeatId(null);
+    toast.success('Seat removed');
+  };
+
+  const openEditSeat = (seat: AccountSeat) => {
+    setEditingSeat(seat);
+    setEditSeatName(seat.name);
+    setEditSeatEmail(seat.email);
+    setEditSeatPhone(seat.phone);
+    setEditSeatRole(seat.role);
+    setEditSeatPermissions(seat.permissions);
+  };
+
+  const handleEditSeat = () => {
+    if (!editingSeat || !editSeatName) { toast.error('Name is required'); return; }
+    setSeats(prev => prev.map(s => s.seat_id === editingSeat.seat_id ? {
+      ...s,
+      name: editSeatName,
+      email: editSeatEmail,
+      phone: editSeatPhone,
+      role: editSeatRole,
+      permissions: editSeatRole === 'Agent' ? editSeatPermissions : [],
+    } : s));
+    setEditingSeat(null);
+    toast.success('Seat updated');
+  };
+
+  const editHasSuperUser = seats.some(s => s.role === 'Super User' && s.is_active && s.seat_id !== editingSeat?.seat_id);
 
   // Billing state
   type BillingCycle = 'quarterly' | 'half_yearly' | 'annual';
@@ -660,7 +716,7 @@ export default function AccountDetail() {
         <TabsList className="flex flex-wrap gap-0.5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
-          <TabsTrigger value="seats">Seats ({seats.length})</TabsTrigger>
+          <TabsTrigger value="seats">Seats ({activeSeats.length})</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="ingestion">Data</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
@@ -740,8 +796,8 @@ export default function AccountDetail() {
                 <CardContent className="grid grid-cols-2 gap-2">
                   {[
                     { label: 'Onboarding', value: `${progress}%`, color: progress === 100 ? 'text-success' : '' },
+                    { label: 'Active Seats', value: activeSeats.length, color: 'text-primary' },
                     { label: 'Tickets', value: tickets.length },
-                    { label: 'Imports', value: jobs.length },
                     { label: 'Documents', value: documents.length },
                   ].map(s => (
                     <div key={s.label} className="text-center p-3 bg-muted/50 rounded-lg">
@@ -817,7 +873,7 @@ export default function AccountDetail() {
         </TabsContent>
 
         {/* ═══ 2. ONBOARDING ═══ */}
-        <TabsContent value="onboarding" className="mt-4">
+        <TabsContent value="onboarding" className="mt-4 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center justify-between">
@@ -840,16 +896,45 @@ export default function AccountDetail() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Seat Onboarding Status */}
+          {activeSeats.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" /> Seat Onboarding Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Progress value={activeSeats.length > 0 ? (activeSeats.filter(s => s.onboarded).length / activeSeats.length) * 100 : 0} className="h-2 flex-1" />
+                  <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                    {activeSeats.filter(s => s.onboarded).length} / {activeSeats.length} onboarded
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {activeSeats.map(seat => (
+                    <div key={seat.seat_id} className="flex items-center gap-2 text-sm">
+                      {seat.onboarded ? <CheckCircle2 className="h-4 w-4 text-success flex-shrink-0" /> : <Circle className="h-4 w-4 text-warning flex-shrink-0" />}
+                      <span className={seat.onboarded ? 'text-muted-foreground' : 'text-foreground'}>{seat.name}</span>
+                      <Badge variant="outline" className="text-[10px] ml-auto">{seat.role}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ═══ SEATS ═══ */}
         <TabsContent value="seats" className="mt-4 space-y-4">
           {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {[
-              { label: 'Total Seats', value: seats.length },
-              { label: 'Onboarded', value: seats.filter(s => s.onboarded).length, color: 'text-success' },
-              { label: 'Pending', value: seats.filter(s => !s.onboarded).length, color: 'text-warning' },
+              { label: 'Active Seats', value: activeSeats.length, color: 'text-primary' },
+              { label: 'Onboarded', value: activeSeats.filter(s => s.onboarded).length, color: 'text-success' },
+              { label: 'Pending', value: activeSeats.filter(s => !s.onboarded).length, color: 'text-warning' },
+              { label: 'Deactivated', value: seats.filter(s => !s.is_active).length, color: 'text-muted-foreground' },
             ].map(s => (
               <Card key={s.label}>
                 <CardContent className="p-4 text-center">
@@ -882,12 +967,16 @@ export default function AccountDetail() {
                         <th className="text-left py-2 px-2 font-medium text-muted-foreground">Permissions</th>
                         <th className="text-left py-2 px-2 font-medium text-muted-foreground">Status</th>
                         <th className="text-left py-2 px-2 font-medium text-muted-foreground hidden md:table-cell">Onboarded</th>
+                        <th className="text-left py-2 px-2 font-medium text-muted-foreground w-10"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {seats.map(seat => (
-                        <tr key={seat.seat_id} className="border-b border-border/50 hover:bg-muted/30">
-                          <td className="py-2.5 px-2 font-medium">{seat.name}</td>
+                        <tr key={seat.seat_id} className={`border-b border-border/50 hover:bg-muted/30 ${!seat.is_active ? 'opacity-50' : ''}`}>
+                          <td className="py-2.5 px-2 font-medium">
+                            {seat.name}
+                            {!seat.is_active && <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 text-muted-foreground">Inactive</Badge>}
+                          </td>
                           <td className="py-2.5 px-2 text-muted-foreground">{seat.email || '—'}</td>
                           <td className="py-2.5 px-2 text-muted-foreground hidden sm:table-cell">{seat.phone || '—'}</td>
                           <td className="py-2.5 px-2"><Badge variant="outline" className="text-xs">{seat.role}</Badge></td>
@@ -907,15 +996,48 @@ export default function AccountDetail() {
                             )}
                           </td>
                           <td className="py-2.5 px-2">
-                            <Badge
-                              className={`text-xs cursor-pointer ${seat.onboarded ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}`}
-                              onClick={() => toggleSeatOnboarded(seat.seat_id)}
-                            >
-                              {seat.onboarded ? 'Onboarded' : 'Pending'}
-                            </Badge>
+                            {seat.is_active ? (
+                              <Badge
+                                className={`text-xs cursor-pointer ${seat.onboarded ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}`}
+                                onClick={() => toggleSeatOnboarded(seat.seat_id)}
+                              >
+                                {seat.onboarded ? 'Onboarded' : 'Pending'}
+                              </Badge>
+                            ) : (
+                              <Badge className="text-xs bg-muted text-muted-foreground">Deactivated</Badge>
+                            )}
                           </td>
                           <td className="py-2.5 px-2 text-xs text-muted-foreground hidden md:table-cell">
                             {seat.onboarded_at ? format(new Date(seat.onboarded_at), 'dd MMM yyyy') : '—'}
+                          </td>
+                          <td className="py-2.5 px-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditSeat(seat)}>
+                                  <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {seat.is_active ? (
+                                  <DropdownMenuItem onClick={() => deactivateSeat(seat.seat_id)} className="text-warning">
+                                    <UserX className="h-3.5 w-3.5 mr-2" /> Deactivate
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem onClick={() => reactivateSeat(seat.seat_id)} className="text-success">
+                                    <UserCheck className="h-3.5 w-3.5 mr-2" /> Reactivate
+                                  </DropdownMenuItem>
+                                )}
+                                {!seat.onboarded && (
+                                  <DropdownMenuItem onClick={() => setRemovingSeatId(seat.seat_id)} className="text-destructive">
+                                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Remove
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       ))}
@@ -926,6 +1048,99 @@ export default function AccountDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Remove Seat Confirmation Dialog */}
+        <Dialog open={!!removingSeatId} onOpenChange={v => { if (!v) setRemovingSeatId(null); }}>
+          <DialogContent className="bg-card">
+            <DialogHeader>
+              <DialogTitle>Remove Seat</DialogTitle>
+              <DialogDescription>This will permanently remove this seat. This action cannot be undone.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRemovingSeatId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => removingSeatId && removeSeat(removingSeatId)}>Remove</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Seat Dialog */}
+        <Dialog open={!!editingSeat} onOpenChange={v => { if (!v) setEditingSeat(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Seat</DialogTitle>
+              <DialogDescription>Update seat details and permissions.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Name <span className="text-destructive">*</span></Label>
+                <Input value={editSeatName} onChange={e => setEditSeatName(e.target.value)} placeholder="Full name" />
+              </div>
+              <div className="space-y-1">
+                <Label>Email</Label>
+                <Input value={editSeatEmail} onChange={e => setEditSeatEmail(e.target.value)} placeholder="email@example.com" type="email" />
+              </div>
+              <div className="space-y-1">
+                <Label>Phone</Label>
+                <Input value={editSeatPhone} onChange={e => setEditSeatPhone(e.target.value)} placeholder="Phone number" />
+              </div>
+              <div className="space-y-1">
+                <Label>Role</Label>
+                <Select value={editSeatRole} onValueChange={v => { setEditSeatRole(v); if (v !== 'Agent') setEditSeatPermissions([]); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Super User" disabled={editHasSuperUser}>
+                      Super User {editHasSuperUser ? '(already assigned)' : ''}
+                    </SelectItem>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Agent">Agent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editSeatRole === 'Agent' && (
+                <div className="space-y-2 rounded-md border border-border p-3">
+                  <Label className="text-xs font-medium text-muted-foreground">Permissions</Label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={editSeatPermissions.includes('org_wide_access')}
+                        onCheckedChange={checked => {
+                          setEditSeatPermissions(prev => checked ? [...prev, 'org_wide_access'] : prev.filter(p => p !== 'org_wide_access'));
+                        }}
+                      />
+                      Organization-wide Access
+                    </label>
+                    {!isBuilder && (
+                      <>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={editSeatPermissions.includes('agent_network_access')}
+                            onCheckedChange={checked => {
+                              setEditSeatPermissions(prev => checked ? [...prev, 'agent_network_access'] : prev.filter(p => p !== 'agent_network_access'));
+                            }}
+                          />
+                          Agent Network Access
+                        </label>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={editSeatPermissions.includes('publish_access')}
+                            onCheckedChange={checked => {
+                              setEditSeatPermissions(prev => checked ? [...prev, 'publish_access'] : prev.filter(p => p !== 'publish_access'));
+                            }}
+                          />
+                          Publish Access
+                        </label>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingSeat(null)}>Cancel</Button>
+              <Button onClick={handleEditSeat}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Add Seat Dialog */}
         <Dialog open={showAddSeat} onOpenChange={setShowAddSeat}>
@@ -1188,18 +1403,22 @@ export default function AccountDetail() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base">Billing Details</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Number of Seats</Label>
-                    <div className="text-sm font-medium pt-1">{seats.length}</div>
+                    <Label className="text-xs text-muted-foreground">Active Seats</Label>
+                    <div className="text-sm font-bold pt-1 text-primary">{activeSeats.length}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Total (incl. inactive)</Label>
+                    <div className="text-sm font-medium pt-1 text-muted-foreground">{seats.length}</div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Per Seat Price (₹)</Label>
                     <Input value={perSeatPrice} onChange={e => setPerSeatPrice(e.target.value)} placeholder="e.g. 500" type="number" className="h-8" />
                   </div>
-                  <div className="space-y-1 col-span-2">
+                  <div className="space-y-1 col-span-3">
                     <Label className="text-xs text-muted-foreground">Total Seat Cost (₹)</Label>
-                    <div className="text-sm font-bold pt-1">{perSeatPrice ? `₹${(seats.length * parseFloat(perSeatPrice || '0')).toLocaleString('en-IN')}` : '—'}</div>
+                    <div className="text-sm font-bold pt-1">{perSeatPrice ? `₹${(activeSeats.length * parseFloat(perSeatPrice || '0')).toLocaleString('en-IN')}` : '—'}</div>
                   </div>
                 </div>
                 <div className="border-t border-border/50 pt-3 mt-1" />
