@@ -399,7 +399,12 @@ export default function EnquiryDetail() {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between flex-wrap gap-2">
                 <div>
-                  <CardTitle className="text-xl">{enquiry.company_name}</CardTitle>
+                  <Input
+                    value={enquiry.company_name}
+                    onChange={e => update({ company_name: e.target.value })}
+                    disabled={isConverted}
+                    className="text-xl font-semibold leading-none tracking-tight border-transparent bg-transparent px-0 h-auto focus-visible:border-input focus-visible:bg-background focus-visible:px-3"
+                  />
                   <p className="text-sm text-muted-foreground mt-1">{sourceLabels[enquiry.source]}</p>
                 </div>
                 <Badge className={stageColors[enquiry.stage]}>{stageLabels[enquiry.stage]}</Badge>
