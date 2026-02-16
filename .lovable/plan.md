@@ -1,186 +1,119 @@
-# Implementation Plan: Multi-Module Enhancements (9 Items)
 
-This plan covers ticket tag/city lookups, Indian city master list, dashboard navigation, enquiry filters and stage logic, calendar module separation, account billing tab, and reports feature adoption updates.
 
----
+# Plan: Explicit CalendarEventType + "Create Event" Button on Calendar Page
 
-## 1. Tags and Cities from Admin Lookups
-
-### 1.1 Shared Lookup Data
-
-- Create a new file `src/data/lookupData.ts` that exports the default tags, markets/cities, portals, and sources arrays. Both `AdminLookups.tsx` and consuming pages (`CreateTicketDialog.tsx`, `Tickets.tsx`, `EnquiryDetail.tsx`, city dropdowns everywhere) will import from this single source of truth.
-
-### 1.2 Ticket Creation -- Tags from Lookups
-
-- In `CreateTicketDialog.tsx`, replace the free-text tag input with a **selectable tag list** (checkboxes or clickable badges) sourced from `lookupData.ts` default tags, plus retain the ability to type a custom tag.
-
-### 1.3 City Dropdowns from Lookups
-
-- Replace all free-text city inputs (`CreateTicketDialog.tsx` city field, `Tickets.tsx` edit city, `EnquiryDetail.tsx` city, `CreateEnquiryDialog.tsx`) with a `<Select>` dropdown populated from the shared markets/cities list.
+This plan covers everything from the previously approved steps, plus one addition: a "Create New Event" button directly on the Calendar page. Currently, the Calendar page is read-only with no way to create events from it.
 
 ---
 
-## 2. Comprehensive Indian Cities List
+## All Changes (8 Steps)
 
-### 2.1 Update Markets in `lookupData.ts`
+### Step 1: Data Model -- Add `CalendarEventType` Enum
 
-- Replace the current 10-city list with a comprehensive list of tier-1 and tier-2 cities across every Indian state.
-- **Top 10 (most popular, shown first)**: Mumbai, Delhi, Bangalore, Hyderabad, Pune, Chennai, Kolkata, Ahmedabad, Jaipur, Lucknow
-- **Remaining cities in alphabetical order**: Agra, Amritsar, Bhopal, Bhubaneswar, Chandigarh, Coimbatore, Dehradun, Faridabad, Ghaziabad, Goa (Panaji), Gurgaon, Guwahati, Indore, Kanpur, Kochi, Ludhiana, Madurai, Mangalore, Meerut, Mysore, Nagpur, Nashik, Noida, Patna, Raipur, Rajkot, Ranchi, Surat, Thane, Thiruvananthapuram, Udaipur, Vadodara, Varanasi, Vijayawada, Visakhapatnam, and more.
-- Update `AdminLookups.tsx` to import from the shared file instead of its own hardcoded defaults.
+**File: `src/types/core.ts`**
 
----
-
-## 3. Dashboard Navigation Links
-
-### 3.1 Clickable Bucket Headers
-
-- Make the "Enquiries" card header in Dashboard link to `/enquiries`.
-- Make the "Onboarding Pipeline" card header link to `/accounts`.
-- Make the "Tickets & Issues" card header link to `/tickets`.
-
-### 3.2 Attention Cards with Filtered Navigation
-
-- "Accounts Attention" card: on click, navigate to `/accounts?status=STALLED_ONBOARDING`.
-- "Enquiries Attention" card: on click, navigate to `/enquiries?status=follow_up_needed`.
-- Update `Accounts.tsx` and `Enquiries.tsx` to read URL query parameters and pre-set filters on mount.
+- Add `CalendarEventType` enum with 6 values: `DEMO`, `FOLLOW_UP`, `CALL_BACK`, `CHECK_IN`, `ONBOARDING`, `GENERAL`
+- Add `event_type: CalendarEventType` field to the `CalendarEvent` interface
 
 ---
 
-## 4. Enquiry Pipeline Outcome Filter and British English
+### Step 2: Update `CalendarEventForm`
 
-### 4.1 Add Outcome Filter
+**File: `src/components/shared/CalendarEventForm.tsx`**
 
-- In `Enquiries.tsx`, add an "Outcome" filter dropdown alongside the existing stage, tenancy, and source filters. Options: All Outcomes, Interested, Call Later, Schedule Demo, Not Interested, Wrong/Bounced Number.
-
-### 4.2 British English Spellings
-
-- Audit all user-facing text across the application and update American spellings to British English where applicable (e.g., "Customize" to "Customise", "Organization" to "Organisation", "Canceled" to "Cancelled", "Categorize" to "Categorise"). This will be applied across all files with visible text.
+- Add `defaultEventType` prop (optional, defaults to `GENERAL`)
+- Add an "Event Type" dropdown with all 6 options
+- Include `event_type` in the `onSubmit` data payload
 
 ---
 
-## 5. Latest Contact Outcome Label in Pipeline Stage
+### Step 3: Tag All Seed Events
 
-- In `EnquiryDetail.tsx`, under the Pipeline Stage card, when the enquiry is at CONTACTED stage and has an outcome set, display a labelled section: **"Latest Contact Outcome"** showing the outcome badge and any associated reason, replacing the current generic "Outcome:" label.
+**File: `src/data/seedData.ts`**
 
----
-
-## 6. Schedule Demo Outcome Auto-Opens Demo Scheduler
-
-- In `EnquiryDetail.tsx`, when the outcome is changed to `SCHEDULE_DEMO` (via `handleOutcomeChange` or the stage modal), automatically open the demo scheduler (`setShowDemoSchedule(true)`) with:
-  - Pre-filled title: "Demo -- [company name]"
-  - Pre-filled description with contact email as invitee reference
-- Update `CalendarEventForm.tsx` to accept optional `defaultDescription` prop for pre-population.
+Tag all 22 existing seed events with the appropriate `event_type` based on title keywords (e.g. "Demo" = `DEMO`, "Follow-up" = `FOLLOW_UP`, "Onboarding prep" = `ONBOARDING`, etc.)
 
 ---
 
-## 7. Stage Update Creates Timeline Note
+### Step 4: Enquiry Module
 
-- In `EnquiryDetail.tsx`, whenever a stage is updated (forward or backward), automatically create a system note with a timestamp entry like: `[System] Stage updated to "Contacted" by [user name] at [timestamp]`.
-- This applies to all stage transitions: forward progression, backward revert, and stage modal confirmations. The note is pushed to `seedNotes` and the enquiry's `notes_thread`.
+**File: `src/pages/EnquiryDetail.tsx`**
 
----
-
-## 8. Reports Feature Adoption Update
-
-- In `Reports.tsx`, update the `featureAdoption` array to reflect the requested features:
-  - "Enquiry Capture" (replaces current "Lead Capture")
-  - "Convert to Lead Button"
-  - "Creating Manual Leads"
-  - "Creating Tasks"
-  - "Task Types Usage"
-  - "Channel Partner Section"
-- Remove the old items (Follow-ups, Integrations, Reports, Bulk Import, Inventory Mgmt) and replace with the above list.
+- Demo scheduling: pass `defaultEventType={DEMO}`
+- Call later outcome: pass `defaultEventType={CALL_BACK}`
+- No-show/ghosted follow-up: pass `defaultEventType={FOLLOW_UP}`
+- Manual creation: pass `defaultEventType={GENERAL}`
+- Update handlers to include `event_type` when pushing events
 
 ---
 
-## 9. Separate Calendar Module from Inquiry Pipeline
+### Step 5: Account Module
 
-### 9.1 New Route and Page
+**File: `src/pages/AccountDetail.tsx`**
 
-- Create `src/pages/CalendarPage.tsx` -- a standalone full calendar page.
-- Add route `/calendar` in `App.tsx`.
-
-### 9.2 Calendar Page Content
-
-- Full month calendar grid (reuse the calendar grid pattern from `EnquiryPipelineDashboard.tsx`).
-- **Entity filter**: All Events, Enquiries, Accounts, Tickets, Marketing, Others.
-- **Team member filter**: Dropdown to select "My Calendar" or any individual team member (populated from `seedUsers`). Admins can view any team member's calendar.
-- Below the calendar grid, a **list view** of events for the selected month, sorted chronologically.
-- No KPI buckets or funnel -- purely calendar-focused.
-
-### 9.3 Update Sidebar Navigation
-
-- Remove the "Calendar & Dashboard" sub-item from the Inquiry Pipeline collapsible group.
-- The Inquiry Pipeline group will only contain "All Enquiries" (or become a single non-collapsible nav item since there is only one sub-item).
-- Add a new top-level nav item "Calendar" with the `CalendarDays` icon, positioned after "Inquiry Pipeline".
-
-### 9.4 Clean Up
-
-- Remove or repurpose `EnquiryPipelineDashboard.tsx` since its functionality is now in `CalendarPage.tsx`.
-- Remove the `/enquiries/dashboard` route.
+- "Schedule Event" form: pass `defaultEventType={FOLLOW_UP}`
+- Seat expansion programmatic event: set `event_type: FOLLOW_UP`
+- Go-live auto-event: set `event_type: ONBOARDING`
+- Update handler to include `event_type`
 
 ---
 
-## 10. Account Billing Tab
+### Step 6: Ticket Module
 
-### 10.1 Add Billing Tab
+**File: `src/pages/Tickets.tsx`**
 
-- In `AccountDetail.tsx`, add a new "Billing" tab after the existing tabs.
-
-### 10.2 Billing Tab Content
-
-- **Payment Plan Selection**: Radio group with three options:
-  - Quarterly (4 months) -- billed 3 times/year
-  - Half-Yearly (6 months) -- billed 2 times/year
-  - Annual (12 months) -- single payment, billed in advance
-- **Billing Details Fields** (manually entered):
-  - Plan Amount (currency input)
-  - Billing Start Date
-  - Next Payment Due Date (auto-calculated based on plan)
-  - Payment Status: Paid / Pending / Overdue
-  - Invoice Number (text input)
-  - Notes/Remarks (textarea)
-- **Payment History Table**: Shows past payments with date, amount, invoice number, status, and receipt attachment.
-- **Attachment Upload**: Ability to attach receipts or invoices per payment entry.
-- **Add Payment** button to log a new payment entry manually.
-- Designed so that quarterly and half-yearly options can be easily removed later, leaving only annual.
+- "Schedule Follow-up" form: pass `defaultEventType={FOLLOW_UP}`
+- Update handler to include `event_type`
 
 ---
 
-## Technical Details
+### Step 7: Calendar Page -- Filter, Badges, and NEW "Create Event" Button
 
-### Files Created
+**File: `src/pages/CalendarPage.tsx`**
 
+This is the largest change. Three additions:
 
-| File                         | Purpose                                             |
-| ---------------------------- | --------------------------------------------------- |
-| `src/data/lookupData.ts`     | Shared lookup data (tags, cities, portals, sources) |
-| `src/pages/CalendarPage.tsx` | Standalone full calendar page                       |
+**A. "Create Event" Button (NEW)**
+- Add a "Create Event" button in the card header, next to the filters
+- Clicking it opens a Dialog containing the `CalendarEventForm` (with `defaultEventType={GENERAL}` so the user can pick any type)
+- The form's entity fields are optional since this is a standalone event (not linked to a specific enquiry/account/ticket)
+- On submit, push the new event into `seedCalendarEvents` with all fields including `event_type`, and show a success toast
 
+**B. Event Type Filter Dropdown**
+- Add a new "Event Type" filter dropdown alongside the existing Entity and Team filters
+- Options: All Types, Demo, Follow-up, Call Back, Check-in, Onboarding, General
+- Applied in the `useMemo` filter logic for both grid and list views
 
-### Files Modified
+**C. Colour-Coded Event Type Badges**
+- Display event type as a badge on both calendar grid cells and list view rows
+- Colour scheme:
+  - Demo: purple
+  - Follow-up: blue
+  - Call Back: amber
+  - Check-in: teal
+  - Onboarding: green
+  - General: grey
 
+---
 
-| File                                            | Changes                                                                                                       |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `src/pages/admin/AdminLookups.tsx`              | Import from shared lookupData instead of hardcoded defaults                                                   |
-| `src/components/shared/CreateTicketDialog.tsx`  | Tags from lookups, city dropdown, British English                                                             |
-| `src/pages/Tickets.tsx`                         | City dropdown from lookups, tags from lookups                                                                 |
-| `src/pages/EnquiryDetail.tsx`                   | City dropdown, "Latest Contact Outcome" label, Schedule Demo auto-open, stage timeline notes, British English |
-| `src/components/shared/CreateEnquiryDialog.tsx` | City dropdown from lookups                                                                                    |
-| `src/pages/Enquiries.tsx`                       | Outcome filter, URL query param filtering, British English                                                    |
-| `src/pages/Accounts.tsx`                        | URL query param filtering for status                                                                          |
-| `src/pages/Dashboard.tsx`                       | Clickable bucket headers, attention card navigation                                                           |
-| `src/pages/Reports.tsx`                         | Updated feature adoption list                                                                                 |
-| `src/pages/AccountDetail.tsx`                   | New Billing tab                                                                                               |
-| `src/components/shared/CalendarEventForm.tsx`   | Accept defaultDescription prop                                                                                |
-| `src/components/layout/AppSidebar.tsx`          | Separate Calendar nav item, simplify Inquiry Pipeline                                                         |
-| `src/App.tsx`                                   | Add `/calendar` route, remove `/enquiries/dashboard`                                                          |
+### Step 8: Dashboard -- Event Type Badge
 
+**File: `src/pages/Dashboard.tsx`**
 
-### State Additions
+- Show event type badge next to each event in the upcoming events section
 
-- `billingPlan`, `payments[]`, `billingDetails` on AccountDetail local state
-- `outcomeFilter` on Enquiries page
-- `entityFilter`, `teamMemberFilter` on CalendarPage
+---
+
+## Files Summary
+
+| File | Changes |
+|------|---------|
+| `src/types/core.ts` | Add `CalendarEventType` enum; add `event_type` to `CalendarEvent` |
+| `src/components/shared/CalendarEventForm.tsx` | Add `defaultEventType` prop; add event type dropdown; include in payload |
+| `src/data/seedData.ts` | Add `event_type` to all 22 seed events |
+| `src/pages/EnquiryDetail.tsx` | Pass `defaultEventType` to both form instances; update handlers |
+| `src/pages/AccountDetail.tsx` | Pass `defaultEventType` to form; tag programmatic events |
+| `src/pages/Tickets.tsx` | Pass `defaultEventType` to form; update handler |
+| `src/pages/CalendarPage.tsx` | Add "Create Event" button with dialog; add event type filter; add colour-coded badges |
+| `src/pages/Dashboard.tsx` | Show event type badge in upcoming events |
+
