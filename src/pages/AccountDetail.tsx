@@ -9,7 +9,7 @@ import {
   TicketPriority, TicketStatus, ImportType, IngestionStatus, TenancyType,
   TicketType, TicketCategory, TimelineEventType,
 } from '@/types/core';
-import type { ChecklistItem, Account, SupportTicket } from '@/types/core';
+import type { ChecklistItem, Account, SupportTicket, AccountSeat } from '@/types/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -260,6 +260,41 @@ export default function AccountDetail() {
 
   // Note refresh
   const [noteRefresh, setNoteRefresh] = useState(0);
+
+  // Seats state
+  const [seats, setSeats] = useState<AccountSeat[]>(account?.seats ?? []);
+  const [showAddSeat, setShowAddSeat] = useState(false);
+  const [newSeatName, setNewSeatName] = useState('');
+  const [newSeatEmail, setNewSeatEmail] = useState('');
+  const [newSeatPhone, setNewSeatPhone] = useState('');
+  const [newSeatRole, setNewSeatRole] = useState('Agent');
+
+  const handleAddSeat = () => {
+    if (!newSeatName) { toast.error('Name is required'); return; }
+    const newSeat: AccountSeat = {
+      seat_id: `SEAT_${account.account_id}_${Date.now()}`,
+      account_id: account.account_id,
+      name: newSeatName,
+      email: newSeatEmail,
+      phone: newSeatPhone,
+      role: newSeatRole,
+      onboarded: false,
+      onboarded_at: null,
+      created_at: new Date().toISOString(),
+    };
+    setSeats(prev => [...prev, newSeat]);
+    setNewSeatName(''); setNewSeatEmail(''); setNewSeatPhone(''); setNewSeatRole('Agent');
+    setShowAddSeat(false);
+    toast.success(`Seat added for ${newSeat.name}`);
+  };
+
+  const toggleSeatOnboarded = (seatId: string) => {
+    setSeats(prev => prev.map(s => s.seat_id === seatId ? {
+      ...s,
+      onboarded: !s.onboarded,
+      onboarded_at: !s.onboarded ? new Date().toISOString() : null,
+    } : s));
+  };
 
   // Billing state
   type BillingCycle = 'quarterly' | 'half_yearly' | 'annual';
@@ -618,6 +653,7 @@ export default function AccountDetail() {
         <TabsList className="flex flex-wrap gap-0.5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+          <TabsTrigger value="seats">Seats ({seats.length})</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="ingestion">Data</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
@@ -798,6 +834,115 @@ export default function AccountDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ═══ SEATS ═══ */}
+        <TabsContent value="seats" className="mt-4 space-y-4">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Total Seats', value: seats.length },
+              { label: 'Onboarded', value: seats.filter(s => s.onboarded).length, color: 'text-success' },
+              { label: 'Pending', value: seats.filter(s => !s.onboarded).length, color: 'text-warning' },
+            ].map(s => (
+              <Card key={s.label}>
+                <CardContent className="p-4 text-center">
+                  <div className={`text-2xl font-bold ${s.color ?? ''}`}>{s.value}</div>
+                  <div className="text-xs text-muted-foreground">{s.label}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span>User Seats</span>
+                <Button size="sm" onClick={() => setShowAddSeat(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add Seat</Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {seats.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No seats added yet. Click "Add Seat" to register users for onboarding.</p>
+              ) : (
+                <div className="overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-2 font-medium text-muted-foreground">Name</th>
+                        <th className="text-left py-2 px-2 font-medium text-muted-foreground">Email</th>
+                        <th className="text-left py-2 px-2 font-medium text-muted-foreground hidden sm:table-cell">Phone</th>
+                        <th className="text-left py-2 px-2 font-medium text-muted-foreground">Role</th>
+                        <th className="text-left py-2 px-2 font-medium text-muted-foreground">Status</th>
+                        <th className="text-left py-2 px-2 font-medium text-muted-foreground hidden md:table-cell">Onboarded</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {seats.map(seat => (
+                        <tr key={seat.seat_id} className="border-b border-border/50 hover:bg-muted/30">
+                          <td className="py-2.5 px-2 font-medium">{seat.name}</td>
+                          <td className="py-2.5 px-2 text-muted-foreground">{seat.email || '—'}</td>
+                          <td className="py-2.5 px-2 text-muted-foreground hidden sm:table-cell">{seat.phone || '—'}</td>
+                          <td className="py-2.5 px-2"><Badge variant="outline" className="text-xs">{seat.role}</Badge></td>
+                          <td className="py-2.5 px-2">
+                            <Badge
+                              className={`text-xs cursor-pointer ${seat.onboarded ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}`}
+                              onClick={() => toggleSeatOnboarded(seat.seat_id)}
+                            >
+                              {seat.onboarded ? 'Onboarded' : 'Pending'}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-2 text-xs text-muted-foreground hidden md:table-cell">
+                            {seat.onboarded_at ? format(new Date(seat.onboarded_at), 'dd MMM yyyy') : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Add Seat Dialog */}
+        <Dialog open={showAddSeat} onOpenChange={setShowAddSeat}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Seat</DialogTitle>
+              <DialogDescription>Register a user for onboarding on this account.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Name <span className="text-destructive">*</span></Label>
+                <Input value={newSeatName} onChange={e => setNewSeatName(e.target.value)} placeholder="Full name" />
+              </div>
+              <div className="space-y-1">
+                <Label>Email</Label>
+                <Input value={newSeatEmail} onChange={e => setNewSeatEmail(e.target.value)} placeholder="email@example.com" type="email" />
+              </div>
+              <div className="space-y-1">
+                <Label>Phone</Label>
+                <Input value={newSeatPhone} onChange={e => setNewSeatPhone(e.target.value)} placeholder="Phone number" />
+              </div>
+              <div className="space-y-1">
+                <Label>Role</Label>
+                <Select value={newSeatRole} onValueChange={setNewSeatRole}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Manager">Manager</SelectItem>
+                    <SelectItem value="Agent">Agent</SelectItem>
+                    <SelectItem value="Viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddSeat(false)}>Cancel</Button>
+              <Button onClick={handleAddSeat}>Add Seat</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* ═══ 3. VERIFICATION ═══ */}
         <TabsContent value="verification" className="mt-4 space-y-4">

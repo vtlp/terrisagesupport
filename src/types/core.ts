@@ -316,6 +316,7 @@ export interface Account {
     website?: { connected: boolean; url?: string };
   };
   data_ingestion_jobs: string[]; // job_ids
+  seats: AccountSeat[];
   created_from_enquiry_id: string | null;
   created_at: string;
   updated_at: string;
@@ -413,6 +414,18 @@ export interface DataIngestionJob {
   duplicate_count: number;
   created_at: string;
   completed_at: string | null;
+}
+
+export interface AccountSeat {
+  seat_id: string;
+  account_id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  onboarded: boolean;
+  onboarded_at: string | null;
+  created_at: string;
 }
 
 export interface AuditTrailEntry {
