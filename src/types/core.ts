@@ -423,6 +423,7 @@ export interface AccountSeat {
   email: string;
   phone: string;
   role: string;
+  permissions: string[];
   onboarded: boolean;
   onboarded_at: string | null;
   created_at: string;
