@@ -5,26 +5,39 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { CalendarEventType } from '@/types/core';
+
+const eventTypeLabels: Record<CalendarEventType, string> = {
+  [CalendarEventType.DEMO]: 'Demo',
+  [CalendarEventType.FOLLOW_UP]: 'Follow-up',
+  [CalendarEventType.CALL_BACK]: 'Call Back',
+  [CalendarEventType.CHECK_IN]: 'Check-in',
+  [CalendarEventType.ONBOARDING]: 'Onboarding',
+  [CalendarEventType.GENERAL]: 'General',
+};
 
 interface CalendarEventFormProps {
-  onSubmit: (data: { title: string; date: Date; time: string; notes: string }) => void;
+  onSubmit: (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => void;
   onCancel: () => void;
   defaultTitle?: string;
   defaultDescription?: string;
+  defaultEventType?: CalendarEventType;
 }
 
-export function CalendarEventForm({ onSubmit, onCancel, defaultTitle = '', defaultDescription = '' }: CalendarEventFormProps) {
+export function CalendarEventForm({ onSubmit, onCancel, defaultTitle = '', defaultDescription = '', defaultEventType = CalendarEventType.GENERAL }: CalendarEventFormProps) {
   const [title, setTitle] = useState(defaultTitle);
   const [date, setDate] = useState<Date | undefined>();
   const [time, setTime] = useState('10:00');
   const [notes, setNotes] = useState(defaultDescription);
+  const [eventType, setEventType] = useState<CalendarEventType>(defaultEventType);
 
   const handleSubmit = () => {
     if (title && date) {
-      onSubmit({ title, date, time, notes });
+      onSubmit({ title, date, time, notes, event_type: eventType });
     }
   };
 
@@ -33,6 +46,17 @@ export function CalendarEventForm({ onSubmit, onCancel, defaultTitle = '', defau
       <div className="space-y-2">
         <Label>Event Title</Label>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Follow-up call" />
+      </div>
+      <div className="space-y-2">
+        <Label>Event Type</Label>
+        <Select value={eventType} onValueChange={(v) => setEventType(v as CalendarEventType)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {Object.values(CalendarEventType).map(t => (
+              <SelectItem key={t} value={t}>{eventTypeLabels[t]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">

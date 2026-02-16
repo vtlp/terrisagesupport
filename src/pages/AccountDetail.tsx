@@ -5,7 +5,7 @@ import {
   getCalendarEventsForEntity, getNextUpcomingEvent, seedCalendarEvents, getUserName, seedEnquiries,
 } from '@/data/seedData';
 import {
-  EntityType, VerificationStatus, AccountStatus, CalendarEventStatus,
+  EntityType, VerificationStatus, AccountStatus, CalendarEventStatus, CalendarEventType,
   TicketPriority, TicketStatus, ImportType, IngestionStatus, TenancyType,
   TicketType, TicketCategory, TimelineEventType,
 } from '@/types/core';
@@ -334,7 +334,7 @@ export default function AccountDetail() {
           event_id: `CE_GL_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
           title: `7-day go-live checkup — ${account.account_name}`, scheduled_at: checkupDate.toISOString(),
           created_by_user_id: 'U001', notes: 'Auto-generated: verify account health, usage, and satisfaction after go-live.',
-          status: CalendarEventStatus.UPCOMING, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          status: CalendarEventStatus.UPCOMING, event_type: CalendarEventType.ONBOARDING, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         });
         seedNotes.push({
           note_id: `N_GL_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
@@ -402,7 +402,7 @@ export default function AccountDetail() {
       event_id: `CE_SR_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
       title: `Seat request follow-up — ${account.account_name}`, scheduled_at: dueDate.toISOString(),
       created_by_user_id: 'U001', notes: `Follow up on seat expansion request (+${seatCount} seats). Ticket: ${ticketId}`,
-      status: CalendarEventStatus.UPCOMING, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      status: CalendarEventStatus.UPCOMING, event_type: CalendarEventType.FOLLOW_UP, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     });
     seedNotes.push({
       note_id: `N_SR_${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
@@ -460,14 +460,14 @@ export default function AccountDetail() {
     setNoteRefresh(prev => prev + 1);
   };
 
-  const handleCreateEvent = (data: { title: string; date: Date; time: string; notes: string }) => {
+  const handleCreateEvent = (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
     const scheduled = new Date(data.date);
     const [h, m] = data.time.split(':');
     scheduled.setHours(parseInt(h), parseInt(m));
     seedCalendarEvents.push({
       event_id: `CE${Date.now()}`, entity_type: EntityType.ACCOUNT, entity_id: account.account_id,
       title: data.title, scheduled_at: scheduled.toISOString(), created_by_user_id: 'U001',
-      notes: data.notes || undefined, status: CalendarEventStatus.UPCOMING,
+      notes: data.notes || undefined, status: CalendarEventStatus.UPCOMING, event_type: data.event_type,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     });
     setShowEventForm(false);
@@ -934,7 +934,7 @@ export default function AccountDetail() {
           {!showEventForm && <Button onClick={() => setShowEventForm(true)}><CalendarIcon className="h-4 w-4 mr-1" /> Schedule Event</Button>}
           {showEventForm && (
             <Card><CardContent className="p-4">
-              <CalendarEventForm onSubmit={handleCreateEvent} onCancel={() => setShowEventForm(false)} defaultTitle={`Follow-up — ${account.account_name}`} />
+              <CalendarEventForm onSubmit={handleCreateEvent} onCancel={() => setShowEventForm(false)} defaultTitle={`Follow-up — ${account.account_name}`} defaultEventType={CalendarEventType.FOLLOW_UP} />
             </CardContent></Card>
           )}
           <div className="space-y-3">

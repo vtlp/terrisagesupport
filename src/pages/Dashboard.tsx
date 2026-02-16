@@ -28,6 +28,7 @@ import {
   TicketStatus,
   TicketPriority,
   CalendarEventStatus,
+  CalendarEventType,
   KBBucket,
   EntityType,
 } from '@/types/core';
@@ -54,6 +55,24 @@ const entityTypeColors: Record<string, string> = {
   [EntityType.ENQUIRY]: 'bg-primary/15 text-primary',
   [EntityType.ACCOUNT]: 'bg-success/15 text-success',
   [EntityType.TICKET]: 'bg-warning/15 text-warning',
+};
+
+const eventTypeLabels: Record<CalendarEventType, string> = {
+  [CalendarEventType.DEMO]: 'Demo',
+  [CalendarEventType.FOLLOW_UP]: 'Follow-up',
+  [CalendarEventType.CALL_BACK]: 'Call Back',
+  [CalendarEventType.CHECK_IN]: 'Check-in',
+  [CalendarEventType.ONBOARDING]: 'Onboarding',
+  [CalendarEventType.GENERAL]: 'General',
+};
+
+const eventTypeColors: Record<CalendarEventType, string> = {
+  [CalendarEventType.DEMO]: 'bg-purple-500/15 text-purple-600 dark:text-purple-400',
+  [CalendarEventType.FOLLOW_UP]: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
+  [CalendarEventType.CALL_BACK]: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  [CalendarEventType.CHECK_IN]: 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
+  [CalendarEventType.ONBOARDING]: 'bg-green-500/15 text-green-600 dark:text-green-400',
+  [CalendarEventType.GENERAL]: 'bg-muted text-muted-foreground',
 };
 
 export default function Dashboard() {
@@ -129,9 +148,14 @@ export default function Dashboard() {
             <p className="text-sm font-medium truncate">{event.title}</p>
             <p className="text-xs text-muted-foreground">{format(new Date(event.scheduled_at), 'HH:mm')}</p>
           </div>
-          <Badge className={`text-[10px] ml-2 ${entityTypeColors[event.entity_type]}`}>
-            {entityTypeLabels[event.entity_type]}
-          </Badge>
+          <div className="flex items-center gap-1.5 ml-2">
+            <Badge className={`text-[10px] ${eventTypeColors[event.event_type] ?? 'bg-muted text-muted-foreground'}`}>
+              {eventTypeLabels[event.event_type] ?? 'General'}
+            </Badge>
+            <Badge className={`text-[10px] ${entityTypeColors[event.entity_type]}`}>
+              {entityTypeLabels[event.entity_type]}
+            </Badge>
+          </div>
         </div>
       </Link>
     );
@@ -253,9 +277,14 @@ export default function Dashboard() {
                           <p className="text-sm font-medium truncate">{e.title}</p>
                           <p className="text-xs text-muted-foreground">{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</p>
                         </div>
-                        <Badge className={`text-[10px] ml-2 ${entityTypeColors[e.entity_type]}`}>
-                          {entityTypeLabels[e.entity_type]}
-                        </Badge>
+                        <div className="flex items-center gap-1.5 ml-2">
+                          <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? 'bg-muted text-muted-foreground'}`}>
+                            {eventTypeLabels[e.event_type] ?? 'General'}
+                          </Badge>
+                          <Badge className={`text-[10px] ${entityTypeColors[e.entity_type]}`}>
+                            {entityTypeLabels[e.entity_type]}
+                          </Badge>
+                        </div>
                       </div>
                     </Link>
                   ))}
