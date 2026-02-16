@@ -1,82 +1,87 @@
 
 
-# Plan: Add Seats / Users List to Account Detail
+# Plan: Enhanced Seat Roles, Permissions, and Billing Integration
 
-## What's Missing
+## Overview
 
-Currently, the Account section has a "Seat Expansion Request" workflow (to request additional seats), but there is no actual list of the users/seats being onboarded. There is no way to:
-- Record who the individual users are (name, email, phone, role)
-- Track whether each user has been onboarded or is still pending
-- See a count of active vs pending seats at a glance
-
-The Enquiry captures a `team_size_estimate` (a number), but once an account is created, there is no structured record of the actual people.
+Update the Add Seat dialog to use structured roles (Super User, Admin, Agent) with conditional permissions, enforce a single Super User per account, and connect seat counts to the Billing tab with per-seat pricing.
 
 ---
 
-## Changes (4 Steps)
+## Changes
 
-### Step 1: Data Model -- Add `AccountSeat` interface
+### 1. Data Model Update
 
 **File: `src/types/core.ts`**
 
-Add a new interface:
+Add a `permissions` field to the `AccountSeat` interface:
 
 ```text
-AccountSeat {
-  seat_id: string
-  account_id: string
-  name: string
-  email: string
-  phone: string
-  role: string              (e.g. "Admin", "Agent", "Manager")
-  onboarded: boolean        (whether this user has been set up)
-  onboarded_at: string | null
-  created_at: string
-}
+permissions: string[]   // e.g. ['org_wide_access', 'agent_network_access', 'publish_access']
 ```
 
-Add `seats: AccountSeat[]` field to the `Account` interface.
-
----
-
-### Step 2: Seed Data -- Add sample seats to existing accounts
-
-**File: `src/data/seedData.ts`**
-
-Add 2-4 sample seats per account (mix of onboarded and pending) so the UI has data to display immediately.
-
----
-
-### Step 3: Account Detail -- Add "Seats" tab
+### 2. Add Seat Dialog -- Role and Permissions Logic
 
 **File: `src/pages/AccountDetail.tsx`**
 
-Add a new **"Seats"** tab (between "Onboarding" and "Verification") with:
+**A. Role dropdown** -- Change options from (Admin, Manager, Agent, Viewer) to:
+- **Super User** -- full access, no separate permissions needed
+- **Admin** -- full access, no separate permissions needed
+- **Agent** -- requires permission selection
 
-**A. Summary Row**
-- Total seats count, onboarded count, pending count -- displayed as small stat cards
+**B. Conditional permissions (visible only when role = Agent):**
+- Organization-wide Access (checkbox)
+- Agent Network Access (checkbox) -- hidden if tenancy type is Builder/Developer
+- Publish Access (checkbox) -- hidden if tenancy type is Builder/Developer
 
-**B. Seats Table**
-- Columns: Name, Email, Phone, Role, Status (Onboarded / Pending), Onboarded Date
-- Each row shows a badge: green for "Onboarded", amber for "Pending"
+**C. Super User enforcement:**
+- If an existing seat already has role "Super User", disable the "Super User" option in the dropdown with a note "(already assigned)"
+- Only one Super User allowed per account
 
-**C. "Add Seat" Button**
-- Opens a small dialog/form to add a new seat (name, email, phone, role)
-- New seats default to `onboarded: false`
+**D. State additions:**
+- `newSeatPermissions: string[]` state to track selected permissions
+- Reset permissions when role changes away from Agent
 
-**D. Toggle Onboarded**
-- A button or checkbox on each row to mark a user as onboarded (sets `onboarded: true` and `onboarded_at` to now)
+### 3. Seats Table -- Show Permissions
 
-**E. Connection to Seat Expansion**
-- The existing "Request Seat Expansion" workflow remains as-is -- it creates a ticket for approval. The Seats tab is the actual roster of users.
+**File: `src/pages/AccountDetail.tsx`**
+
+Add a "Permissions" column (or show permissions as small badges under the Role column) so agents can see what permissions each seat has at a glance.
+
+### 4. Billing Tab -- Seat Count and Per-Seat Pricing
+
+**File: `src/pages/AccountDetail.tsx`**
+
+Add to the Billing Details card:
+- **Number of Seats** -- auto-calculated from `seats.length`, displayed as a read-only field
+- **Per Seat Price (INR)** -- new editable input field (state: `perSeatPrice`)
+- **Total Seat Cost** -- auto-calculated as `seats.length x perSeatPrice`, displayed below
+
+This gives billing visibility into how many seats are active and the associated cost.
+
+### 5. Seed Data -- Add Permissions to Existing Seats
+
+**File: `src/data/seedData.ts`**
+
+Update the `makeSeats` helper to accept a `permissions` parameter and retroactively tag existing seed seats with appropriate permissions. Ensure each account has exactly one Super User.
 
 ---
 
-### Step 4: Wire up the Enquiry-to-Account conversion
+## Tenancy-Based Permission Rules
 
-**File: `src/pages/EnquiryDetail.tsx`**
+```text
+Role = Super User or Admin --> No permission checkboxes shown (full access implied)
 
-When an enquiry is converted to an account, initialize `seats` as an empty array. The `team_size_estimate` from the enquiry can be shown as a reference note, but actual seat entries are added manually in the Account Seats tab.
+Role = Agent + Tenancy = Agency/Brokerage:
+  [x] Organization-wide Access
+  [x] Agent Network Access
+  [x] Publish Access
+
+Role = Agent + Tenancy = Builder/Developer:
+  [x] Organization-wide Access
+  [ ] Agent Network Access    (hidden)
+  [ ] Publish Access           (hidden)
+```
 
 ---
 
@@ -84,8 +89,7 @@ When an enquiry is converted to an account, initialize `seats` as an empty array
 
 | File | Change |
 |------|--------|
-| `src/types/core.ts` | Add `AccountSeat` interface; add `seats` to `Account` |
-| `src/data/seedData.ts` | Add sample seat data to existing accounts |
-| `src/pages/AccountDetail.tsx` | Add "Seats" tab with table, add/toggle functionality, summary stats |
-| `src/pages/EnquiryDetail.tsx` | Initialize `seats: []` on account conversion |
+| `src/types/core.ts` | Add `permissions: string[]` to `AccountSeat` |
+| `src/pages/AccountDetail.tsx` | Update Add Seat dialog (roles, permissions, Super User limit); add permissions display in table; add seat count and per-seat price to Billing tab |
+| `src/data/seedData.ts` | Update seed seats with permissions and one Super User per account |
 
