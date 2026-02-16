@@ -91,6 +91,15 @@ export enum CalendarEventStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum CalendarEventType {
+  DEMO = 'DEMO',
+  FOLLOW_UP = 'FOLLOW_UP',
+  CALL_BACK = 'CALL_BACK',
+  CHECK_IN = 'CHECK_IN',
+  ONBOARDING = 'ONBOARDING',
+  GENERAL = 'GENERAL',
+}
+
 export enum EntityType {
   ENQUIRY = 'ENQUIRY',
   ACCOUNT = 'ACCOUNT',
@@ -236,6 +245,7 @@ export interface CalendarEvent {
   created_by_user_id: string;
   notes?: string;
   status: CalendarEventStatus;
+  event_type: CalendarEventType;
   created_at: string;
   updated_at: string;
 }

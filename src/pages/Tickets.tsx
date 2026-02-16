@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { seedTickets, getUserName, seedNotes, seedCalendarEvents, seedAccounts, getAccountName } from '@/data/seedData';
-import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, CalendarEventStatus, TimelineEventType } from '@/types/core';
+import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, CalendarEventStatus, CalendarEventType, TimelineEventType } from '@/types/core';
 import { NotesPanel } from '@/components/shared/NotesPanel';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
@@ -165,7 +165,7 @@ export default function Tickets() {
     setNoteRefresh(prev => prev + 1);
   };
 
-  const handleCreateEvent = (data: { title: string; date: Date; time: string; notes: string }) => {
+  const handleCreateEvent = (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
     if (!selected) return;
     const scheduled = new Date(data.date);
     const [h, m] = data.time.split(':');
@@ -179,6 +179,7 @@ export default function Tickets() {
       created_by_user_id: 'U001',
       notes: data.notes || undefined,
       status: CalendarEventStatus.UPCOMING,
+      event_type: data.event_type,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -596,6 +597,7 @@ export default function Tickets() {
                       onSubmit={handleCreateEvent}
                       onCancel={() => setShowEventForm(false)}
                       defaultTitle={`Follow-up — ${selected.subject.slice(0, 40)}`}
+                      defaultEventType={CalendarEventType.FOLLOW_UP}
                     />
                   </CardContent>
                 </Card>

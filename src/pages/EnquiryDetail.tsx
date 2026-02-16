@@ -4,7 +4,7 @@ import { seedEnquiries, seedNotes, seedCalendarEvents, seedAccounts, seedUsers, 
 import {
   EnquiryStage, EnquiryOutcome, EnquirySource, TenancyType, FocusArea, SalesFocus,
   PrimaryPropertyType, NotInterestedReason, DemoOutcome, EntityType, CalendarEventStatus,
-  AccountStatus, VerificationStatus,
+  CalendarEventType, AccountStatus, VerificationStatus,
 } from '@/types/core';
 import type { Enquiry, Note, CalendarEvent, Account } from '@/types/core';
 import { Button } from '@/components/ui/button';
@@ -289,7 +289,23 @@ export default function EnquiryDetail() {
     }
   };
 
-  const handleDemoScheduled = (data: { title: string; date: Date; time: string; notes: string }) => {
+  const handleDemoScheduled = (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
+    const scheduled = new Date(data.date);
+    const [h, m] = data.time.split(':');
+    scheduled.setHours(parseInt(h), parseInt(m));
+    seedCalendarEvents.push({
+      event_id: `CE_DEMO_${Date.now()}`,
+      entity_type: EntityType.ENQUIRY,
+      entity_id: enquiry.enquiry_id,
+      title: data.title,
+      scheduled_at: scheduled.toISOString(),
+      created_by_user_id: currentUser.user_id,
+      notes: data.notes || undefined,
+      status: CalendarEventStatus.UPCOMING,
+      event_type: data.event_type,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
     update({ stage: EnquiryStage.DEMO_SCHEDULED, outcome: EnquiryOutcome.SCHEDULE_DEMO, demo_event_id: 'CE_NEW' });
     toast.success(`Demo "${data.title}" scheduled for ${format(data.date, 'dd MMM yyyy')} at ${data.time}`);
     setShowDemoSchedule(false);
@@ -321,7 +337,7 @@ export default function EnquiryDetail() {
     setShowConvertDialog(false);
   };
 
-  const handleCalendarEventCreated = (data: { title: string; date: Date; time: string; notes: string }) => {
+  const handleCalendarEventCreated = (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
     const scheduled = new Date(data.date);
     const [h, m] = data.time.split(':');
     scheduled.setHours(parseInt(h), parseInt(m));
@@ -334,6 +350,7 @@ export default function EnquiryDetail() {
       created_by_user_id: currentUser.user_id,
       notes: data.notes || undefined,
       status: CalendarEventStatus.UPCOMING,
+      event_type: data.event_type,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -782,6 +799,7 @@ export default function EnquiryDetail() {
           </DialogHeader>
           <CalendarEventForm
             defaultTitle={`Demo — ${enquiry.company_name}`}
+            defaultEventType={CalendarEventType.DEMO}
             onSubmit={handleDemoScheduled}
             onCancel={() => setShowDemoSchedule(false)}
           />
@@ -797,6 +815,7 @@ export default function EnquiryDetail() {
           </DialogHeader>
           <CalendarEventForm
             defaultTitle={`Call back — ${enquiry.company_name}`}
+            defaultEventType={enquiry.outcome === EnquiryOutcome.CALL_LATER ? CalendarEventType.CALL_BACK : CalendarEventType.FOLLOW_UP}
             onSubmit={handleCalendarEventCreated}
             onCancel={() => setShowCalendarForm(false)}
           />
