@@ -223,6 +223,7 @@ export default function AccountDetail() {
 
   // Editable overview fields
   const [editingOverview, setEditingOverview] = useState(false);
+  const [accountName, setAccountName] = useState(account?.account_name ?? '');
   const [ownerName, setOwnerName] = useState(account?.owner_name ?? '');
   const [ownerPhone, setOwnerPhone] = useState(account?.owner_phone ?? '');
   const [ownerEmail, setOwnerEmail] = useState(account?.owner_email ?? '');
@@ -570,7 +571,15 @@ export default function AccountDetail() {
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">{account.account_name}</h1>
+            {editingOverview ? (
+              <Input
+                value={accountName}
+                onChange={e => setAccountName(e.target.value)}
+                className="text-xl md:text-2xl font-bold border-transparent bg-transparent px-0 h-auto focus-visible:border-input focus-visible:bg-background focus-visible:px-3"
+              />
+            ) : (
+              <h1 className="text-xl md:text-2xl font-bold text-foreground">{account.account_name}</h1>
+            )}
             <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground flex-wrap">
               <MapPin className="h-3.5 w-3.5" /><span>{city}</span>
               <span className="text-border">•</span>
