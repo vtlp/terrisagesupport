@@ -31,6 +31,7 @@ import {
   Upload, FileSpreadsheet, ArrowRight, Plus, Wifi, WifiOff,
   CalendarIcon, Ticket, Pencil, Save, X, Phone, Mail, User, Building2, MapPin,
   Download, Send, AlertTriangle, MoreHorizontal, UserX, UserCheck, Trash2, Users,
+  Copy, FileText,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
@@ -384,6 +385,8 @@ export default function AccountDetail() {
   const [newPaymentRemarks, setNewPaymentRemarks] = useState('');
   const [newPaymentReceipt, setNewPaymentReceipt] = useState('');
 
+  // Invoice state
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
   const billingCycleLabels: Record<BillingCycle, string> = {
     quarterly: 'Quarterly (every 4 months)',
     half_yearly: 'Half-Yearly (every 6 months)',
@@ -857,7 +860,11 @@ export default function AccountDetail() {
               <CardHeader className="pb-2"><CardTitle className="text-base">From Enquiry</CardTitle></CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-                  <div><span className="text-xs text-muted-foreground block">Team Size</span>{sourceEnquiry.team_size_estimate ?? '—'}</div>
+                  <div>
+                    <span className="text-xs text-muted-foreground block">Team Size (Estimate)</span>
+                    <span>{sourceEnquiry.team_size_estimate ?? '—'}</span>
+                    <span className="text-xs text-muted-foreground ml-2">· Actual seats: <span className="font-medium text-primary">{activeSeats.length} active</span></span>
+                  </div>
                   <div><span className="text-xs text-muted-foreground block">Focus Area</span>{sourceEnquiry.focus_area.join(', ') || '—'}</div>
                   <div><span className="text-xs text-muted-foreground block">Sales Focus</span>{sourceEnquiry.sales_focus.map(s => s.replace(/_/g, ' ')).join(', ') || '—'}</div>
                   <div><span className="text-xs text-muted-foreground block">Property Types</span>{sourceEnquiry.primary_property_types.join(', ') || '—'}</div>
@@ -928,6 +935,13 @@ export default function AccountDetail() {
 
         {/* ═══ SEATS ═══ */}
         <TabsContent value="seats" className="mt-4 space-y-4">
+          {/* Enquiry estimate banner */}
+          {sourceEnquiry && sourceEnquiry.team_size_estimate && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg text-sm">
+              <AlertTriangle className="h-4 w-4 text-primary flex-shrink-0" />
+              <span>Estimated team size from enquiry: <span className="font-semibold">{sourceEnquiry.team_size_estimate}</span>. Add the actual users below.</span>
+            </div>
+          )}
           {/* Summary Stats */}
           <div className="grid grid-cols-4 gap-3">
             {[
@@ -1448,7 +1462,148 @@ export default function AccountDetail() {
             </Card>
           </div>
 
-          {/* Payment History */}
+          {/* Create Invoice Button */}
+          <div className="flex gap-2">
+            <Button onClick={() => setShowInvoicePreview(true)}>
+              <FileText className="h-4 w-4 mr-1" /> Create Invoice
+            </Button>
+          </div>
+
+          {/* Invoice Preview Dialog */}
+          <Dialog open={showInvoicePreview} onOpenChange={setShowInvoicePreview}>
+            <DialogContent className="bg-card max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Invoice Preview</DialogTitle>
+                <DialogDescription>Review and copy the invoice payload</DialogDescription>
+              </DialogHeader>
+              {(() => {
+                const now = new Date();
+                const invNum = `VTLP-INV-${format(now, 'yyyyMMdd')}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`;
+                const dueDate = new Date(now);
+                dueDate.setMonth(dueDate.getMonth() + billingCycleMonths[billingCycle]);
+                const seatCost = activeSeats.length * parseFloat(perSeatPrice || '0');
+                const plan = parseFloat(planAmount || '0');
+                const subtotal = plan + seatCost;
+                const gstRate = 0.18;
+                const gstAmount = subtotal * gstRate;
+                const grandTotal = subtotal + gstAmount;
+                const inactiveCount = seats.length - activeSeats.length;
+
+                const payload = {
+                  invoice_number: invNum,
+                  invoice_date: format(now, 'yyyy-MM-dd'),
+                  due_date: format(dueDate, 'yyyy-MM-dd'),
+                  from: {
+                    company: 'VTLP Technologies Private Limited',
+                    address: 'Hyderabad, Telangana, India',
+                    gstin: 'XXXXXXXXXXXXXXXXX',
+                  },
+                  bill_to: {
+                    account_name: accountName,
+                    owner_name: ownerName,
+                    city,
+                    email: ownerEmail,
+                    phone: ownerPhone,
+                  },
+                  line_items: [
+                    { description: `SaaS Subscription - ${billingCycleLabels[billingCycle]}`, amount: plan },
+                    { description: `Active Seats (${activeSeats.length} seats × ₹${perSeatPrice || '0'}/seat)`, amount: seatCost },
+                  ],
+                  subtotal,
+                  gst_rate: '18%',
+                  gst_amount: gstAmount,
+                  grand_total: grandTotal,
+                  billing_cycle: billingCycle,
+                  remarks: `Total Seats: ${activeSeats.length} active, ${inactiveCount} inactive. ${billingRemarks}`.trim(),
+                };
+
+                console.log('[Invoice Payload]', payload);
+
+                return (
+                  <div className="space-y-4">
+                    {/* Header */}
+                    <div className="border-b border-border pb-3">
+                      <h3 className="text-lg font-bold text-foreground">VTLP Technologies Private Limited</h3>
+                      <p className="text-xs text-muted-foreground">Hyderabad, Telangana, India</p>
+                    </div>
+
+                    {/* Invoice Meta */}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div><span className="text-muted-foreground">Invoice #:</span> <span className="font-medium">{invNum}</span></div>
+                      <div><span className="text-muted-foreground">Date:</span> {format(now, 'dd MMM yyyy')}</div>
+                      <div><span className="text-muted-foreground">Due Date:</span> {format(dueDate, 'dd MMM yyyy')}</div>
+                      <div><span className="text-muted-foreground">Billing Cycle:</span> {billingCycleLabels[billingCycle]}</div>
+                    </div>
+
+                    {/* Bill To */}
+                    <div className="border border-border rounded-md p-3">
+                      <p className="text-xs text-muted-foreground font-medium mb-1">BILL TO</p>
+                      <p className="text-sm font-semibold">{accountName}</p>
+                      <p className="text-sm text-muted-foreground">{ownerName}</p>
+                      <p className="text-xs text-muted-foreground">{city} · {ownerEmail} · {ownerPhone}</p>
+                    </div>
+
+                    {/* Line Items */}
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 font-medium text-muted-foreground">Description</th>
+                          <th className="text-right py-2 font-medium text-muted-foreground">Amount (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-border/50">
+                          <td className="py-2">SaaS Subscription — {billingCycleLabels[billingCycle]}</td>
+                          <td className="py-2 text-right">{plan.toLocaleString('en-IN')}</td>
+                        </tr>
+                        <tr className="border-b border-border/50">
+                          <td className="py-2">Active Seats ({activeSeats.length} × ₹{perSeatPrice || '0'}/seat)</td>
+                          <td className="py-2 text-right">{seatCost.toLocaleString('en-IN')}</td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-b border-border/50">
+                          <td className="py-2 font-medium">Subtotal</td>
+                          <td className="py-2 text-right font-medium">₹{subtotal.toLocaleString('en-IN')}</td>
+                        </tr>
+                        <tr className="border-b border-border/50">
+                          <td className="py-2 text-muted-foreground">GST (18%)</td>
+                          <td className="py-2 text-right text-muted-foreground">₹{gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 font-bold text-foreground">Grand Total</td>
+                          <td className="py-2 text-right font-bold text-foreground">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+
+                    <p className="text-xs text-muted-foreground">Total Seats: {activeSeats.length} active, {inactiveCount} inactive</p>
+
+                    {/* JSON Payload */}
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">View JSON Payload</summary>
+                      <pre className="mt-2 p-3 bg-muted rounded-md overflow-auto max-h-48 text-xs">{JSON.stringify(payload, null, 2)}</pre>
+                    </details>
+
+                    <DialogFooter className="flex gap-2">
+                      <Button variant="outline" onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+                        toast.success('Invoice payload copied to clipboard');
+                      }}>
+                        <Copy className="h-4 w-4 mr-1" /> Copy Payload
+                      </Button>
+                      <Button onClick={() => {
+                        toast.success('Invoice download initiated (simulated)');
+                      }}>
+                        <Download className="h-4 w-4 mr-1" /> Download Invoice
+                      </Button>
+                    </DialogFooter>
+                  </div>
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center justify-between">
