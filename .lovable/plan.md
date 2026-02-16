@@ -1,62 +1,50 @@
 
 
-# Fix: Clarify Calendar Filter Dropdowns + BRD Update Summary
+# Fix: Make Company Name and Account Name Editable
 
-## Part 1: Fix the Contradicting Dropdowns
+## Problem
 
-**Problem:** Two dropdowns sit side by side — the first defaults to "All Events" (filters by source entity), the second defaults to "All Types" (filters by event type). "All Events" is misleading because it sounds like it covers all filtering, making "All Types" seem redundant.
+Two fields are currently rendered as static, non-editable text:
 
-**Solution:** Rename the first dropdown's default label from "All Events" to "All Sources" and keep the options as Enquiries, Accounts, Tickets, Marketing, Others. This makes it clear:
-- **"All Sources"** = which module the event came from
-- **"All Types"** = what kind of event it is (Demo, Follow-up, etc.)
+1. **Enquiry Detail** (line 402): `company_name` is displayed as a static `<CardTitle>` -- every other field on the page (contact name, phone, email, city, tenancy type) is an editable `<Input>`, but the company name is not.
+2. **Account Detail** (line 573): `account_name` is displayed as a static `<h1>` -- even when the "Edit" toggle on the Account Summary card is active, the account name remains read-only.
 
-**File: `src/pages/CalendarPage.tsx`**
-- Change `ENTITY_FILTERS[0].label` from `'All Events'` to `'All Sources'`
-- No logic changes needed — only the display label
+This also matters because the company name from the enquiry becomes the account name upon conversion. If the agent types it wrong during enquiry creation, there is currently no way to fix it.
 
 ---
 
-## Part 2: Complete List of CalendarEventType Updates (for BRD)
+## Fix 1: Enquiry Detail -- Editable Company Name
 
-Here is every change made in the previous implementation, as bullet points for your BRD:
+**File: `src/pages/EnquiryDetail.tsx`**
 
-**Data Model**
-- Added `CalendarEventType` enum to `src/types/core.ts` with 6 values: `DEMO`, `FOLLOW_UP`, `CALL_BACK`, `CHECK_IN`, `ONBOARDING`, `GENERAL`
-- Added `event_type: CalendarEventType` field to the `CalendarEvent` interface
+Replace the static `<CardTitle>{enquiry.company_name}</CardTitle>` at line 402 with an editable `<Input>` that:
+- Is bound to `enquiry.company_name` via the existing `update()` helper
+- Is disabled when the enquiry is converted (same `isConverted` rule as all other fields)
+- Is styled to look like a heading (larger text, no visible border when not focused) so the visual hierarchy is maintained
 
-**Shared Component: CalendarEventForm**
-- Added optional `defaultEventType` prop (defaults to `GENERAL`)
-- Added "Event Type" dropdown to the form UI with all 6 options
-- `event_type` is now included in the form's submit payload
+---
 
-**Enquiry Module (EnquiryDetail.tsx)**
-- Demo scheduling (outcome = `SCHEDULE_DEMO`) now passes `defaultEventType = DEMO`
-- Call later (outcome = `CALL_LATER`) now passes `defaultEventType = CALL_BACK`
-- No-show / ghosted follow-up now passes `defaultEventType = FOLLOW_UP`
-- `handleDemoScheduled` handler now includes `event_type` when creating events
-- `handleCalendarEventCreated` handler now includes `event_type` when creating events
+## Fix 2: Account Detail -- Editable Account Name
 
-**Account Module (AccountDetail.tsx)**
-- "Schedule Event" button on Calendar tab now passes `defaultEventType = FOLLOW_UP`
-- Seat expansion programmatic event now tagged with `event_type = FOLLOW_UP`
-- Go-live auto-created check-in event now tagged with `event_type = ONBOARDING`
-- `handleCreateEvent` handler now includes `event_type` when creating events
+**File: `src/pages/AccountDetail.tsx`**
 
-**Ticket Module (Tickets.tsx)**
-- "Schedule Follow-up" button now passes `defaultEventType = FOLLOW_UP`
-- `handleCreateEvent` handler now includes `event_type` when creating events
+Two changes:
 
-**Seed Data (seedData.ts)**
-- All 20+ pre-seeded calendar events retroactively tagged with the correct `event_type` based on their context (e.g., demo events tagged `DEMO`, onboarding events tagged `ONBOARDING`)
+**A. Add `accountName` state** (around line 226, alongside the existing `ownerName`, `ownerPhone`, etc.):
+- `const [accountName, setAccountName] = useState(account?.account_name ?? '')`
 
-**Calendar Page (CalendarPage.tsx)**
-- Added "Create Event" button at the top of the page with a dialog containing CalendarEventForm (defaults to `GENERAL`)
-- Added "Event Type" filter dropdown alongside the existing source and team filters
-- Calendar grid cells are now colour-coded by event type (purple = Demo, blue = Follow-up, amber = Call Back, teal = Check-in, green = Onboarding, grey = General)
-- List view rows now display event type badge, entity source badge, and status badge
-- Filter logic updated to support filtering by entity source, event type, and team member simultaneously
-- First filter dropdown label to be renamed from "All Events" to "All Sources" (this fix)
+**B. Make the header editable** (line 573):
+- When `editingOverview` is true: replace the static `<h1>` with an `<Input>` bound to `accountName`, styled as a heading-sized input
+- When `editingOverview` is false: keep the current static `<h1>` display
 
-**Dashboard (Dashboard.tsx)**
-- Upcoming events section now displays the event type badge next to each event for quick visual identification
+This way, the account name is editable alongside all other overview fields when the agent clicks "Edit" on the Account Summary card.
+
+---
+
+## Files Summary
+
+| File | Change |
+|------|--------|
+| `src/pages/EnquiryDetail.tsx` | Replace static `<CardTitle>` with editable `<Input>` for company name, disabled when converted |
+| `src/pages/AccountDetail.tsx` | Add `accountName` state; toggle header between `<h1>` and `<Input>` based on edit mode |
 
