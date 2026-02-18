@@ -504,10 +504,10 @@ export default function Tickets() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">City:</span>
-                    <Select value={editCity} onValueChange={setEditCity}>
+                    <Select value={editCity || '__none__'} onValueChange={v => setEditCity(v === '__none__' ? '' : v)}>
                       <SelectTrigger className="h-7 text-xs border-none bg-transparent w-auto"><SelectValue placeholder="City" /></SelectTrigger>
                       <SelectContent className="max-h-48">
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="__none__">None</SelectItem>
                         {getCityOptions().map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
