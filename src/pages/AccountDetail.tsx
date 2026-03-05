@@ -25,6 +25,7 @@ import { NotesPanel } from '@/components/shared/NotesPanel';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import {
   CheckCircle2, Circle, Clock, Shield, ShieldCheck, ShieldX, ShieldAlert,
@@ -214,6 +215,10 @@ export default function AccountDetail() {
   const account = seedAccounts.find(a => a.account_id === accountId);
 
   const [checklist, setChecklist] = useState<ChecklistItem[]>(account?.onboarding_checklist ?? []);
+  const [draftChecklist, setDraftChecklist] = useState<ChecklistItem[] | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [panStatus, setPanStatus] = useState(account?.verification_pan_status ?? VerificationStatus.NOT_STARTED);
   const [idStatus, setIdStatus] = useState(account?.verification_identity_status ?? VerificationStatus.NOT_STARTED);
   const [accountStatus, setAccountStatus] = useState(account?.status ?? AccountStatus.ONBOARDING_IN_PROGRESS);
@@ -548,13 +553,48 @@ export default function AccountDetail() {
   const tickets = seedTickets.filter(t => t.account_id === account.account_id || t.linked_entity_id === account.account_id);
   const documents = seedDocuments.filter(d => d.entity_id === account.account_id);
   const jobs = seedIngestionJobs.filter(j => j.account_id === account.account_id);
-  const completedCount = checklist.filter(c => c.completed).length;
-  const progress = checklist.length > 0 ? Math.round((completedCount / checklist.length) * 100) : 0;
+  const displayChecklist = draftChecklist ?? checklist;
+  const completedCount = displayChecklist.filter(c => c.completed).length;
+  const progress = displayChecklist.length > 0 ? Math.round((completedCount / displayChecklist.length) * 100) : 0;
+  const isDirty = draftChecklist !== null;
 
   const toggleChecklistItem = (id: string) => {
-    setChecklist(prev => prev.map(item =>
-      item.id === id ? { ...item, completed: !item.completed, completed_at: !item.completed ? new Date().toISOString() : null, completed_by_user_id: !item.completed ? 'U001' : null } : item
-    ));
+    setDraftChecklist(prev => {
+      const base = prev ?? checklist;
+      return base.map(item =>
+        item.id === id ? { ...item, completed: !item.completed, completed_at: !item.completed ? new Date().toISOString() : null, completed_by_user_id: !item.completed ? 'U001' : null } : item
+      );
+    });
+  };
+
+  const saveChecklist = () => {
+    if (draftChecklist) {
+      setChecklist(draftChecklist);
+      setDraftChecklist(null);
+      toast.success('Onboarding checklist updated');
+    }
+  };
+
+  const cancelChecklist = () => {
+    setDraftChecklist(null);
+  };
+
+  const handleTabChange = (value: string) => {
+    if (isDirty && activeTab === 'onboarding') {
+      setPendingTab(value);
+      setShowDiscardDialog(true);
+    } else {
+      setActiveTab(value);
+    }
+  };
+
+  const confirmDiscard = () => {
+    setDraftChecklist(null);
+    setShowDiscardDialog(false);
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    }
   };
 
   const handleAddNote = (text: string) => {
@@ -592,6 +632,20 @@ export default function AccountDetail() {
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
+      {/* Unsaved Changes Discard Dialog */}
+      <AlertDialog open={showDiscardDialog} onOpenChange={v => { if (!v) { setShowDiscardDialog(false); setPendingTab(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Onboarding Changes</AlertDialogTitle>
+            <AlertDialogDescription>You have unsaved onboarding checklist changes. Discard them and switch tabs?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowDiscardDialog(false); setPendingTab(null); }}>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDiscard} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Discard & Switch</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Verification Note Dialog */}
       <Dialog open={verificationNoteDialog} onOpenChange={v => { if (!v) { setVerificationNoteDialog(false); setPendingVerification(null); } }}>
         <DialogContent className="bg-card">
@@ -715,7 +769,7 @@ export default function AccountDetail() {
       </div>
 
       {/* ── Tabs ──────────────────────────────── */}
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="flex flex-wrap gap-0.5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
@@ -885,7 +939,7 @@ export default function AccountDetail() {
             <CardHeader>
               <CardTitle className="text-base flex items-center justify-between">
                 <span>Onboarding Checklist</span>
-                <span className="text-sm font-normal text-muted-foreground">{completedCount}/{checklist.length} completed</span>
+                <span className="text-sm font-normal text-muted-foreground">{completedCount}/{displayChecklist.length} completed</span>
               </CardTitle>
               <div className="w-full bg-muted rounded-full h-2 mt-2">
                 <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
@@ -893,16 +947,39 @@ export default function AccountDetail() {
             </CardHeader>
             <CardContent>
               <div className="space-y-1">
-                {checklist.map(item => (
-                  <button key={item.id} className="flex items-center gap-3 w-full text-left p-2.5 rounded-md hover:bg-muted/50 transition-colors" onClick={() => toggleChecklistItem(item.id)}>
-                    {item.completed ? <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" /> : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />}
-                    <span className={item.completed ? 'text-foreground line-through opacity-70' : 'text-foreground'}>{item.label}</span>
-                    {item.completed_at && <span className="text-xs text-muted-foreground ml-auto">{format(new Date(item.completed_at), 'dd MMM')} • {getUserName(item.completed_by_user_id)}</span>}
-                  </button>
-                ))}
+                {displayChecklist.map(item => {
+                  const original = checklist.find(c => c.id === item.id);
+                  const isChanged = isDirty && original && original.completed !== item.completed;
+                  return (
+                    <button key={item.id} className={`flex items-center gap-3 w-full text-left p-2.5 rounded-md hover:bg-muted/50 transition-colors ${isChanged ? 'bg-warning/10 ring-1 ring-warning/30' : ''}`} onClick={() => toggleChecklistItem(item.id)}>
+                      {item.completed ? <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" /> : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />}
+                      <span className={item.completed ? 'text-foreground line-through opacity-70' : 'text-foreground'}>{item.label}</span>
+                      {isChanged && <Badge variant="outline" className="ml-2 text-[10px] bg-warning/10 text-warning border-warning/30">changed</Badge>}
+                      {item.completed_at && !isChanged && <span className="text-xs text-muted-foreground ml-auto">{format(new Date(item.completed_at), 'dd MMM')} • {getUserName(item.completed_by_user_id)}</span>}
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
+
+          {/* Save / Cancel bar */}
+          {isDirty && (
+            <div className="sticky bottom-0 z-10 bg-background border border-border rounded-lg p-3 flex items-center justify-between shadow-lg">
+              <div className="flex items-center gap-2 text-sm">
+                <AlertTriangle className="h-4 w-4 text-warning" />
+                <span className="font-medium">You have unsaved checklist changes</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={cancelChecklist}>
+                  <X className="h-3.5 w-3.5 mr-1" /> Cancel
+                </Button>
+                <Button size="sm" onClick={saveChecklist}>
+                  <Save className="h-3.5 w-3.5 mr-1" /> Save Changes
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Seat Onboarding Status */}
           {activeSeats.length > 0 && (
