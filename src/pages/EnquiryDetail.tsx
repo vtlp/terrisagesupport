@@ -155,7 +155,9 @@ export default function EnquiryDetail() {
 
   const canConvert = () => {
     if (enquiry.stage !== EnquiryStage.DEMO_COMPLETED) return 'Demo must be completed first';
-    if (!enquiry.onboarding_pack_sent) return 'Onboarding pack must be sent first';
+    if (!enquiry.onboarding_pack_sent) return 'Onboarding form must be sent first';
+    if (!enquiry.onboarding_submission) return 'Onboarding form has not been submitted yet';
+    if (enquiry.onboarding_submission.status !== SubmissionStatus.APPROVED) return 'Onboarding form must be reviewed and approved';
     return null;
   };
 
@@ -326,10 +328,64 @@ export default function EnquiryDetail() {
     setShowDemoOutcome(false);
   };
 
+  const getOnboardingFormUrl = (packType: string) => {
+    const base = 'https://terrisage-agency-onboard.lovable.app/onboarding';
+    const path = packType === 'PACK_BUILDER_01' ? 'builder' : 'agency';
+    return `${base}/${path}?enquiry_id=${enquiry.enquiry_id}`;
+  };
+
   const handleSendOnboardingPack = (packId: string) => {
-    update({ onboarding_pack_sent: true, onboarding_pack_id: packId });
-    toast.success('Onboarding pack marked as sent. Content copied to clipboard.');
+    const formLink = getOnboardingFormUrl(packId);
+    navigator.clipboard.writeText(formLink);
+    update({ onboarding_pack_sent: true, onboarding_pack_id: packId, onboarding_form_link: formLink });
+    // Log timeline note
+    const linkNote: Note = {
+      note_id: `N_LINK_${Date.now()}`,
+      entity_type: EntityType.ENQUIRY,
+      entity_id: enquiry.enquiry_id,
+      note_text: `[System] Onboarding form link sent by ${currentUser.full_name}: ${formLink}`,
+      created_by_user_id: currentUser.user_id,
+      created_at: new Date().toISOString(),
+    };
+    seedNotes.push(linkNote);
+    update({ notes_thread: [...enquiry.notes_thread, linkNote.note_id] });
+    toast.success('Onboarding form link copied to clipboard');
     setShowOnboardingPack(false);
+  };
+
+  const handleApproveSubmission = () => {
+    if (!enquiry.onboarding_submission) return;
+    update({
+      onboarding_submission: {
+        ...enquiry.onboarding_submission,
+        status: SubmissionStatus.APPROVED,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by_user_id: currentUser.user_id,
+      },
+    });
+    toast.success('Onboarding form approved! You can now convert to account.');
+  };
+
+  const handleRejectSubmission = () => {
+    if (!enquiry.onboarding_submission) return;
+    update({
+      onboarding_submission: {
+        ...enquiry.onboarding_submission,
+        status: SubmissionStatus.REJECTED,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by_user_id: currentUser.user_id,
+      },
+    });
+    toast.warning('Onboarding form rejected. You can re-send the form link.');
+  };
+
+  const handleResendFormLink = () => {
+    if (enquiry.onboarding_form_link) {
+      navigator.clipboard.writeText(enquiry.onboarding_form_link);
+      // Reset submission
+      update({ onboarding_submission: null });
+      toast.success('Form link copied. Submission reset for re-submission.');
+    }
   };
 
   const handleConvertToAccount = () => {
