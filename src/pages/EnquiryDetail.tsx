@@ -4,9 +4,9 @@ import { seedEnquiries, seedNotes, seedCalendarEvents, seedAccounts, seedUsers, 
 import {
   EnquiryStage, EnquiryOutcome, EnquirySource, TenancyType, FocusArea, SalesFocus,
   PrimaryPropertyType, NotInterestedReason, DemoOutcome, EntityType, CalendarEventStatus,
-  CalendarEventType, AccountStatus, VerificationStatus,
+  CalendarEventType, AccountStatus, VerificationStatus, SubmissionStatus,
 } from '@/types/core';
-import type { Enquiry, Note, CalendarEvent, Account } from '@/types/core';
+import type { Enquiry, Note, CalendarEvent, Account, OnboardingFormSubmission } from '@/types/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,11 +22,12 @@ import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
 import { toast } from 'sonner';
+import { OnboardingSubmissionCard } from '@/components/onboarding/OnboardingSubmissionCard';
 import { format } from 'date-fns';
 import { useUser } from '@/context/UserContext';
 import {
   ArrowLeft, Phone, Mail, MessageSquare, Building2, MapPin, Users, Calendar,
-  Send, UserCheck, ClipboardCheck, FileText, AlertTriangle, CheckCircle2, XCircle,
+  Send, UserCheck, ClipboardCheck, FileText, AlertTriangle, CheckCircle2, XCircle, Link2, Copy,
 } from 'lucide-react';
 
 const PORTAL_OPTIONS = ['MagicBricks', '99acres', 'Housing.com', 'NoBroker', 'Square Yards', 'CommonFloor', 'Other'];
@@ -154,7 +155,9 @@ export default function EnquiryDetail() {
 
   const canConvert = () => {
     if (enquiry.stage !== EnquiryStage.DEMO_COMPLETED) return 'Demo must be completed first';
-    if (!enquiry.onboarding_pack_sent) return 'Onboarding pack must be sent first';
+    if (!enquiry.onboarding_pack_sent) return 'Onboarding form must be sent first';
+    if (!enquiry.onboarding_submission) return 'Onboarding form has not been submitted yet';
+    if (enquiry.onboarding_submission.status !== SubmissionStatus.APPROVED) return 'Onboarding form must be reviewed and approved';
     return null;
   };
 
@@ -325,15 +328,72 @@ export default function EnquiryDetail() {
     setShowDemoOutcome(false);
   };
 
+  const getOnboardingFormUrl = (packType: string) => {
+    const base = 'https://terrisage-agency-onboard.lovable.app/onboarding';
+    const path = packType === 'PACK_BUILDER_01' ? 'builder' : 'agency';
+    return `${base}/${path}?enquiry_id=${enquiry.enquiry_id}`;
+  };
+
   const handleSendOnboardingPack = (packId: string) => {
-    update({ onboarding_pack_sent: true, onboarding_pack_id: packId });
-    toast.success('Onboarding pack marked as sent. Content copied to clipboard.');
+    const formLink = getOnboardingFormUrl(packId);
+    navigator.clipboard.writeText(formLink);
+    update({ onboarding_pack_sent: true, onboarding_pack_id: packId, onboarding_form_link: formLink });
+    // Log timeline note
+    const linkNote: Note = {
+      note_id: `N_LINK_${Date.now()}`,
+      entity_type: EntityType.ENQUIRY,
+      entity_id: enquiry.enquiry_id,
+      note_text: `[System] Onboarding form link sent by ${currentUser.full_name}: ${formLink}`,
+      created_by_user_id: currentUser.user_id,
+      created_at: new Date().toISOString(),
+    };
+    seedNotes.push(linkNote);
+    update({ notes_thread: [...enquiry.notes_thread, linkNote.note_id] });
+    toast.success('Onboarding form link copied to clipboard');
     setShowOnboardingPack(false);
   };
 
+  const handleApproveSubmission = () => {
+    if (!enquiry.onboarding_submission) return;
+    update({
+      onboarding_submission: {
+        ...enquiry.onboarding_submission,
+        status: SubmissionStatus.APPROVED,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by_user_id: currentUser.user_id,
+      },
+    });
+    toast.success('Onboarding form approved! You can now convert to account.');
+  };
+
+  const handleRejectSubmission = () => {
+    if (!enquiry.onboarding_submission) return;
+    update({
+      onboarding_submission: {
+        ...enquiry.onboarding_submission,
+        status: SubmissionStatus.REJECTED,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by_user_id: currentUser.user_id,
+      },
+    });
+    toast.warning('Onboarding form rejected. You can re-send the form link.');
+  };
+
+  const handleResendFormLink = () => {
+    if (enquiry.onboarding_form_link) {
+      navigator.clipboard.writeText(enquiry.onboarding_form_link);
+      // Reset submission
+      update({ onboarding_submission: null });
+      toast.success('Form link copied. Submission reset for re-submission.');
+    }
+  };
+
   const handleConvertToAccount = () => {
+    const sub = enquiry.onboarding_submission;
+    const accountName = sub ? sub.company_name : enquiry.company_name;
+    const ownerName = sub ? sub.owner_name : enquiry.contact_name;
     update({ stage: EnquiryStage.ACCOUNT_CREATED });
-    toast.success(`Account "${enquiry.company_name}" created! All data and notes carried over.`);
+    toast.success(`Account "${accountName}" created from ${sub ? 'form submission' : 'enquiry'} data! Owner: ${ownerName}`);
     setShowConvertDialog(false);
   };
 
@@ -671,7 +731,17 @@ export default function EnquiryDetail() {
               {enquiry.onboarding_pack_sent && (
                 <div className="flex items-center gap-2 text-sm">
                   <CheckCircle2 className="h-4 w-4 text-success" />
-                  <span>Onboarding pack sent ({enquiry.onboarding_pack_id})</span>
+                  <span>Onboarding form link sent</span>
+                  {enquiry.onboarding_submission && (
+                    <Badge variant="outline" className={
+                      enquiry.onboarding_submission.status === SubmissionStatus.APPROVED ? 'text-success border-success/30' :
+                      enquiry.onboarding_submission.status === SubmissionStatus.REJECTED ? 'text-destructive border-destructive/30' :
+                      'text-primary border-primary/30'
+                    }>
+                      {enquiry.onboarding_submission.status === SubmissionStatus.PENDING_REVIEW ? 'Form Submitted — Pending Review' :
+                       enquiry.onboarding_submission.status === SubmissionStatus.APPROVED ? 'Approved' : 'Rejected'}
+                    </Badge>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -730,7 +800,7 @@ export default function EnquiryDetail() {
 
                 {(enquiry.stage === EnquiryStage.DEMO_COMPLETED || enquiry.stage === EnquiryStage.DEMO_SCHEDULED) && !enquiry.onboarding_pack_sent && (
                   <Button variant="outline" className="w-full justify-start" onClick={() => setShowOnboardingPack(true)}>
-                    <Send className="h-4 w-4 mr-2" /> Send Onboarding Pack
+                    <Link2 className="h-4 w-4 mr-2" /> Send Onboarding Form Link
                   </Button>
                 )}
 
@@ -749,6 +819,18 @@ export default function EnquiryDetail() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Onboarding Submission Review */}
+          {!isConverted && (
+            <OnboardingSubmissionCard
+              formLink={enquiry.onboarding_form_link}
+              submission={enquiry.onboarding_submission}
+              packSent={enquiry.onboarding_pack_sent}
+              onApprove={handleApproveSubmission}
+              onReject={handleRejectSubmission}
+              onResendLink={handleResendFormLink}
+            />
           )}
 
           {isConverted && (
@@ -853,20 +935,35 @@ export default function EnquiryDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Onboarding Pack Dialog */}
+      {/* Onboarding Form Link Dialog */}
       <Dialog open={showOnboardingPack} onOpenChange={setShowOnboardingPack}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Send Onboarding Pack</DialogTitle>
-            <DialogDescription>Choose a pack and copy content to send via email</DialogDescription>
+            <DialogTitle>Send Onboarding Form Link</DialogTitle>
+            <DialogDescription>Choose the form type for this customer. The link will be copied to your clipboard.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <Button variant="outline" className="w-full justify-start" onClick={() => handleSendOnboardingPack('PACK_AGENCY_01')}>
-              <FileText className="h-4 w-4 mr-2" /> Agency Onboarding Pack
-            </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => handleSendOnboardingPack('PACK_BUILDER_01')}>
-              <FileText className="h-4 w-4 mr-2" /> Builder Onboarding Pack
-            </Button>
+            {enquiry.tenancy_type === TenancyType.BUILDER_DEVELOPER ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Builder form link will be generated:</p>
+                <div className="p-2 bg-muted/50 rounded text-xs font-mono break-all">
+                  {getOnboardingFormUrl('PACK_BUILDER_01')}
+                </div>
+                <Button className="w-full" onClick={() => handleSendOnboardingPack('PACK_BUILDER_01')}>
+                  <Copy className="h-4 w-4 mr-2" /> Copy Link & Mark Sent
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Agency form link will be generated:</p>
+                <div className="p-2 bg-muted/50 rounded text-xs font-mono break-all">
+                  {getOnboardingFormUrl('PACK_AGENCY_01')}
+                </div>
+                <Button className="w-full" onClick={() => handleSendOnboardingPack('PACK_AGENCY_01')}>
+                  <Copy className="h-4 w-4 mr-2" /> Copy Link & Mark Sent
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -880,11 +977,25 @@ export default function EnquiryDetail() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="text-sm space-y-1">
-              <p><strong>Account Name:</strong> {enquiry.company_name}</p>
-              <p><strong>City:</strong> {enquiry.city}</p>
-              <p><strong>Type:</strong> {enquiry.tenancy_type === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder'}</p>
-              <p><strong>Owner:</strong> {enquiry.contact_name}</p>
-              <p><strong>Notes:</strong> {enquiry.notes_thread.length} note(s) will be carried over</p>
+              {enquiry.onboarding_submission?.status === SubmissionStatus.APPROVED ? (
+                <>
+                  <p className="text-xs text-muted-foreground mb-2">Account will be created using the approved form submission data:</p>
+                  <p><strong>Account Name:</strong> {enquiry.onboarding_submission.company_name}</p>
+                  <p><strong>City:</strong> {enquiry.onboarding_submission.city}</p>
+                  <p><strong>Type:</strong> {enquiry.tenancy_type === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder'}</p>
+                  <p><strong>Owner:</strong> {enquiry.onboarding_submission.owner_name}</p>
+                  <p><strong>Team Members:</strong> {enquiry.onboarding_submission.team_members.length} member(s)</p>
+                  <p><strong>Notes:</strong> {enquiry.notes_thread.length} note(s) will be carried over</p>
+                </>
+              ) : (
+                <>
+                  <p><strong>Account Name:</strong> {enquiry.company_name}</p>
+                  <p><strong>City:</strong> {enquiry.city}</p>
+                  <p><strong>Type:</strong> {enquiry.tenancy_type === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder'}</p>
+                  <p><strong>Owner:</strong> {enquiry.contact_name}</p>
+                  <p><strong>Notes:</strong> {enquiry.notes_thread.length} note(s) will be carried over</p>
+                </>
+              )}
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setShowConvertDialog(false)}>Cancel</Button>

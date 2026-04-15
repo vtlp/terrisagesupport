@@ -195,6 +195,12 @@ export enum IngestionStatus {
   COMPLETED = 'COMPLETED',
 }
 
+export enum SubmissionStatus {
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
 // ── Timeline Event Types ─────────────────────────
 export enum TimelineEventType {
   CUSTOMER_MESSAGE = 'CUSTOMER_MESSAGE',
@@ -278,6 +284,8 @@ export interface Enquiry {
   demo_event_id: string | null;
   onboarding_pack_sent: boolean;
   onboarding_pack_id: string | null;
+  onboarding_form_link: string | null;
+  onboarding_submission: OnboardingFormSubmission | null;
   created_at: string;
   updated_at: string;
 }
@@ -438,4 +446,45 @@ export interface AuditTrailEntry {
   performed_by_user_id: string;
   details: string;
   created_at: string;
+}
+
+// ── Onboarding Form Submission ─────────────────
+export interface OnboardingTeamMember {
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+}
+
+export interface OnboardingProject {
+  project_name: string;
+  location: string;
+  units: number;
+  type: string;
+}
+
+export interface OnboardingFormSubmission {
+  submission_id: string;
+  enquiry_id: string;
+  status: SubmissionStatus;
+  submitted_at: string;
+  reviewed_at: string | null;
+  reviewed_by_user_id: string | null;
+  // Business info from form
+  company_name: string;
+  company_address: string;
+  city: string;
+  owner_name: string;
+  owner_email: string;
+  owner_phone: string;
+  gst_number: string;
+  pan_number: string;
+  rera_number: string;
+  website_url: string;
+  team_members: OnboardingTeamMember[];
+  projects: OnboardingProject[];
+  // Files uploaded
+  uploaded_files: string[];
+  // Additional notes from the form
+  additional_notes: string;
 }
