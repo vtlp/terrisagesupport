@@ -95,6 +95,8 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
       demo_event_id: null,
       onboarding_pack_sent: false,
       onboarding_pack_id: null,
+      onboarding_form_link: null,
+      onboarding_submission: null,
       created_at: now,
       updated_at: now,
     };
