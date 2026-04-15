@@ -389,8 +389,11 @@ export default function EnquiryDetail() {
   };
 
   const handleConvertToAccount = () => {
+    const sub = enquiry.onboarding_submission;
+    const accountName = sub ? sub.company_name : enquiry.company_name;
+    const ownerName = sub ? sub.owner_name : enquiry.contact_name;
     update({ stage: EnquiryStage.ACCOUNT_CREATED });
-    toast.success(`Account "${enquiry.company_name}" created! All data and notes carried over.`);
+    toast.success(`Account "${accountName}" created from ${sub ? 'form submission' : 'enquiry'} data! Owner: ${ownerName}`);
     setShowConvertDialog(false);
   };
 
