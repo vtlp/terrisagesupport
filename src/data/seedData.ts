@@ -3,12 +3,13 @@ import {
   type SupportTicket, type KnowledgeBaseItem, type MarketingLog,
   type DataIngestionJob, type DocumentAttachment, type ChecklistItem,
   type KBFolder, type KBFile, type TimelineEntry, type AccountSeat,
+  type OnboardingFormSubmission,
   UserRole, TenancyType, EnquiryStage, EnquirySource, EnquiryOutcome,
   NotInterestedReason, DemoOutcome, FocusArea, SalesFocus, PrimaryPropertyType,
   AccountStatus, VerificationStatus, CalendarEventStatus, CalendarEventType, EntityType,
   TicketPriority, TicketStatus, TicketType, TicketCategory, TimelineEventType,
   KBBucket, MarketingObjectType, MarketingCostType,
-  ImportType, IngestionStatus,
+  ImportType, IngestionStatus, SubmissionStatus,
 } from '@/types/core';
 
 // ── Seat Helpers ──────────────────────────────
