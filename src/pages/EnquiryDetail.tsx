@@ -925,20 +925,35 @@ export default function EnquiryDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Onboarding Pack Dialog */}
+      {/* Onboarding Form Link Dialog */}
       <Dialog open={showOnboardingPack} onOpenChange={setShowOnboardingPack}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Send Onboarding Pack</DialogTitle>
-            <DialogDescription>Choose a pack and copy content to send via email</DialogDescription>
+            <DialogTitle>Send Onboarding Form Link</DialogTitle>
+            <DialogDescription>Choose the form type for this customer. The link will be copied to your clipboard.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <Button variant="outline" className="w-full justify-start" onClick={() => handleSendOnboardingPack('PACK_AGENCY_01')}>
-              <FileText className="h-4 w-4 mr-2" /> Agency Onboarding Pack
-            </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => handleSendOnboardingPack('PACK_BUILDER_01')}>
-              <FileText className="h-4 w-4 mr-2" /> Builder Onboarding Pack
-            </Button>
+            {enquiry.tenancy_type === TenancyType.BUILDER_DEVELOPER ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Builder form link will be generated:</p>
+                <div className="p-2 bg-muted/50 rounded text-xs font-mono break-all">
+                  {getOnboardingFormUrl('PACK_BUILDER_01')}
+                </div>
+                <Button className="w-full" onClick={() => handleSendOnboardingPack('PACK_BUILDER_01')}>
+                  <Copy className="h-4 w-4 mr-2" /> Copy Link & Mark Sent
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Agency form link will be generated:</p>
+                <div className="p-2 bg-muted/50 rounded text-xs font-mono break-all">
+                  {getOnboardingFormUrl('PACK_AGENCY_01')}
+                </div>
+                <Button className="w-full" onClick={() => handleSendOnboardingPack('PACK_AGENCY_01')}>
+                  <Copy className="h-4 w-4 mr-2" /> Copy Link & Mark Sent
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -952,11 +967,25 @@ export default function EnquiryDetail() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="text-sm space-y-1">
-              <p><strong>Account Name:</strong> {enquiry.company_name}</p>
-              <p><strong>City:</strong> {enquiry.city}</p>
-              <p><strong>Type:</strong> {enquiry.tenancy_type === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder'}</p>
-              <p><strong>Owner:</strong> {enquiry.contact_name}</p>
-              <p><strong>Notes:</strong> {enquiry.notes_thread.length} note(s) will be carried over</p>
+              {enquiry.onboarding_submission?.status === SubmissionStatus.APPROVED ? (
+                <>
+                  <p className="text-xs text-muted-foreground mb-2">Account will be created using the approved form submission data:</p>
+                  <p><strong>Account Name:</strong> {enquiry.onboarding_submission.company_name}</p>
+                  <p><strong>City:</strong> {enquiry.onboarding_submission.city}</p>
+                  <p><strong>Type:</strong> {enquiry.tenancy_type === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder'}</p>
+                  <p><strong>Owner:</strong> {enquiry.onboarding_submission.owner_name}</p>
+                  <p><strong>Team Members:</strong> {enquiry.onboarding_submission.team_members.length} member(s)</p>
+                  <p><strong>Notes:</strong> {enquiry.notes_thread.length} note(s) will be carried over</p>
+                </>
+              ) : (
+                <>
+                  <p><strong>Account Name:</strong> {enquiry.company_name}</p>
+                  <p><strong>City:</strong> {enquiry.city}</p>
+                  <p><strong>Type:</strong> {enquiry.tenancy_type === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder'}</p>
+                  <p><strong>Owner:</strong> {enquiry.contact_name}</p>
+                  <p><strong>Notes:</strong> {enquiry.notes_thread.length} note(s) will be carried over</p>
+                </>
+              )}
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setShowConvertDialog(false)}>Cancel</Button>
