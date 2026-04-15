@@ -731,7 +731,17 @@ export default function EnquiryDetail() {
               {enquiry.onboarding_pack_sent && (
                 <div className="flex items-center gap-2 text-sm">
                   <CheckCircle2 className="h-4 w-4 text-success" />
-                  <span>Onboarding pack sent ({enquiry.onboarding_pack_id})</span>
+                  <span>Onboarding form link sent</span>
+                  {enquiry.onboarding_submission && (
+                    <Badge variant="outline" className={
+                      enquiry.onboarding_submission.status === SubmissionStatus.APPROVED ? 'text-success border-success/30' :
+                      enquiry.onboarding_submission.status === SubmissionStatus.REJECTED ? 'text-destructive border-destructive/30' :
+                      'text-primary border-primary/30'
+                    }>
+                      {enquiry.onboarding_submission.status === SubmissionStatus.PENDING_REVIEW ? 'Form Submitted — Pending Review' :
+                       enquiry.onboarding_submission.status === SubmissionStatus.APPROVED ? 'Approved' : 'Rejected'}
+                    </Badge>
+                  )}
                 </div>
               )}
             </CardContent>
