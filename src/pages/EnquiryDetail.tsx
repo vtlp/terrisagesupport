@@ -4,9 +4,9 @@ import { seedEnquiries, seedNotes, seedCalendarEvents, seedAccounts, seedUsers, 
 import {
   EnquiryStage, EnquiryOutcome, EnquirySource, TenancyType, FocusArea, SalesFocus,
   PrimaryPropertyType, NotInterestedReason, DemoOutcome, EntityType, CalendarEventStatus,
-  CalendarEventType, AccountStatus, VerificationStatus,
+  CalendarEventType, AccountStatus, VerificationStatus, SubmissionStatus,
 } from '@/types/core';
-import type { Enquiry, Note, CalendarEvent, Account } from '@/types/core';
+import type { Enquiry, Note, CalendarEvent, Account, OnboardingFormSubmission } from '@/types/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,11 +22,12 @@ import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
 import { toast } from 'sonner';
+import { OnboardingSubmissionCard } from '@/components/onboarding/OnboardingSubmissionCard';
 import { format } from 'date-fns';
 import { useUser } from '@/context/UserContext';
 import {
   ArrowLeft, Phone, Mail, MessageSquare, Building2, MapPin, Users, Calendar,
-  Send, UserCheck, ClipboardCheck, FileText, AlertTriangle, CheckCircle2, XCircle,
+  Send, UserCheck, ClipboardCheck, FileText, AlertTriangle, CheckCircle2, XCircle, Link2, Copy,
 } from 'lucide-react';
 
 const PORTAL_OPTIONS = ['MagicBricks', '99acres', 'Housing.com', 'NoBroker', 'Square Yards', 'CommonFloor', 'Other'];
