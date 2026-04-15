@@ -790,7 +790,7 @@ export default function EnquiryDetail() {
 
                 {(enquiry.stage === EnquiryStage.DEMO_COMPLETED || enquiry.stage === EnquiryStage.DEMO_SCHEDULED) && !enquiry.onboarding_pack_sent && (
                   <Button variant="outline" className="w-full justify-start" onClick={() => setShowOnboardingPack(true)}>
-                    <Send className="h-4 w-4 mr-2" /> Send Onboarding Pack
+                    <Link2 className="h-4 w-4 mr-2" /> Send Onboarding Form Link
                   </Button>
                 )}
 
@@ -809,6 +809,18 @@ export default function EnquiryDetail() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Onboarding Submission Review */}
+          {!isConverted && (
+            <OnboardingSubmissionCard
+              formLink={enquiry.onboarding_form_link}
+              submission={enquiry.onboarding_submission}
+              packSent={enquiry.onboarding_pack_sent}
+              onApprove={handleApproveSubmission}
+              onReject={handleRejectSubmission}
+              onResendLink={handleResendFormLink}
+            />
           )}
 
           {isConverted && (
