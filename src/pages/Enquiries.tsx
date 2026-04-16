@@ -51,11 +51,6 @@ export default function Enquiries() {
   const [stageFilter, setStageFilter] = useState('all');
   const [tenancyFilter, setTenancyFilter] = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    full_name: '', phone: '', email: '', city: '', company_name: '',
-    tenancy_type: 'AGENCY_BROKERAGE_CONSULTANCY' as Tenancy, source: 'CALL_DIRECT', notes: '',
-  });
 
   const load = useCallback(async () => {
     setLoading(true);
