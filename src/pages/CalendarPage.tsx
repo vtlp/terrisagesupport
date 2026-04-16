@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { toast } from 'sonner';
@@ -98,17 +98,35 @@ export default function CalendarPage() {
       DEMO: 'DEMO', FOLLOW_UP: 'FOLLOW_UP', CALL_BACK: 'CALL_BACK',
       CHECK_IN: 'CHECK_IN', ONBOARDING: 'ONBOARDING', GENERAL: 'OTHER',
     };
-    const { error } = await supabase.from('calendar_events').insert({
+    const { data: inserted, error } = await supabase.from('calendar_events').insert({
       title: data.title,
       scheduled_at: scheduled.toISOString(),
       notes: data.notes || null,
       event_type: (eventTypeMap[data.event_type] ?? 'OTHER') as 'OTHER',
       created_by: currentUser.user_id,
-    });
+    }).select('id').maybeSingle();
     if (error) { toast.error(error.message); return; }
     toast.success(`Event "${data.title}" created`);
     setShowCreateDialog(false);
     load();
+    // Auto-push to Google Calendar (silent fail; user can retry from list)
+    if (inserted?.id) {
+      supabase.functions.invoke('sync-calendar-event', { body: { event_id: inserted.id } }).then(({ error: syncErr }) => {
+        if (!syncErr) toast.success('Synced to Google Calendar');
+      }).catch(() => { /* ignore — surfaces via Sync button later */ });
+    }
+  };
+
+  const syncToGoogle = async (eventId: string, title: string) => {
+    toast.loading('Syncing to Google Calendar…', { id: `sync-${eventId}` });
+    const { data, error } = await supabase.functions.invoke('sync-calendar-event', { body: { event_id: eventId } });
+    if (error || (data && (data as { error?: string }).error)) {
+      const msg = (data as { error?: string; code?: string })?.error ?? error?.message ?? 'Sync failed';
+      const code = (data as { code?: string })?.code;
+      toast.error(code === 'NOT_CONNECTED' ? 'Connect Google Calendar from Settings first.' : msg, { id: `sync-${eventId}` });
+      return;
+    }
+    toast.success(`"${title}" synced to Google Calendar`, { id: `sync-${eventId}` });
   };
 
   return (
