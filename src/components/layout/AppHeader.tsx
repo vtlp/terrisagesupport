@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket } from 'lucide-react';
+import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket, LogOut } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,23 +28,20 @@ interface AppHeaderProps {
 
 export function AppHeader({ onMenuClick }: AppHeaderProps) {
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser, isAdmin } = useUser();
+  const { currentUser, isAdmin, signOut } = useUser();
   const { toggleSidebar } = useSidebar();
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
 
-  // Compute attention count
+  // Compute attention count (still uses seed for tickets/accounts pending backend)
   const attentionCount =
-    seedEnquiries.filter(e => e.stage === EnquiryStage.NEW_ENQUIRY).length +
     seedTickets.filter(t => (t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2) && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length +
     seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;
 
-  const toggleRole = () => {
-    setCurrentUser({
-      ...currentUser,
-      role: isAdmin ? UserRole.SUPPORT_AGENT : UserRole.ADMIN,
-    });
-    toast.success(`Switched to ${isAdmin ? 'Support Agent' : 'Admin'} role`);
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success('Signed out');
+    navigate('/auth', { replace: true });
   };
 
   return (
@@ -136,12 +133,17 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 bg-card">
-            <DropdownMenuItem>My Profile</DropdownMenuItem>
-            <DropdownMenuItem onClick={toggleRole}>
-              Switch to {isAdmin ? 'Support Agent' : 'Admin'}
+            <DropdownMenuItem disabled>
+              <div className="flex flex-col">
+                <span className="text-sm">{currentUser.full_name}</span>
+                <span className="text-xs text-muted-foreground">{currentUser.email}</span>
+              </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Sign Out</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
