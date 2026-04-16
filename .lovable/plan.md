@@ -1,75 +1,102 @@
 
+The user wants the existing plan extended so that **Accounts** module is also wired to the backend, completing the full flow: Enquiry → Onboarding form submission → Review → Convert to Account (persisted in DB).
 
-# Plan: Onboarding Pack as Web Form Link + Form Review Before Conversion
+I'll add Accounts to the in-scope list and detail the conversion persistence.
 
-## Summary
+---
 
-Change the onboarding flow so that "Send Onboarding Pack" generates a web form link (from the Terrisage Agency Onboard project) instead of copying clipboard content. When the customer submits that form, a submission record appears in the enquiry for the support agent to review. The "Convert to Account" action is gated behind a reviewed/approved submission -- the submitted form data flows into the Account (not from the enquiry fields).
+# Plan (Updated): Backend for Dashboard, Enquiries, Calendar, KB, Admin (Users) + **Accounts & Full Conversion Flow**
 
-## Current Flow vs New Flow
+## What's new in this revision
+
+**Accounts module is now in scope.** The full pipeline persists end-to-end:
 
 ```text
-CURRENT:
-  Enquiry → Send Pack (clipboard copy) → Convert to Account (uses enquiry fields)
-
-NEW:
-  Enquiry → Send Onboarding Form Link (Agency/Builder URL)
-       → Customer fills & submits form
-       → Submission appears on Enquiry as "Pending Review"
-       → Agent reviews submitted data
-       → Agent approves → "Convert to Account" unlocked
-       → Account created using FORM SUBMISSION data (not enquiry fields)
+Sign in → Enquiry (DB) → Send Onboarding Link (Copy / Email / WhatsApp)
+       → Customer fills public onboarding form (/onboarding/agency|builder)
+       → Submission saved to DB (status = PENDING_REVIEW)
+       → Agent reviews on Enquiry detail → Approve / Reject
+       → Convert to Account (gated on APPROVED)
+       → Account row + AccountSeats inserted from submission payload
+       → Enquiry stage = ACCOUNT_CREATED, linked to new account_id
+       → Account appears in Accounts list / detail (live from DB)
 ```
 
-## Changes
+## Scope (this round)
 
-### 1. Add onboarding form submission type (`src/types/core.ts`)
+In scope: **Auth, Dashboard, Enquiries, Calendar, Knowledge Base, Admin → Teams & Users, Onboarding form (working) + share dialog, Accounts (list + detail + conversion).**
+Out of scope: Tickets, Marketing, Reports, Admin → Queues / Lookups (remain on seed data).
 
-Add an `OnboardingFormSubmission` interface capturing the payload shape from the external form (business info, team members, projects, files). Add a `submission_status` enum: `PENDING_REVIEW`, `APPROVED`, `REJECTED`. Add `onboarding_submission` field to the `Enquiry` interface (nullable).
+## 1. Auth + Roles
+(unchanged from previous plan)
+- Lovable Cloud + email/password, no public sign-up.
+- Admin seeded from credentials you provide; first-login password reset.
+- `profiles` + `user_roles` (separate table) + `has_role()` security-definer function.
+- Remove "Switch to Support Agent" toggle, add real Sign Out.
+- Public routes: `/auth`, `/onboarding/agency`, `/onboarding/builder`.
 
-### 2. Update "Send Onboarding Pack" dialog (`src/pages/EnquiryDetail.tsx`)
+## 2. Database tables
 
-Replace the current clipboard-copy behavior with:
-- Show the onboarding form URL based on tenancy type:
-  - Agency: `https://terrisage-agency-onboard.lovable.app/onboarding/agency?enquiry_id={id}`
-  - Builder: `https://terrisage-agency-onboard.lovable.app/onboarding/builder?enquiry_id={id}`
-- Provide a "Copy Link" button that copies the URL to clipboard
-- Mark `onboarding_pack_sent` as true and log a timeline note with the link sent
+| Table | Purpose |
+|---|---|
+| `profiles`, `user_roles` | Auth + RBAC |
+| `enquiries`, `enquiry_notes` | Enquiry pipeline |
+| `calendar_events` | Calendar |
+| `kb_folders`, `kb_files`, `kb_articles` | Knowledge base |
+| `onboarding_submissions` | Form payloads |
+| **`accounts`** | Live account records |
+| **`account_seats`** | Team members per account |
+| **`account_notes`** | Account notes thread |
+| **`account_checklist_items`** | Onboarding checklist per account |
 
-### 3. Add "Onboarding Submission" review card on EnquiryDetail
+Storage: `kb-files`, `onboarding-uploads` (private buckets, RLS).
 
-Below the Actions card (right sidebar), add a new card:
-- **If no submission**: Show "Awaiting submission" status with the form link
-- **If submission exists (PENDING_REVIEW)**: Show a collapsible review panel displaying all submitted data (business info, team members, projects, files) in read-only ReviewSummaryCard-style layout, with "Approve" and "Reject" buttons
-- **If APPROVED**: Show green approved badge
-- **If REJECTED**: Show rejected badge with option to re-send form link
+**RLS:** authenticated read/write across operational tables; admin-only writes on `profiles`/`user_roles`; public INSERT on `onboarding_submissions` (scoped by `enquiry_id` token); read of submissions only by authenticated staff.
 
-### 4. Add seed submission data (`src/data/seedData.ts`)
+## 3. Conversion flow (the new piece)
 
-Add 1-2 sample `OnboardingFormSubmission` objects attached to existing enquiries at `DEMO_COMPLETED` stage so the review UI is testable.
+When agent clicks **Convert to Account** (only enabled when submission `APPROVED`):
 
-### 5. Gate "Convert to Account" on approved submission
+1. Insert `accounts` row using **submission payload**: `account_name`, `city`, `tenancy_type`, owner fields, GST/PAN/RERA, website.
+2. Bulk insert `account_seats` from `submission.team_members`.
+3. Seed default `account_checklist_items` (standard onboarding checklist).
+4. Copy uploaded files (from `onboarding-uploads`) reference into `account` documents.
+5. Update `enquiries`: `stage = ACCOUNT_CREATED`, store `converted_account_id`.
+6. Log timeline note on both enquiry and account.
+7. Navigate to new `/accounts/:id`.
 
-Update `canConvert()` in EnquiryDetail:
-- Current checks: demo completed + pack sent
-- Add: `onboarding_submission?.status === 'APPROVED'` required
-- Error message: "Onboarding form must be submitted and approved"
+All steps wrapped in a Postgres function `convert_enquiry_to_account(enquiry_id)` for atomicity, called via `supabase.rpc(...)`.
 
-### 6. Use submission data for account creation
+## 4. Accounts module wiring
 
-Update `handleConvertToAccount` to pull account fields from the approved submission payload (company name, city, owner details, team members as seats) instead of from enquiry fields.
+- **`Accounts.tsx`** — list from `accounts` table; filters by status / tenancy / city; counts live.
+- **`AccountDetail.tsx`** — read account + seats + notes + checklist from DB; existing tabs (Overview, Seats, Onboarding checklist with Save/Cancel guard, Notes, Documents) all persist.
+- Seat add/edit/deactivate persists to `account_seats`.
+- Checklist save commits draft to `account_checklist_items`.
 
-### 7. Copy shared components from Terrisage Agency Onboard
+## 5. Onboarding form + share dialog
+(unchanged from previous plan)
+- Public routes `/onboarding/agency` and `/onboarding/builder`, multi-step, writes one row to `onboarding_submissions`.
+- **Share dialog** with Copy / Email (`mailto:`) / WhatsApp (`wa.me/<phone>?text=...`) — no auto-clipboard.
 
-Copy `ReviewSummaryCard` component for rendering the submission review, since it matches the form's own review layout. Files to copy:
-- `src/components/onboarding/ReviewSummaryCard.tsx`
+## 6. Dashboard / Enquiries / Calendar / KB / Admin Users
+(unchanged from previous plan — all switch from seed to live queries.)
 
-## Files Summary
+## 7. UI cleanup
+- Remove role-switch menu item.
+- Header shows real user from `profiles` + role.
+- Route guard: redirect to `/auth` unless on a public route.
 
-| File | Change |
-|------|--------|
-| `src/types/core.ts` | Add `OnboardingFormSubmission`, `SubmissionStatus` enum, update `Enquiry` interface |
-| `src/data/seedData.ts` | Add sample submissions for 1-2 enquiries |
-| `src/pages/EnquiryDetail.tsx` | Replace pack dialog with link generation; add submission review card; gate conversion on approval; use submission data for account creation |
-| `src/components/onboarding/ReviewSummaryCard.tsx` | Copy from Terrisage Agency Onboard project |
+## What I still need from you
 
+1. **Admin email + temp password** to seed the first admin.
+2. Confirm the onboarding form lives **in this app** at `/onboarding/agency|builder` (recommended — keeps submissions in the same DB and avoids cross-project plumbing).
+
+## Files / surfaces touched (delta from previous plan)
+
+| Area | Change |
+|---|---|
+| Migration | + `accounts`, `account_seats`, `account_notes`, `account_checklist_items` tables + RLS + `convert_enquiry_to_account()` RPC |
+| `src/pages/Accounts.tsx`, `AccountDetail.tsx` | Switch from seed to Supabase queries; persist seats / notes / checklist |
+| `src/pages/EnquiryDetail.tsx` | `handleConvertToAccount` calls RPC; navigates to new account |
+| (all other items as in prior plan) | — |
