@@ -109,12 +109,7 @@ export default function CalendarPage() {
     toast.success(`Event "${data.title}" created`);
     setShowCreateDialog(false);
     load();
-    // Auto-push to Google Calendar (silent fail; user can retry from list)
-    if (inserted?.id) {
-      supabase.functions.invoke('sync-calendar-event', { body: { event_id: inserted.id } }).then(({ error: syncErr }) => {
-        if (!syncErr) toast.success('Synced to Google Calendar');
-      }).catch(() => { /* ignore — surfaces via Sync button later */ });
-    }
+    // Google Calendar sync is opt-in via the Sync button on each event row.
   };
 
   const syncToGoogle = async (eventId: string, title: string) => {
