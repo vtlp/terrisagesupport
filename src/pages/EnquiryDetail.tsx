@@ -1,20 +1,43 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, MapPin, Building2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SendOnboardingDialog } from '@/components/shared/SendOnboardingDialog';
+import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/components/shared/PhoneInput';
+import { defaultMarkets, defaultPortals } from '@/data/lookupData';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
 type SubStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+
+interface EnquiryPayload {
+  contact_phone_alt?: string;
+  whatsapp_enabled?: boolean;
+  outcome?: string;
+  not_interested_reason?: string;
+  not_interested_text?: string;
+  demo_outcome?: string;
+  focus_area?: string[];
+  sales_focus?: string[];
+  primary_property_types?: string[];
+  team_size_estimate?: number | null;
+  current_system_text?: string;
+  approx_onboarding_date?: string | null;
+  portals_in_use?: string[];
+  [k: string]: unknown;
+}
 
 interface Enquiry {
   id: string; full_name: string; phone: string; email: string | null;
@@ -22,8 +45,12 @@ interface Enquiry {
   tenancy_type: Tenancy | null; stage: Stage; source: string | null;
   onboarding_form_link: string | null; onboarding_pack_sent: boolean;
   converted_account_id: string | null;
+  demo_scheduled_at: string | null; demo_completed_at: string | null;
+  lost_reason: string | null;
+  payload: EnquiryPayload;
   created_at: string;
 }
+
 interface NoteRow { id: string; note_text: string; created_at: string; }
 interface Submission {
   id: string; status: SubStatus; submitted_at: string; reviewed_at: string | null;
@@ -36,14 +63,67 @@ const stageLabels: Record<Stage, string> = {
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
 
+const SOURCES = [
+  { v: 'CALL_DIRECT', l: 'Call (Direct)' },
+  { v: 'LANDING_PAGE', l: 'Landing Page' },
+  { v: 'META_ADS', l: 'Meta Ads' },
+  { v: 'CHAMPION_PARTNER', l: 'Champion / Partner' },
+  { v: 'CP_REQUEST_PROJECTS', l: 'CP Request (Projects)' },
+];
+
+const FOCUS_AREAS = [
+  { v: 'SALES', l: 'Sales' },
+  { v: 'RENTALS', l: 'Rentals' },
+];
+
+const SALES_FOCUS = [
+  { v: 'PRIMARY_ONLY', l: 'Primary only' },
+  { v: 'PRIMARY_AND_SECONDARY', l: 'Primary & Secondary' },
+  { v: 'LUXURY_ONLY', l: 'Luxury only' },
+];
+
+const PROPERTY_TYPES = [
+  { v: 'PLOT', l: 'Plot' },
+  { v: 'APARTMENT', l: 'Apartment' },
+  { v: 'VILLA', l: 'Villa' },
+  { v: 'OTHER', l: 'Other' },
+];
+
+const OUTCOMES = [
+  { v: 'INTERESTED', l: 'Interested' },
+  { v: 'CALL_LATER', l: 'Call later' },
+  { v: 'SCHEDULE_DEMO', l: 'Schedule demo' },
+  { v: 'NOT_INTERESTED', l: 'Not interested' },
+  { v: 'WRONG_OR_BOUNCED_NUMBER', l: 'Wrong / bounced number' },
+];
+
+const NOT_INTERESTED_REASONS = [
+  { v: 'OTHER_CRM_IN_USE', l: 'Other CRM in use' },
+  { v: 'NOT_RIGHT_PERSON', l: 'Not the right person' },
+  { v: 'NOT_RIGHT_TIME', l: 'Not the right time' },
+  { v: 'TOO_MANY_REQUIREMENTS', l: 'Too many requirements' },
+  { v: 'BUDGET_CONCERN', l: 'Budget concern' },
+  { v: 'OTHER', l: 'Other' },
+];
+
+const DEMO_OUTCOMES = [
+  { v: 'NO_SHOW', l: 'No show' },
+  { v: 'LIKED_WANT_ONBOARD_SOON', l: 'Liked, wants to onboard soon' },
+  { v: 'GHOSTED', l: 'Ghosted' },
+];
+
+const NONE = '__none__';
+
 export default function EnquiryDetail() {
   const { enquiryId } = useParams<{ enquiryId: string }>();
   const navigate = useNavigate();
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
+  const [draft, setDraft] = useState<Enquiry | null>(null);
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -56,13 +136,55 @@ export default function EnquiryDetail() {
       supabase.from('onboarding_submissions').select('id, status, submitted_at, reviewed_at, payload, tenancy_type').eq('enquiry_id', enquiryId).order('submitted_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
     if (eErr || !e) { toast.error('Enquiry not found'); navigate('/enquiries'); return; }
-    setEnquiry(e as Enquiry);
+    const enq = { ...e, payload: (e.payload ?? {}) as EnquiryPayload } as Enquiry;
+    setEnquiry(enq);
+    setDraft(enq);
     setNotes((n ?? []) as NoteRow[]);
     setSubmission(s as Submission | null);
     setLoading(false);
   }, [enquiryId, navigate]);
 
   useEffect(() => { load(); }, [load]);
+
+  const isDirty = useMemo(() => JSON.stringify(enquiry) !== JSON.stringify(draft), [enquiry, draft]);
+
+  const setField = <K extends keyof Enquiry>(key: K, value: Enquiry[K]) => {
+    setDraft(d => d ? { ...d, [key]: value } : d);
+  };
+  const setPayload = <K extends keyof EnquiryPayload>(key: K, value: EnquiryPayload[K]) => {
+    setDraft(d => d ? { ...d, payload: { ...d.payload, [key]: value } } : d);
+  };
+  const togglePayloadArr = (key: keyof EnquiryPayload, value: string) => {
+    setDraft(d => {
+      if (!d) return d;
+      const cur = ((d.payload[key] as string[] | undefined) ?? []);
+      const next = cur.includes(value) ? cur.filter(x => x !== value) : [...cur, value];
+      return { ...d, payload: { ...d.payload, [key]: next } };
+    });
+  };
+
+  const saveAll = async () => {
+    if (!draft || !enquiry) return;
+    setSaving(true);
+    const update = {
+      full_name: draft.full_name,
+      phone: draft.phone,
+      email: draft.email,
+      city: draft.city,
+      company_name: draft.company_name,
+      tenancy_type: draft.tenancy_type,
+      source: draft.source,
+      demo_scheduled_at: draft.demo_scheduled_at,
+      demo_completed_at: draft.demo_completed_at,
+      lost_reason: draft.lost_reason,
+      payload: draft.payload as unknown as never,
+    };
+    const { error } = await supabase.from('enquiries').update(update).eq('id', enquiry.id);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Saved');
+    load();
+  };
 
   const updateStage = async (stage: Stage) => {
     if (!enquiry) return;
@@ -144,146 +266,414 @@ export default function EnquiryDetail() {
     return null;
   };
 
-  if (loading || !enquiry) {
+  if (loading || !enquiry || !draft) {
     return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
 
   const convertBlock = canConvert();
-  const payload = (submission?.payload ?? {}) as Record<string, unknown>;
-  const teamMembers = Array.isArray(payload.team_members) ? payload.team_members as Array<Record<string, string>> : [];
+  const subPayload = (submission?.payload ?? {}) as Record<string, unknown>;
+  const teamMembers = Array.isArray(subPayload.team_members) ? subPayload.team_members as Array<Record<string, string>> : [];
+
+  const phoneSplit = splitPhone(draft.phone || '');
+  const altSplit = splitPhone(draft.payload.contact_phone_alt || '');
+  const isBuilder = draft.tenancy_type === 'BUILDER_DEVELOPER';
+  const showLost = draft.stage === 'LOST';
+  const outcome = draft.payload.outcome ?? '';
+  const showNotInterested = outcome === 'NOT_INTERESTED';
+  const showDemoOutcome = ['DEMO_COMPLETED', 'DEMO_SCHEDULED'].includes(draft.stage);
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate('/enquiries')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
-          <h1 className="text-xl font-semibold">{enquiry.full_name}</h1>
-          <p className="text-sm text-muted-foreground">{enquiry.company_name ?? '—'}</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-semibold truncate">{enquiry.company_name || enquiry.full_name}</h1>
+          <p className="text-sm text-muted-foreground truncate">{enquiry.full_name} · {enquiry.phone}</p>
         </div>
         <Badge>{stageLabels[enquiry.stage]}</Badge>
+        {isDirty && (
+          <Button onClick={saveAll} disabled={saving} size="sm">
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Save changes
+          </Button>
+        )}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Contact</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" />{enquiry.phone}</div>
-              {enquiry.email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" />{enquiry.email}</div>}
-              {enquiry.city && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" />{enquiry.city}</div>}
-              <div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground" />{enquiry.tenancy_type === 'BUILDER_DEVELOPER' ? 'Builder / Developer' : 'Agency / Brokerage'}</div>
-            </CardContent>
-          </Card>
+      {/* Editable detail card */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Enquiry details</CardTitle></CardHeader>
+        <CardContent className="space-y-6">
+          {/* Contact block */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Company name</Label>
+              <Input value={draft.company_name ?? ''} onChange={e => setField('company_name', e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Contact name</Label>
+              <Input value={draft.full_name} onChange={e => setField('full_name', e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Primary phone</Label>
+              <PhoneInput
+                countryCode={phoneSplit.code}
+                onCountryCodeChange={c => setField('phone', joinPhone(c, phoneSplit.number))}
+                number={phoneSplit.number}
+                onNumberChange={n => setField('phone', joinPhone(phoneSplit.code, n))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Alternate phone</Label>
+              <PhoneInput
+                countryCode={altSplit.code || DEFAULT_COUNTRY_CODE}
+                onCountryCodeChange={c => setPayload('contact_phone_alt', joinPhone(c, altSplit.number))}
+                number={altSplit.number}
+                onNumberChange={n => setPayload('contact_phone_alt', n ? joinPhone(altSplit.code || DEFAULT_COUNTRY_CODE, n) : '')}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={draft.email ?? ''} onChange={e => setField('email', e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>City</Label>
+              <Select value={draft.city ?? NONE} onValueChange={v => setField('city', v === NONE ? null : v)}>
+                <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value={NONE}>—</SelectItem>
+                  {defaultMarkets.map(m => <SelectItem key={m.id} value={m.value}>{m.value}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-3 pt-6">
+              <Switch
+                id="wa"
+                checked={!!draft.payload.whatsapp_enabled}
+                onCheckedChange={v => setPayload('whatsapp_enabled', v)}
+              />
+              <Label htmlFor="wa" className="cursor-pointer">WhatsApp enabled on primary number</Label>
+            </div>
+          </div>
 
-          {submission ? (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">Onboarding Submission</CardTitle>
-                  {submission.status === 'PENDING_REVIEW' && <Badge className="bg-warning/15 text-warning"><Clock className="h-3 w-3 mr-1" />Pending Review</Badge>}
-                  {submission.status === 'APPROVED' && <Badge className="bg-success/15 text-success"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>}
-                  {submission.status === 'REJECTED' && <Badge className="bg-destructive/15 text-destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>}
-                </div>
-                <p className="text-xs text-muted-foreground">Submitted {format(new Date(submission.submitted_at), 'dd MMM yyyy, HH:mm')}</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><div className="text-xs text-muted-foreground">Company</div><div>{String(payload.company_name ?? '—')}</div></div>
-                  <div><div className="text-xs text-muted-foreground">City</div><div>{String(payload.city ?? '—')}</div></div>
-                  <div><div className="text-xs text-muted-foreground">Owner</div><div>{String(payload.owner_name ?? '—')}</div></div>
-                  <div><div className="text-xs text-muted-foreground">Phone</div><div>{String(payload.owner_phone ?? '—')}</div></div>
-                  {payload.gst_number ? <div><div className="text-xs text-muted-foreground">GST</div><div>{String(payload.gst_number)}</div></div> : null}
-                  {payload.rera_number ? <div><div className="text-xs text-muted-foreground">RERA</div><div>{String(payload.rera_number)}</div></div> : null}
-                </div>
-                {teamMembers.length > 0 && (
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-2">Team members ({teamMembers.length})</div>
-                    <div className="space-y-1.5">
-                      {teamMembers.map((m, i) => (
-                        <div key={i} className="text-sm border rounded p-2 flex justify-between">
-                          <span>{m.full_name}</span>
-                          <span className="text-xs text-muted-foreground">{m.role}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {submission.status === 'PENDING_REVIEW' && (
-                  <div className="flex gap-2 pt-2">
-                    <Button onClick={() => reviewSubmission('APPROVED')} disabled={busy} className="flex-1">
-                      <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
-                    </Button>
-                    <Button onClick={() => reviewSubmission('REJECTED')} disabled={busy} variant="outline" className="flex-1">
-                      <XCircle className="h-4 w-4 mr-2" /> Reject
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : enquiry.onboarding_pack_sent ? (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Onboarding Submission</CardTitle></CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" /> Awaiting customer to complete the form.
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
+          <Separator />
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">Notes & Activity</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <Textarea value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add a note..." rows={2} />
-                <Button onClick={addNote} disabled={!newNote.trim() || busy}>Add</Button>
+          {/* Classification */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Tenancy type</Label>
+              <Select value={draft.tenancy_type ?? NONE} onValueChange={v => setField('tenancy_type', v === NONE ? null : v as Tenancy)}>
+                <SelectTrigger><SelectValue placeholder="Select tenancy" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AGENCY_BROKERAGE_CONSULTANCY">Agency / Brokerage / Consultancy</SelectItem>
+                  <SelectItem value="BUILDER_DEVELOPER">Builder / Developer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Source</Label>
+              <Select value={draft.source ?? NONE} onValueChange={v => setField('source', v === NONE ? null : v)}>
+                <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>—</SelectItem>
+                  {SOURCES.map(s => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Qualification — agency vs builder */}
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Focus area</Label>
+              <div className="flex gap-3 flex-wrap mt-2">
+                {FOCUS_AREAS.map(fa => (
+                  <label key={fa.v} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={(draft.payload.focus_area ?? []).includes(fa.v)}
+                      onCheckedChange={() => togglePayloadArr('focus_area', fa.v)}
+                    />
+                    {fa.l}
+                  </label>
+                ))}
               </div>
-              <Separator />
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {notes.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No notes yet.</p> :
-                  notes.map(n => (
-                    <div key={n.id} className="text-sm border-l-2 border-primary/30 pl-3 py-1">
-                      <p>{n.note_text}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{format(new Date(n.created_at), 'dd MMM, HH:mm')}</p>
-                    </div>
-                  ))
-                }
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+            {!isBuilder && (
+              <div>
+                <Label className="text-sm font-medium">Sales focus</Label>
+                <div className="flex gap-3 flex-wrap mt-2">
+                  {SALES_FOCUS.map(sf => (
+                    <label key={sf.v} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={(draft.payload.sales_focus ?? []).includes(sf.v)}
+                        onCheckedChange={() => togglePayloadArr('sales_focus', sf.v)}
+                      />
+                      {sf.l}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Label className="text-sm font-medium">Primary property types</Label>
+              <div className="flex gap-3 flex-wrap mt-2">
+                {PROPERTY_TYPES.map(pt => (
+                  <label key={pt.v} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={(draft.payload.primary_property_types ?? []).includes(pt.v)}
+                      onCheckedChange={() => togglePayloadArr('primary_property_types', pt.v)}
+                    />
+                    {pt.l}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">Stage</label>
-                <Select value={enquiry.stage} onValueChange={(v: Stage) => updateStage(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Estimated team / seat count</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={draft.payload.team_size_estimate ?? ''}
+                  onChange={e => setPayload('team_size_estimate', e.target.value === '' ? null : Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Approx. onboarding date</Label>
+                <Input
+                  type="date"
+                  value={draft.payload.approx_onboarding_date ?? ''}
+                  onChange={e => setPayload('approx_onboarding_date', e.target.value || null)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Current system / software in use</Label>
+              <Textarea
+                rows={2}
+                placeholder="e.g. Excel, PropTech CRM, in-house tool…"
+                value={draft.payload.current_system_text ?? ''}
+                onChange={e => setPayload('current_system_text', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Portals currently in use</Label>
+              <div className="flex gap-3 flex-wrap mt-2">
+                {defaultPortals.map(p => (
+                  <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={(draft.payload.portals_in_use ?? []).includes(p.value)}
+                      onCheckedChange={() => togglePayloadArr('portals_in_use', p.value)}
+                    />
+                    {p.value}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Outcomes & dates */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Call outcome</Label>
+              <Select value={outcome || NONE} onValueChange={v => setPayload('outcome', v === NONE ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>—</SelectItem>
+                  {OUTCOMES.map(o => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Demo scheduled at</Label>
+              <Input
+                type="datetime-local"
+                value={draft.demo_scheduled_at ? draft.demo_scheduled_at.slice(0, 16) : ''}
+                onChange={e => setField('demo_scheduled_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Demo completed at</Label>
+              <Input
+                type="datetime-local"
+                value={draft.demo_completed_at ? draft.demo_completed_at.slice(0, 16) : ''}
+                onChange={e => setField('demo_completed_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+              />
+            </div>
+            {showDemoOutcome && (
+              <div className="space-y-1.5">
+                <Label>Demo outcome</Label>
+                <Select value={(draft.payload.demo_outcome as string) || NONE} onValueChange={v => setPayload('demo_outcome', v === NONE ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select demo outcome" /></SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(stageLabels) as Stage[]).map(s => <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>)}
+                    <SelectItem value={NONE}>—</SelectItem>
+                    {DEMO_OUTCOMES.map(o => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <Button className="w-full" onClick={handleSendOnboarding} disabled={busy} variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}>
-                <Send className="h-4 w-4 mr-2" />
-                {enquiry.onboarding_pack_sent ? 'Share Onboarding Link' : 'Send Onboarding Form'}
-              </Button>
-              <Button className="w-full" disabled={!!convertBlock || busy} onClick={convertToAccount}>
-                Convert to Account
-              </Button>
-              {convertBlock && <p className="text-xs text-muted-foreground text-center">{convertBlock}</p>}
-              {enquiry.converted_account_id && (
-                <Link to={`/accounts/${enquiry.converted_account_id}`}>
-                  <Button variant="outline" className="w-full">View Account</Button>
-                </Link>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </div>
+
+          {showNotInterested && (
+            <div className="grid md:grid-cols-2 gap-4 rounded-md border border-dashed p-3">
+              <div className="space-y-1.5">
+                <Label>Not interested reason</Label>
+                <Select value={(draft.payload.not_interested_reason as string) || NONE} onValueChange={v => setPayload('not_interested_reason', v === NONE ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>—</SelectItem>
+                    {NOT_INTERESTED_REASONS.map(r => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Additional context</Label>
+                <Input
+                  value={draft.payload.not_interested_text ?? ''}
+                  onChange={e => setPayload('not_interested_text', e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {showLost && (
+            <div className="space-y-1.5">
+              <Label>Lost reason</Label>
+              <Textarea rows={2} value={draft.lost_reason ?? ''} onChange={e => setField('lost_reason', e.target.value)} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Onboarding submission review */}
+      {submission ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Onboarding submission</CardTitle>
+              {submission.status === 'PENDING_REVIEW' && <Badge className="bg-warning/15 text-warning"><Clock className="h-3 w-3 mr-1" />Pending review</Badge>}
+              {submission.status === 'APPROVED' && <Badge className="bg-success/15 text-success"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>}
+              {submission.status === 'REJECTED' && <Badge className="bg-destructive/15 text-destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>}
+            </div>
+            <p className="text-xs text-muted-foreground">Submitted {format(new Date(submission.submitted_at), 'dd MMM yyyy, HH:mm')}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+              <div><div className="text-xs text-muted-foreground">Company</div><div>{String(subPayload.company_name ?? '—')}</div></div>
+              <div><div className="text-xs text-muted-foreground">City</div><div>{String(subPayload.city ?? '—')}</div></div>
+              <div><div className="text-xs text-muted-foreground">Owner</div><div>{String(subPayload.owner_name ?? '—')}</div></div>
+              <div><div className="text-xs text-muted-foreground">Phone</div><div>{String(subPayload.owner_phone ?? '—')}</div></div>
+              {subPayload.gst_number ? <div><div className="text-xs text-muted-foreground">GST</div><div>{String(subPayload.gst_number)}</div></div> : null}
+              {subPayload.rera_number ? <div><div className="text-xs text-muted-foreground">RERA</div><div>{String(subPayload.rera_number)}</div></div> : null}
+            </div>
+            {teamMembers.length > 0 && (
+              <div>
+                <div className="text-xs text-muted-foreground mb-2">Team members ({teamMembers.length})</div>
+                <div className="space-y-1.5">
+                  {teamMembers.map((m, i) => (
+                    <div key={i} className="text-sm border rounded p-2 flex justify-between">
+                      <span>{m.full_name || m.name}</span>
+                      <span className="text-xs text-muted-foreground">{m.role}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {submission.status === 'PENDING_REVIEW' && (
+              <div className="flex gap-2 pt-2">
+                <Button onClick={() => reviewSubmission('APPROVED')} disabled={busy} className="flex-1">
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+                </Button>
+                <Button onClick={() => reviewSubmission('REJECTED')} disabled={busy} variant="outline" className="flex-1">
+                  <XCircle className="h-4 w-4 mr-2" /> Reject
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : enquiry.onboarding_pack_sent ? (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Onboarding submission</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" /> Awaiting customer to complete the form.
+            </div>
+            {enquiry.onboarding_form_link && (
+              <a href={enquiry.onboarding_form_link} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 mt-2">
+                <ExternalLink className="h-3 w-3" /> Open form link
+              </a>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Bottom row — Notes & Actions side-by-side */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle className="text-base">Notes & activity</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <Textarea value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add a note…" rows={2} />
+              <Button onClick={addNote} disabled={!newNote.trim() || busy}>Add</Button>
+            </div>
+            <Separator />
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {notes.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No notes yet.</p> :
+                notes.map(n => (
+                  <div key={n.id} className="text-sm border-l-2 border-primary/30 pl-3 py-1">
+                    <p>{n.note_text}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(n.created_at), 'dd MMM, HH:mm')}</p>
+                  </div>
+                ))
+              }
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Stage</Label>
+              <Select value={enquiry.stage} onValueChange={(v: Stage) => updateStage(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(stageLabels) as Stage[]).map(s => <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={handleSendOnboarding} disabled={busy} variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}>
+              <Send className="h-4 w-4 mr-2" />
+              {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
+            </Button>
+            <Button className="w-full" disabled={!!convertBlock || busy} onClick={convertToAccount}>
+              Convert to account
+            </Button>
+            {convertBlock && <p className="text-xs text-muted-foreground text-center">{convertBlock}</p>}
+            {enquiry.converted_account_id && (
+              <Link to={`/accounts/${enquiry.converted_account_id}`}>
+                <Button variant="outline" className="w-full">View account</Button>
+              </Link>
+            )}
+            <Separator />
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2"><Phone className="h-3 w-3" /> {enquiry.phone}</div>
+              {enquiry.email && <div className="flex items-center gap-2"><Mail className="h-3 w-3" /> {enquiry.email}</div>}
+              <div>Created {format(new Date(enquiry.created_at), 'dd MMM yyyy')}</div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <SendOnboardingDialog
