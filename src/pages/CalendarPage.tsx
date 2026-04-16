@@ -226,21 +226,22 @@ export default function CalendarPage() {
           ) : (
             <div className="space-y-2">
               {sorted.map(e => (
-                <Link key={e.id} to={entityLink(e.related_entity_type, e.related_entity_id)} className="block">
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{e.title}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span>{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</span>
-                        <span>•</span><span>{userName(e.created_by)}</span>
-                      </div>
+                <div key={e.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70 gap-2">
+                  <Link to={entityLink(e.related_entity_type, e.related_entity_id)} className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{e.title}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      <span>{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</span>
+                      <span>•</span><span>{userName(e.created_by)}</span>
                     </div>
-                    <div className="flex items-center gap-2 ml-2">
-                      <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? ''}`}>{eventTypeLabels[e.event_type] ?? e.event_type}</Badge>
-                      {e.related_entity_type && <Badge className={`text-[10px] ${entityColors[e.related_entity_type] ?? ''}`}>{e.related_entity_type}</Badge>}
-                    </div>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? ''}`}>{eventTypeLabels[e.event_type] ?? e.event_type}</Badge>
+                    {e.related_entity_type && <Badge className={`text-[10px] ${entityColors[e.related_entity_type] ?? ''}`}>{e.related_entity_type}</Badge>}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Sync to Google Calendar" onClick={(ev) => { ev.preventDefault(); syncToGoogle(e.id, e.title); }}>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}
