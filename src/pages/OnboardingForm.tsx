@@ -77,9 +77,9 @@ export default function OnboardingForm() {
       team_members: team.filter(m => m.full_name.trim()),
       notes,
     };
-    const { error } = await supabase.from('onboarding_submissions').insert({
+    const { error } = await (supabase.from('onboarding_submissions') as any).insert({
       enquiry_id: enquiryId,
-      tenancy_type: tenancyType as 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER',
+      tenancy_type: tenancyType,
       payload,
       status: 'PENDING_REVIEW',
     });
