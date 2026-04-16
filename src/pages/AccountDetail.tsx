@@ -393,6 +393,22 @@ export default function AccountDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="verification" className="space-y-4">
+          <VerificationTab accountId={acc.id} />
+        </TabsContent>
+
+        <TabsContent value="billing" className="space-y-4">
+          <BillingTab accountId={acc.id} />
+        </TabsContent>
+
+        <TabsContent value="imports" className="space-y-4">
+          <ImportsTab accountId={acc.id} />
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-4">
+          <ActivityTimeline entityType="ACCOUNT" entityId={acc.id} />
+        </TabsContent>
       </Tabs>
 
       {/* Seat dialog */}

@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { SendOnboardingDialog } from '@/components/shared/SendOnboardingDialog';
 import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/components/shared/PhoneInput';
 import { defaultMarkets, defaultPortals } from '@/data/lookupData';
+import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
@@ -675,6 +676,8 @@ export default function EnquiryDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <ActivityTimeline entityType="ENQUIRY" entityId={enquiry.id} />
 
       <SendOnboardingDialog
         open={shareOpen}
