@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { toast } from 'sonner';
@@ -50,9 +50,9 @@ export default function CalendarPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const monthStart = useMemo(() => startOfMonth(currentMonth), [currentMonth]);
+  const monthEnd = useMemo(() => endOfMonth(currentMonth), [currentMonth]);
+  const days = useMemo(() => eachDayOfInterval({ start: monthStart, end: monthEnd }), [monthStart, monthEnd]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,17 +98,35 @@ export default function CalendarPage() {
       DEMO: 'DEMO', FOLLOW_UP: 'FOLLOW_UP', CALL_BACK: 'CALL_BACK',
       CHECK_IN: 'CHECK_IN', ONBOARDING: 'ONBOARDING', GENERAL: 'OTHER',
     };
-    const { error } = await supabase.from('calendar_events').insert({
+    const { data: inserted, error } = await supabase.from('calendar_events').insert({
       title: data.title,
       scheduled_at: scheduled.toISOString(),
       notes: data.notes || null,
       event_type: (eventTypeMap[data.event_type] ?? 'OTHER') as 'OTHER',
       created_by: currentUser.user_id,
-    });
+    }).select('id').maybeSingle();
     if (error) { toast.error(error.message); return; }
     toast.success(`Event "${data.title}" created`);
     setShowCreateDialog(false);
     load();
+    // Auto-push to Google Calendar (silent fail; user can retry from list)
+    if (inserted?.id) {
+      supabase.functions.invoke('sync-calendar-event', { body: { event_id: inserted.id } }).then(({ error: syncErr }) => {
+        if (!syncErr) toast.success('Synced to Google Calendar');
+      }).catch(() => { /* ignore — surfaces via Sync button later */ });
+    }
+  };
+
+  const syncToGoogle = async (eventId: string, title: string) => {
+    toast.loading('Syncing to Google Calendar…', { id: `sync-${eventId}` });
+    const { data, error } = await supabase.functions.invoke('sync-calendar-event', { body: { event_id: eventId } });
+    if (error || (data && (data as { error?: string }).error)) {
+      const msg = (data as { error?: string; code?: string })?.error ?? error?.message ?? 'Sync failed';
+      const code = (data as { code?: string })?.code;
+      toast.error(code === 'NOT_CONNECTED' ? 'Connect Google Calendar from Settings first.' : msg, { id: `sync-${eventId}` });
+      return;
+    }
+    toast.success(`"${title}" synced to Google Calendar`, { id: `sync-${eventId}` });
   };
 
   return (
@@ -208,21 +226,22 @@ export default function CalendarPage() {
           ) : (
             <div className="space-y-2">
               {sorted.map(e => (
-                <Link key={e.id} to={entityLink(e.related_entity_type, e.related_entity_id)} className="block">
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{e.title}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span>{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</span>
-                        <span>•</span><span>{userName(e.created_by)}</span>
-                      </div>
+                <div key={e.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70 gap-2">
+                  <Link to={entityLink(e.related_entity_type, e.related_entity_id)} className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{e.title}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      <span>{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</span>
+                      <span>•</span><span>{userName(e.created_by)}</span>
                     </div>
-                    <div className="flex items-center gap-2 ml-2">
-                      <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? ''}`}>{eventTypeLabels[e.event_type] ?? e.event_type}</Badge>
-                      {e.related_entity_type && <Badge className={`text-[10px] ${entityColors[e.related_entity_type] ?? ''}`}>{e.related_entity_type}</Badge>}
-                    </div>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? ''}`}>{eventTypeLabels[e.event_type] ?? e.event_type}</Badge>
+                    {e.related_entity_type && <Badge className={`text-[10px] ${entityColors[e.related_entity_type] ?? ''}`}>{e.related_entity_type}</Badge>}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Sync to Google Calendar" onClick={(ev) => { ev.preventDefault(); syncToGoogle(e.id, e.title); }}>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}

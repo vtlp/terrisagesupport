@@ -17,6 +17,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { defaultMarkets } from '@/data/lookupData';
 import { PhoneInput, splitPhone, joinPhone } from '@/components/shared/PhoneInput';
+import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
+import { VerificationTab } from '@/components/account/VerificationTab';
+import { BillingTab } from '@/components/account/BillingTab';
+import { ImportsTab } from '@/components/account/ImportsTab';
 
 type Status = 'LIVE' | 'ONBOARDING_IN_PROGRESS' | 'STALLED_ONBOARDING' | 'DEACTIVATED';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
@@ -193,11 +197,15 @@ export default function AccountDetail() {
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="seats">Seats ({seats.filter(s => s.is_active).length})</TabsTrigger>
           <TabsTrigger value="checklist">Onboarding ({doneCount}/{checklist.length})</TabsTrigger>
+          <TabsTrigger value="verification">Verification</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="imports">Imports</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -384,6 +392,22 @@ export default function AccountDetail() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="verification" className="space-y-4">
+          <VerificationTab accountId={acc.id} />
+        </TabsContent>
+
+        <TabsContent value="billing" className="space-y-4">
+          <BillingTab accountId={acc.id} />
+        </TabsContent>
+
+        <TabsContent value="imports" className="space-y-4">
+          <ImportsTab accountId={acc.id} />
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-4">
+          <ActivityTimeline entityType="ACCOUNT" entityId={acc.id} />
         </TabsContent>
       </Tabs>
 

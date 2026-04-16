@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_billing_settings: {
+        Row: {
+          account_id: string
+          base_fee: number
+          billing_cycle: Database["public"]["Enums"]["billing_cycle"]
+          created_at: string
+          gst_pct: number
+          id: string
+          next_renewal_at: string | null
+          plan_name: string
+          seat_rate: number
+          status: Database["public"]["Enums"]["subscription_status"]
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          base_fee?: number
+          billing_cycle?: Database["public"]["Enums"]["billing_cycle"]
+          created_at?: string
+          gst_pct?: number
+          id?: string
+          next_renewal_at?: string | null
+          plan_name?: string
+          seat_rate?: number
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          base_fee?: number
+          billing_cycle?: Database["public"]["Enums"]["billing_cycle"]
+          created_at?: string
+          gst_pct?: number
+          id?: string
+          next_renewal_at?: string | null
+          plan_name?: string
+          seat_rate?: number
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_billing_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_checklist_items: {
         Row: {
           account_id: string
@@ -51,6 +101,86 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "account_checklist_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_invoices: {
+        Row: {
+          account_id: string
+          base_fee: number
+          created_at: string
+          created_by: string | null
+          due_at: string | null
+          gst_amount: number
+          gst_pct: number
+          id: string
+          invoice_no: string | null
+          issued_at: string | null
+          notes: string | null
+          paid_at: string | null
+          period_from: string | null
+          period_to: string | null
+          plan_name: string | null
+          seat_count: number
+          seat_rate: number
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          base_fee?: number
+          created_at?: string
+          created_by?: string | null
+          due_at?: string | null
+          gst_amount?: number
+          gst_pct?: number
+          id?: string
+          invoice_no?: string | null
+          issued_at?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          period_from?: string | null
+          period_to?: string | null
+          plan_name?: string | null
+          seat_count?: number
+          seat_rate?: number
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          base_fee?: number
+          created_at?: string
+          created_by?: string | null
+          due_at?: string | null
+          gst_amount?: number
+          gst_pct?: number
+          id?: string
+          invoice_no?: string | null
+          issued_at?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          period_from?: string | null
+          period_to?: string | null
+          plan_name?: string | null
+          seat_count?: number
+          seat_rate?: number
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_invoices_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
@@ -127,6 +257,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "account_seats_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_verifications: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["verification_kind"]
+          notes: string | null
+          proof_storage_path: string | null
+          reference_no: string | null
+          status: Database["public"]["Enums"]["verification_status"]
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["verification_kind"]
+          notes?: string | null
+          proof_storage_path?: string | null
+          reference_no?: string | null
+          status?: Database["public"]["Enums"]["verification_status"]
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["verification_kind"]
+          notes?: string | null
+          proof_storage_path?: string | null
+          reference_no?: string | null
+          status?: Database["public"]["Enums"]["verification_status"]
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_verifications_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
@@ -212,6 +392,83 @@ export type Database = {
           },
         ]
       }
+      activity_log: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          details: Json
+          entity_id: string
+          entity_type: string
+          event_type: Database["public"]["Enums"]["activity_event_type"]
+          id: string
+          summary: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          entity_id: string
+          entity_type: string
+          event_type: Database["public"]["Enums"]["activity_event_type"]
+          id?: string
+          summary: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          entity_id?: string
+          entity_type?: string
+          event_type?: Database["public"]["Enums"]["activity_event_type"]
+          id?: string
+          summary?: string
+        }
+        Relationships: []
+      }
+      calendar_event_sync: {
+        Row: {
+          calendar_event_id: string
+          created_at: string
+          google_calendar_id: string | null
+          google_event_id: string | null
+          id: string
+          sync_error: string | null
+          sync_status: string
+          synced_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          calendar_event_id: string
+          created_at?: string
+          google_calendar_id?: string | null
+          google_event_id?: string | null
+          id?: string
+          sync_error?: string | null
+          sync_status?: string
+          synced_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          calendar_event_id?: string
+          created_at?: string
+          google_calendar_id?: string | null
+          google_event_id?: string | null
+          id?: string
+          sync_error?: string | null
+          sync_status?: string
+          synced_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_sync_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: true
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           assigned_to: string | null
@@ -259,6 +516,62 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      data_imports: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          error_log: string | null
+          file_name: string
+          id: string
+          import_type: Database["public"]["Enums"]["import_type"]
+          mapping_json: Json
+          row_count: number | null
+          size_bytes: number | null
+          status: Database["public"]["Enums"]["import_status"]
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          error_log?: string | null
+          file_name: string
+          id?: string
+          import_type: Database["public"]["Enums"]["import_type"]
+          mapping_json?: Json
+          row_count?: number | null
+          size_bytes?: number | null
+          status?: Database["public"]["Enums"]["import_status"]
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          error_log?: string | null
+          file_name?: string
+          id?: string
+          import_type?: Database["public"]["Enums"]["import_type"]
+          mapping_json?: Json
+          row_count?: number | null
+          size_bytes?: number | null
+          status?: Database["public"]["Enums"]["import_status"]
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_imports_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       enquiries: {
         Row: {
@@ -594,6 +907,16 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      log_activity: {
+        Args: {
+          _details?: Json
+          _entity_id: string
+          _entity_type: string
+          _event_type: Database["public"]["Enums"]["activity_event_type"]
+          _summary: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       account_status:
@@ -601,7 +924,20 @@ export type Database = {
         | "ONBOARDING_IN_PROGRESS"
         | "STALLED_ONBOARDING"
         | "DEACTIVATED"
+      activity_event_type:
+        | "STAGE_CHANGE"
+        | "FIELD_EDIT"
+        | "NOTE"
+        | "CALENDAR_EVENT"
+        | "SEAT_CHANGE"
+        | "CHECKLIST"
+        | "SUBMISSION"
+        | "CONVERSION"
+        | "VERIFICATION"
+        | "INVOICE"
+        | "IMPORT"
       app_role: "admin" | "support_agent"
+      billing_cycle: "MONTHLY" | "QUARTERLY" | "ANNUAL"
       calendar_event_status: "SCHEDULED" | "COMPLETED" | "CANCELLED" | "NO_SHOW"
       calendar_event_type:
         | "DEMO"
@@ -618,8 +954,19 @@ export type Database = {
         | "ONBOARDING_PACK_SENT"
         | "ACCOUNT_CREATED"
         | "LOST"
+      import_status:
+        | "UPLOADED"
+        | "MAPPING"
+        | "PROCESSING"
+        | "COMPLETED"
+        | "FAILED"
+      import_type: "LISTINGS" | "LEADS" | "CONTACTS" | "OTHER"
+      invoice_status: "DRAFT" | "SENT" | "PAID" | "OVERDUE" | "CANCELLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
+      subscription_status: "ACTIVE" | "PAUSED" | "CANCELLED" | "OVERDUE"
       tenancy_type: "AGENCY_BROKERAGE_CONSULTANCY" | "BUILDER_DEVELOPER"
+      verification_kind: "PAN" | "GST" | "RERA" | "BANK" | "IDENTITY"
+      verification_status: "PENDING" | "VERIFIED" | "REJECTED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -753,7 +1100,21 @@ export const Constants = {
         "STALLED_ONBOARDING",
         "DEACTIVATED",
       ],
+      activity_event_type: [
+        "STAGE_CHANGE",
+        "FIELD_EDIT",
+        "NOTE",
+        "CALENDAR_EVENT",
+        "SEAT_CHANGE",
+        "CHECKLIST",
+        "SUBMISSION",
+        "CONVERSION",
+        "VERIFICATION",
+        "INVOICE",
+        "IMPORT",
+      ],
       app_role: ["admin", "support_agent"],
+      billing_cycle: ["MONTHLY", "QUARTERLY", "ANNUAL"],
       calendar_event_status: ["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"],
       calendar_event_type: [
         "DEMO",
@@ -772,8 +1133,20 @@ export const Constants = {
         "ACCOUNT_CREATED",
         "LOST",
       ],
+      import_status: [
+        "UPLOADED",
+        "MAPPING",
+        "PROCESSING",
+        "COMPLETED",
+        "FAILED",
+      ],
+      import_type: ["LISTINGS", "LEADS", "CONTACTS", "OTHER"],
+      invoice_status: ["DRAFT", "SENT", "PAID", "OVERDUE", "CANCELLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
+      subscription_status: ["ACTIVE", "PAUSED", "CANCELLED", "OVERDUE"],
       tenancy_type: ["AGENCY_BROKERAGE_CONSULTANCY", "BUILDER_DEVELOPER"],
+      verification_kind: ["PAN", "GST", "RERA", "BANK", "IDENTITY"],
+      verification_status: ["PENDING", "VERIFIED", "REJECTED"],
     },
   },
 } as const
