@@ -150,9 +150,6 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
       <CreateEnquiryDialog
         open={createEnquiryOpen}
         onOpenChange={setCreateEnquiryOpen}
-        onCreated={(enquiry) => {
-          seedEnquiries.unshift(enquiry);
-        }}
       />
       <CreateTicketDialog
         open={createTicketOpen}
