@@ -7,12 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
@@ -53,11 +51,6 @@ export default function Enquiries() {
   const [stageFilter, setStageFilter] = useState('all');
   const [tenancyFilter, setTenancyFilter] = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    full_name: '', phone: '', email: '', city: '', company_name: '',
-    tenancy_type: 'AGENCY_BROKERAGE_CONSULTANCY' as Tenancy, source: 'CALL_DIRECT', notes: '',
-  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,30 +81,7 @@ export default function Enquiries() {
   const contacted = rows.filter(r => r.stage !== 'NEW_ENQUIRY').length;
   const converted = rows.filter(r => r.stage === 'ACCOUNT_CREATED').length;
 
-  const handleCreate = async () => {
-    if (!form.full_name.trim() || !form.phone.trim()) {
-      toast.error('Name and phone required'); return;
-    }
-    setCreating(true);
-    const { data, error } = await supabase.from('enquiries').insert({
-      full_name: form.full_name,
-      phone: form.phone,
-      email: form.email || null,
-      city: form.city || null,
-      company_name: form.company_name || null,
-      tenancy_type: form.tenancy_type,
-      source: form.source,
-      stage: 'NEW_ENQUIRY' as Stage,
-      payload: { initial_notes: form.notes },
-    }).select('id').maybeSingle();
-    setCreating(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Enquiry created');
-    setCreateOpen(false);
-    setForm({ full_name: '', phone: '', email: '', city: '', company_name: '', tenancy_type: 'AGENCY_BROKERAGE_CONSULTANCY', source: 'CALL_DIRECT', notes: '' });
-    if (data?.id) navigate(`/enquiries/${data.id}`);
-    else load();
-  };
+  // Create handled by shared CreateEnquiryDialog
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -205,49 +175,11 @@ export default function Enquiries() {
         </>
       )}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>New Enquiry</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Full Name *</Label><Input value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} /></div>
-              <div className="space-y-1.5"><Label>Phone *</Label><Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="+91" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} /></div>
-              <div className="space-y-1.5"><Label>City</Label><Input value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} /></div>
-            </div>
-            <div className="space-y-1.5"><Label>Company</Label><Input value={form.company_name} onChange={e => setForm(p => ({ ...p, company_name: e.target.value }))} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Type</Label>
-                <Select value={form.tenancy_type} onValueChange={(v: Tenancy) => setForm(p => ({ ...p, tenancy_type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AGENCY_BROKERAGE_CONSULTANCY">Agency / Brokerage</SelectItem>
-                    <SelectItem value="BUILDER_DEVELOPER">Builder / Developer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5"><Label>Source</Label>
-                <Select value={form.source} onValueChange={v => setForm(p => ({ ...p, source: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CALL_DIRECT">Direct Call</SelectItem>
-                    <SelectItem value="LANDING_PAGE">Landing Page</SelectItem>
-                    <SelectItem value="META_ADS">Meta Ads</SelectItem>
-                    <SelectItem value="CHAMPION_PARTNER">Champion Partner</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5"><Label>Initial Notes</Label><Textarea rows={3} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={creating}>{creating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateEnquiryDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => load()}
+      />
     </div>
   );
 }
