@@ -6,6 +6,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { UserProvider } from "@/context/UserContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import Auth from "@/pages/Auth";
+import OnboardingForm from "@/pages/OnboardingForm";
 import Dashboard from "@/pages/Dashboard";
 import Accounts from "@/pages/Accounts";
 import AccountDetail from "@/pages/AccountDetail";
@@ -27,13 +30,18 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
-      <UserProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+      <BrowserRouter>
+        <UserProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
             <Routes>
-              <Route element={<AppLayout />}>
+              {/* Public routes */}
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/onboarding/:tenancy" element={<OnboardingForm />} />
+
+              {/* Protected app */}
+              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/enquiries" element={<Enquiries />} />
                 <Route path="/enquiries/dashboard" element={<EnquiryPipelineDashboard />} />
@@ -46,15 +54,15 @@ const App = () => (
                 <Route path="/knowledge" element={<Knowledge />} />
                 <Route path="/marketing" element={<Marketing />} />
                 <Route path="/reports" element={<Reports />} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/admin/queues" element={<AdminQueues />} />
-                <Route path="/admin/lookups" element={<AdminLookups />} />
+                <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
+                <Route path="/admin/queues" element={<ProtectedRoute adminOnly><AdminQueues /></ProtectedRoute>} />
+                <Route path="/admin/lookups" element={<ProtectedRoute adminOnly><AdminLookups /></ProtectedRoute>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </UserProvider>
+          </TooltipProvider>
+        </UserProvider>
+      </BrowserRouter>
     </ThemeProvider>
   </QueryClientProvider>
 );
