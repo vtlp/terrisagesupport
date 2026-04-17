@@ -698,6 +698,9 @@ export default function EnquiryDetail() {
               <Send className="h-4 w-4 mr-2" />
               {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
             </Button>
+            <Button className="w-full" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
+              <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
+            </Button>
             <Button className="w-full" disabled={!!convertBlock || busy} onClick={convertToAccount}>
               Convert to account
             </Button>
