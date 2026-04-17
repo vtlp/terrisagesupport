@@ -215,6 +215,7 @@ export default function AccountDetail() {
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="imports">Imports</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar ({events.length})</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -416,10 +417,54 @@ export default function AccountDetail() {
           <ImportsTab accountId={acc.id} />
         </TabsContent>
 
+        <TabsContent value="calendar" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Calendar events</CardTitle>
+                <Button size="sm" onClick={() => setScheduleOpen(true)}><CalendarIcon className="h-4 w-4 mr-1" /> Schedule event</Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {events.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No events scheduled.</p>
+              ) : (
+                <div className="space-y-2">
+                  {events.map(e => (
+                    <button key={e.id} onClick={() => setOpenEvent(e)}
+                      className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70">
+                      <div>
+                        <p className="text-sm font-medium">{e.title}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</p>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">{e.event_type}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="activity" className="space-y-4">
           <ActivityTimeline entityType="ACCOUNT" entityId={acc.id} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
+          <CalendarEventForm
+            onSubmit={handleScheduleEvent}
+            onCancel={() => setScheduleOpen(false)}
+            lockedEntityType="ACCOUNT"
+            lockedEntityId={acc.id}
+            lockedEntityLabel={acc.account_name}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <EventDetailDialog event={openEvent} open={!!openEvent} onOpenChange={(v) => !v && setOpenEvent(null)} onChanged={load} />
 
       {/* Seat dialog */}
       <Dialog open={seatOpen} onOpenChange={setSeatOpen}>
