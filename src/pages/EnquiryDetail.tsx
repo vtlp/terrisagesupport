@@ -747,7 +747,45 @@ export default function EnquiryDetail() {
         </Card>
       </div>
 
+      {/* Stage flow — horizontal stepper with outcome modal */}
+      <StageFlow
+        currentStage={enquiry.stage}
+        busy={busy}
+        onSelectStage={(s) => setPendingStage(s)}
+      />
+
       <ActivityTimeline entityType="ENQUIRY" entityId={enquiry.id} />
+
+      <Dialog open={!!pendingStage} onOpenChange={(v) => !v && setPendingStage(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Move to {pendingStage ? stageLabels[pendingStage] : ''}</DialogTitle>
+          </DialogHeader>
+          {pendingStage && (
+            <StageOutcomePanel
+              stage={pendingStage}
+              draft={draft}
+              setField={setField}
+              setPayload={setPayload}
+            />
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setPendingStage(null)} disabled={busy || saving}>Cancel</Button>
+            <Button
+              disabled={busy || saving}
+              onClick={async () => {
+                if (!pendingStage) return;
+                if (isDirty) await saveAll();
+                if (pendingStage !== enquiry.stage) await updateStage(pendingStage);
+                setPendingStage(null);
+              }}
+            >
+              {(busy || saving) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save & advance
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <SendOnboardingDialog
         open={shareOpen}
