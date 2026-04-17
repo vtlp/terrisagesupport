@@ -327,6 +327,14 @@ export default function EnquiryDetail() {
           <p className="text-sm text-muted-foreground truncate">{enquiry.full_name} · {enquiry.phone}</p>
         </div>
         <Badge>{stageLabels[enquiry.stage]}</Badge>
+        {duplicateOf && (
+          <Link to={`/enquiries/${duplicateOf.id}`}>
+            <Badge variant="outline" className="gap-1 border-warning/40 text-warning hover:bg-warning/10">
+              <CopyIcon className="h-3 w-3" />
+              Duplicate of {duplicateOf.enquiry_code ?? duplicateOf.full_name}
+            </Badge>
+          </Link>
+        )}
         {isDirty && (
           <Button onClick={saveAll} disabled={saving} size="sm">
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
