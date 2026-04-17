@@ -140,6 +140,7 @@ export default function EnquiryDetail() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
+  const [pendingStage, setPendingStage] = useState<Stage | null>(null);
 
   const loadEvents = useCallback(async (id: string) => {
     const nowIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
