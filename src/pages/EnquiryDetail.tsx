@@ -344,6 +344,21 @@ export default function EnquiryDetail() {
         )}
       </div>
 
+      {/* Horizontal stage flow */}
+      <StageFlow
+        currentStage={enquiry.stage}
+        busy={busy}
+        onSelectStage={updateStage}
+        outcomeNode={
+          <StageOutcomePanel
+            stage={enquiry.stage}
+            draft={draft}
+            setField={setField}
+            setPayload={setPayload}
+          />
+        }
+      />
+
       {/* Editable detail card */}
       <Card>
         <CardHeader><CardTitle className="text-base">Enquiry details</CardTitle></CardHeader>
