@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon, ChevronRight, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
