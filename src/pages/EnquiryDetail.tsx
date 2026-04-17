@@ -762,6 +762,38 @@ export default function EnquiryDetail() {
         customerPhone={enquiry.phone}
         customerEmail={enquiry.email ?? undefined}
       />
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
+          <CalendarEventForm
+            defaultEventType={CalendarEventType.FOLLOW_UP}
+            lockedEntityType="ENQUIRY"
+            lockedEntityId={enquiry.id}
+            lockedEntityLabel={enquiry.company_name || enquiry.full_name}
+            onCancel={() => setScheduleOpen(false)}
+            onSubmit={async (d) => {
+              const [hh, mm] = d.time.split(':').map(Number);
+              const dt = new Date(d.date); dt.setHours(hh ?? 10, mm ?? 0, 0, 0);
+              const { error } = await supabase.from('calendar_events').insert({
+                title: d.title, scheduled_at: dt.toISOString(), notes: d.notes || null,
+                event_type: d.event_type, related_entity_type: 'ENQUIRY', related_entity_id: enquiry.id,
+              });
+              if (error) { toast.error(error.message); return; }
+              toast.success('Event scheduled');
+              setScheduleOpen(false);
+              loadEvents(enquiry.id);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <EventDetailDialog
+        event={openEvent}
+        open={!!openEvent}
+        onOpenChange={(v) => !v && setOpenEvent(null)}
+        onChanged={() => { loadEvents(enquiry.id); setOpenEvent(null); }}
+      />
     </div>
   );
 }
