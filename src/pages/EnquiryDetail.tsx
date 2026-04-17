@@ -839,12 +839,11 @@ const STAGE_ORDER: Stage[] = [
 ];
 
 function StageFlow({
-  currentStage, busy, onSelectStage, outcomeNode,
+  currentStage, busy, onSelectStage,
 }: {
   currentStage: Stage;
   busy: boolean;
   onSelectStage: (s: Stage) => void;
-  outcomeNode: React.ReactNode;
 }) {
   const isLost = currentStage === 'LOST';
   const currentIdx = isLost ? -1 : STAGE_ORDER.indexOf(currentStage);
