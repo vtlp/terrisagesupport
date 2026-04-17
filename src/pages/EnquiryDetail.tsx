@@ -896,12 +896,11 @@ function StageFlow({
             </button>
           </div>
         </div>
-        <Separator />
-        <div>{outcomeNode}</div>
       </CardContent>
     </Card>
   );
 }
+const _unused = () => null;
 
 function StageOutcomePanel({
   stage, draft, setField, setPayload,
