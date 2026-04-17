@@ -9,6 +9,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday
 import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
+import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { CalendarEventType } from '@/types/core';
@@ -49,6 +50,7 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
 
   const monthStart = useMemo(() => startOfMonth(currentMonth), [currentMonth]);
   const monthEnd = useMemo(() => endOfMonth(currentMonth), [currentMonth]);
@@ -90,7 +92,7 @@ export default function CalendarPage() {
 
   const userName = (id: string | null) => id ? (profiles.find(p => p.id === id)?.full_name ?? '—') : '—';
 
-  const handleCreateEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
+  const handleCreateEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType; related_entity_type: 'ENQUIRY' | 'ACCOUNT' | ''; related_entity_id: string | null }) => {
     const scheduled = new Date(data.date);
     const [h, m] = data.time.split(':');
     scheduled.setHours(parseInt(h), parseInt(m));
@@ -98,18 +100,19 @@ export default function CalendarPage() {
       DEMO: 'DEMO', FOLLOW_UP: 'FOLLOW_UP', CALL_BACK: 'CALL_BACK',
       CHECK_IN: 'CHECK_IN', ONBOARDING: 'ONBOARDING', GENERAL: 'OTHER',
     };
-    const { data: inserted, error } = await supabase.from('calendar_events').insert({
+    const { error } = await supabase.from('calendar_events').insert({
       title: data.title,
       scheduled_at: scheduled.toISOString(),
       notes: data.notes || null,
       event_type: (eventTypeMap[data.event_type] ?? 'OTHER') as 'OTHER',
       created_by: currentUser.user_id,
+      related_entity_type: data.related_entity_type || null,
+      related_entity_id: data.related_entity_id || null,
     }).select('id').maybeSingle();
     if (error) { toast.error(error.message); return; }
     toast.success(`Event "${data.title}" created`);
     setShowCreateDialog(false);
     load();
-    // Google Calendar sync is opt-in via the Sync button on each event row.
   };
 
   const syncToGoogle = async (eventId: string, title: string) => {
@@ -198,9 +201,9 @@ export default function CalendarPage() {
                       <div className={`font-medium mb-0.5 ${isToday(day) ? 'text-primary' : ''}`}>{format(day, 'd')}</div>
                       <div className="space-y-0.5 overflow-hidden">
                         {dayEvents.slice(0, 2).map(e => (
-                          <Link key={e.id} to={entityLink(e.related_entity_type, e.related_entity_id)}
-                            className={`block rounded px-1 py-0.5 truncate hover:opacity-80 ${eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary'}`}
-                            title={e.title}>{e.title.substring(0, 15)}…</Link>
+                          <button key={e.id} onClick={() => setOpenEvent(e as EventRow)}
+                            className={`block w-full text-left rounded px-1 py-0.5 truncate hover:opacity-80 ${eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary'}`}
+                            title={e.title}>{e.title.substring(0, 15)}…</button>
                         ))}
                         {dayEvents.length > 2 && <div className="text-muted-foreground">+{dayEvents.length - 2} more</div>}
                       </div>
@@ -222,13 +225,13 @@ export default function CalendarPage() {
             <div className="space-y-2">
               {sorted.map(e => (
                 <div key={e.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70 gap-2">
-                  <Link to={entityLink(e.related_entity_type, e.related_entity_id)} className="min-w-0 flex-1">
+                  <button onClick={() => setOpenEvent(e as EventRow)} className="min-w-0 flex-1 text-left">
                     <p className="text-sm font-medium truncate">{e.title}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       <span>{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</span>
                       <span>•</span><span>{userName(e.created_by)}</span>
                     </div>
-                  </Link>
+                  </button>
                   <div className="flex items-center gap-2">
                     <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? ''}`}>{eventTypeLabels[e.event_type] ?? e.event_type}</Badge>
                     {e.related_entity_type && <Badge className={`text-[10px] ${entityColors[e.related_entity_type] ?? ''}`}>{e.related_entity_type}</Badge>}
@@ -252,6 +255,14 @@ export default function CalendarPage() {
           <CalendarEventForm onSubmit={handleCreateEvent} onCancel={() => setShowCreateDialog(false)} defaultEventType={CalendarEventType.GENERAL} />
         </DialogContent>
       </Dialog>
+
+      <EventDetailDialog
+        event={openEvent}
+        ownerName={userName(openEvent?.created_by ?? null)}
+        open={!!openEvent}
+        onOpenChange={(v) => { if (!v) setOpenEvent(null); }}
+        onChanged={load}
+      />
     </div>
   );
 }

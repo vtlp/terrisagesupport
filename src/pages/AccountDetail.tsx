@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, Plus, Trash2, UserCheck, UserX, CheckCircle2, Circle } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Plus, Trash2, UserCheck, UserX, CheckCircle2, Circle, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,10 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { VerificationTab } from '@/components/account/VerificationTab';
 import { BillingTab } from '@/components/account/BillingTab';
 import { ImportsTab } from '@/components/account/ImportsTab';
+import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
+import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
+import { CalendarEventType } from '@/types/core';
+import { useUser } from '@/context/UserContext';
 
 type Status = 'LIVE' | 'ONBOARDING_IN_PROGRESS' | 'STALLED_ONBOARDING' | 'DEACTIVATED';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
@@ -60,10 +64,14 @@ export default function AccountDetail() {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [checklist, setChecklist] = useState<ChecklistRow[]>([]);
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
+  const { currentUser } = useUser();
 
   // seat dialog
   const [seatOpen, setSeatOpen] = useState(false);
@@ -74,11 +82,12 @@ export default function AccountDetail() {
   const load = useCallback(async () => {
     if (!accountId) return;
     setLoading(true);
-    const [a, s, n, c] = await Promise.all([
+    const [a, s, n, c, ev] = await Promise.all([
       supabase.from('accounts').select('*').eq('id', accountId).maybeSingle(),
       supabase.from('account_seats').select('*').eq('account_id', accountId).order('created_at'),
       supabase.from('account_notes').select('id, note_text, created_at').eq('account_id', accountId).order('created_at', { ascending: false }),
       supabase.from('account_checklist_items').select('id, label, is_done, sort_order, done_at').eq('account_id', accountId).order('sort_order'),
+      supabase.from('calendar_events').select('*').eq('related_entity_type', 'ACCOUNT').eq('related_entity_id', accountId).order('scheduled_at', { ascending: true }),
     ]);
     if (a.error || !a.data) { toast.error('Account not found'); navigate('/accounts'); return; }
     const acct = { ...a.data, payload: (a.data.payload ?? {}) as Record<string, unknown> } as Account;
@@ -87,6 +96,7 @@ export default function AccountDetail() {
     setSeats((s.data ?? []) as Seat[]);
     setNotes((n.data ?? []) as NoteRow[]);
     setChecklist((c.data ?? []) as ChecklistRow[]);
+    setEvents((ev.data ?? []) as EventRow[]);
     setLoading(false);
   }, [accountId, navigate]);
 
@@ -170,7 +180,21 @@ export default function AccountDetail() {
     else load();
   };
 
-  if (loading || !acc || !draft) {
+  const handleScheduleEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
+    if (!acc) return;
+    const scheduled = new Date(data.date);
+    const [h, m] = data.time.split(':');
+    scheduled.setHours(parseInt(h), parseInt(m));
+    const map: Record<string, string> = { DEMO: 'DEMO', FOLLOW_UP: 'FOLLOW_UP', CALL_BACK: 'CALL_BACK', CHECK_IN: 'CHECK_IN', ONBOARDING: 'ONBOARDING', GENERAL: 'OTHER' };
+    const { error } = await supabase.from('calendar_events').insert({
+      title: data.title, scheduled_at: scheduled.toISOString(), notes: data.notes || null,
+      event_type: (map[data.event_type] ?? 'OTHER') as 'OTHER',
+      created_by: currentUser.user_id,
+      related_entity_type: 'ACCOUNT', related_entity_id: acc.id,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success('Event scheduled'); setScheduleOpen(false); load();
+  };
     return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
 
@@ -205,6 +229,7 @@ export default function AccountDetail() {
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="imports">Imports</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar ({events.length})</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -406,10 +431,54 @@ export default function AccountDetail() {
           <ImportsTab accountId={acc.id} />
         </TabsContent>
 
+        <TabsContent value="calendar" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Calendar events</CardTitle>
+                <Button size="sm" onClick={() => setScheduleOpen(true)}><CalendarIcon className="h-4 w-4 mr-1" /> Schedule event</Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {events.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No events scheduled.</p>
+              ) : (
+                <div className="space-y-2">
+                  {events.map(e => (
+                    <button key={e.id} onClick={() => setOpenEvent(e)}
+                      className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70">
+                      <div>
+                        <p className="text-sm font-medium">{e.title}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</p>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">{e.event_type}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="activity" className="space-y-4">
           <ActivityTimeline entityType="ACCOUNT" entityId={acc.id} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
+          <CalendarEventForm
+            onSubmit={handleScheduleEvent}
+            onCancel={() => setScheduleOpen(false)}
+            lockedEntityType="ACCOUNT"
+            lockedEntityId={acc.id}
+            lockedEntityLabel={acc.account_name}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <EventDetailDialog event={openEvent} open={!!openEvent} onOpenChange={(v) => !v && setOpenEvent(null)} onChanged={load} />
 
       {/* Seat dialog */}
       <Dialog open={seatOpen} onOpenChange={setSeatOpen}>

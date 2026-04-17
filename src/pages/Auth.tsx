@@ -5,25 +5,26 @@ import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 
 export default function Auth() {
   const { authUser, loading } = useUser();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [stay, setStay] = useState(true);
   const [busy, setBusy] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
-  // Auto-seed the initial admin on first load (idempotent)
   useEffect(() => {
     const seeded = localStorage.getItem('admin_seeded');
     if (!seeded) {
       setSeeding(true);
-      supabase.functions
-        .invoke('seed-admin')
+      supabase.functions.invoke('seed-admin')
         .then(() => localStorage.setItem('admin_seeded', '1'))
         .catch(() => {})
         .finally(() => setSeeding(false));
@@ -44,10 +45,10 @@ export default function Auth() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
+    if (error) { toast.error(error.message); return; }
+    // Persistence preference: when unchecked, sign out at tab close.
+    localStorage.setItem('session_persist', stay ? '1' : '0');
+    sessionStorage.setItem('session_alive', '1');
     toast.success('Signed in');
     navigate('/', { replace: true });
   };
@@ -68,6 +69,16 @@ export default function Auth() {
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="stay" checked={stay} onCheckedChange={(v) => setStay(!!v)} />
+              <Label htmlFor="stay" className="cursor-pointer text-sm">Stay signed in</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>Uncheck on shared devices.</TooltipContent>
+              </Tooltip>
             </div>
             <Button type="submit" className="w-full" disabled={busy || seeding}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign in'}
