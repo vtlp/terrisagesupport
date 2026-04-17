@@ -64,10 +64,14 @@ export default function AccountDetail() {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [checklist, setChecklist] = useState<ChecklistRow[]>([]);
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
+  const { currentUser } = useUser();
 
   // seat dialog
   const [seatOpen, setSeatOpen] = useState(false);
@@ -78,11 +82,12 @@ export default function AccountDetail() {
   const load = useCallback(async () => {
     if (!accountId) return;
     setLoading(true);
-    const [a, s, n, c] = await Promise.all([
+    const [a, s, n, c, ev] = await Promise.all([
       supabase.from('accounts').select('*').eq('id', accountId).maybeSingle(),
       supabase.from('account_seats').select('*').eq('account_id', accountId).order('created_at'),
       supabase.from('account_notes').select('id, note_text, created_at').eq('account_id', accountId).order('created_at', { ascending: false }),
       supabase.from('account_checklist_items').select('id, label, is_done, sort_order, done_at').eq('account_id', accountId).order('sort_order'),
+      supabase.from('calendar_events').select('*').eq('related_entity_type', 'ACCOUNT').eq('related_entity_id', accountId).order('scheduled_at', { ascending: true }),
     ]);
     if (a.error || !a.data) { toast.error('Account not found'); navigate('/accounts'); return; }
     const acct = { ...a.data, payload: (a.data.payload ?? {}) as Record<string, unknown> } as Account;
@@ -91,6 +96,7 @@ export default function AccountDetail() {
     setSeats((s.data ?? []) as Seat[]);
     setNotes((n.data ?? []) as NoteRow[]);
     setChecklist((c.data ?? []) as ChecklistRow[]);
+    setEvents((ev.data ?? []) as EventRow[]);
     setLoading(false);
   }, [accountId, navigate]);
 
