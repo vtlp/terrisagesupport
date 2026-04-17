@@ -140,6 +140,7 @@ export default function EnquiryDetail() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
+  const [pendingStage, setPendingStage] = useState<Stage | null>(null);
 
   const loadEvents = useCallback(async (id: string) => {
     const nowIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
@@ -344,20 +345,7 @@ export default function EnquiryDetail() {
         )}
       </div>
 
-      {/* Horizontal stage flow */}
-      <StageFlow
-        currentStage={enquiry.stage}
-        busy={busy}
-        onSelectStage={updateStage}
-        outcomeNode={
-          <StageOutcomePanel
-            stage={enquiry.stage}
-            draft={draft}
-            setField={setField}
-            setPayload={setPayload}
-          />
-        }
-      />
+
 
       {/* Editable detail card */}
       <Card>
@@ -759,7 +747,45 @@ export default function EnquiryDetail() {
         </Card>
       </div>
 
+      {/* Stage flow — horizontal stepper with outcome modal */}
+      <StageFlow
+        currentStage={enquiry.stage}
+        busy={busy}
+        onSelectStage={(s) => setPendingStage(s)}
+      />
+
       <ActivityTimeline entityType="ENQUIRY" entityId={enquiry.id} />
+
+      <Dialog open={!!pendingStage} onOpenChange={(v) => !v && setPendingStage(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Move to {pendingStage ? stageLabels[pendingStage] : ''}</DialogTitle>
+          </DialogHeader>
+          {pendingStage && (
+            <StageOutcomePanel
+              stage={pendingStage}
+              draft={draft}
+              setField={setField}
+              setPayload={setPayload}
+            />
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setPendingStage(null)} disabled={busy || saving}>Cancel</Button>
+            <Button
+              disabled={busy || saving}
+              onClick={async () => {
+                if (!pendingStage) return;
+                if (isDirty) await saveAll();
+                if (pendingStage !== enquiry.stage) await updateStage(pendingStage);
+                setPendingStage(null);
+              }}
+            >
+              {(busy || saving) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save & advance
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <SendOnboardingDialog
         open={shareOpen}
@@ -813,12 +839,11 @@ const STAGE_ORDER: Stage[] = [
 ];
 
 function StageFlow({
-  currentStage, busy, onSelectStage, outcomeNode,
+  currentStage, busy, onSelectStage,
 }: {
   currentStage: Stage;
   busy: boolean;
   onSelectStage: (s: Stage) => void;
-  outcomeNode: React.ReactNode;
 }) {
   const isLost = currentStage === 'LOST';
   const currentIdx = isLost ? -1 : STAGE_ORDER.indexOf(currentStage);
@@ -871,12 +896,11 @@ function StageFlow({
             </button>
           </div>
         </div>
-        <Separator />
-        <div>{outcomeNode}</div>
       </CardContent>
     </Card>
   );
 }
+
 
 function StageOutcomePanel({
   stage, draft, setField, setPayload,
