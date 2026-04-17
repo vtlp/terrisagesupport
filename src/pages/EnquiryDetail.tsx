@@ -165,8 +165,17 @@ export default function EnquiryDetail() {
     setDraft(enq);
     setNotes((n ?? []) as NoteRow[]);
     setSubmission(s as Submission | null);
+    loadEvents(enq.id);
+    if (enq.is_duplicate_of) {
+      const { data: dup } = await supabase.from('enquiries')
+        .select('id, enquiry_code, full_name')
+        .eq('id', enq.is_duplicate_of).maybeSingle();
+      setDuplicateOf((dup as DuplicateOf | null) ?? null);
+    } else {
+      setDuplicateOf(null);
+    }
     setLoading(false);
-  }, [enquiryId, navigate]);
+  }, [enquiryId, navigate, loadEvents]);
 
   useEffect(() => { load(); }, [load]);
 
