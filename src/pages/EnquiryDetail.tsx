@@ -659,6 +659,38 @@ export default function EnquiryDetail() {
         </Card>
       ) : null}
 
+      {/* Upcoming events */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Upcoming events</CardTitle>
+            <Button size="sm" variant="outline" onClick={() => setScheduleOpen(true)}>
+              <CalendarPlus className="h-4 w-4 mr-1" /> Schedule
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-3">No upcoming events.</p>
+          ) : (
+            <div className="space-y-2">
+              {events.map(ev => (
+                <button key={ev.id} onClick={() => setOpenEvent(ev)}
+                  className="w-full text-left rounded-md border px-3 py-2 hover:bg-accent transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{ev.title}</div>
+                      <div className="text-xs text-muted-foreground">{format(new Date(ev.scheduled_at), 'EEE dd MMM, HH:mm')}</div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] shrink-0">{ev.event_type.replace('_', ' ')}</Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Bottom row — Notes & Actions side-by-side */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
