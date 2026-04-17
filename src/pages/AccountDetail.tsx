@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, Plus, Trash2, UserCheck, UserX, CheckCircle2, Circle } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Plus, Trash2, UserCheck, UserX, CheckCircle2, Circle, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,10 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { VerificationTab } from '@/components/account/VerificationTab';
 import { BillingTab } from '@/components/account/BillingTab';
 import { ImportsTab } from '@/components/account/ImportsTab';
+import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
+import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
+import { CalendarEventType } from '@/types/core';
+import { useUser } from '@/context/UserContext';
 
 type Status = 'LIVE' | 'ONBOARDING_IN_PROGRESS' | 'STALLED_ONBOARDING' | 'DEACTIVATED';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';

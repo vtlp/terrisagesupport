@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { getCityOptions } from '@/data/lookupData';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { PhoneInput, DEFAULT_COUNTRY_CODE, joinPhone } from './PhoneInput';
 
@@ -30,6 +31,19 @@ const SOURCES = [
 const PHONE_RE = /^[0-9\s\-]{6,15}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const STAGE_LABELS: Record<string, string> = {
+  NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Scheduled',
+  DEMO_COMPLETED: 'Demo Completed', ONBOARDING_PACK_SENT: 'Onboarding Sent',
+  ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
+};
+
+interface DuplicateMatch {
+  id: string; full_name: string; company_name: string | null;
+  stage: string; created_at: string;
+}
+
+const normalisePhone = (s: string) => s.replace(/\D/g, '');
+
 export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnquiryDialogProps) {
   const navigate = useNavigate();
   const cities = getCityOptions();
@@ -48,6 +62,7 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [duplicate, setDuplicate] = useState<DuplicateMatch | null>(null);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -71,11 +86,24 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
     setPhoneAltCode(DEFAULT_COUNTRY_CODE); setPhoneAltNumber('');
     setEmail(''); setCity(''); setSource('CALL_DIRECT');
     setTenancyType('AGENCY_BROKERAGE_CONSULTANCY');
-    setWhatsappEnabled(true); setNotes(''); setErrors({});
+    setWhatsappEnabled(true); setNotes(''); setErrors({}); setDuplicate(null);
   };
 
-  const handleSubmit = async () => {
-    if (!validate()) return;
+  const findDuplicate = async (): Promise<DuplicateMatch | null> => {
+    const digits = normalisePhone(joinPhone(phoneCode, phoneNumber));
+    if (digits.length < 6) return null;
+    const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from('enquiries')
+      .select('id, full_name, company_name, stage, created_at, phone')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    const match = (data ?? []).find(r => normalisePhone(r.phone) === digits);
+    return (match as DuplicateMatch) ?? null;
+  };
+
+  const insertEnquiry = async (isDuplicateOf: string | null) => {
     setSubmitting(true);
     const { data, error } = await supabase.from('enquiries').insert({
       full_name: contactName.trim(),
@@ -86,20 +114,35 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
       tenancy_type: tenancyType as 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER',
       source,
       stage: 'NEW_ENQUIRY',
+      is_duplicate_of: isDuplicateOf,
       payload: {
         contact_phone_alt: phoneAltNumber ? joinPhone(phoneAltCode, phoneAltNumber) : null,
         whatsapp_enabled: whatsappEnabled,
         initial_notes: notes.trim(),
       },
-    }).select('id').maybeSingle();
+    } as never).select('id').maybeSingle();
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
     toast.success(`Enquiry created for ${companyName.trim()}`);
-    const id = data?.id as string | undefined;
+    const id = (data as { id?: string } | null)?.id;
+    if (id && isDuplicateOf) {
+      await supabase.rpc('log_activity', {
+        _entity_type: 'ENQUIRY', _entity_id: id, _event_type: 'NOTE',
+        _summary: 'Duplicate phone — created intentionally',
+        _details: { duplicate_of: isDuplicateOf } as never,
+      } as never);
+    }
     if (id) onCreated?.(id);
     reset();
     onOpenChange(false);
     if (id) navigate(`/enquiries/${id}`);
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    const dup = await findDuplicate();
+    if (dup) { setDuplicate(dup); return; }
+    await insertEnquiry(null);
   };
 
   return (
@@ -108,6 +151,31 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
         <DialogHeader>
           <DialogTitle>Create New Enquiry</DialogTitle>
         </DialogHeader>
+
+        {duplicate && (
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 text-warning" />
+              <div>
+                <p className="font-medium">An enquiry already exists for this number</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Opened {format(new Date(duplicate.created_at), 'dd MMM yyyy')} for{' '}
+                  <span className="font-medium text-foreground">{duplicate.company_name || duplicate.full_name}</span> · current stage:{' '}
+                  <span className="font-medium text-foreground">{STAGE_LABELS[duplicate.stage] ?? duplicate.stage}</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button size="sm" variant="outline" onClick={() => { onOpenChange(false); navigate(`/enquiries/${duplicate.id}`); }}>
+                Open existing
+              </Button>
+              <Button size="sm" onClick={() => insertEnquiry(duplicate.id)} disabled={submitting}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create anyway'}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4 mt-2">
           <div className="space-y-1.5">
             <Label>Company Name <span className="text-destructive">*</span></Label>
@@ -125,7 +193,7 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
               <Label>Phone <span className="text-destructive">*</span></Label>
               <PhoneInput
                 countryCode={phoneCode} onCountryCodeChange={setPhoneCode}
-                number={phoneNumber} onNumberChange={setPhoneNumber}
+                number={phoneNumber} onNumberChange={(n) => { setPhoneNumber(n); setDuplicate(null); }}
                 invalid={!!errors.phone}
               />
               {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
@@ -198,7 +266,7 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
 
           <div className="flex gap-2 justify-end pt-2">
             <Button variant="ghost" onClick={() => { reset(); onOpenChange(false); }}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={submitting}>
+            <Button onClick={handleSubmit} disabled={submitting || !!duplicate}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Enquiry'}
             </Button>
           </div>
