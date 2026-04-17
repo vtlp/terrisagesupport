@@ -180,7 +180,21 @@ export default function AccountDetail() {
     else load();
   };
 
-  if (loading || !acc || !draft) {
+  const handleScheduleEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
+    if (!acc) return;
+    const scheduled = new Date(data.date);
+    const [h, m] = data.time.split(':');
+    scheduled.setHours(parseInt(h), parseInt(m));
+    const map: Record<string, string> = { DEMO: 'DEMO', FOLLOW_UP: 'FOLLOW_UP', CALL_BACK: 'CALL_BACK', CHECK_IN: 'CHECK_IN', ONBOARDING: 'ONBOARDING', GENERAL: 'OTHER' };
+    const { error } = await supabase.from('calendar_events').insert({
+      title: data.title, scheduled_at: scheduled.toISOString(), notes: data.notes || null,
+      event_type: (map[data.event_type] ?? 'OTHER') as 'OTHER',
+      created_by: currentUser.user_id,
+      related_entity_type: 'ACCOUNT', related_entity_id: acc.id,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success('Event scheduled'); setScheduleOpen(false); load();
+  };
     return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
 
