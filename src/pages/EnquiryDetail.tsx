@@ -52,9 +52,13 @@ interface Enquiry {
   converted_account_id: string | null;
   demo_scheduled_at: string | null; demo_completed_at: string | null;
   lost_reason: string | null;
+  is_duplicate_of: string | null;
+  enquiry_code: string | null;
   payload: EnquiryPayload;
   created_at: string;
 }
+
+interface DuplicateOf { id: string; enquiry_code: string | null; full_name: string; }
 
 interface NoteRow { id: string; note_text: string; created_at: string; }
 interface Submission {
