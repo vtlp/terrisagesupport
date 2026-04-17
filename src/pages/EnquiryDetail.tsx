@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
+import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
+import { CalendarEventType } from '@/types/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,9 +52,13 @@ interface Enquiry {
   converted_account_id: string | null;
   demo_scheduled_at: string | null; demo_completed_at: string | null;
   lost_reason: string | null;
+  is_duplicate_of: string | null;
+  enquiry_code: string | null;
   payload: EnquiryPayload;
   created_at: string;
 }
+
+interface DuplicateOf { id: string; enquiry_code: string | null; full_name: string; }
 
 interface NoteRow { id: string; note_text: string; created_at: string; }
 interface Submission {
@@ -127,6 +135,21 @@ export default function EnquiryDetail() {
   const [saving, setSaving] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
+  const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
+
+  const loadEvents = useCallback(async (id: string) => {
+    const nowIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+    const { data } = await supabase.from('calendar_events')
+      .select('id, title, scheduled_at, event_type, status, notes, related_entity_type, related_entity_id, created_by')
+      .eq('related_entity_type', 'ENQUIRY')
+      .eq('related_entity_id', id)
+      .gte('scheduled_at', nowIso)
+      .order('scheduled_at', { ascending: true });
+    setEvents((data ?? []) as EventRow[]);
+  }, []);
 
   const load = useCallback(async () => {
     if (!enquiryId) return;
@@ -142,8 +165,17 @@ export default function EnquiryDetail() {
     setDraft(enq);
     setNotes((n ?? []) as NoteRow[]);
     setSubmission(s as Submission | null);
+    loadEvents(enq.id);
+    if (enq.is_duplicate_of) {
+      const { data: dup } = await supabase.from('enquiries')
+        .select('id, enquiry_code, full_name')
+        .eq('id', enq.is_duplicate_of).maybeSingle();
+      setDuplicateOf((dup as DuplicateOf | null) ?? null);
+    } else {
+      setDuplicateOf(null);
+    }
     setLoading(false);
-  }, [enquiryId, navigate]);
+  }, [enquiryId, navigate, loadEvents]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -295,6 +327,14 @@ export default function EnquiryDetail() {
           <p className="text-sm text-muted-foreground truncate">{enquiry.full_name} · {enquiry.phone}</p>
         </div>
         <Badge>{stageLabels[enquiry.stage]}</Badge>
+        {duplicateOf && (
+          <Link to={`/enquiries/${duplicateOf.id}`}>
+            <Badge variant="outline" className="gap-1 border-warning/40 text-warning hover:bg-warning/10">
+              <CopyIcon className="h-3 w-3" />
+              Duplicate of {duplicateOf.enquiry_code ?? duplicateOf.full_name}
+            </Badge>
+          </Link>
+        )}
         {isDirty && (
           <Button onClick={saveAll} disabled={saving} size="sm">
             {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
@@ -619,6 +659,38 @@ export default function EnquiryDetail() {
         </Card>
       ) : null}
 
+      {/* Upcoming events */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Upcoming events</CardTitle>
+            <Button size="sm" variant="outline" onClick={() => setScheduleOpen(true)}>
+              <CalendarPlus className="h-4 w-4 mr-1" /> Schedule
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-3">No upcoming events.</p>
+          ) : (
+            <div className="space-y-2">
+              {events.map(ev => (
+                <button key={ev.id} onClick={() => setOpenEvent(ev)}
+                  className="w-full text-left rounded-md border px-3 py-2 hover:bg-accent transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{ev.title}</div>
+                      <div className="text-xs text-muted-foreground">{format(new Date(ev.scheduled_at), 'EEE dd MMM, HH:mm')}</div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] shrink-0">{ev.event_type.replace('_', ' ')}</Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Bottom row — Notes & Actions side-by-side */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
@@ -658,6 +730,9 @@ export default function EnquiryDetail() {
               <Send className="h-4 w-4 mr-2" />
               {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
             </Button>
+            <Button className="w-full" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
+              <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
+            </Button>
             <Button className="w-full" disabled={!!convertBlock || busy} onClick={convertToAccount}>
               Convert to account
             </Button>
@@ -686,6 +761,39 @@ export default function EnquiryDetail() {
         customerName={enquiry.full_name}
         customerPhone={enquiry.phone}
         customerEmail={enquiry.email ?? undefined}
+      />
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
+          <CalendarEventForm
+            defaultEventType={CalendarEventType.FOLLOW_UP}
+            lockedEntityType="ENQUIRY"
+            lockedEntityId={enquiry.id}
+            lockedEntityLabel={enquiry.company_name || enquiry.full_name}
+            onCancel={() => setScheduleOpen(false)}
+            onSubmit={async (d) => {
+              const [hh, mm] = d.time.split(':').map(Number);
+              const dt = new Date(d.date); dt.setHours(hh ?? 10, mm ?? 0, 0, 0);
+              const { error } = await supabase.from('calendar_events').insert({
+                title: d.title, scheduled_at: dt.toISOString(), notes: d.notes || null,
+                event_type: d.event_type as 'DEMO' | 'FOLLOW_UP' | 'CALL_BACK' | 'CHECK_IN' | 'ONBOARDING' | 'OTHER',
+                related_entity_type: 'ENQUIRY', related_entity_id: enquiry.id,
+              });
+              if (error) { toast.error(error.message); return; }
+              toast.success('Event scheduled');
+              setScheduleOpen(false);
+              loadEvents(enquiry.id);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <EventDetailDialog
+        event={openEvent}
+        open={!!openEvent}
+        onOpenChange={(v) => !v && setOpenEvent(null)}
+        onChanged={() => { loadEvents(enquiry.id); setOpenEvent(null); }}
       />
     </div>
   );
