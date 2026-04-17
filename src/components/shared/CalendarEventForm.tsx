@@ -10,6 +10,7 @@ import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CalendarEventType } from '@/types/core';
+import { EntityPicker } from './EntityPicker';
 
 const eventTypeLabels: Record<CalendarEventType, string> = {
   [CalendarEventType.DEMO]: 'Demo',
@@ -20,24 +21,45 @@ const eventTypeLabels: Record<CalendarEventType, string> = {
   [CalendarEventType.GENERAL]: 'General',
 };
 
+interface SubmitData {
+  title: string; date: Date; time: string; notes: string;
+  event_type: CalendarEventType;
+  related_entity_type: 'ENQUIRY' | 'ACCOUNT' | '';
+  related_entity_id: string | null;
+}
+
 interface CalendarEventFormProps {
-  onSubmit: (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => void;
+  onSubmit: (data: SubmitData) => void;
   onCancel: () => void;
   defaultTitle?: string;
   defaultDescription?: string;
   defaultEventType?: CalendarEventType;
+  /** When provided, the entity link is locked (pre-filled context). */
+  lockedEntityType?: 'ENQUIRY' | 'ACCOUNT';
+  lockedEntityId?: string;
+  lockedEntityLabel?: string;
 }
 
-export function CalendarEventForm({ onSubmit, onCancel, defaultTitle = '', defaultDescription = '', defaultEventType = CalendarEventType.GENERAL }: CalendarEventFormProps) {
+export function CalendarEventForm({
+  onSubmit, onCancel,
+  defaultTitle = '', defaultDescription = '', defaultEventType = CalendarEventType.GENERAL,
+  lockedEntityType, lockedEntityId, lockedEntityLabel,
+}: CalendarEventFormProps) {
   const [title, setTitle] = useState(defaultTitle);
   const [date, setDate] = useState<Date | undefined>();
   const [time, setTime] = useState('10:00');
   const [notes, setNotes] = useState(defaultDescription);
   const [eventType, setEventType] = useState<CalendarEventType>(defaultEventType);
+  const [linkType, setLinkType] = useState<'ENQUIRY' | 'ACCOUNT' | ''>(lockedEntityType ?? '');
+  const [linkId, setLinkId] = useState<string | null>(lockedEntityId ?? null);
 
   const handleSubmit = () => {
     if (title && date) {
-      onSubmit({ title, date, time, notes, event_type: eventType });
+      onSubmit({
+        title, date, time, notes, event_type: eventType,
+        related_entity_type: linkType,
+        related_entity_id: linkId,
+      });
     }
   };
 
@@ -78,6 +100,14 @@ export function CalendarEventForm({ onSubmit, onCancel, defaultTitle = '', defau
           <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
       </div>
+      {lockedEntityType ? (
+        <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+          Linking to <span className="font-medium">{lockedEntityType === 'ENQUIRY' ? 'Enquiry' : 'Account'}</span>
+          {lockedEntityLabel ? <>: <span className="font-medium">{lockedEntityLabel}</span></> : null}
+        </div>
+      ) : (
+        <EntityPicker entityType={linkType} entityId={linkId} onChange={(t, id) => { setLinkType(t); setLinkId(id); }} />
+      )}
       <div className="space-y-2">
         <Label>Notes (optional)</Label>
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
