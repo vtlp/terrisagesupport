@@ -11,6 +11,9 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { supabase } from "@/integrations/supabase/client";
 import Auth from "@/pages/Auth";
 import OnboardingForm from "@/pages/OnboardingForm";
+import AgencyOnboarding from "@/pages/onboarding/AgencyOnboarding";
+import BuilderOnboarding from "@/pages/onboarding/BuilderOnboarding";
+import OnboardingSuccess from "@/pages/onboarding/OnboardingSuccess";
 import Dashboard from "@/pages/Dashboard";
 import Accounts from "@/pages/Accounts";
 import AccountDetail from "@/pages/AccountDetail";
@@ -53,6 +56,10 @@ const App = () => {
             <Routes>
               {/* Public routes */}
               <Route path="/auth" element={<Auth />} />
+              <Route path="/onboarding/agency" element={<AgencyOnboarding />} />
+              <Route path="/onboarding/builder" element={<BuilderOnboarding />} />
+              <Route path="/onboarding/agency/success" element={<OnboardingSuccess />} />
+              <Route path="/onboarding/builder/success" element={<OnboardingSuccess />} />
               <Route path="/onboarding/:tenancy" element={<OnboardingForm />} />
 
               {/* Protected app */}
