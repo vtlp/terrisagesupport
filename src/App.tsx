@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +8,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { UserProvider } from "@/context/UserContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { supabase } from "@/integrations/supabase/client";
 import Auth from "@/pages/Auth";
 import OnboardingForm from "@/pages/OnboardingForm";
 import Dashboard from "@/pages/Dashboard";
@@ -27,7 +29,20 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  // Honour "Stay signed in": if user opted out and the tab was fully closed,
+  // sign out on next boot. sessionStorage clears on tab close; localStorage persists.
+  useEffect(() => {
+    const persist = localStorage.getItem('session_persist');
+    const alive = sessionStorage.getItem('session_alive');
+    if (persist === '0' && !alive) {
+      supabase.auth.signOut();
+      localStorage.removeItem('session_persist');
+    }
+    sessionStorage.setItem('session_alive', '1');
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
       <BrowserRouter>
@@ -65,6 +80,7 @@ const App = () => (
       </BrowserRouter>
     </ThemeProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
