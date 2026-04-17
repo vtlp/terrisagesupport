@@ -135,6 +135,21 @@ export default function EnquiryDetail() {
   const [saving, setSaving] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
+  const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
+
+  const loadEvents = useCallback(async (id: string) => {
+    const nowIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+    const { data } = await supabase.from('calendar_events')
+      .select('id, title, scheduled_at, event_type, status, notes, related_entity_type, related_entity_id, created_by')
+      .eq('related_entity_type', 'ENQUIRY')
+      .eq('related_entity_id', id)
+      .gte('scheduled_at', nowIso)
+      .order('scheduled_at', { ascending: true });
+    setEvents((data ?? []) as EventRow[]);
+  }, []);
 
   const load = useCallback(async () => {
     if (!enquiryId) return;
