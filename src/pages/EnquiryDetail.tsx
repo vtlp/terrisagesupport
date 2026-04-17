@@ -733,15 +733,6 @@ export default function EnquiryDetail() {
         <Card>
           <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Stage</Label>
-              <Select value={enquiry.stage} onValueChange={(v: Stage) => updateStage(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(stageLabels) as Stage[]).map(s => <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
             <Button className="w-full" onClick={handleSendOnboarding} disabled={busy} variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}>
               <Send className="h-4 w-4 mr-2" />
               {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
