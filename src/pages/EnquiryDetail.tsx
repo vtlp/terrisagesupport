@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon, ChevronRight, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
@@ -342,6 +343,21 @@ export default function EnquiryDetail() {
           </Button>
         )}
       </div>
+
+      {/* Horizontal stage flow */}
+      <StageFlow
+        currentStage={enquiry.stage}
+        busy={busy}
+        onSelectStage={updateStage}
+        outcomeNode={
+          <StageOutcomePanel
+            stage={enquiry.stage}
+            draft={draft}
+            setField={setField}
+            setPayload={setPayload}
+          />
+        }
+      />
 
       {/* Editable detail card */}
       <Card>
@@ -717,15 +733,6 @@ export default function EnquiryDetail() {
         <Card>
           <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Stage</Label>
-              <Select value={enquiry.stage} onValueChange={(v: Stage) => updateStage(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(stageLabels) as Stage[]).map(s => <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
             <Button className="w-full" onClick={handleSendOnboarding} disabled={busy} variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}>
               <Send className="h-4 w-4 mr-2" />
               {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
@@ -797,4 +804,186 @@ export default function EnquiryDetail() {
       />
     </div>
   );
+}
+
+// ---------------- Stage Flow ----------------
+
+const STAGE_ORDER: Stage[] = [
+  'NEW_ENQUIRY', 'CONTACTED', 'DEMO_SCHEDULED', 'DEMO_COMPLETED', 'ONBOARDING_PACK_SENT', 'ACCOUNT_CREATED',
+];
+
+function StageFlow({
+  currentStage, busy, onSelectStage, outcomeNode,
+}: {
+  currentStage: Stage;
+  busy: boolean;
+  onSelectStage: (s: Stage) => void;
+  outcomeNode: React.ReactNode;
+}) {
+  const isLost = currentStage === 'LOST';
+  const currentIdx = isLost ? -1 : STAGE_ORDER.indexOf(currentStage);
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+          {STAGE_ORDER.map((s, i) => {
+            const done = !isLost && i < currentIdx;
+            const active = !isLost && i === currentIdx;
+            return (
+              <div key={s} className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onSelectStage(s)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    active && 'bg-primary text-primary-foreground border-primary shadow-sm',
+                    done && 'bg-success/15 text-success border-success/30',
+                    !active && !done && 'bg-background text-muted-foreground hover:bg-accent',
+                  )}
+                >
+                  <span className={cn(
+                    'flex h-5 w-5 items-center justify-center rounded-full text-[10px]',
+                    active && 'bg-primary-foreground/20',
+                    done && 'bg-success/20',
+                    !active && !done && 'bg-muted',
+                  )}>
+                    {done ? <Check className="h-3 w-3" /> : i + 1}
+                  </span>
+                  {stageLabels[s]}
+                </button>
+                {i < STAGE_ORDER.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+              </div>
+            );
+          })}
+          <div className="ml-auto pl-2 shrink-0">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onSelectStage('LOST')}
+              className={cn(
+                'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                isLost ? 'bg-destructive text-destructive-foreground border-destructive' : 'text-muted-foreground hover:bg-destructive/10 hover:text-destructive',
+              )}
+            >
+              Lost
+            </button>
+          </div>
+        </div>
+        <Separator />
+        <div>{outcomeNode}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StageOutcomePanel({
+  stage, draft, setField, setPayload,
+}: {
+  stage: Stage;
+  draft: Enquiry;
+  setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
+  setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
+}) {
+  const outcome = (draft.payload.outcome as string) || '';
+
+  if (stage === 'NEW_ENQUIRY') {
+    return <p className="text-sm text-muted-foreground">New enquiry captured. Make first contact, then move to <strong>Contacted</strong>.</p>;
+  }
+
+  if (stage === 'CONTACTED') {
+    return (
+      <div className="space-y-3">
+        <div className="text-sm font-medium">Call outcome</div>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Outcome</Label>
+            <Select value={outcome || NONE} onValueChange={v => setPayload('outcome', v === NONE ? '' : v)}>
+              <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
+                {OUTCOMES.map(o => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {outcome === 'NOT_INTERESTED' && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Reason</Label>
+                <Select value={(draft.payload.not_interested_reason as string) || NONE} onValueChange={v => setPayload('not_interested_reason', v === NONE ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>—</SelectItem>
+                    {NOT_INTERESTED_REASONS.map(r => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-xs">Additional context</Label>
+                <Input value={draft.payload.not_interested_text ?? ''} onChange={e => setPayload('not_interested_text', e.target.value)} />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'DEMO_SCHEDULED') {
+    return (
+      <div className="space-y-1.5 max-w-md">
+        <Label className="text-xs">Demo scheduled at</Label>
+        <Input
+          type="datetime-local"
+          value={draft.demo_scheduled_at ? draft.demo_scheduled_at.slice(0, 16) : ''}
+          onChange={e => setField('demo_scheduled_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+        />
+      </div>
+    );
+  }
+
+  if (stage === 'DEMO_COMPLETED') {
+    return (
+      <div className="grid md:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Demo completed at</Label>
+          <Input
+            type="datetime-local"
+            value={draft.demo_completed_at ? draft.demo_completed_at.slice(0, 16) : ''}
+            onChange={e => setField('demo_completed_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Demo outcome</Label>
+          <Select value={(draft.payload.demo_outcome as string) || NONE} onValueChange={v => setPayload('demo_outcome', v === NONE ? '' : v)}>
+            <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>—</SelectItem>
+              {DEMO_OUTCOMES.map(o => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'ONBOARDING_PACK_SENT') {
+    return <p className="text-sm text-muted-foreground">Onboarding form sent. Awaiting customer submission, then approve to convert.</p>;
+  }
+
+  if (stage === 'ACCOUNT_CREATED') {
+    return <p className="text-sm text-success">Account created. The enquiry is now live in Accounts.</p>;
+  }
+
+  if (stage === 'LOST') {
+    return (
+      <div className="space-y-1.5">
+        <Label className="text-xs">Lost reason</Label>
+        <Textarea rows={2} value={draft.lost_reason ?? ''} onChange={e => setField('lost_reason', e.target.value)} />
+      </div>
+    );
+  }
+
+  return null;
 }
