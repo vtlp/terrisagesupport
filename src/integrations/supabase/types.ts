@@ -586,6 +586,7 @@ export type Database = {
           enquiry_code: string | null
           full_name: string
           id: string
+          is_duplicate_of: string | null
           lost_reason: string | null
           onboarding_form_link: string | null
           onboarding_pack_sent: boolean
@@ -609,6 +610,7 @@ export type Database = {
           enquiry_code?: string | null
           full_name: string
           id?: string
+          is_duplicate_of?: string | null
           lost_reason?: string | null
           onboarding_form_link?: string | null
           onboarding_pack_sent?: boolean
@@ -632,6 +634,7 @@ export type Database = {
           enquiry_code?: string | null
           full_name?: string
           id?: string
+          is_duplicate_of?: string | null
           lost_reason?: string | null
           onboarding_form_link?: string | null
           onboarding_pack_sent?: boolean
@@ -643,7 +646,15 @@ export type Database = {
           tenancy_type?: Database["public"]["Enums"]["tenancy_type"] | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "enquiries_is_duplicate_of_fkey"
+            columns: ["is_duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "enquiries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       enquiry_notes: {
         Row: {
