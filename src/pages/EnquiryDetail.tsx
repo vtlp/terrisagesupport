@@ -777,7 +777,8 @@ export default function EnquiryDetail() {
               const dt = new Date(d.date); dt.setHours(hh ?? 10, mm ?? 0, 0, 0);
               const { error } = await supabase.from('calendar_events').insert({
                 title: d.title, scheduled_at: dt.toISOString(), notes: d.notes || null,
-                event_type: d.event_type, related_entity_type: 'ENQUIRY', related_entity_id: enquiry.id,
+                event_type: d.event_type as 'DEMO' | 'FOLLOW_UP' | 'CALL_BACK' | 'CHECK_IN' | 'ONBOARDING' | 'OTHER',
+                related_entity_type: 'ENQUIRY', related_entity_id: enquiry.id,
               });
               if (error) { toast.error(error.message); return; }
               toast.success('Event scheduled');
