@@ -195,6 +195,8 @@ export default function AccountDetail() {
     if (error) { toast.error(error.message); return; }
     toast.success('Event scheduled'); setScheduleOpen(false); load();
   };
+
+  if (loading || !acc) {
     return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
 
