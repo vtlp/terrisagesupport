@@ -1013,6 +1013,252 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          message_id: string | null
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string
+          ticket_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          message_id?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path: string
+          ticket_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          message_id?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string
+          ticket_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_messages: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          ticket_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_queues: {
+        Row: {
+          created_at: string
+          default_assignee: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_assignee?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_assignee?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          account_id: string | null
+          assigned_to: string | null
+          category: Database["public"]["Enums"]["ticket_category"]
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          csat_comment: string | null
+          csat_rating: number | null
+          description: string
+          first_response_at: string | null
+          id: string
+          market_city: string | null
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          queue_id: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          requester_email: string | null
+          requester_name: string
+          requester_phone: string | null
+          resolution_code: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          sla_first_response_at: string | null
+          sla_resolution_at: string | null
+          status: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          tags: string[]
+          ticket_code: string | null
+          type: Database["public"]["Enums"]["ticket_type"]
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          assigned_to?: string | null
+          category?: Database["public"]["Enums"]["ticket_category"]
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          csat_comment?: string | null
+          csat_rating?: number | null
+          description?: string
+          first_response_at?: string | null
+          id?: string
+          market_city?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          queue_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          requester_email?: string | null
+          requester_name: string
+          requester_phone?: string | null
+          resolution_code?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          sla_first_response_at?: string | null
+          sla_resolution_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          tags?: string[]
+          ticket_code?: string | null
+          type?: Database["public"]["Enums"]["ticket_type"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          assigned_to?: string | null
+          category?: Database["public"]["Enums"]["ticket_category"]
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          csat_comment?: string | null
+          csat_rating?: number | null
+          description?: string
+          first_response_at?: string | null
+          id?: string
+          market_city?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          queue_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          requester_email?: string | null
+          requester_name?: string
+          requester_phone?: string | null
+          resolution_code?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          sla_first_response_at?: string | null
+          sla_resolution_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject?: string
+          tags?: string[]
+          ticket_code?: string | null
+          type?: Database["public"]["Enums"]["ticket_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_queues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1095,6 +1341,7 @@ export type Database = {
         | "VERIFICATION"
         | "INVOICE"
         | "IMPORT"
+        | "TICKET"
       app_role: "admin" | "support_agent"
       billing_cycle: "MONTHLY" | "QUARTERLY" | "ANNUAL"
       calendar_event_status: "SCHEDULED" | "COMPLETED" | "CANCELLED" | "NO_SHOW"
@@ -1125,6 +1372,23 @@ export type Database = {
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
       subscription_status: "ACTIVE" | "PAUSED" | "CANCELLED" | "OVERDUE"
       tenancy_type: "AGENCY_BROKERAGE_CONSULTANCY" | "BUILDER_DEVELOPER"
+      ticket_category:
+        | "LISTINGS_INVENTORY"
+        | "BILLING_PLAN"
+        | "API_INTEGRATIONS"
+        | "ONBOARDING_MIGRATION"
+        | "SECURITY_ACCESS"
+        | "COMPLIANCE_LEGAL"
+        | "PERFORMANCE_RELIABILITY"
+        | "OTHER"
+      ticket_priority: "P1" | "P2" | "P3" | "P4"
+      ticket_status:
+        | "OPEN"
+        | "PENDING_CUSTOMER"
+        | "PENDING_INTERNAL"
+        | "RESOLVED"
+        | "CLOSED"
+      ticket_type: "INCIDENT" | "QUESTION" | "TASK" | "FEEDBACK"
       verification_kind: "PAN" | "GST" | "RERA" | "BANK" | "IDENTITY"
       verification_status: "PENDING" | "VERIFIED" | "REJECTED"
     }
@@ -1272,6 +1536,7 @@ export const Constants = {
         "VERIFICATION",
         "INVOICE",
         "IMPORT",
+        "TICKET",
       ],
       app_role: ["admin", "support_agent"],
       billing_cycle: ["MONTHLY", "QUARTERLY", "ANNUAL"],
@@ -1306,6 +1571,25 @@ export const Constants = {
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
       subscription_status: ["ACTIVE", "PAUSED", "CANCELLED", "OVERDUE"],
       tenancy_type: ["AGENCY_BROKERAGE_CONSULTANCY", "BUILDER_DEVELOPER"],
+      ticket_category: [
+        "LISTINGS_INVENTORY",
+        "BILLING_PLAN",
+        "API_INTEGRATIONS",
+        "ONBOARDING_MIGRATION",
+        "SECURITY_ACCESS",
+        "COMPLIANCE_LEGAL",
+        "PERFORMANCE_RELIABILITY",
+        "OTHER",
+      ],
+      ticket_priority: ["P1", "P2", "P3", "P4"],
+      ticket_status: [
+        "OPEN",
+        "PENDING_CUSTOMER",
+        "PENDING_INTERNAL",
+        "RESOLVED",
+        "CLOSED",
+      ],
+      ticket_type: ["INCIDENT", "QUESTION", "TASK", "FEEDBACK"],
       verification_kind: ["PAN", "GST", "RERA", "BANK", "IDENTITY"],
       verification_status: ["PENDING", "VERIFIED", "REJECTED"],
     },
