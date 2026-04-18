@@ -25,6 +25,8 @@ import { SeatsAndRequestsTab } from '@/components/account/SeatsAndRequestsTab';
 import { ApiKeysCard } from '@/components/account/ApiKeysCard';
 import { ProjectsTab } from '@/components/account/ProjectsTab';
 import { DocumentsTab } from '@/components/account/DocumentsTab';
+import { OnboardingFactsCard } from '@/components/account/OnboardingFactsCard';
+import { CategorizedNotes } from '@/components/account/CategorizedNotes';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
 import { CalendarEventType } from '@/types/core';
@@ -329,6 +331,8 @@ export default function AccountDetail() {
             </CardContent>
           </Card>
 
+          <OnboardingFactsCard payload={acc.payload} />
+
           <Card>
             <CardHeader><CardTitle className="text-base">Metadata</CardTitle></CardHeader>
             <CardContent className="grid md:grid-cols-3 gap-3 text-sm">
@@ -422,26 +426,7 @@ export default function AccountDetail() {
         </TabsContent>
 
         <TabsContent value="notes" className="space-y-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Notes & activity</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <Textarea value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add a note…" rows={2} />
-                <Button onClick={addNote} disabled={!newNote.trim() || busy}>Add</Button>
-              </div>
-              <Separator />
-              <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                {notes.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No notes yet.</p> :
-                  notes.map(n => (
-                    <div key={n.id} className="text-sm border-l-2 border-primary/30 pl-3 py-1">
-                      <p>{n.note_text}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{format(new Date(n.created_at), 'dd MMM, HH:mm')}</p>
-                    </div>
-                  ))
-                }
-              </div>
-            </CardContent>
-          </Card>
+          <CategorizedNotes accountId={acc.id} notes={notes} onChanged={load} />
         </TabsContent>
 
         <TabsContent value="verification" className="space-y-4">
