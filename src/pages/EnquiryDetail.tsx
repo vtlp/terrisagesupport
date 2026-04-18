@@ -231,9 +231,26 @@ export default function EnquiryDetail() {
   };
 
   const updateStage = async (stage: Stage) => {
-    if (!enquiry) return;
+    if (!enquiry || !draft) return;
     setBusy(true);
-    const { error } = await supabase.from('enquiries').update({ stage }).eq('id', enquiry.id);
+    // Persist any unsaved field edits before changing stage so they aren't lost on reload
+    const update: Record<string, unknown> = { stage };
+    if (JSON.stringify(enquiry) !== JSON.stringify(draft)) {
+      Object.assign(update, {
+        full_name: draft.full_name,
+        phone: draft.phone,
+        email: draft.email,
+        city: draft.city,
+        company_name: draft.company_name,
+        tenancy_type: draft.tenancy_type,
+        source: draft.source,
+        demo_scheduled_at: draft.demo_scheduled_at,
+        demo_completed_at: draft.demo_completed_at,
+        lost_reason: draft.lost_reason,
+        payload: draft.payload as unknown as never,
+      });
+    }
+    const { error } = await supabase.from('enquiries').update(update).eq('id', enquiry.id);
     if (error) toast.error(error.message);
     else {
       toast.success('Stage updated');
@@ -344,12 +361,10 @@ export default function EnquiryDetail() {
             </Badge>
           </Link>
         )}
-        {isDirty && (
-          <Button onClick={saveAll} disabled={saving} size="sm">
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Save changes
-          </Button>
-        )}
+        <Button onClick={saveAll} disabled={saving || !isDirty} size="sm" variant={isDirty ? 'default' : 'outline'}>
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          {isDirty ? 'Save changes' : 'Saved'}
+        </Button>
       </div>
 
       {/* Horizontal stage flow */}
