@@ -25,7 +25,7 @@ import { SeatsAndRequestsTab } from '@/components/account/SeatsAndRequestsTab';
 import { ApiKeysCard } from '@/components/account/ApiKeysCard';
 import { ProjectsTab } from '@/components/account/ProjectsTab';
 import { DocumentsTab } from '@/components/account/DocumentsTab';
-import { OnboardingFactsCard } from '@/components/account/OnboardingFactsCard';
+
 import { CategorizedNotes } from '@/components/account/CategorizedNotes';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
@@ -237,91 +237,115 @@ export default function AccountDetail() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Account details</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Account name</Label>
-                  <Input value={draft.account_name} onChange={e => setField('account_name', e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Status</Label>
-                  <Select value={draft.status} onValueChange={v => setField('status', v as Status)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(statusLabels) as Status[]).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>City</Label>
-                  <Select value={draft.city ?? NONE} onValueChange={v => setField('city', v === NONE ? null : v)}>
-                    <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      <SelectItem value={NONE}>—</SelectItem>
-                      {defaultMarkets.map(m => <SelectItem key={m.id} value={m.value}>{m.value}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Tenancy type</Label>
-                  <Select value={draft.tenancy_type} onValueChange={v => setField('tenancy_type', v as Tenancy)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AGENCY_BROKERAGE_CONSULTANCY">Agency / Brokerage</SelectItem>
-                      <SelectItem value="BUILDER_DEVELOPER">Builder / Developer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+          {(() => {
+            const company = (acc.payload?.company as Record<string, unknown> | undefined) ?? {};
+            const tagline = (company.tagline as string | undefined)?.trim();
+            const businessArea = (company.business_area as string | undefined)?.trim();
+            const propertyTypeFocus = (company.property_type_focus as string | undefined)?.trim();
+            const labelize = (val?: string | null) =>
+              (val ?? '').toString().replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-              <Separator />
+            return (
+              <Card>
+                <CardHeader><CardTitle className="text-base">Account details</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Account name</Label>
+                      <Input value={draft.account_name} onChange={e => setField('account_name', e.target.value)} />
+                      {tagline && (
+                        <p className="text-xs text-muted-foreground italic mt-1">&ldquo;{tagline}&rdquo;</p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Status</Label>
+                      <Select value={draft.status} onValueChange={v => setField('status', v as Status)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(statusLabels) as Status[]).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>City</Label>
+                      <Select value={draft.city ?? NONE} onValueChange={v => setField('city', v === NONE ? null : v)}>
+                        <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          <SelectItem value={NONE}>—</SelectItem>
+                          {defaultMarkets.map(m => <SelectItem key={m.id} value={m.value}>{m.value}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Tenancy type</Label>
+                      <Select value={draft.tenancy_type} onValueChange={v => setField('tenancy_type', v as Tenancy)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AGENCY_BROKERAGE_CONSULTANCY">Agency / Brokerage</SelectItem>
+                          <SelectItem value="BUILDER_DEVELOPER">Builder / Developer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {businessArea && (
+                      <div className="space-y-1.5">
+                        <Label className="text-muted-foreground">Business area</Label>
+                        <div><Badge variant="outline" className="text-xs">{labelize(businessArea)}</Badge></div>
+                      </div>
+                    )}
+                    {propertyTypeFocus && (
+                      <div className="space-y-1.5">
+                        <Label className="text-muted-foreground">Property type focus</Label>
+                        <div><Badge variant="outline" className="text-xs">{labelize(propertyTypeFocus)}</Badge></div>
+                      </div>
+                    )}
+                  </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Owner name</Label>
-                  <Input value={draft.owner_name ?? ''} onChange={e => setField('owner_name', e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Owner email</Label>
-                  <Input type="email" value={draft.owner_email ?? ''} onChange={e => setField('owner_email', e.target.value)} />
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label>Owner phone</Label>
-                  <PhoneInput
-                    countryCode={phoneSplit.code}
-                    onCountryCodeChange={c => setField('owner_phone', joinPhone(c, phoneSplit.number))}
-                    number={phoneSplit.number}
-                    onNumberChange={n => setField('owner_phone', joinPhone(phoneSplit.code, n))}
-                  />
-                </div>
-              </div>
+                  <Separator />
 
-              <Separator />
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Owner name</Label>
+                      <Input value={draft.owner_name ?? ''} onChange={e => setField('owner_name', e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Owner email</Label>
+                      <Input type="email" value={draft.owner_email ?? ''} onChange={e => setField('owner_email', e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5 md:col-span-2">
+                      <Label>Owner phone</Label>
+                      <PhoneInput
+                        countryCode={phoneSplit.code}
+                        onCountryCodeChange={c => setField('owner_phone', joinPhone(c, phoneSplit.number))}
+                        number={phoneSplit.number}
+                        onNumberChange={n => setField('owner_phone', joinPhone(phoneSplit.code, n))}
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>GST number</Label>
-                  <Input value={draft.gst_number ?? ''} onChange={e => setField('gst_number', e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>PAN number</Label>
-                  <Input value={draft.pan_number ?? ''} onChange={e => setField('pan_number', e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>RERA number</Label>
-                  <Input value={draft.rera_number ?? ''} onChange={e => setField('rera_number', e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Website</Label>
-                  <Input type="url" value={draft.website ?? ''} onChange={e => setField('website', e.target.value)} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  <Separator />
 
-          <OnboardingFactsCard payload={acc.payload} />
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>GST number</Label>
+                      <Input value={draft.gst_number ?? ''} onChange={e => setField('gst_number', e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>PAN number</Label>
+                      <Input value={draft.pan_number ?? ''} onChange={e => setField('pan_number', e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>RERA number</Label>
+                      <Input value={draft.rera_number ?? ''} onChange={e => setField('rera_number', e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Website</Label>
+                      <Input type="url" value={draft.website ?? ''} onChange={e => setField('website', e.target.value)} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           <Card>
             <CardHeader><CardTitle className="text-base">Metadata</CardTitle></CardHeader>
