@@ -164,7 +164,7 @@ export default function EnquiryDetail() {
 
   const draftRef = useRef<Enquiry | null>(null);
   const enquiryRef = useRef<Enquiry | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   useEffect(() => { draftRef.current = draft; }, [draft]);
   useEffect(() => { enquiryRef.current = enquiry; }, [enquiry]);
 
