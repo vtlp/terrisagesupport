@@ -458,9 +458,76 @@ export default function AgencyOnboarding() {
 
       {currentStep === 4 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-32 space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Review & Submit</h2>
-            <p className="text-sm text-muted-foreground mt-1">Please review your details carefully before final submission.</p>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">Review & Submit</h2>
+              <p className="text-sm text-muted-foreground mt-1">Please review your details carefully before final submission.</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() =>
+                downloadOnboardingZip({
+                  companyName,
+                  sections: [
+                    {
+                      title: "Business & Primary Contact",
+                      rows: [
+                        { label: "Full name", value: fullName },
+                        { label: "Mobile number", value: mobile ? `${mobileCode} ${mobile}` : "" },
+                        { label: "Email address", value: email },
+                        { label: "Company name", value: companyName },
+                        { label: "Company tagline", value: companyTagline },
+                        { label: "RERA ID", value: reraId },
+                        { label: "City / primary market", value: city },
+                        { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label },
+                      ],
+                    },
+                    {
+                      title: "Team Access & Permissions",
+                      rows: [
+                        { label: "Seats required", value: seatsRequired },
+                        ...teamMembers.map((tm, i) => ({
+                          label: `Team Member ${i + 1}`,
+                          value: `${tm.fullName} (${tm.email || "no email"}) — ${ROLE_OPTIONS.find(r => r.value === tm.role)?.label || "No role"}`,
+                        })),
+                      ],
+                    },
+                    ...projects.map((proj, i) => ({
+                      title: `Project ${i + 1}`,
+                      rows: [
+                        { label: "Project name", value: proj.projectName },
+                        { label: "Location", value: proj.location },
+                        { label: "Representative", value: proj.repName },
+                        { label: "Builder", value: proj.builderName },
+                        { label: "Brochure files", value: proj.brochure.length > 0 ? `${proj.brochure.length} file(s)` : "" },
+                      ],
+                    })),
+                    {
+                      title: "Bulk Imports",
+                      rows: [
+                        { label: "Files", value: bulkImportFiles.length > 0 ? `${bulkImportFiles.length} file(s)` : "" },
+                        { label: "Notes", value: bulkImportNotes },
+                      ],
+                    },
+                    { title: "Additional Notes", rows: [{ label: "Notes", value: notes }] },
+                  ],
+                  fileGroups: [
+                    { folder: "company-logo", files: companyLogo },
+                    ...projects.map((proj, i) => ({
+                      folder: `project-${i + 1}-${proj.projectName || "brochure"}`,
+                      files: proj.brochure,
+                    })),
+                    { folder: "bulk-imports", files: bulkImportFiles },
+                  ],
+                })
+              }
+            >
+              <Download className="w-4 h-4" />
+              Download all as ZIP
+            </Button>
           </div>
 
           <ReviewSummaryCard title="Business & Primary Contact" onEdit={() => setCurrentStep(1)} fields={[
