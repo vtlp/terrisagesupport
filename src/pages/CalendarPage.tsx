@@ -284,7 +284,8 @@ export default function CalendarPage() {
 
       <EventDetailDialog
         event={openEvent}
-        ownerName={userName(openEvent?.created_by ?? null)}
+        ownerName={userName(openEvent?.assigned_to ?? openEvent?.created_by ?? null)}
+        teamMembers={profiles}
         open={!!openEvent}
         onOpenChange={(v) => { if (!v) setOpenEvent(null); }}
         onChanged={load}
