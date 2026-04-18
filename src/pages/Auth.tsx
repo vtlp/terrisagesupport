@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
@@ -18,18 +18,6 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [stay, setStay] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [seeding, setSeeding] = useState(false);
-
-  useEffect(() => {
-    const seeded = localStorage.getItem('admin_seeded');
-    if (!seeded) {
-      setSeeding(true);
-      supabase.functions.invoke('seed-admin')
-        .then(() => localStorage.setItem('admin_seeded', '1'))
-        .catch(() => {})
-        .finally(() => setSeeding(false));
-    }
-  }, []);
 
   if (loading) {
     return (
@@ -80,10 +68,9 @@ export default function Auth() {
                 <TooltipContent>Uncheck on shared devices.</TooltipContent>
               </Tooltip>
             </div>
-            <Button type="submit" className="w-full" disabled={busy || seeding}>
+            <Button type="submit" className="w-full" disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign in'}
             </Button>
-            {seeding && <p className="text-xs text-muted-foreground text-center">Preparing admin account...</p>}
             <p className="text-xs text-muted-foreground text-center">
               Contact your administrator for access.
             </p>
