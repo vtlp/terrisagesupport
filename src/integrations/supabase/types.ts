@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_api_keys: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
       account_billing_settings: {
         Row: {
           account_id: string
@@ -25,6 +64,7 @@ export type Database = {
           next_renewal_at: string | null
           plan_name: string
           seat_rate: number
+          seats_purchased: number
           status: Database["public"]["Enums"]["subscription_status"]
           updated_at: string
         }
@@ -38,6 +78,7 @@ export type Database = {
           next_renewal_at?: string | null
           plan_name?: string
           seat_rate?: number
+          seats_purchased?: number
           status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
         }
@@ -51,10 +92,18 @@ export type Database = {
           next_renewal_at?: string | null
           plan_name?: string
           seat_rate?: number
+          seats_purchased?: number
           status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "account_billing_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
           {
             foreignKeyName: "account_billing_settings_account_id_fkey"
             columns: ["account_id"]
@@ -99,6 +148,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "account_checklist_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
           {
             foreignKeyName: "account_checklist_items_account_id_fkey"
             columns: ["account_id"]
@@ -183,6 +239,13 @@ export type Database = {
             foreignKeyName: "account_invoices_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "account_invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
@@ -211,6 +274,13 @@ export type Database = {
           note_text?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "account_notes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
           {
             foreignKeyName: "account_notes_account_id_fkey"
             columns: ["account_id"]
@@ -255,6 +325,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "account_seats_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
           {
             foreignKeyName: "account_seats_account_id_fkey"
             columns: ["account_id"]
@@ -305,6 +382,13 @@ export type Database = {
           verified_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "account_verifications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
           {
             foreignKeyName: "account_verifications_account_id_fkey"
             columns: ["account_id"]
@@ -564,6 +648,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "data_imports_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
           {
             foreignKeyName: "data_imports_account_id_fkey"
             columns: ["account_id"]
@@ -880,6 +971,48 @@ export type Database = {
         }
         Relationships: []
       }
+      seat_requests: {
+        Row: {
+          account_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          fulfilled_at: string | null
+          id: string
+          reason: string | null
+          requested_by_email: string | null
+          requested_seats: number
+          status: Database["public"]["Enums"]["seat_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          fulfilled_at?: string | null
+          id?: string
+          reason?: string | null
+          requested_by_email?: string | null
+          requested_seats: number
+          status?: Database["public"]["Enums"]["seat_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          fulfilled_at?: string | null
+          id?: string
+          reason?: string | null
+          requested_by_email?: string | null
+          requested_seats?: number
+          status?: Database["public"]["Enums"]["seat_request_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -903,13 +1036,27 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      account_seat_capacity: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          plan_name: string | null
+          seats_available: number | null
+          seats_purchased: number | null
+          seats_used: number | null
+          subscription_status:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       convert_enquiry_to_account: {
         Args: { _enquiry_id: string }
         Returns: string
       }
+      fulfil_seat_request: { Args: { _request_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -928,6 +1075,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      validate_account_api_key: { Args: { _key_hash: string }; Returns: string }
     }
     Enums: {
       account_status:
@@ -973,6 +1121,7 @@ export type Database = {
         | "FAILED"
       import_type: "LISTINGS" | "LEADS" | "CONTACTS" | "OTHER"
       invoice_status: "DRAFT" | "SENT" | "PAID" | "OVERDUE" | "CANCELLED"
+      seat_request_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
       subscription_status: "ACTIVE" | "PAUSED" | "CANCELLED" | "OVERDUE"
       tenancy_type: "AGENCY_BROKERAGE_CONSULTANCY" | "BUILDER_DEVELOPER"
@@ -1153,6 +1302,7 @@ export const Constants = {
       ],
       import_type: ["LISTINGS", "LEADS", "CONTACTS", "OTHER"],
       invoice_status: ["DRAFT", "SENT", "PAID", "OVERDUE", "CANCELLED"],
+      seat_request_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
       subscription_status: ["ACTIVE", "PAUSED", "CANCELLED", "OVERDUE"],
       tenancy_type: ["AGENCY_BROKERAGE_CONSULTANCY", "BUILDER_DEVELOPER"],
