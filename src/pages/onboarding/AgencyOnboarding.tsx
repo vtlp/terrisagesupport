@@ -316,9 +316,9 @@ export default function AgencyOnboarding() {
                 <p className="text-sm text-muted-foreground mt-1">This person will receive the primary account access and will be our main point of contact during onboarding, setup, and training.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div data-field="fullName"><TextField label="Full name" required value={fullName} onChange={setFullName} error={errors.fullName} /></div>
-                <div data-field="mobile"><PhoneField label="Mobile number" required countryCode={mobileCode} onCountryCodeChange={setMobileCode} value={mobile} onChange={setMobile} error={errors.mobile} /></div>
-                <div data-field="email" className="sm:col-span-2"><TextField label="Email address" type="email" required value={email} onChange={setEmail} error={errors.email} /></div>
+                <div data-field="fullName"><TextField label="Full name" required value={fullName} onChange={setFullName} error={errors.fullName} disabled={lockFullName} helperText={lockFullName ? "Provided by the Terrisage team — contact us if this needs to change." : undefined} /></div>
+                <div data-field="mobile"><PhoneField label="Mobile number" required countryCode={mobileCode} onCountryCodeChange={setMobileCode} value={mobile} onChange={setMobile} error={errors.mobile} disabled={lockMobile} helperText={lockMobile ? "Provided by the Terrisage team." : undefined} /></div>
+                <div data-field="email" className="sm:col-span-2"><TextField label="Email address" type="email" required value={email} onChange={setEmail} error={errors.email} disabled={lockEmail} helperText={lockEmail ? "Provided by the Terrisage team — contact us if this needs to change." : undefined} /></div>
               </div>
             </section>
 
@@ -358,7 +358,7 @@ export default function AgencyOnboarding() {
           </div>
 
           <div data-field="seatsRequired">
-            <TextField label="Number of seats required" type="number" required value={seatsRequired} onChange={setSeatsRequired} error={errors.seatsRequired} helperText="This helps us prepare the correct number of user accounts for your initial setup." className="max-w-xs" />
+            <TextField label="Number of seats required" type="number" required value={seatsRequired} onChange={setSeatsRequired} error={errors.seatsRequired} disabled={lockSeats} helperText={lockSeats ? "Set during your enquiry. Contact the Terrisage team if you need to add more seats." : "This helps us prepare the correct number of user accounts for your initial setup."} className="max-w-xs" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
