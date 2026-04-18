@@ -802,28 +802,6 @@ export default function EnquiryDetail() {
             </div>
           </div>
 
-          {showNotInterested && (
-            <div className="grid md:grid-cols-2 gap-4 rounded-md border border-dashed p-3">
-              <div className="space-y-1.5">
-                <Label>Not interested reason</Label>
-                <Select value={(draft.payload.not_interested_reason as string) || NONE} onValueChange={v => setPayload('not_interested_reason', v === NONE ? '' : v)}>
-                  <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {NOT_INTERESTED_REASONS.map(r => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Additional context</Label>
-                <Input
-                  value={draft.payload.not_interested_text ?? ''}
-                  onChange={e => setPayload('not_interested_text', e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
           {showLost && (
             <div className="space-y-1.5">
               <Label>Lost reason</Label>
@@ -1193,6 +1171,7 @@ function ActiveStagePanel({
   }
 
   if (stage === 'CONTACTED') {
+    const niReason = (draft.payload.not_interested_reason as string) || '';
     return (
       <div className="space-y-3">
         <div className="grid md:grid-cols-2 gap-3">
@@ -1207,28 +1186,40 @@ function ActiveStagePanel({
             </Select>
           </div>
           {outcome === 'NOT_INTERESTED' && (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Reason</Label>
-                <Select value={(draft.payload.not_interested_reason as string) || NONE} onValueChange={v => setPayload('not_interested_reason', v === NONE ? '' : v)}>
-                  <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {NOT_INTERESTED_REASONS.map(r => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <Label className="text-xs">Additional context</Label>
-                <VoiceTextarea
-                  as="input"
-                  value={(draft.payload.not_interested_text as string) ?? ''}
-                  onChange={v => setPayload('not_interested_text', v)}
-                />
-              </div>
-            </>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Reason</Label>
+              <Select value={niReason || NONE} onValueChange={v => setPayload('not_interested_reason', v === NONE ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>—</SelectItem>
+                  {NOT_INTERESTED_REASONS.map(r => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
+        {outcome === 'NOT_INTERESTED' && niReason === 'OTHER' && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Additional context</Label>
+            <VoiceTextarea
+              as="input"
+              value={(draft.payload.not_interested_text as string) ?? ''}
+              onChange={v => setPayload('not_interested_text', v)}
+              placeholder="Describe the reason"
+            />
+          </div>
+        )}
+        {outcome === 'INTERESTED' && (
+          <div className="space-y-1.5 rounded-md border border-dashed p-3 bg-muted/20">
+            <Label className="text-xs">Quick note</Label>
+            <VoiceTextarea
+              rows={2}
+              value={(draft.payload.interested_note_draft as string) ?? ''}
+              onChange={v => setPayload('interested_note_draft' as keyof EnquiryPayload, v)}
+              placeholder="What are they interested in? (Save the enquiry, then add this to Notes if needed.)"
+            />
+          </div>
+        )}
       </div>
     );
   }
