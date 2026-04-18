@@ -161,6 +161,8 @@ export default function EnquiryDetail() {
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
   const notesCardRef = useRef<HTMLDivElement | null>(null);
+  const [notesPage, setNotesPage] = useState(0);
+  const NOTES_PER_PAGE = 4;
 
   const draftRef = useRef<Enquiry | null>(null);
   const enquiryRef = useRef<Enquiry | null>(null);
@@ -536,7 +538,7 @@ export default function EnquiryDetail() {
           <h1 className="text-xl font-semibold truncate">{enquiry.company_name || enquiry.full_name}</h1>
           <p className="text-sm text-muted-foreground truncate">{enquiry.full_name} · {enquiry.phone}</p>
         </div>
-        <Badge>{stageLabels[enquiry.stage]}</Badge>
+        <Badge variant="secondary">{SOURCES.find(s => s.v === enquiry.source)?.l ?? enquiry.source ?? 'No source'}</Badge>
         {duplicateOf && (
           <Link to={`/enquiries/${duplicateOf.id}`}>
             <Badge variant="outline" className="gap-1 border-warning/40 text-warning hover:bg-warning/10">
@@ -625,16 +627,25 @@ export default function EnquiryDetail() {
 
             {/* Notes column (spans 2) */}
             <div className="p-4 space-y-2.5 lg:col-span-2">
-              <div className="text-sm font-semibold text-foreground mb-1">Notes</div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-sm font-semibold text-foreground">Notes</div>
+                {notes.length > NOTES_PER_PAGE && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" disabled={notesPage === 0} onClick={() => setNotesPage(p => Math.max(0, p - 1))}>‹</Button>
+                    <span>{notesPage + 1}/{Math.ceil(notes.length / NOTES_PER_PAGE)}</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" disabled={(notesPage + 1) * NOTES_PER_PAGE >= notes.length} onClick={() => setNotesPage(p => p + 1)}>›</Button>
+                  </div>
+                )}
+              </div>
               <div className="flex gap-2">
                 <Textarea autoFocus={showNoteForm} value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add a note…" rows={2} className="text-sm" />
                 <Button onClick={addNote} disabled={!newNote.trim() || busy} size="sm">Add</Button>
               </div>
-              <div className="space-y-1.5 max-h-72 overflow-y-auto pt-1">
+              <div className="space-y-1.5 pt-1 min-h-[7rem]">
                 {notes.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-3">No notes yet.</p>
                 ) : (
-                  notes.map(n => (
+                  notes.slice(notesPage * NOTES_PER_PAGE, (notesPage + 1) * NOTES_PER_PAGE).map(n => (
                     <div key={n.id} className="text-sm border-l-2 border-primary/40 pl-3 py-0.5">
                       <p className="leading-snug">{n.note_text}</p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">{format(new Date(n.created_at), 'dd MMM, HH:mm')}</p>
