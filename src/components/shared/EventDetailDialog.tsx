@@ -20,11 +20,13 @@ export interface EventRow {
   related_entity_type: string | null;
   related_entity_id: string | null;
   created_by: string | null;
+  assigned_to?: string | null;
 }
 
 interface Props {
   event: EventRow | null;
   ownerName?: string;
+  teamMembers?: { id: string; full_name: string }[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onChanged?: () => void;
