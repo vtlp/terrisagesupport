@@ -51,7 +51,7 @@ interface Props {
 
 export function PaymentLinkDialog({ open, onOpenChange, enquiryId, defaults, onSuccess }: Props) {
   const [planName, setPlanName] = useState('Standard');
-  const [cycle, setCycle] = useState<Cycle>('MONTHLY');
+  const [cycle, setCycle] = useState<Cycle>('ANNUAL');
   const [seats, setSeats] = useState<number>(defaults.seats ?? DEFAULT_INCLUDED_SEATS);
   const [baseFee, setBaseFee] = useState<number>(DEFAULT_BASE_FEE);
   const [seatRate, setSeatRate] = useState<number>(DEFAULT_SEAT_RATE);
