@@ -104,7 +104,7 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
         <DialogHeader>
           <DialogTitle>Create Support Ticket</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
+        <div className="space-y-4 py-2 px-1 -mx-1 max-h-[70vh] overflow-y-auto">
           <div className="space-y-1.5">
             <Label>Subject *</Label>
             <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Brief description of the issue" />
