@@ -40,6 +40,7 @@ interface EnquiryPayload {
   sales_focus?: string[];
   primary_property_types?: string[];
   team_size_estimate?: number | null;
+  current_system?: string;
   current_system_text?: string;
   approx_onboarding_date?: string | null;
   portals_in_use?: string[];
@@ -121,6 +122,14 @@ const DEMO_OUTCOMES = [
   { v: 'NO_SHOW', l: 'No show' },
   { v: 'LIKED_WANT_ONBOARD_SOON', l: 'Liked, wants to onboard soon' },
   { v: 'GHOSTED', l: 'Ghosted' },
+];
+
+const CURRENT_SYSTEMS = [
+  { v: 'SELL_DO', l: 'Sell.do' },
+  { v: 'LEADRAT', l: 'LeadRat' },
+  { v: 'HOUSSED', l: 'Houssed' },
+  { v: 'EXCEL_ONLY', l: 'Excel sheet only' },
+  { v: 'OTHER', l: 'Other' },
 ];
 
 const NONE = '__none__';
