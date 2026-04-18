@@ -32,8 +32,12 @@ export function DocumentsTab({ payload }: Props) {
       (proj.brochurePaths ?? []).forEach((p) => out.push({ path: p, category: 'Project brochure', projectName }));
     });
 
-    const propertyImport = (payload?.property_import as { image_paths?: string[] } | undefined) ?? {};
+    const propertyImport = (payload?.property_import as { image_paths?: string[]; file_paths?: string[] } | undefined) ?? {};
     (propertyImport.image_paths ?? []).forEach((p) => out.push({ path: p, category: 'Property images' }));
+    (propertyImport.file_paths ?? []).forEach((p) => out.push({ path: p, category: 'Property import files' }));
+
+    const leadImport = (payload?.lead_import as { file_paths?: string[] } | undefined) ?? {};
+    (leadImport.file_paths ?? []).forEach((p) => out.push({ path: p, category: 'Lead import files' }));
 
     return out;
   }, [payload]);
