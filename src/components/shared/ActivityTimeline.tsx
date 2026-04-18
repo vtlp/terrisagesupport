@@ -10,6 +10,8 @@ type EventType = 'STAGE_CHANGE' | 'FIELD_EDIT' | 'NOTE' | 'CALENDAR_EVENT' | 'SE
 
 interface LogRow {
   id: string;
+  entity_type: string;
+  entity_id: string;
   event_type: EventType;
   summary: string;
   details: Record<string, unknown>;
