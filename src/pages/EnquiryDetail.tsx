@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon, ChevronRight, Check } from 'lucide-react';
+import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon, ChevronRight, Check, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
@@ -24,6 +24,8 @@ import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/compo
 import { defaultMarkets, defaultPortals } from '@/data/lookupData';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
+import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
+import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
@@ -147,16 +149,22 @@ export default function EnquiryDetail() {
   const [busy, setBusy] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [newNote, setNewNote] = useState('');
+  const [showNoteForm, setShowNoteForm] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [pendingEventType, setPendingEventType] = useState<CalendarEventType>(CalendarEventType.GENERAL);
+  const [pendingEventTitle, setPendingEventTitle] = useState<string>('');
   const [pendingDemoSchedule, setPendingDemoSchedule] = useState(false);
+  const [existingEventOptions, setExistingEventOptions] = useState<ExistingEventOption[]>([]);
+  const [existingPromptOpen, setExistingPromptOpen] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
+  const notesCardRef = useRef<HTMLDivElement | null>(null);
 
   const draftRef = useRef<Enquiry | null>(null);
   const enquiryRef = useRef<Enquiry | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   useEffect(() => { draftRef.current = draft; }, [draft]);
   useEffect(() => { enquiryRef.current = enquiry; }, [enquiry]);
 
@@ -238,6 +246,20 @@ export default function EnquiryDetail() {
 
   const isDirty = useMemo(() => JSON.stringify(enquiry) !== JSON.stringify(draft), [enquiry, draft]);
 
+  // Mark dirty for save indicator (no autosave — manual Save button is required).
+  useEffect(() => {
+    if (!enquiry || !draft) return;
+    if (isDirty) setSaveState('dirty');
+  }, [draft, enquiry, isDirty]);
+
+  // Warn before leaving the page with unsaved changes.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
   // Persist current draft → server. Does NOT reload page.
   const persistDraft = useCallback(async (): Promise<boolean> => {
     const d = draftRef.current; const orig = enquiryRef.current;
@@ -264,24 +286,15 @@ export default function EnquiryDetail() {
     return true;
   }, []);
 
-  const flushPendingSave = useCallback(async () => {
-    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    await persistDraft();
-  }, [persistDraft]);
+  // Backwards-compatible alias used by side actions.
+  const flushPendingSave = useCallback(async () => { await persistDraft(); }, [persistDraft]);
 
-  // Debounced autosave on draft change
-  useEffect(() => {
-    if (!enquiry || !draft) return;
-    if (JSON.stringify(enquiry) === JSON.stringify(draft)) return;
-    setSaveState('dirty');
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => { persistDraft(); }, 1200);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft]);
-
-  // Flush on unmount
-  useEffect(() => () => { flushPendingSave(); }, [flushPendingSave]);
+  // Block side actions when there are unsaved edits.
+  const requireClean = useCallback((label = 'continue'): boolean => {
+    if (!isDirty) return true;
+    toast.error(`Save or cancel your changes first to ${label}.`);
+    return false;
+  }, [isDirty]);
 
   const setField = <K extends keyof Enquiry>(key: K, value: Enquiry[K]) => {
     setDraft(d => d ? { ...d, [key]: value } : d);
@@ -298,7 +311,46 @@ export default function EnquiryDetail() {
     });
   };
 
-  const saveAll = async () => { await flushPendingSave(); };
+  const saveAll = async () => { await persistDraft(); };
+  const cancelEdits = () => { if (enquiry) { setDraft(enquiry); setSaveState('idle'); toast('Changes discarded'); } };
+
+  // ---- Existing-event check + scheduling helpers ----
+  const openSchedulePrompt = useCallback((eventType: CalendarEventType, defaultTitle: string, isDemoFlow = false) => {
+    if (!enquiry) return;
+    setPendingEventType(eventType);
+    setPendingEventTitle(defaultTitle);
+    setPendingDemoSchedule(isDemoFlow);
+    const matching = events.filter(e => e.event_type === eventType && new Date(e.scheduled_at) >= new Date());
+    if (matching.length > 0) {
+      setExistingEventOptions(matching.map(e => ({
+        id: e.id, title: e.title, scheduled_at: e.scheduled_at, event_type: e.event_type,
+      })));
+      setExistingPromptOpen(true);
+    } else {
+      setScheduleOpen(true);
+    }
+  }, [enquiry, events]);
+
+  // Outcome change in Contacted stage.
+  const handleOutcomeChange = (v: string) => {
+    setPayload('outcome', v);
+    if (v === 'INTERESTED') {
+      setShowNoteForm(true);
+      toast('Add a quick note about what they\'re interested in.');
+      setTimeout(() => notesCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+    } else if (v === 'CALL_LATER') {
+      openSchedulePrompt(CalendarEventType.CALL_BACK, `Call back ${enquiry?.full_name ?? ''}`.trim());
+    } else if (v === 'SCHEDULE_DEMO') {
+      openSchedulePrompt(CalendarEventType.DEMO, `Demo · ${enquiry?.company_name || enquiry?.full_name || ''}`.trim(), true);
+    }
+  };
+
+  const handleDemoOutcomeChange = (v: string) => {
+    setPayload('demo_outcome', v);
+    if (v === 'GHOSTED' || v === 'NO_SHOW') {
+      openSchedulePrompt(CalendarEventType.FOLLOW_UP, `Follow up · ${enquiry?.company_name || enquiry?.full_name || ''}`.trim());
+    }
+  };
 
   // Validate that the user can leave the *current* stage based on its mandatory outcome.
   const validateStageGate = (currentStage: Stage, d: Enquiry): string | null => {
@@ -316,19 +368,17 @@ export default function EnquiryDetail() {
 
   const updateStage = async (stage: Stage) => {
     if (!enquiry || !draft) return;
+    if (!requireClean('change the stage')) return;
 
-    // Block manual selection of ACCOUNT_CREATED — must use Convert to account flow.
     if (stage === 'ACCOUNT_CREATED') {
       toast.error('Account Created is set automatically when you convert the enquiry.');
       return;
     }
-    // Block manual selection of ONBOARDING_PACK_SENT — happens via Send onboarding action.
     if (stage === 'ONBOARDING_PACK_SENT' && !enquiry.onboarding_pack_sent) {
       toast.error('Use "Send onboarding form" to move to this stage.');
       return;
     }
 
-    // Mandatory-outcome gating: only when moving forward in the pipeline (not Lost, not back).
     const fromIdx = STAGE_ORDER.indexOf(enquiry.stage);
     const toIdx = STAGE_ORDER.indexOf(stage);
     if (stage !== 'LOST' && toIdx > fromIdx) {
@@ -336,21 +386,16 @@ export default function EnquiryDetail() {
       if (blocker) { toast.error(blocker); return; }
     }
 
-    // Auto-open scheduling dialog when entering DEMO_SCHEDULED with no upcoming demo event.
     if (stage === 'DEMO_SCHEDULED') {
       const hasDemo = events.some(e => e.event_type === 'DEMO');
       if (!hasDemo) {
-        setPendingDemoSchedule(true);
-        setScheduleOpen(true);
-        // Don't change stage yet — it will auto-set after the demo is scheduled.
+        openSchedulePrompt(CalendarEventType.DEMO, `Demo · ${enquiry.company_name || enquiry.full_name}`, true);
         return;
       }
     }
 
     setBusy(true);
-    await flushPendingSave();
     const updates: { stage: Stage; demo_scheduled_at?: string } = { stage };
-    // When entering DEMO_SCHEDULED, auto-populate demo_scheduled_at from earliest demo event if empty.
     if (stage === 'DEMO_SCHEDULED' && !draft.demo_scheduled_at) {
       const demo = events.filter(e => e.event_type === 'DEMO').sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))[0];
       if (demo) updates.demo_scheduled_at = demo.scheduled_at;
@@ -367,14 +412,15 @@ export default function EnquiryDetail() {
 
   const addNote = async () => {
     if (!enquiry || !newNote.trim()) return;
+    if (!requireClean('add a note')) return;
     setBusy(true);
-    await flushPendingSave();
     const { data, error } = await supabase.from('enquiry_notes')
       .insert({ enquiry_id: enquiry.id, note_text: newNote.trim() })
       .select('id, note_text, created_at').single();
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     setNewNote('');
+    setShowNoteForm(false);
     if (data) setNotes(prev => [data as NoteRow, ...prev]);
   };
 
@@ -386,7 +432,7 @@ export default function EnquiryDetail() {
 
   const handleSendOnboarding = async () => {
     if (!enquiry) return;
-    await flushPendingSave();
+    if (!requireClean('send the onboarding form')) return;
     const link = generateLink();
     if (!enquiry.onboarding_pack_sent) {
       await supabase.from('enquiries').update({
@@ -428,8 +474,8 @@ export default function EnquiryDetail() {
 
   const convertToAccount = async () => {
     if (!enquiry) return;
+    if (!requireClean('convert to account')) return;
     setBusy(true);
-    await flushPendingSave();
     const { data, error } = await supabase.rpc('convert_enquiry_to_account', { _enquiry_id: enquiry.id });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
@@ -481,9 +527,14 @@ export default function EnquiryDetail() {
           </Link>
         )}
         <SaveStatusIndicator state={saveState} isDirty={isDirty} />
+        {isDirty && (
+          <Button onClick={cancelEdits} disabled={saveState === 'saving'} size="sm" variant="outline">
+            <Undo2 className="h-4 w-4 mr-2" /> Cancel
+          </Button>
+        )}
         <Button onClick={saveAll} disabled={saveState === 'saving' || !isDirty} size="sm" variant={isDirty ? 'default' : 'outline'}>
           {saveState === 'saving' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          {isDirty ? 'Save now' : 'Saved'}
+          {isDirty ? 'Save' : 'Saved'}
         </Button>
       </div>
 
@@ -498,6 +549,8 @@ export default function EnquiryDetail() {
             draft={draft}
             setField={setField}
             setPayload={setPayload}
+            onOutcomeChange={handleOutcomeChange}
+            onDemoOutcomeChange={handleDemoOutcomeChange}
           />
         }
       />
@@ -588,6 +641,27 @@ export default function EnquiryDetail() {
 
           {/* Qualification — agency vs builder */}
           <div className="space-y-4">
+            {/* Seat count first, per request */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Estimated team / seat count</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={draft.payload.team_size_estimate ?? ''}
+                  onChange={e => setPayload('team_size_estimate', e.target.value === '' ? null : Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Approx. onboarding date</Label>
+                <Input
+                  type="date"
+                  value={draft.payload.approx_onboarding_date ?? ''}
+                  onChange={e => setPayload('approx_onboarding_date', e.target.value || null)}
+                />
+              </div>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Focus area</Label>
@@ -628,26 +702,6 @@ export default function EnquiryDetail() {
                   selected={(draft.payload.portals_in_use as string[] | undefined) ?? []}
                   onChange={vals => setPayload('portals_in_use', vals)}
                   placeholder="Select portals"
-                />
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Estimated team / seat count</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={draft.payload.team_size_estimate ?? ''}
-                  onChange={e => setPayload('team_size_estimate', e.target.value === '' ? null : Number(e.target.value))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Approx. onboarding date</Label>
-                <Input
-                  type="date"
-                  value={draft.payload.approx_onboarding_date ?? ''}
-                  onChange={e => setPayload('approx_onboarding_date', e.target.value || null)}
                 />
               </div>
             </div>
@@ -704,7 +758,7 @@ export default function EnquiryDetail() {
           {showLost && (
             <div className="space-y-1.5">
               <Label>Lost reason</Label>
-              <Textarea rows={2} value={draft.lost_reason ?? ''} onChange={e => setField('lost_reason', e.target.value)} />
+              <VoiceTextarea rows={2} value={draft.lost_reason ?? ''} onChange={v => setField('lost_reason', v)} />
             </div>
           )}
         </CardContent>
@@ -889,11 +943,12 @@ export default function EnquiryDetail() {
         <DialogContent>
           <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
           <CalendarEventForm
-            defaultEventType={pendingDemoSchedule ? CalendarEventType.DEMO : CalendarEventType.FOLLOW_UP}
+            defaultEventType={pendingEventType !== CalendarEventType.GENERAL ? pendingEventType : (pendingDemoSchedule ? CalendarEventType.DEMO : CalendarEventType.FOLLOW_UP)}
+            defaultTitle={pendingEventTitle}
             lockedEntityType="ENQUIRY"
             lockedEntityId={enquiry.id}
             lockedEntityLabel={enquiry.company_name || enquiry.full_name}
-            onCancel={() => { setScheduleOpen(false); setPendingDemoSchedule(false); }}
+            onCancel={() => { setScheduleOpen(false); setPendingDemoSchedule(false); setPendingEventTitle(''); setPendingEventType(CalendarEventType.GENERAL); }}
             onSubmit={async (d) => {
               const [hh, mm] = d.time.split(':').map(Number);
               const dt = new Date(d.date); dt.setHours(hh ?? 10, mm ?? 0, 0, 0);
@@ -907,8 +962,6 @@ export default function EnquiryDetail() {
               toast.success('Event scheduled');
               setScheduleOpen(false);
 
-              // If a DEMO event was scheduled, auto-advance enquiry to DEMO_SCHEDULED
-              // and populate demo_scheduled_at with the chosen time.
               if (d.event_type === CalendarEventType.DEMO) {
                 await supabase.from('enquiries').update({
                   stage: 'DEMO_SCHEDULED' as Stage,
@@ -918,11 +971,38 @@ export default function EnquiryDetail() {
                 setDraft(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: scheduledIso } : prev);
               }
               setPendingDemoSchedule(false);
+              setPendingEventTitle('');
+              setPendingEventType(CalendarEventType.GENERAL);
               loadEvents(enquiry.id);
             }}
           />
         </DialogContent>
       </Dialog>
+
+      <ExistingEventPrompt
+        open={existingPromptOpen}
+        onOpenChange={setExistingPromptOpen}
+        events={existingEventOptions}
+        eventTypeLabel={pendingEventType.replace('_', ' ')}
+        onUseExisting={async (ev) => {
+          setExistingPromptOpen(false);
+          if (pendingDemoSchedule && enquiry) {
+            await supabase.from('enquiries').update({
+              stage: 'DEMO_SCHEDULED' as Stage,
+              demo_scheduled_at: ev.scheduled_at,
+            }).eq('id', enquiry.id);
+            setEnquiry(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: ev.scheduled_at } : prev);
+            setDraft(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: ev.scheduled_at } : prev);
+            toast.success('Linked existing demo');
+          } else {
+            toast.success('Using existing event');
+          }
+          setPendingDemoSchedule(false);
+          setPendingEventTitle('');
+          setPendingEventType(CalendarEventType.GENERAL);
+        }}
+        onCreateNew={() => { setExistingPromptOpen(false); setScheduleOpen(true); }}
+      />
 
       <EventDetailDialog
         event={openEvent}
@@ -1020,12 +1100,14 @@ function StageFlow({
 }
 
 function StageOutcomePanel({
-  stage, draft, setField, setPayload,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
 }: {
   stage: Stage;
   draft: Enquiry;
   setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
+  onOutcomeChange: (v: string) => void;
+  onDemoOutcomeChange: (v: string) => void;
 }) {
   const isLost = stage === 'LOST';
   const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
@@ -1045,7 +1127,7 @@ function StageOutcomePanel({
       )}
       <div>
         <div className="text-xs font-medium text-primary uppercase tracking-wide mb-2">Current stage · {stageLabels[stage]}</div>
-        <ActiveStagePanel stage={stage} draft={draft} setField={setField} setPayload={setPayload} />
+        <ActiveStagePanel stage={stage} draft={draft} setField={setField} setPayload={setPayload} onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange} />
       </div>
     </div>
   );
@@ -1096,12 +1178,14 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
 }
 
 function ActiveStagePanel({
-  stage, draft, setField, setPayload,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
 }: {
   stage: Stage;
   draft: Enquiry;
   setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
+  onOutcomeChange: (v: string) => void;
+  onDemoOutcomeChange: (v: string) => void;
 }) {
   const outcome = (draft.payload.outcome as string) || '';
 
@@ -1115,7 +1199,7 @@ function ActiveStagePanel({
         <div className="grid md:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Outcome</Label>
-            <Select value={outcome || NONE} onValueChange={v => setPayload('outcome', v === NONE ? '' : v)}>
+            <Select value={outcome || NONE} onValueChange={v => onOutcomeChange(v === NONE ? '' : v)}>
               <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>—</SelectItem>
@@ -1137,7 +1221,11 @@ function ActiveStagePanel({
               </div>
               <div className="space-y-1.5 md:col-span-2">
                 <Label className="text-xs">Additional context</Label>
-                <Input value={draft.payload.not_interested_text ?? ''} onChange={e => setPayload('not_interested_text', e.target.value)} />
+                <VoiceTextarea
+                  as="input"
+                  value={(draft.payload.not_interested_text as string) ?? ''}
+                  onChange={v => setPayload('not_interested_text', v)}
+                />
               </div>
             </>
           )}
@@ -1172,7 +1260,7 @@ function ActiveStagePanel({
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Demo outcome</Label>
-          <Select value={(draft.payload.demo_outcome as string) || NONE} onValueChange={v => setPayload('demo_outcome', v === NONE ? '' : v)}>
+          <Select value={(draft.payload.demo_outcome as string) || NONE} onValueChange={v => onDemoOutcomeChange(v === NONE ? '' : v)}>
             <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={NONE}>—</SelectItem>
