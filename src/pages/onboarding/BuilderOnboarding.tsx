@@ -13,10 +13,11 @@ import { GuidanceCard } from "@/components/onboarding/GuidanceCard";
 import { ReferencePanel } from "@/components/onboarding/ReferencePanel";
 import { ReviewSummaryCard } from "@/components/onboarding/ReviewSummaryCard";
 import { Checkbox } from "@/components/ui/checkbox";
-import { saveDraft, loadDraft, clearDraft } from "@/lib/onboardingStorage";
+import { saveDraft, loadDraft, clearDraft, filesToSerializable, serializableToFiles } from "@/lib/onboardingStorage";
 import {
   LOGO_FORMATS, BROCHURE_FORMATS, IMPORT_FILE_FORMATS,
   LOGO_EXTENSIONS, BROCHURE_EXTENSIONS, IMPORT_EXTENSIONS,
+  BULK_IMPORT_MAX_BYTES,
 } from "@/lib/onboardingValidation";
 import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock, AlreadySubmittedError } from "@/lib/onboardingSubmit";
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
@@ -25,7 +26,7 @@ import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmitted
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
   { number: 2, label: "Team Access & Permissions" },
-  { number: 3, label: "Projects & Lead Files" },
+  { number: 3, label: "Projects & Bulk Imports" },
   { number: 4, label: "Review & Submit" },
 ];
 
@@ -118,9 +119,9 @@ export default function BuilderOnboarding() {
 
   // Step 3
   const [projects, setProjects] = useState<Project[]>([createProject()]);
-  const [leadFile, setLeadFile] = useState<File[]>([]);
-  const [leadSheetLink, setLeadSheetLink] = useState("");
-  const [leadFileNotes, setLeadFileNotes] = useState("");
+  // Bulk imports (optional) — replaces previous Lead Import section.
+  const [bulkImportFiles, setBulkImportFiles] = useState<File[]>([]);
+  const [bulkImportNotes, setBulkImportNotes] = useState("");
 
   useEffect(() => {
     const draft = loadDraft("builder");
@@ -143,22 +144,25 @@ export default function BuilderOnboarding() {
         if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
         if (d.projects) setProjects(d.projects.map((p: any) => ({ ...p, brochure: [] })));
-        if (d.leadSheetLink) setLeadSheetLink(d.leadSheetLink);
-        if (d.leadFileNotes) setLeadFileNotes(d.leadFileNotes);
+        // Restore the previously uploaded company logo so it doesn't disappear
+        // when the user reopens the form from a saved draft.
+        if (d.companyLogoSerialized) setCompanyLogo(serializableToFiles(d.companyLogoSerialized));
+        if (d.bulkImportNotes) setBulkImportNotes(d.bulkImportNotes);
         toast.info("Draft restored. You may continue where you left off.");
       } catch { /* ignore */ }
     }
   }, []);
 
-  const getFormData = () => ({
-    fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus, notes,
-    seatsRequired, teamMembers,
-    projects: projects.map(p => ({ ...p, brochure: undefined })),
-    leadSheetLink, leadFileNotes,
-  });
-
-  const handleSaveDraft = () => {
-    saveDraft("builder", getFormData(), currentStep);
+  const handleSaveDraft = async () => {
+    const companyLogoSerialized = await filesToSerializable(companyLogo);
+    const data = {
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus, notes,
+      seatsRequired, teamMembers,
+      projects: projects.map(p => ({ ...p, brochure: undefined })),
+      companyLogoSerialized,
+      bulkImportNotes,
+    };
+    saveDraft("builder", data, currentStep);
     toast.success("Draft saved successfully.");
   };
 
