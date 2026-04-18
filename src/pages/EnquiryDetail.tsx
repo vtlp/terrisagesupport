@@ -149,6 +149,7 @@ export default function EnquiryDetail() {
   const [newNote, setNewNote] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [pendingDemoSchedule, setPendingDemoSchedule] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
