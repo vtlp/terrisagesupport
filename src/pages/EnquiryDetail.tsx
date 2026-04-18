@@ -28,7 +28,7 @@ import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
 import { useUser } from '@/context/UserContext';
 
-type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
+type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'PAYMENT_LINK_SENT' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
 type SubStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
 
@@ -76,7 +76,8 @@ interface Submission {
 
 const stageLabels: Record<Stage, string> = {
   NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Scheduled',
-  DEMO_COMPLETED: 'Demo Completed', ONBOARDING_PACK_SENT: 'Onboarding Sent',
+  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment Link Sent',
+  ONBOARDING_PACK_SENT: 'Onboarding Sent',
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
 
@@ -1078,7 +1079,7 @@ function SaveStatusIndicator({ state, isDirty }: { state: SaveState; isDirty: bo
 // ---------------- Stage Flow ----------------
 
 const STAGE_ORDER: Stage[] = [
-  'NEW_ENQUIRY', 'CONTACTED', 'DEMO_SCHEDULED', 'DEMO_COMPLETED', 'ONBOARDING_PACK_SENT', 'ACCOUNT_CREATED',
+  'NEW_ENQUIRY', 'CONTACTED', 'DEMO_SCHEDULED', 'DEMO_COMPLETED', 'PAYMENT_LINK_SENT', 'ONBOARDING_PACK_SENT', 'ACCOUNT_CREATED',
 ];
 
 function StageFlow({

@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 
-type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
+type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'PAYMENT_LINK_SENT' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
 
 interface EnquiryRow {
@@ -30,7 +30,8 @@ interface EnquiryRow {
 
 const stageLabels: Record<Stage, string> = {
   NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Scheduled',
-  DEMO_COMPLETED: 'Demo Completed', ONBOARDING_PACK_SENT: 'Pack Sent',
+  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment Sent',
+  ONBOARDING_PACK_SENT: 'Pack Sent',
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
 const stageColors: Record<Stage, string> = {
@@ -38,6 +39,7 @@ const stageColors: Record<Stage, string> = {
   CONTACTED: 'bg-info/15 text-info',
   DEMO_SCHEDULED: 'bg-primary/15 text-primary',
   DEMO_COMPLETED: 'bg-accent/20 text-accent-foreground',
+  PAYMENT_LINK_SENT: 'bg-warning/15 text-warning',
   ONBOARDING_PACK_SENT: 'bg-warning/15 text-warning',
   ACCOUNT_CREATED: 'bg-success/15 text-success',
   LOST: 'bg-destructive/15 text-destructive',

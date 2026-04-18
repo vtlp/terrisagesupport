@@ -1966,6 +1966,7 @@ export type Database = {
         | "CONTACTED"
         | "DEMO_SCHEDULED"
         | "DEMO_COMPLETED"
+        | "PAYMENT_LINK_SENT"
         | "ONBOARDING_PACK_SENT"
         | "ACCOUNT_CREATED"
         | "LOST"
@@ -2178,6 +2179,7 @@ export const Constants = {
         "CONTACTED",
         "DEMO_SCHEDULED",
         "DEMO_COMPLETED",
+        "PAYMENT_LINK_SENT",
         "ONBOARDING_PACK_SENT",
         "ACCOUNT_CREATED",
         "LOST",
