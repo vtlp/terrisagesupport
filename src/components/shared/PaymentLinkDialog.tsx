@@ -4,13 +4,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { calcBilling, fmtINR } from '@/lib/billing';
 
 type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+
+const DEFAULT_BASE_FEE = 33000;
+const DEFAULT_SEAT_RATE = 7000;
+const DEFAULT_INCLUDED_SEATS = 3;
+const DEFAULT_GST_PCT = 18;
 
 export interface PaymentLinkResult {
   link_id: string;
@@ -48,19 +52,18 @@ interface Props {
 export function PaymentLinkDialog({ open, onOpenChange, enquiryId, defaults, onSuccess }: Props) {
   const [planName, setPlanName] = useState('Standard');
   const [cycle, setCycle] = useState<Cycle>('MONTHLY');
-  const [seats, setSeats] = useState<number>(defaults.seats ?? 1);
-  const [baseFee, setBaseFee] = useState<number>(0);
-  const [seatRate, setSeatRate] = useState<number>(0);
-  const [gstPct, setGstPct] = useState<number>(18);
+  const [seats, setSeats] = useState<number>(defaults.seats ?? DEFAULT_INCLUDED_SEATS);
+  const [baseFee, setBaseFee] = useState<number>(DEFAULT_BASE_FEE);
+  const [seatRate, setSeatRate] = useState<number>(DEFAULT_SEAT_RATE);
+  const [gstPct, setGstPct] = useState<number>(DEFAULT_GST_PCT);
   const [name, setName] = useState(defaults.customerName);
   const [email, setEmail] = useState(defaults.customerEmail ?? '');
   const [phone, setPhone] = useState(defaults.customerPhone ?? '');
-  const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setSeats(defaults.seats && defaults.seats > 0 ? defaults.seats : 1);
+      setSeats(defaults.seats && defaults.seats > 0 ? defaults.seats : DEFAULT_INCLUDED_SEATS);
       setName(defaults.customerName);
       setEmail(defaults.customerEmail ?? '');
       setPhone(defaults.customerPhone ?? '');
@@ -68,7 +71,7 @@ export function PaymentLinkDialog({ open, onOpenChange, enquiryId, defaults, onS
   }, [open, defaults.seats, defaults.customerName, defaults.customerEmail, defaults.customerPhone]);
 
   const breakdown = useMemo(
-    () => calcBilling(baseFee, seatRate, seats, gstPct),
+    () => calcBilling(baseFee, seatRate, seats, gstPct, DEFAULT_INCLUDED_SEATS),
     [baseFee, seatRate, seats, gstPct],
   );
 
@@ -95,7 +98,6 @@ export function PaymentLinkDialog({ open, onOpenChange, enquiryId, defaults, onS
         gst_amount: breakdown.gstAmount,
         total: breakdown.total,
         customer: { name, email: email || undefined, phone: phone || undefined },
-        notes: notes || undefined,
       },
     });
     setBusy(false);
@@ -111,22 +113,22 @@ export function PaymentLinkDialog({ open, onOpenChange, enquiryId, defaults, onS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="max-w-md p-4 gap-3">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="flex items-center gap-2 text-base">
             <LinkIcon className="h-4 w-4" /> Generate payment link
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid md:grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label>Plan name</Label>
-            <Input value={planName} onChange={e => setPlanName(e.target.value)} />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Plan</Label>
+            <Input className="h-8" value={planName} onChange={e => setPlanName(e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Billing cycle</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">Cycle</Label>
             <Select value={cycle} onValueChange={v => setCycle(v as Cycle)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="MONTHLY">Monthly</SelectItem>
                 <SelectItem value="QUARTERLY">Quarterly</SelectItem>
@@ -134,68 +136,64 @@ export function PaymentLinkDialog({ open, onOpenChange, enquiryId, defaults, onS
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Team size (seats)</Label>
-            <Input type="number" min={1} value={seats}
+          <div className="space-y-1">
+            <Label className="text-xs">Team size</Label>
+            <Input className="h-8" type="number" min={1} value={seats}
               onChange={e => setSeats(Math.max(0, Number(e.target.value) || 0))} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Base fee (₹)</Label>
-            <Input type="number" min={0} value={baseFee}
-              onChange={e => setBaseFee(Number(e.target.value) || 0)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Per-seat rate (₹)</Label>
-            <Input type="number" min={0} value={seatRate}
-              onChange={e => setSeatRate(Number(e.target.value) || 0)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>GST %</Label>
-            <Input type="number" min={0} value={gstPct}
+          <div className="space-y-1">
+            <Label className="text-xs">GST %</Label>
+            <Input className="h-8" type="number" min={0} value={gstPct}
               onChange={e => setGstPct(Number(e.target.value) || 0)} />
           </div>
-
-          <div className="space-y-1.5 md:col-span-2 pt-2 border-t">
-            <Label className="text-xs uppercase text-muted-foreground tracking-wide">Customer</Label>
+          <div className="space-y-1">
+            <Label className="text-xs">Base fee (₹)</Label>
+            <Input className="h-8" type="number" min={0} value={baseFee}
+              onChange={e => setBaseFee(Number(e.target.value) || 0)} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Name</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} />
-          </div>
-          <div className="space-y-1.5 md:col-span-2">
-            <Label>Phone</Label>
-            <Input value={phone} onChange={e => setPhone(e.target.value)} />
-          </div>
-          <div className="space-y-1.5 md:col-span-2">
-            <Label>Notes (optional)</Label>
-            <Textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
-              placeholder="Internal note shown on the payment link." />
+          <div className="space-y-1">
+            <Label className="text-xs">Per-seat rate (₹)</Label>
+            <Input className="h-8" type="number" min={0} value={seatRate}
+              onChange={e => setSeatRate(Number(e.target.value) || 0)} />
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 pt-2">
-          <div className="border rounded p-3">
-            <div className="text-xs text-muted-foreground">Subtotal</div>
-            <div className="text-base font-semibold">{fmtINR(breakdown.subtotal)}</div>
+        <p className="text-[11px] text-muted-foreground -mt-1">
+          Base covers first {DEFAULT_INCLUDED_SEATS} seats. Extra seats charged at per-seat rate.
+        </p>
+
+        <div className="space-y-2 pt-2 border-t">
+          <Label className="text-[11px] uppercase text-muted-foreground tracking-wide">Customer</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Input className="h-8" placeholder="Name" value={name} onChange={e => setName(e.target.value)} />
+            <Input className="h-8" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
           </div>
-          <div className="border rounded p-3">
-            <div className="text-xs text-muted-foreground">GST ({breakdown.gstPct}%)</div>
-            <div className="text-base font-semibold">{fmtINR(breakdown.gstAmount)}</div>
+          <Input className="h-8" placeholder="Phone" value={phone} onChange={e => setPhone(e.target.value)} />
+        </div>
+
+        <div className="rounded border p-2 text-sm space-y-0.5 bg-muted/30">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Base ({DEFAULT_INCLUDED_SEATS} seats incl.)</span>
+            <span>{fmtINR(breakdown.baseFee)}</span>
           </div>
-          <div className="border rounded p-3 bg-primary/5">
-            <div className="text-xs text-muted-foreground">Total</div>
-            <div className="text-base font-semibold text-primary">{fmtINR(breakdown.total)}</div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Extra seats ({breakdown.chargeableSeats} × {fmtINR(breakdown.perSeatRate)})</span>
+            <span>{fmtINR(breakdown.chargeableSeats * breakdown.perSeatRate)}</span>
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>GST ({breakdown.gstPct}%)</span>
+            <span>{fmtINR(breakdown.gstAmount)}</span>
+          </div>
+          <div className="flex justify-between font-semibold text-primary pt-1 border-t mt-1">
+            <span>Total</span>
+            <span>{fmtINR(breakdown.total)}</span>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <LinkIcon className="h-4 w-4 mr-2" />}
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button size="sm" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button size="sm" onClick={submit} disabled={busy}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <LinkIcon className="h-3.5 w-3.5 mr-1.5" />}
             Generate link
           </Button>
         </DialogFooter>
