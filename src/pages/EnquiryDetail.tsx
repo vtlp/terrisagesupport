@@ -1212,7 +1212,7 @@ function StageFlow({
 }
 
 function StageOutcomePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1220,6 +1220,8 @@ function StageOutcomePanel({
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
+  onOpenPaymentDialog: () => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
 }) {
   const isLost = stage === 'LOST';
   const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
@@ -1239,7 +1241,11 @@ function StageOutcomePanel({
       )}
       <div>
         <div className="text-xs font-medium text-primary uppercase tracking-wide mb-2">Current stage · {stageLabels[stage]}</div>
-        <ActiveStagePanel stage={stage} draft={draft} setField={setField} setPayload={setPayload} onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange} />
+        <ActiveStagePanel
+          stage={stage} draft={draft} setField={setField} setPayload={setPayload}
+          onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange}
+          onOpenPaymentDialog={onOpenPaymentDialog} onSetPaymentStatus={onSetPaymentStatus}
+        />
       </div>
     </div>
   );
