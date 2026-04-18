@@ -97,6 +97,33 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
     load();
   };
 
+  const submitMockRequest = async () => {
+    const totalRequested = parseInt(mockSeats, 10);
+    if (!Number.isInteger(totalRequested) || totalRequested < 1) {
+      toast.error('Enter a valid total seat count');
+      return;
+    }
+    const purchasedNow = capacity?.seats_purchased ?? 0;
+    const delta = totalRequested - purchasedNow;
+    if (delta <= 0) {
+      toast.error(`Requested total must be greater than current allocation (${purchasedNow})`);
+      return;
+    }
+    setSubmittingMock(true);
+    const { error } = await supabase.from('seat_requests').insert({
+      account_id: accountId,
+      requested_seats: delta,
+      requested_by_email: mockEmail.trim() || null,
+      reason: mockReason.trim() || `Requested via Terrisage app — new total ${totalRequested} seats`,
+    });
+    setSubmittingMock(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Mock request submitted from Terrisage app');
+    setMockOpen(false);
+    setMockSeats(''); setMockEmail(''); setMockReason('');
+    load();
+  };
+
   const purchased = capacity?.seats_purchased ?? 0;
   const used = capacity?.seats_used ?? activeSeatsUsed;
   const available = Math.max(0, purchased - used);
@@ -132,8 +159,11 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
 
       {/* Requests list */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <CardTitle className="text-base">Seat requests ({rows.length})</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setMockOpen(true)}>
+            <Smartphone className="h-4 w-4 mr-1" /> Mock request from Terrisage app
+          </Button>
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (
