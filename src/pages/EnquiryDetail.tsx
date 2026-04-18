@@ -149,12 +149,18 @@ export default function EnquiryDetail() {
   const [busy, setBusy] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [newNote, setNewNote] = useState('');
+  const [showNoteForm, setShowNoteForm] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [pendingEventType, setPendingEventType] = useState<CalendarEventType>(CalendarEventType.GENERAL);
+  const [pendingEventTitle, setPendingEventTitle] = useState<string>('');
   const [pendingDemoSchedule, setPendingDemoSchedule] = useState(false);
+  const [existingEventOptions, setExistingEventOptions] = useState<ExistingEventOption[]>([]);
+  const [existingPromptOpen, setExistingPromptOpen] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
+  const notesCardRef = useRef<HTMLDivElement | null>(null);
 
   const draftRef = useRef<Enquiry | null>(null);
   const enquiryRef = useRef<Enquiry | null>(null);
