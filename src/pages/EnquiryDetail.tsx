@@ -433,7 +433,16 @@ export default function EnquiryDetail() {
   };
 
   const handleSendOnboarding = async () => {
-    if (!enquiry) return;
+    if (!enquiry || !draft) return;
+    const teamSize = draft.payload.team_size_estimate;
+    if (teamSize === null || teamSize === undefined || Number(teamSize) <= 0) {
+      toast.error('Please enter the team / seat size before generating the onboarding link.');
+      // Scroll the field into view and focus it.
+      const el = document.querySelector<HTMLInputElement>('input[data-field="team_size_estimate"]');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => el?.focus(), 300);
+      return;
+    }
     if (!(await requireClean('send the onboarding form'))) return;
     const link = generateLink();
     if (!enquiry.onboarding_pack_sent) {
@@ -715,6 +724,7 @@ export default function EnquiryDetail() {
               <div className="space-y-1.5">
                 <Label>Estimated team / seat count</Label>
                 <Input
+                  data-field="team_size_estimate"
                   type="number"
                   min={0}
                   value={draft.payload.team_size_estimate ?? ''}
