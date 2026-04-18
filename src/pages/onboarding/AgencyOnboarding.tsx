@@ -480,25 +480,17 @@ export default function AgencyOnboarding() {
 
           {projects.map((proj, i) => (
             <ReviewSummaryCard key={proj.id} title={`Project ${i + 1}`} onEdit={() => setCurrentStep(3)} fields={[
-              { label: "Project name", value: proj.projectName, required: true },
-              { label: "Location", value: proj.location, required: true },
-              { label: "Representative", value: proj.repName, required: true },
-              { label: "Builder", value: proj.builderName, required: true },
+              { label: "Project name", value: proj.projectName },
+              { label: "Location", value: proj.location },
+              { label: "Representative", value: proj.repName },
+              { label: "Builder", value: proj.builderName },
               { label: "Brochure", value: proj.brochure.length > 0 ? `${proj.brochure.length} file(s)` : undefined },
             ]} />
           ))}
 
-          <ReviewSummaryCard title="Lead Import" onEdit={() => setCurrentStep(3)} fields={[
-            { label: "Lead file(s)", value: leadFile.length > 0 ? `${leadFile.length} file(s)` : undefined },
-            { label: "Google Sheet link", value: leadSheetLink },
-            { label: "Notes", value: leadFileNotes },
-          ]} />
-
-          <ReviewSummaryCard title="Property Import" onEdit={() => setCurrentStep(3)} fields={[
-            { label: "Property file(s)", value: propertyFile.length > 0 ? `${propertyFile.length} file(s)` : undefined },
-            { label: "Property images", value: propertyImages.length > 0 ? `${propertyImages.length} file(s)` : undefined },
-            { label: "Google Sheet link", value: propertySheetLink },
-            { label: "Notes", value: propertyFileNotes },
+          <ReviewSummaryCard title="Bulk Imports" onEdit={() => setCurrentStep(3)} fields={[
+            { label: "Files", value: bulkImportFiles.length > 0 ? `${bulkImportFiles.length} file(s)` : undefined },
+            { label: "Notes", value: bulkImportNotes },
           ]} />
 
           {notes && (
