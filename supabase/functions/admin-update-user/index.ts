@@ -60,17 +60,38 @@ Deno.serve(async (req) => {
       });
 
     if (body.full_name !== undefined || body.is_active !== undefined) {
-      const patch: Record<string, unknown> = {};
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (body.full_name !== undefined) patch.full_name = body.full_name;
       if (body.is_active !== undefined) patch.is_active = body.is_active;
-      await admin.from("profiles").update(patch).eq("id", body.user_id);
+      const { error: pErr } = await admin.from("profiles").update(patch).eq("id", body.user_id);
+      if (pErr) {
+        return new Response(JSON.stringify({ error: `profiles: ${pErr.message}` }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Also mirror full_name into auth user metadata so it survives auth-driven refreshes
+      if (body.full_name !== undefined) {
+        await admin.auth.admin.updateUserById(body.user_id, {
+          user_metadata: { full_name: body.full_name },
+        });
+      }
     }
 
     if (body.role) {
-      await admin.from("user_roles").delete().eq("user_id", body.user_id);
-      await admin
+      const { error: dErr } = await admin.from("user_roles").delete().eq("user_id", body.user_id);
+      if (dErr) {
+        return new Response(JSON.stringify({ error: `roles delete: ${dErr.message}` }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { error: iErr } = await admin
         .from("user_roles")
         .insert({ user_id: body.user_id, role: body.role });
+      if (iErr) {
+        return new Response(JSON.stringify({ error: `roles insert: ${iErr.message}` }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (body.password) {
