@@ -430,6 +430,11 @@ export default function AccountDetail() {
 
         <TabsContent value="billing" className="space-y-4">
           <BillingTab accountId={acc.id} />
+          <ApiKeysCard accountId={acc.id} />
+        </TabsContent>
+
+        <TabsContent value="seat-requests" className="space-y-4">
+          <SeatRequestsTab accountId={acc.id} />
         </TabsContent>
 
         <TabsContent value="imports" className="space-y-4">
