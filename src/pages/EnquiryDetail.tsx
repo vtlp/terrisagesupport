@@ -40,12 +40,14 @@ interface EnquiryPayload {
   sales_focus?: string[];
   primary_property_types?: string[];
   team_size_estimate?: number | null;
-  current_system?: string;
+  current_system?: string | string[];
   current_system_text?: string;
   approx_onboarding_date?: string | null;
   portals_in_use?: string[];
   [k: string]: unknown;
 }
+
+type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
 interface Enquiry {
   id: string; full_name: string; phone: string; email: string | null;
