@@ -6,7 +6,7 @@ import { FileText, Image as ImageIcon, FileBadge, Loader2, ExternalLink, FolderO
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type DocCategory = 'Company logo' | 'Project brochure' | 'Property images' | 'Lead import files' | 'Property import files';
+type DocCategory = 'Company logo' | 'Project brochure' | 'Property images' | 'Bulk imports' | 'Lead import files' | 'Property import files';
 
 interface DocItem {
   path: string;
@@ -32,6 +32,11 @@ export function DocumentsTab({ payload }: Props) {
       (proj.brochurePaths ?? []).forEach((p) => out.push({ path: p, category: 'Project brochure', projectName }));
     });
 
+    // New unified bulk imports section (current onboarding form)
+    const bulkImports = (payload?.bulk_imports as { paths?: string[] } | undefined) ?? {};
+    (bulkImports.paths ?? []).forEach((p) => out.push({ path: p, category: 'Bulk imports' }));
+
+    // Legacy keys — kept so older submissions still render their files
     const propertyImport = (payload?.property_import as { image_paths?: string[]; file_paths?: string[] } | undefined) ?? {};
     (propertyImport.image_paths ?? []).forEach((p) => out.push({ path: p, category: 'Property images' }));
     (propertyImport.file_paths ?? []).forEach((p) => out.push({ path: p, category: 'Property import files' }));
