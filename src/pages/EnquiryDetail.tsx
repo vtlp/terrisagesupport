@@ -575,7 +575,7 @@ export default function EnquiryDetail() {
       />
 
       <div className="grid lg:grid-cols-3 gap-6">
-        <Card>
+        <Card className="border-2 border-border/80 shadow-sm">
           <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {(() => {
@@ -621,7 +621,7 @@ export default function EnquiryDetail() {
           </CardContent>
         </Card>
 
-        <Card ref={notesCardRef} className="lg:col-span-2">
+        <Card ref={notesCardRef} className="lg:col-span-2 border-2 border-border/80 shadow-sm">
           <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2">
@@ -644,11 +644,11 @@ export default function EnquiryDetail() {
       </div>
 
       {/* Editable detail card */}
-      <Card>
+      <Card className="border-2 border-border/80 shadow-sm">
         <CardHeader><CardTitle className="text-base">Enquiry details</CardTitle></CardHeader>
         <CardContent className="space-y-6">
           {/* Contact block */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-x-4 gap-y-4">
             <div className="space-y-1.5">
               <Label>Company name</Label>
               <Input value={draft.company_name ?? ''} onChange={e => setField('company_name', e.target.value)} />
@@ -657,6 +657,8 @@ export default function EnquiryDetail() {
               <Label>Contact name</Label>
               <Input value={draft.full_name} onChange={e => setField('full_name', e.target.value)} />
             </div>
+
+            {/* Primary phone + WhatsApp toggle directly under it */}
             <div className="space-y-1.5">
               <Label>Primary phone</Label>
               <PhoneInput
@@ -665,7 +667,18 @@ export default function EnquiryDetail() {
                 number={phoneSplit.number}
                 onNumberChange={n => setField('phone', joinPhone(phoneSplit.code, n))}
               />
+              <div className="flex items-center gap-2 pt-1">
+                <Switch
+                  id="wa"
+                  checked={!!draft.payload.whatsapp_enabled}
+                  onCheckedChange={v => setPayload('whatsapp_enabled', v)}
+                />
+                <Label htmlFor="wa" className="cursor-pointer text-xs text-muted-foreground font-normal">
+                  WhatsApp enabled on primary number
+                </Label>
+              </div>
             </div>
+
             <div className="space-y-1.5">
               <Label>Alternate phone</Label>
               <PhoneInput
@@ -675,6 +688,7 @@ export default function EnquiryDetail() {
                 onNumberChange={n => setPayload('contact_phone_alt', n ? joinPhone(altSplit.code || DEFAULT_COUNTRY_CODE, n) : '')}
               />
             </div>
+
             <div className="space-y-1.5">
               <Label>Email</Label>
               <Input type="email" value={draft.email ?? ''} onChange={e => setField('email', e.target.value)} />
@@ -688,14 +702,6 @@ export default function EnquiryDetail() {
                   {defaultMarkets.map(m => <SelectItem key={m.id} value={m.value}>{m.value}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex items-center gap-3 pt-6">
-              <Switch
-                id="wa"
-                checked={!!draft.payload.whatsapp_enabled}
-                onCheckedChange={v => setPayload('whatsapp_enabled', v)}
-              />
-              <Label htmlFor="wa" className="cursor-pointer">WhatsApp enabled on primary number</Label>
             </div>
           </div>
 
@@ -774,7 +780,21 @@ export default function EnquiryDetail() {
                   placeholder="Select property types"
                 />
               </div>
+            </div>
 
+            {/* Current system + Portals side by side */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Current system / software in use</Label>
+                <MultiSelect
+                  options={CURRENT_SYSTEMS.map(o => ({ value: o.v, label: o.l }))}
+                  selected={Array.isArray(draft.payload.current_system)
+                    ? draft.payload.current_system
+                    : (draft.payload.current_system ? [draft.payload.current_system as string] : [])}
+                  onChange={vals => setPayload('current_system', vals)}
+                  placeholder="Select current system(s)"
+                />
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Portals currently in use</Label>
                 <MultiSelect
@@ -786,21 +806,10 @@ export default function EnquiryDetail() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Current system / software in use</Label>
-                <MultiSelect
-                  options={CURRENT_SYSTEMS.map(o => ({ value: o.v, label: o.l }))}
-                  selected={Array.isArray(draft.payload.current_system)
-                    ? draft.payload.current_system
-                    : (draft.payload.current_system ? [draft.payload.current_system as string] : [])}
-                  onChange={vals => setPayload('current_system', vals)}
-                  placeholder="Select current system(s)"
-                />
-              </div>
-              {(Array.isArray(draft.payload.current_system)
-                  ? draft.payload.current_system.includes('OTHER')
-                  : draft.payload.current_system === 'OTHER') && (
+            {(Array.isArray(draft.payload.current_system)
+                ? draft.payload.current_system.includes('OTHER')
+                : draft.payload.current_system === 'OTHER') && (
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label>Specify other system</Label>
                   <Input
@@ -809,8 +818,8 @@ export default function EnquiryDetail() {
                     onChange={e => setPayload('current_system_text', e.target.value)}
                   />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Approx. onboarding date — last field per request */}
             <div className="grid md:grid-cols-2 gap-4">
@@ -836,7 +845,7 @@ export default function EnquiryDetail() {
 
       {/* Onboarding submission review */}
       {submission ? (
-        <Card>
+        <Card className="border-2 border-border/80 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Onboarding submission</CardTitle>
@@ -881,7 +890,7 @@ export default function EnquiryDetail() {
           </CardContent>
         </Card>
       ) : enquiry.onboarding_pack_sent ? (
-        <Card>
+        <Card className="border-2 border-border/80 shadow-sm">
           <CardHeader><CardTitle className="text-base">Onboarding submission</CardTitle></CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -897,7 +906,7 @@ export default function EnquiryDetail() {
       ) : null}
 
       {/* Upcoming events */}
-      <Card>
+      <Card className="border-2 border-border/80 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Upcoming events</CardTitle>
@@ -1045,7 +1054,7 @@ function StageFlow({
   const currentIdx = isLost ? -1 : STAGE_ORDER.indexOf(currentStage);
 
   return (
-    <Card>
+    <Card className="border-2 border-primary/40 bg-primary/5 shadow-sm">
       <CardContent className="p-4 space-y-4">
         <div className="flex items-center gap-1 overflow-x-auto pb-1">
           {STAGE_ORDER.map((s, i) => {
