@@ -23,6 +23,7 @@ import { SendOnboardingDialog } from '@/components/shared/SendOnboardingDialog';
 import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/components/shared/PhoneInput';
 import { defaultMarkets, defaultPortals } from '@/data/lookupData';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
+import { MultiSelect } from '@/components/shared/MultiSelect';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
@@ -445,50 +446,47 @@ export default function EnquiryDetail() {
 
           {/* Qualification — agency vs builder */}
           <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Focus area</Label>
-              <div className="flex gap-3 flex-wrap mt-2">
-                {FOCUS_AREAS.map(fa => (
-                  <label key={fa.v} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={(draft.payload.focus_area ?? []).includes(fa.v)}
-                      onCheckedChange={() => togglePayloadArr('focus_area', fa.v)}
-                    />
-                    {fa.l}
-                  </label>
-                ))}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Focus area</Label>
+                <MultiSelect
+                  options={FOCUS_AREAS.map(o => ({ value: o.v, label: o.l }))}
+                  selected={(draft.payload.focus_area as string[] | undefined) ?? []}
+                  onChange={vals => setPayload('focus_area', vals)}
+                  placeholder="Select focus areas"
+                />
               </div>
-            </div>
 
-            {!isBuilder && (
-              <div>
-                <Label className="text-sm font-medium">Sales focus</Label>
-                <div className="flex gap-3 flex-wrap mt-2">
-                  {SALES_FOCUS.map(sf => (
-                    <label key={sf.v} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Checkbox
-                        checked={(draft.payload.sales_focus ?? []).includes(sf.v)}
-                        onCheckedChange={() => togglePayloadArr('sales_focus', sf.v)}
-                      />
-                      {sf.l}
-                    </label>
-                  ))}
+              {!isBuilder && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Sales focus</Label>
+                  <MultiSelect
+                    options={SALES_FOCUS.map(o => ({ value: o.v, label: o.l }))}
+                    selected={(draft.payload.sales_focus as string[] | undefined) ?? []}
+                    onChange={vals => setPayload('sales_focus', vals)}
+                    placeholder="Select sales focus"
+                  />
                 </div>
-              </div>
-            )}
+              )}
 
-            <div>
-              <Label className="text-sm font-medium">Primary property types</Label>
-              <div className="flex gap-3 flex-wrap mt-2">
-                {PROPERTY_TYPES.map(pt => (
-                  <label key={pt.v} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={(draft.payload.primary_property_types ?? []).includes(pt.v)}
-                      onCheckedChange={() => togglePayloadArr('primary_property_types', pt.v)}
-                    />
-                    {pt.l}
-                  </label>
-                ))}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Primary property types</Label>
+                <MultiSelect
+                  options={PROPERTY_TYPES.map(o => ({ value: o.v, label: o.l }))}
+                  selected={(draft.payload.primary_property_types as string[] | undefined) ?? []}
+                  onChange={vals => setPayload('primary_property_types', vals)}
+                  placeholder="Select property types"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Portals currently in use</Label>
+                <MultiSelect
+                  options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                  selected={(draft.payload.portals_in_use as string[] | undefined) ?? []}
+                  onChange={vals => setPayload('portals_in_use', vals)}
+                  placeholder="Select portals"
+                />
               </div>
             </div>
 
@@ -520,21 +518,6 @@ export default function EnquiryDetail() {
                 value={draft.payload.current_system_text ?? ''}
                 onChange={e => setPayload('current_system_text', e.target.value)}
               />
-            </div>
-
-            <div>
-              <Label className="text-sm font-medium">Portals currently in use</Label>
-              <div className="flex gap-3 flex-wrap mt-2">
-                {defaultPortals.map(p => (
-                  <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={(draft.payload.portals_in_use ?? []).includes(p.value)}
-                      onCheckedChange={() => togglePayloadArr('portals_in_use', p.value)}
-                    />
-                    {p.value}
-                  </label>
-                ))}
-              </div>
             </div>
           </div>
 
