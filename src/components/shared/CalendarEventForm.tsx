@@ -28,6 +28,7 @@ interface SubmitData {
   event_type: CalendarEventType;
   related_entity_type: 'ENQUIRY' | 'ACCOUNT' | '';
   related_entity_id: string | null;
+  assigned_to: string | null;
 }
 
 interface CalendarEventFormProps {
@@ -36,6 +37,7 @@ interface CalendarEventFormProps {
   defaultTitle?: string;
   defaultDescription?: string;
   defaultEventType?: CalendarEventType;
+  defaultAssignedTo?: string | null;
   /** When provided, the entity link is locked (pre-filled context). */
   lockedEntityType?: 'ENQUIRY' | 'ACCOUNT';
   lockedEntityId?: string;
@@ -45,6 +47,7 @@ interface CalendarEventFormProps {
 export function CalendarEventForm({
   onSubmit, onCancel,
   defaultTitle = '', defaultDescription = '', defaultEventType = CalendarEventType.GENERAL,
+  defaultAssignedTo = null,
   lockedEntityType, lockedEntityId, lockedEntityLabel,
 }: CalendarEventFormProps) {
   const [title, setTitle] = useState(defaultTitle);
@@ -54,6 +57,13 @@ export function CalendarEventForm({
   const [eventType, setEventType] = useState<CalendarEventType>(defaultEventType);
   const [linkType, setLinkType] = useState<'ENQUIRY' | 'ACCOUNT' | ''>(lockedEntityType ?? '');
   const [linkId, setLinkId] = useState<string | null>(lockedEntityId ?? null);
+  const [assignedTo, setAssignedTo] = useState<string | null>(defaultAssignedTo);
+  const [team, setTeam] = useState<{ id: string; full_name: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name').eq('is_active', true)
+      .order('full_name').then(({ data }) => setTeam((data ?? []) as { id: string; full_name: string }[]));
+  }, []);
 
   const handleSubmit = () => {
     if (title && date) {
@@ -61,6 +71,7 @@ export function CalendarEventForm({
         title, date, time, notes, event_type: eventType,
         related_entity_type: linkType,
         related_entity_id: linkId,
+        assigned_to: assignedTo,
       });
     }
   };
