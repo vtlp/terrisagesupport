@@ -517,14 +517,30 @@ export default function EnquiryDetail() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Current system / software in use</Label>
-              <Textarea
-                rows={2}
-                placeholder="e.g. Excel, PropTech CRM, in-house tool…"
-                value={draft.payload.current_system_text ?? ''}
-                onChange={e => setPayload('current_system_text', e.target.value)}
-              />
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Current system / software in use</Label>
+                <Select
+                  value={(draft.payload.current_system as string) || NONE}
+                  onValueChange={v => setPayload('current_system', v === NONE ? '' : v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select current system" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>—</SelectItem>
+                    {CURRENT_SYSTEMS.map(s => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {draft.payload.current_system === 'OTHER' && (
+                <div className="space-y-1.5">
+                  <Label>Specify other system</Label>
+                  <Input
+                    placeholder="e.g. Custom in-house tool"
+                    value={draft.payload.current_system_text ?? ''}
+                    onChange={e => setPayload('current_system_text', e.target.value)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
