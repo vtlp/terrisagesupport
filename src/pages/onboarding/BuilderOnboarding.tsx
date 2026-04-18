@@ -22,6 +22,9 @@ import {
 import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock, AlreadySubmittedError } from "@/lib/onboardingSubmit";
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
+import { downloadOnboardingZip } from "@/lib/onboardingZipDownload";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
