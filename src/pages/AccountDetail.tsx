@@ -74,7 +74,6 @@ export default function AccountDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [newNote, setNewNote] = useState('');
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const { currentUser } = useUser();
@@ -126,15 +125,6 @@ export default function AccountDetail() {
     if (error) { toast.error(error.message); return; }
     toast.success('Saved');
     load();
-  };
-
-  const addNote = async () => {
-    if (!acc || !newNote.trim()) return;
-    setBusy(true);
-    const { error } = await supabase.from('account_notes').insert({ account_id: acc.id, note_text: newNote.trim() });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else { setNewNote(''); load(); }
   };
 
   const toggleChecklist = async (item: ChecklistRow) => {
