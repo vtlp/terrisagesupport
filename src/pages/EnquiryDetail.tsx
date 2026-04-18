@@ -149,6 +149,7 @@ export default function EnquiryDetail() {
   const [newNote, setNewNote] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [pendingDemoSchedule, setPendingDemoSchedule] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
@@ -299,16 +300,67 @@ export default function EnquiryDetail() {
 
   const saveAll = async () => { await flushPendingSave(); };
 
+  // Validate that the user can leave the *current* stage based on its mandatory outcome.
+  const validateStageGate = (currentStage: Stage, d: Enquiry): string | null => {
+    if (currentStage === 'CONTACTED' && !d.payload.outcome) {
+      return 'Please select an outcome for the Contacted stage before moving on.';
+    }
+    if (currentStage === 'DEMO_SCHEDULED' && !d.demo_scheduled_at) {
+      return 'Please set the demo scheduled date/time before moving on.';
+    }
+    if (currentStage === 'DEMO_COMPLETED' && !d.payload.demo_outcome) {
+      return 'Please select a demo outcome before moving on.';
+    }
+    return null;
+  };
+
   const updateStage = async (stage: Stage) => {
-    if (!enquiry) return;
+    if (!enquiry || !draft) return;
+
+    // Block manual selection of ACCOUNT_CREATED — must use Convert to account flow.
+    if (stage === 'ACCOUNT_CREATED') {
+      toast.error('Account Created is set automatically when you convert the enquiry.');
+      return;
+    }
+    // Block manual selection of ONBOARDING_PACK_SENT — happens via Send onboarding action.
+    if (stage === 'ONBOARDING_PACK_SENT' && !enquiry.onboarding_pack_sent) {
+      toast.error('Use "Send onboarding form" to move to this stage.');
+      return;
+    }
+
+    // Mandatory-outcome gating: only when moving forward in the pipeline (not Lost, not back).
+    const fromIdx = STAGE_ORDER.indexOf(enquiry.stage);
+    const toIdx = STAGE_ORDER.indexOf(stage);
+    if (stage !== 'LOST' && toIdx > fromIdx) {
+      const blocker = validateStageGate(enquiry.stage, draft);
+      if (blocker) { toast.error(blocker); return; }
+    }
+
+    // Auto-open scheduling dialog when entering DEMO_SCHEDULED with no upcoming demo event.
+    if (stage === 'DEMO_SCHEDULED') {
+      const hasDemo = events.some(e => e.event_type === 'DEMO');
+      if (!hasDemo) {
+        setPendingDemoSchedule(true);
+        setScheduleOpen(true);
+        // Don't change stage yet — it will auto-set after the demo is scheduled.
+        return;
+      }
+    }
+
     setBusy(true);
     await flushPendingSave();
-    const { error } = await supabase.from('enquiries').update({ stage }).eq('id', enquiry.id);
+    const updates: { stage: Stage; demo_scheduled_at?: string } = { stage };
+    // When entering DEMO_SCHEDULED, auto-populate demo_scheduled_at from earliest demo event if empty.
+    if (stage === 'DEMO_SCHEDULED' && !draft.demo_scheduled_at) {
+      const demo = events.filter(e => e.event_type === 'DEMO').sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))[0];
+      if (demo) updates.demo_scheduled_at = demo.scheduled_at;
+    }
+    const { error } = await supabase.from('enquiries').update(updates).eq('id', enquiry.id);
     if (error) toast.error(error.message);
     else {
       toast.success('Stage updated');
-      setEnquiry(prev => prev ? { ...prev, stage } : prev);
-      setDraft(prev => prev ? { ...prev, stage } : prev);
+      setEnquiry(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
+      setDraft(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
     }
     setBusy(false);
   };
@@ -343,10 +395,14 @@ export default function EnquiryDetail() {
         onboarding_form_link: link,
         stage: 'ONBOARDING_PACK_SENT' as Stage,
       }).eq('id', enquiry.id);
-      const { data: noteRow } = await supabase.from('enquiry_notes').insert({
-        enquiry_id: enquiry.id, note_text: `Onboarding form link generated: ${link}`,
-      }).select('id, note_text, created_at').single();
-      if (noteRow) setNotes(prev => [noteRow as NoteRow, ...prev]);
+      // Log to activity timeline (not notes) — onboarding link history belongs here.
+      await supabase.from('activity_log').insert({
+        entity_type: 'ENQUIRY',
+        entity_id: enquiry.id,
+        event_type: 'SUBMISSION',
+        summary: 'Onboarding form link generated',
+        details: { link },
+      });
       await refreshEnquiryMeta(enquiry.id);
     }
     setShareOpen(true);
@@ -774,10 +830,28 @@ export default function EnquiryDetail() {
         <Card>
           <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <Button className="w-full" onClick={handleSendOnboarding} disabled={busy} variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}>
-              <Send className="h-4 w-4 mr-2" />
-              {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
-            </Button>
+            {(() => {
+              const onboardEnabled = enquiry.onboarding_pack_sent
+                || draft.payload.demo_outcome === 'LIKED_WANT_ONBOARD_SOON';
+              return (
+                <>
+                  <Button
+                    className="w-full"
+                    onClick={handleSendOnboarding}
+                    disabled={busy || !onboardEnabled}
+                    variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
+                  </Button>
+                  {!onboardEnabled && (
+                    <p className="text-[11px] text-muted-foreground -mt-2 text-center">
+                      Available after demo outcome is "Liked, wants to onboard soon".
+                    </p>
+                  )}
+                </>
+              );
+            })()}
             <Button className="w-full" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
               <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
             </Button>
@@ -815,22 +889,35 @@ export default function EnquiryDetail() {
         <DialogContent>
           <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
           <CalendarEventForm
-            defaultEventType={CalendarEventType.FOLLOW_UP}
+            defaultEventType={pendingDemoSchedule ? CalendarEventType.DEMO : CalendarEventType.FOLLOW_UP}
             lockedEntityType="ENQUIRY"
             lockedEntityId={enquiry.id}
             lockedEntityLabel={enquiry.company_name || enquiry.full_name}
-            onCancel={() => setScheduleOpen(false)}
+            onCancel={() => { setScheduleOpen(false); setPendingDemoSchedule(false); }}
             onSubmit={async (d) => {
               const [hh, mm] = d.time.split(':').map(Number);
               const dt = new Date(d.date); dt.setHours(hh ?? 10, mm ?? 0, 0, 0);
+              const scheduledIso = dt.toISOString();
               const { error } = await supabase.from('calendar_events').insert({
-                title: d.title, scheduled_at: dt.toISOString(), notes: d.notes || null,
+                title: d.title, scheduled_at: scheduledIso, notes: d.notes || null,
                 event_type: d.event_type as 'DEMO' | 'FOLLOW_UP' | 'CALL_BACK' | 'CHECK_IN' | 'ONBOARDING' | 'OTHER',
                 related_entity_type: 'ENQUIRY', related_entity_id: enquiry.id,
               });
               if (error) { toast.error(error.message); return; }
               toast.success('Event scheduled');
               setScheduleOpen(false);
+
+              // If a DEMO event was scheduled, auto-advance enquiry to DEMO_SCHEDULED
+              // and populate demo_scheduled_at with the chosen time.
+              if (d.event_type === CalendarEventType.DEMO) {
+                await supabase.from('enquiries').update({
+                  stage: 'DEMO_SCHEDULED' as Stage,
+                  demo_scheduled_at: scheduledIso,
+                }).eq('id', enquiry.id);
+                setEnquiry(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: scheduledIso } : prev);
+                setDraft(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: scheduledIso } : prev);
+              }
+              setPendingDemoSchedule(false);
               loadEvents(enquiry.id);
             }}
           />
