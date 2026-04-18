@@ -172,10 +172,10 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
           </div>
           <div className="space-y-1.5">
             <Label>City</Label>
-            <Select value={market} onValueChange={setMarket}>
+            <Select value={market || '__none__'} onValueChange={(v) => setMarket(v === '__none__' ? '' : v)}>
               <SelectTrigger><SelectValue placeholder="Select city…" /></SelectTrigger>
               <SelectContent className="bg-card max-h-48">
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
