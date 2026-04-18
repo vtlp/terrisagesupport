@@ -13,10 +13,11 @@ import { GuidanceCard } from "@/components/onboarding/GuidanceCard";
 import { ReferencePanel } from "@/components/onboarding/ReferencePanel";
 import { ReviewSummaryCard } from "@/components/onboarding/ReviewSummaryCard";
 import { Checkbox } from "@/components/ui/checkbox";
-import { saveDraft, loadDraft, clearDraft } from "@/lib/onboardingStorage";
+import { saveDraft, loadDraft, clearDraft, filesToSerializable, serializableToFiles } from "@/lib/onboardingStorage";
 import {
-  LOGO_FORMATS, BROCHURE_FORMATS, IMPORT_FILE_FORMATS, IMAGE_FORMATS,
-  LOGO_EXTENSIONS, BROCHURE_EXTENSIONS, IMPORT_EXTENSIONS, IMAGE_EXTENSIONS,
+  LOGO_FORMATS, BROCHURE_FORMATS, IMPORT_FILE_FORMATS,
+  LOGO_EXTENSIONS, BROCHURE_EXTENSIONS, IMPORT_EXTENSIONS,
+  BULK_IMPORT_MAX_BYTES,
 } from "@/lib/onboardingValidation";
 import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock, AlreadySubmittedError } from "@/lib/onboardingSubmit";
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
