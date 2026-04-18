@@ -299,16 +299,66 @@ export default function EnquiryDetail() {
 
   const saveAll = async () => { await flushPendingSave(); };
 
+  // Validate that the user can leave the *current* stage based on its mandatory outcome.
+  const validateStageGate = (currentStage: Stage, d: Enquiry): string | null => {
+    if (currentStage === 'CONTACTED' && !d.payload.outcome) {
+      return 'Please select an outcome for the Contacted stage before moving on.';
+    }
+    if (currentStage === 'DEMO_SCHEDULED' && !d.demo_scheduled_at) {
+      return 'Please set the demo scheduled date/time before moving on.';
+    }
+    if (currentStage === 'DEMO_COMPLETED' && !d.payload.demo_outcome) {
+      return 'Please select a demo outcome before moving on.';
+    }
+    return null;
+  };
+
   const updateStage = async (stage: Stage) => {
-    if (!enquiry) return;
+    if (!enquiry || !draft) return;
+
+    // Block manual selection of ACCOUNT_CREATED — must use Convert to account flow.
+    if (stage === 'ACCOUNT_CREATED') {
+      toast.error('Account Created is set automatically when you convert the enquiry.');
+      return;
+    }
+    // Block manual selection of ONBOARDING_PACK_SENT — happens via Send onboarding action.
+    if (stage === 'ONBOARDING_PACK_SENT' && !enquiry.onboarding_pack_sent) {
+      toast.error('Use "Send onboarding form" to move to this stage.');
+      return;
+    }
+
+    // Mandatory-outcome gating: only when moving forward in the pipeline (not Lost, not back).
+    const fromIdx = STAGE_ORDER.indexOf(enquiry.stage);
+    const toIdx = STAGE_ORDER.indexOf(stage);
+    if (stage !== 'LOST' && toIdx > fromIdx) {
+      const blocker = validateStageGate(enquiry.stage, draft);
+      if (blocker) { toast.error(blocker); return; }
+    }
+
+    // Auto-open scheduling dialog when entering DEMO_SCHEDULED with no upcoming demo event.
+    if (stage === 'DEMO_SCHEDULED') {
+      const hasDemo = events.some(e => e.event_type === 'DEMO');
+      if (!hasDemo) {
+        setScheduleOpen(true);
+        // Don't change stage yet — it will auto-set after the demo is scheduled.
+        return;
+      }
+    }
+
     setBusy(true);
     await flushPendingSave();
-    const { error } = await supabase.from('enquiries').update({ stage }).eq('id', enquiry.id);
+    const updates: Record<string, unknown> = { stage };
+    // When entering DEMO_SCHEDULED, auto-populate demo_scheduled_at from earliest demo event if empty.
+    if (stage === 'DEMO_SCHEDULED' && !draft.demo_scheduled_at) {
+      const demo = events.filter(e => e.event_type === 'DEMO').sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))[0];
+      if (demo) updates.demo_scheduled_at = demo.scheduled_at;
+    }
+    const { error } = await supabase.from('enquiries').update(updates).eq('id', enquiry.id);
     if (error) toast.error(error.message);
     else {
       toast.success('Stage updated');
-      setEnquiry(prev => prev ? { ...prev, stage } : prev);
-      setDraft(prev => prev ? { ...prev, stage } : prev);
+      setEnquiry(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
+      setDraft(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
     }
     setBusy(false);
   };
