@@ -13,10 +13,11 @@ import { GuidanceCard } from "@/components/onboarding/GuidanceCard";
 import { ReferencePanel } from "@/components/onboarding/ReferencePanel";
 import { ReviewSummaryCard } from "@/components/onboarding/ReviewSummaryCard";
 import { Checkbox } from "@/components/ui/checkbox";
-import { saveDraft, loadDraft, clearDraft } from "@/lib/onboardingStorage";
+import { saveDraft, loadDraft, clearDraft, filesToSerializable, serializableToFiles } from "@/lib/onboardingStorage";
 import {
-  LOGO_FORMATS, BROCHURE_FORMATS, IMPORT_FILE_FORMATS, IMAGE_FORMATS,
-  LOGO_EXTENSIONS, BROCHURE_EXTENSIONS, IMPORT_EXTENSIONS, IMAGE_EXTENSIONS,
+  LOGO_FORMATS, BROCHURE_FORMATS, IMPORT_FILE_FORMATS,
+  LOGO_EXTENSIONS, BROCHURE_EXTENSIONS, IMPORT_EXTENSIONS,
+  BULK_IMPORT_MAX_BYTES,
 } from "@/lib/onboardingValidation";
 import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock, AlreadySubmittedError } from "@/lib/onboardingSubmit";
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
@@ -25,7 +26,7 @@ import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmitted
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
   { number: 2, label: "Team Access & Permissions" },
-  { number: 3, label: "Projects & Data Files" },
+  { number: 3, label: "Projects & Bulk Imports" },
   { number: 4, label: "Review & Submit" },
 ];
 
@@ -46,7 +47,7 @@ function createTeamMember() {
 }
 
 function createProject() {
-  return { id: crypto.randomUUID(), projectName: "", location: "", repName: "", repMobile: "", repMobileCode: "+91", repEmail: "", builderName: "", builderDetails: "", brochure: [] as File[] };
+  return { id: crypto.randomUUID(), projectName: "", location: "", repName: "", repMobile: "", repMobileCode: "+91", repEmail: "", builderName: "", brochure: [] as File[] };
 }
 
 type TeamMember = ReturnType<typeof createTeamMember>;
@@ -112,13 +113,9 @@ export default function AgencyOnboarding() {
 
   // Step 3
   const [projects, setProjects] = useState<Project[]>([createProject()]);
-  const [leadFile, setLeadFile] = useState<File[]>([]);
-  const [leadSheetLink, setLeadSheetLink] = useState("");
-  const [leadFileNotes, setLeadFileNotes] = useState("");
-  const [propertyFile, setPropertyFile] = useState<File[]>([]);
-  const [propertyImages, setPropertyImages] = useState<File[]>([]);
-  const [propertySheetLink, setPropertySheetLink] = useState("");
-  const [propertyFileNotes, setPropertyFileNotes] = useState("");
+  // Bulk imports (optional) — replaces the previous Lead/Property import sections.
+  const [bulkImportFiles, setBulkImportFiles] = useState<File[]>([]);
+  const [bulkImportNotes, setBulkImportNotes] = useState("");
 
   useEffect(() => {
     const draft = loadDraft("agency");
@@ -141,24 +138,28 @@ export default function AgencyOnboarding() {
         if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
         if (d.projects) setProjects(d.projects.map((p: any) => ({ ...p, brochure: [] })));
-        if (d.leadSheetLink) setLeadSheetLink(d.leadSheetLink);
-        if (d.leadFileNotes) setLeadFileNotes(d.leadFileNotes);
-        if (d.propertySheetLink) setPropertySheetLink(d.propertySheetLink);
-        if (d.propertyFileNotes) setPropertyFileNotes(d.propertyFileNotes);
+        // Restore the previously uploaded company logo so it doesn't disappear
+        // when the user reopens the form from a saved draft.
+        if (d.companyLogoSerialized) setCompanyLogo(serializableToFiles(d.companyLogoSerialized));
+        if (d.bulkImportNotes) setBulkImportNotes(d.bulkImportNotes);
         toast.info("Draft restored. You may continue where you left off.");
       } catch { /* ignore */ }
     }
   }, []);
 
-  const getFormData = () => ({
-    fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea, notes,
-    seatsRequired, teamMembers,
-    projects: projects.map(p => ({ ...p, brochure: undefined })),
-    leadSheetLink, leadFileNotes, propertySheetLink, propertyFileNotes,
-  });
-
-  const handleSaveDraft = () => {
-    saveDraft("agency", getFormData(), currentStep);
+  const handleSaveDraft = async () => {
+    // Persist company logo as base64 so it survives page reloads. Bulk import
+    // files can be very large (up to 100 MB each), so we deliberately do NOT
+    // serialise them — users re-attach those before final submission.
+    const companyLogoSerialized = await filesToSerializable(companyLogo);
+    const data = {
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea, notes,
+      seatsRequired, teamMembers,
+      projects: projects.map(p => ({ ...p, brochure: undefined })),
+      companyLogoSerialized,
+      bulkImportNotes,
+    };
+    saveDraft("agency", data, currentStep);
     toast.success("Draft saved successfully.");
   };
 
@@ -198,13 +199,14 @@ export default function AgencyOnboarding() {
 
   const validateStep3 = () => {
     const e: Record<string, string> = {};
+    // Per request: project fields are no longer mandatory for the agency form.
+    // Only the project name is required when a project card is filled in, and
+    // representative mobile (if provided) must be 10 digits. Bulk imports are
+    // entirely optional.
     projects.forEach((p, i) => {
-      if (!p.projectName.trim()) e[`proj_${i}_projectName`] = "Please enter the project name.";
-      if (!p.location.trim()) e[`proj_${i}_location`] = "Please enter the project location.";
-      if (!p.repName.trim()) e[`proj_${i}_repName`] = "Please enter the representative's name.";
-      if (!p.repMobile.trim()) e[`proj_${i}_repMobile`] = "Please provide a mobile number.";
-      else if (!validatePhone(p.repMobile)) e[`proj_${i}_repMobile`] = "Please enter a 10-digit mobile number.";
-      if (!p.builderName.trim()) e[`proj_${i}_builderName`] = "Please enter the builder name.";
+      if (p.repMobile.trim() && !validatePhone(p.repMobile)) {
+        e[`proj_${i}_repMobile`] = "Please enter a 10-digit mobile number.";
+      }
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -238,11 +240,9 @@ export default function AgencyOnboarding() {
     try {
       const enquiryId = getEnquiryIdFromUrl();
       const folder = `agency/${enquiryId ?? "anon"}/${Date.now()}`;
-      const [logoPaths, leadPaths, propertyPaths, propertyImagePaths] = await Promise.all([
+      const [logoPaths, bulkImportPaths] = await Promise.all([
         uploadFiles(companyLogo, `${folder}/logo`),
-        uploadFiles(leadFile, `${folder}/leads`),
-        uploadFiles(propertyFile, `${folder}/properties`),
-        uploadFiles(propertyImages, `${folder}/property-images`),
+        uploadFiles(bulkImportFiles, `${folder}/bulk-imports`),
       ]);
       const projectsWithBrochures = await Promise.all(projects.map(async (p, i) => ({
         ...p,
@@ -262,8 +262,7 @@ export default function AgencyOnboarding() {
         team: { seats_required: seatsRequired, members: teamMembers },
         team_members: teamMembers.map(tm => ({ full_name: tm.fullName, email: tm.email, phone: `${tm.mobileCode}${tm.mobile}`, role: tm.role })),
         projects: projectsWithBrochures,
-        lead_import: { paths: leadPaths, sheet_link: leadSheetLink, notes: leadFileNotes },
-        property_import: { paths: propertyPaths, image_paths: propertyImagePaths, sheet_link: propertySheetLink, notes: propertyFileNotes },
+        bulk_imports: { paths: bulkImportPaths, notes: bulkImportNotes },
         notes,
       };
 
@@ -409,25 +408,24 @@ export default function AgencyOnboarding() {
       {currentStep === 3 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-32 space-y-10">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Projects & Data Files</h2>
-            <p className="text-sm text-muted-foreground mt-1">Capture the projects your agency works on and gather the data files required for import preparation.</p>
+            <h2 className="text-2xl font-bold text-foreground">Projects & Bulk Imports</h2>
+            <p className="text-sm text-muted-foreground mt-1">Tell us about the projects your agency works on. Bulk imports are optional — share them now if ready, or send them later.</p>
           </div>
 
           <section className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Projects You Work On</h3>
-              <p className="text-sm text-muted-foreground mt-1">Please add the projects your team is actively marketing, selling, renting, or managing. Uploading the latest brochure helps us understand the project more quickly and configure it more accurately.</p>
+              <h3 className="text-lg font-semibold text-foreground">Projects You Work On <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">Add the projects your team is actively marketing, selling, renting, or managing. None of the project fields are required — share whatever you have available.</p>
             </div>
             {projects.map((proj, idx) => (
               <RepeatableCard key={proj.id} title={`Project ${idx + 1}`} subtitle={proj.projectName || undefined} index={idx} onRemove={() => setProjects((prev) => prev.filter((_, i) => i !== idx))} canRemove={projects.length > 1}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <TextField label="Project name" required value={proj.projectName} onChange={(v) => updateProject(idx, "projectName", v)} error={errors[`proj_${idx}_projectName`]} />
-                  <TextField label="Google Maps address / project location" required value={proj.location} onChange={(v) => updateProject(idx, "location", v)} error={errors[`proj_${idx}_location`]} />
-                  <TextField label="Project representative name" required value={proj.repName} onChange={(v) => updateProject(idx, "repName", v)} error={errors[`proj_${idx}_repName`]} placeholder="e.g. Arjun Agnihotri" />
-                  <PhoneField label="Project representative mobile number" required countryCode={proj.repMobileCode} onCountryCodeChange={(v) => updateProject(idx, "repMobileCode", v)} value={proj.repMobile} onChange={(v) => updateProject(idx, "repMobile", v)} error={errors[`proj_${idx}_repMobile`]} />
+                  <TextField label="Project name" value={proj.projectName} onChange={(v) => updateProject(idx, "projectName", v)} error={errors[`proj_${idx}_projectName`]} />
+                  <TextField label="Google Maps address / project location" value={proj.location} onChange={(v) => updateProject(idx, "location", v)} error={errors[`proj_${idx}_location`]} />
+                  <TextField label="Project representative name" value={proj.repName} onChange={(v) => updateProject(idx, "repName", v)} error={errors[`proj_${idx}_repName`]} placeholder="e.g. Arjun Agnihotri" />
+                  <PhoneField label="Project representative mobile number" countryCode={proj.repMobileCode} onCountryCodeChange={(v) => updateProject(idx, "repMobileCode", v)} value={proj.repMobile} onChange={(v) => updateProject(idx, "repMobile", v)} error={errors[`proj_${idx}_repMobile`]} />
                   <TextField label="Project representative email" type="email" value={proj.repEmail} onChange={(v) => updateProject(idx, "repEmail", v)} />
-                  <TextField label="Builder name" required value={proj.builderName} onChange={(v) => updateProject(idx, "builderName", v)} error={errors[`proj_${idx}_builderName`]} />
-                  <div className="sm:col-span-2"><TextField label="Builder details" value={proj.builderDetails} onChange={(v) => updateProject(idx, "builderDetails", v)} /></div>
+                  <TextField label="Builder name" value={proj.builderName} onChange={(v) => updateProject(idx, "builderName", v)} error={errors[`proj_${idx}_builderName`]} />
                 </div>
                 <FileUploadField label="Project brochure" acceptedFormats={BROCHURE_EXTENSIONS} acceptedMimeTypes={BROCHURE_FORMATS} files={proj.brochure} onChange={(files) => updateProject(idx, "brochure", files)} helperText="Upload the latest brochure for this project." />
               </RepeatableCard>
@@ -437,25 +435,20 @@ export default function AgencyOnboarding() {
 
           <section className="space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Lead Import Files <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
-              <p className="text-sm text-muted-foreground mt-1">If you have lead data ready, share it now. You can also send it later — none of these files are required to submit this form.</p>
+              <h3 className="text-lg font-semibold text-foreground">Bulk Imports <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">Upload any files you'd like us to import — leads, properties, contacts, or anything else. PDF, Word, Excel, CSV and image formats are supported, up to 100 MB per file.</p>
             </div>
-            <FileUploadField label="Upload lead file" acceptedFormats={IMPORT_EXTENSIONS} acceptedMimeTypes={IMPORT_FILE_FORMATS} files={leadFile} onChange={setLeadFile} multiple />
-            <TextField label="Google Sheet link" type="url" value={leadSheetLink} onChange={setLeadSheetLink} placeholder="https://docs.google.com/spreadsheets/..." />
-            <TextAreaField label="Lead file notes" value={leadFileNotes} onChange={setLeadFileNotes} rows={2} />
-            <ReferencePanel title="Expected Lead Fields" fields={["Lead name", "Contact number", "Looking for: Rent or Sale", "Budget", "Area requirement in sq ft", "Property type", "Property category", "Preferred locality", "Preferred city"]} />
-          </section>
-
-          <section className="space-y-5">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Property Import Files <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
-              <p className="text-sm text-muted-foreground mt-1">Existing property stock you want imported into the CRM. Share it now or send it later — these files are not required to submit this form.</p>
-            </div>
-            <FileUploadField label="Upload property file" acceptedFormats={IMPORT_EXTENSIONS} acceptedMimeTypes={IMPORT_FILE_FORMATS} files={propertyFile} onChange={setPropertyFile} multiple />
-            <FileUploadField label="Upload property images" acceptedFormats={IMAGE_EXTENSIONS} acceptedMimeTypes={IMAGE_FORMATS} files={propertyImages} onChange={setPropertyImages} multiple />
-            <TextField label="Google Sheet link" type="url" value={propertySheetLink} onChange={setPropertySheetLink} placeholder="https://docs.google.com/spreadsheets/..." />
-            <TextAreaField label="Property file notes" value={propertyFileNotes} onChange={setPropertyFileNotes} rows={2} />
-            <ReferencePanel title="Expected Property Fields" fields={["Property title or identifier", "Owner, broker, or representative name", "Contact number", "Sale or rent", "Property location", "Price", "Configuration", "Locality", "Availability status", "Images, if available"]} />
+            <FileUploadField
+              label="Upload import files"
+              acceptedFormats={IMPORT_EXTENSIONS}
+              acceptedMimeTypes={IMPORT_FILE_FORMATS}
+              files={bulkImportFiles}
+              onChange={setBulkImportFiles}
+              multiple
+              maxSizeBytes={BULK_IMPORT_MAX_BYTES}
+              helperText="Maximum file size: 100 MB."
+            />
+            <TextAreaField label="Import notes" value={bulkImportNotes} onChange={setBulkImportNotes} rows={3} helperText="Add any context that will help us process these imports correctly." />
           </section>
         </motion.div>
       )}
@@ -487,25 +480,17 @@ export default function AgencyOnboarding() {
 
           {projects.map((proj, i) => (
             <ReviewSummaryCard key={proj.id} title={`Project ${i + 1}`} onEdit={() => setCurrentStep(3)} fields={[
-              { label: "Project name", value: proj.projectName, required: true },
-              { label: "Location", value: proj.location, required: true },
-              { label: "Representative", value: proj.repName, required: true },
-              { label: "Builder", value: proj.builderName, required: true },
+              { label: "Project name", value: proj.projectName },
+              { label: "Location", value: proj.location },
+              { label: "Representative", value: proj.repName },
+              { label: "Builder", value: proj.builderName },
               { label: "Brochure", value: proj.brochure.length > 0 ? `${proj.brochure.length} file(s)` : undefined },
             ]} />
           ))}
 
-          <ReviewSummaryCard title="Lead Import" onEdit={() => setCurrentStep(3)} fields={[
-            { label: "Lead file(s)", value: leadFile.length > 0 ? `${leadFile.length} file(s)` : undefined },
-            { label: "Google Sheet link", value: leadSheetLink },
-            { label: "Notes", value: leadFileNotes },
-          ]} />
-
-          <ReviewSummaryCard title="Property Import" onEdit={() => setCurrentStep(3)} fields={[
-            { label: "Property file(s)", value: propertyFile.length > 0 ? `${propertyFile.length} file(s)` : undefined },
-            { label: "Property images", value: propertyImages.length > 0 ? `${propertyImages.length} file(s)` : undefined },
-            { label: "Google Sheet link", value: propertySheetLink },
-            { label: "Notes", value: propertyFileNotes },
+          <ReviewSummaryCard title="Bulk Imports" onEdit={() => setCurrentStep(3)} fields={[
+            { label: "Files", value: bulkImportFiles.length > 0 ? `${bulkImportFiles.length} file(s)` : undefined },
+            { label: "Notes", value: bulkImportNotes },
           ]} />
 
           {notes && (

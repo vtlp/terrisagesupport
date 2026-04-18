@@ -12,19 +12,28 @@ interface FileUploadFieldProps {
   onChange: (files: File[]) => void;
   error?: string;
   required?: boolean;
+  maxSizeBytes?: number;
 }
 
 export function FileUploadField({
-  label, acceptedFormats, acceptedMimeTypes, helperText, multiple = false, files, onChange, error, required,
+  label, acceptedFormats, acceptedMimeTypes, helperText, multiple = false, files, onChange, error, required, maxSizeBytes,
 }: FileUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [sizeError, setSizeError] = useState<string | null>(null);
 
   const handleFiles = (incoming: FileList | null) => {
     if (!incoming) return;
-    const valid = Array.from(incoming).filter((f) =>
-      acceptedMimeTypes.some((t) => f.type === t || t === "*")
-    );
+    setSizeError(null);
+    const arr = Array.from(incoming);
+    const oversized = maxSizeBytes ? arr.filter((f) => f.size > maxSizeBytes) : [];
+    if (oversized.length > 0) {
+      const limitMb = Math.round((maxSizeBytes ?? 0) / (1024 * 1024));
+      setSizeError(`${oversized.map((f) => f.name).join(", ")} exceeds the ${limitMb} MB limit.`);
+    }
+    const valid = arr
+      .filter((f) => !maxSizeBytes || f.size <= maxSizeBytes)
+      .filter((f) => acceptedMimeTypes.some((t) => f.type === t || t === "*"));
     if (multiple) onChange([...files, ...valid]);
     else onChange(valid.slice(0, 1));
   };
@@ -78,7 +87,8 @@ export function FileUploadField({
         </div>
       )}
 
-      {helperText && !error && <p className="text-xs text-muted-foreground">{helperText}</p>}
+      {helperText && !error && !sizeError && <p className="text-xs text-muted-foreground">{helperText}</p>}
+      {sizeError && <p className="text-sm text-destructive">{sizeError}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );

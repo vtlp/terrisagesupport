@@ -13,10 +13,11 @@ import { GuidanceCard } from "@/components/onboarding/GuidanceCard";
 import { ReferencePanel } from "@/components/onboarding/ReferencePanel";
 import { ReviewSummaryCard } from "@/components/onboarding/ReviewSummaryCard";
 import { Checkbox } from "@/components/ui/checkbox";
-import { saveDraft, loadDraft, clearDraft } from "@/lib/onboardingStorage";
+import { saveDraft, loadDraft, clearDraft, filesToSerializable, serializableToFiles } from "@/lib/onboardingStorage";
 import {
   LOGO_FORMATS, BROCHURE_FORMATS, IMPORT_FILE_FORMATS,
   LOGO_EXTENSIONS, BROCHURE_EXTENSIONS, IMPORT_EXTENSIONS,
+  BULK_IMPORT_MAX_BYTES,
 } from "@/lib/onboardingValidation";
 import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock, AlreadySubmittedError } from "@/lib/onboardingSubmit";
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
@@ -25,7 +26,7 @@ import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmitted
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
   { number: 2, label: "Team Access & Permissions" },
-  { number: 3, label: "Projects & Lead Files" },
+  { number: 3, label: "Projects & Bulk Imports" },
   { number: 4, label: "Review & Submit" },
 ];
 
@@ -118,9 +119,9 @@ export default function BuilderOnboarding() {
 
   // Step 3
   const [projects, setProjects] = useState<Project[]>([createProject()]);
-  const [leadFile, setLeadFile] = useState<File[]>([]);
-  const [leadSheetLink, setLeadSheetLink] = useState("");
-  const [leadFileNotes, setLeadFileNotes] = useState("");
+  // Bulk imports (optional) — replaces previous Lead Import section.
+  const [bulkImportFiles, setBulkImportFiles] = useState<File[]>([]);
+  const [bulkImportNotes, setBulkImportNotes] = useState("");
 
   useEffect(() => {
     const draft = loadDraft("builder");
@@ -143,22 +144,25 @@ export default function BuilderOnboarding() {
         if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
         if (d.projects) setProjects(d.projects.map((p: any) => ({ ...p, brochure: [] })));
-        if (d.leadSheetLink) setLeadSheetLink(d.leadSheetLink);
-        if (d.leadFileNotes) setLeadFileNotes(d.leadFileNotes);
+        // Restore the previously uploaded company logo so it doesn't disappear
+        // when the user reopens the form from a saved draft.
+        if (d.companyLogoSerialized) setCompanyLogo(serializableToFiles(d.companyLogoSerialized));
+        if (d.bulkImportNotes) setBulkImportNotes(d.bulkImportNotes);
         toast.info("Draft restored. You may continue where you left off.");
       } catch { /* ignore */ }
     }
   }, []);
 
-  const getFormData = () => ({
-    fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus, notes,
-    seatsRequired, teamMembers,
-    projects: projects.map(p => ({ ...p, brochure: undefined })),
-    leadSheetLink, leadFileNotes,
-  });
-
-  const handleSaveDraft = () => {
-    saveDraft("builder", getFormData(), currentStep);
+  const handleSaveDraft = async () => {
+    const companyLogoSerialized = await filesToSerializable(companyLogo);
+    const data = {
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus, notes,
+      seatsRequired, teamMembers,
+      projects: projects.map(p => ({ ...p, brochure: undefined })),
+      companyLogoSerialized,
+      bulkImportNotes,
+    };
+    saveDraft("builder", data, currentStep);
     toast.success("Draft saved successfully.");
   };
 
@@ -238,9 +242,9 @@ export default function BuilderOnboarding() {
     try {
       const enquiryId = getEnquiryIdFromUrl();
       const folder = `builder/${enquiryId ?? "anon"}/${Date.now()}`;
-      const [logoPaths, leadPaths] = await Promise.all([
+      const [logoPaths, bulkImportPaths] = await Promise.all([
         uploadFiles(companyLogo, `${folder}/logo`),
-        uploadFiles(leadFile, `${folder}/leads`),
+        uploadFiles(bulkImportFiles, `${folder}/bulk-imports`),
       ]);
       const projectsWithBrochures = await Promise.all(projects.map(async (p, i) => ({
         ...p,
@@ -260,7 +264,7 @@ export default function BuilderOnboarding() {
         team: { seats_required: seatsRequired, members: teamMembers },
         team_members: teamMembers.map(tm => ({ full_name: tm.fullName, email: tm.email, phone: `${tm.mobileCode}${tm.mobile}`, role: tm.role })),
         projects: projectsWithBrochures,
-        lead_import: { paths: leadPaths, sheet_link: leadSheetLink, notes: leadFileNotes },
+        bulk_imports: { paths: bulkImportPaths, notes: bulkImportNotes },
         notes,
       };
 
@@ -422,16 +426,20 @@ export default function BuilderOnboarding() {
 
           <section className="space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Lead Import Files <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
-              <p className="text-sm text-muted-foreground mt-1">If you have lead data ready, share it now or send it later — none of these files are required to submit this form. Recommended fields: name, contact number, budget, project interested, notes.</p>
+              <h3 className="text-lg font-semibold text-foreground">Bulk Imports <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">Upload any files you'd like us to import — leads, contacts, or anything else. PDF, Word, Excel, CSV and image formats are supported, up to 100 MB per file.</p>
             </div>
-            <FileUploadField label="Upload lead file" acceptedFormats={IMPORT_EXTENSIONS} acceptedMimeTypes={IMPORT_FILE_FORMATS} files={leadFile} onChange={setLeadFile} multiple />
-            <TextField label="Google Sheet link" type="url" value={leadSheetLink} onChange={setLeadSheetLink} placeholder="https://docs.google.com/spreadsheets/..." />
-            <TextAreaField label="Lead file notes" value={leadFileNotes} onChange={setLeadFileNotes} rows={2} />
-            <ReferencePanel title="Expected Lead Fields" fields={["Name", "Contact number", "Budget", "Project interested (project name)", "Notes"]} />
-            <div className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-sm text-muted-foreground">
-              ℹ️ Property import is not part of this builder onboarding form. Project brochures and details above will be used to guide project setup.
-            </div>
+            <FileUploadField
+              label="Upload import files"
+              acceptedFormats={IMPORT_EXTENSIONS}
+              acceptedMimeTypes={IMPORT_FILE_FORMATS}
+              files={bulkImportFiles}
+              onChange={setBulkImportFiles}
+              multiple
+              maxSizeBytes={BULK_IMPORT_MAX_BYTES}
+              helperText="Maximum file size: 100 MB."
+            />
+            <TextAreaField label="Import notes" value={bulkImportNotes} onChange={setBulkImportNotes} rows={3} helperText="Add any context that will help us process these imports correctly." />
           </section>
         </motion.div>
       )}
@@ -472,10 +480,9 @@ export default function BuilderOnboarding() {
             ]} />
           ))}
 
-          <ReviewSummaryCard title="Lead Import" onEdit={() => setCurrentStep(3)} fields={[
-            { label: "Lead file(s)", value: leadFile.length > 0 ? `${leadFile.length} file(s)` : undefined },
-            { label: "Google Sheet link", value: leadSheetLink },
-            { label: "Notes", value: leadFileNotes },
+          <ReviewSummaryCard title="Bulk Imports" onEdit={() => setCurrentStep(3)} fields={[
+            { label: "Files", value: bulkImportFiles.length > 0 ? `${bulkImportFiles.length} file(s)` : undefined },
+            { label: "Notes", value: bulkImportNotes },
           ]} />
 
           {notes && (
