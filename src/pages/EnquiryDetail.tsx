@@ -26,6 +26,7 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
+import { useUser } from '@/context/UserContext';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
@@ -141,6 +142,7 @@ const NONE = '__none__';
 export default function EnquiryDetail() {
   const { enquiryId } = useParams<{ enquiryId: string }>();
   const navigate = useNavigate();
+  const { currentUser } = useUser();
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
   const [draft, setDraft] = useState<Enquiry | null>(null);
   const [notes, setNotes] = useState<NoteRow[]>([]);
@@ -512,11 +514,8 @@ export default function EnquiryDetail() {
       .eq('id', submission.id);
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    const { data: noteRow } = await supabase.from('enquiry_notes').insert({
-      enquiry_id: enquiry.id,
-      note_text: `Onboarding submission ${status === 'APPROVED' ? 'approved' : 'rejected'}`,
-    }).select('id, note_text, created_at').single();
-    if (noteRow) setNotes(prev => [noteRow as NoteRow, ...prev]);
+    // Note: status change is already captured automatically in the Activity Timeline
+    // via the trg_submissions_activity trigger, so we no longer duplicate it here as a note.
     toast.success(`Submission ${status.toLowerCase()}`);
     refreshSubmission(enquiry.id);
   };
@@ -1003,6 +1002,8 @@ export default function EnquiryDetail() {
               const { error } = await supabase.from('calendar_events').insert({
                 title: d.title, scheduled_at: scheduledIso, notes: d.notes || null,
                 event_type: d.event_type as 'DEMO' | 'FOLLOW_UP' | 'CALL_BACK' | 'CHECK_IN' | 'ONBOARDING' | 'OTHER',
+                created_by: currentUser.user_id,
+                assigned_to: d.assigned_to ?? currentUser.user_id,
                 related_entity_type: 'ENQUIRY', related_entity_id: enquiry.id,
               });
               if (error) { toast.error(error.message); return; }

@@ -14,6 +14,7 @@ import { getCityOptions, getTagOptions } from '@/data/lookupData';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
 import { toast } from 'sonner';
 import { createTicket, fetchAccountsLite, fetchQueues, type AccountRow, type QueueRow } from '@/lib/ticketsApi';
+import { useUser } from '@/context/UserContext';
 
 interface CreateTicketDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface CreateTicketDialogProps {
 }
 
 export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTicketDialogProps) {
+  const { currentUser } = useUser();
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TicketPriority>(TicketPriority.P3);
@@ -29,7 +31,8 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
   const [category, setCategory] = useState<TicketCategory>(TicketCategory.OTHER);
   const [accountId, setAccountId] = useState<string>('none');
   const [queueId, setQueueId] = useState<string>('none');
-  const [assignedTo, setAssignedTo] = useState<string | null>(null);
+  // Default assignee = creator (current user)
+  const [assignedTo, setAssignedTo] = useState<string | null>(currentUser.user_id || null);
   const [market, setMarket] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
@@ -62,7 +65,8 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
   const reset = () => {
     setSubject(''); setDescription(''); setPriority(TicketPriority.P3);
     setType(TicketType.INCIDENT); setCategory(TicketCategory.OTHER);
-    setAccountId('none'); setQueueId('none'); setAssignedTo(null);
+    setAccountId('none'); setQueueId('none');
+    setAssignedTo(currentUser.user_id || null);
     setMarket(''); setTags([]); setTagInput('');
     setRequesterName(''); setRequesterEmail('');
   };

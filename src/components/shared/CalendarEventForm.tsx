@@ -13,6 +13,7 @@ import { CalendarEventType } from '@/types/core';
 import { EntityPicker } from './EntityPicker';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
+import { useUser } from '@/context/UserContext';
 
 const eventTypeLabels: Record<CalendarEventType, string> = {
   [CalendarEventType.DEMO]: 'Demo',
@@ -47,9 +48,10 @@ interface CalendarEventFormProps {
 export function CalendarEventForm({
   onSubmit, onCancel,
   defaultTitle = '', defaultDescription = '', defaultEventType = CalendarEventType.GENERAL,
-  defaultAssignedTo = null,
+  defaultAssignedTo,
   lockedEntityType, lockedEntityId, lockedEntityLabel,
 }: CalendarEventFormProps) {
+  const { currentUser } = useUser();
   const [title, setTitle] = useState(defaultTitle);
   const [date, setDate] = useState<Date | undefined>();
   const [time, setTime] = useState('10:00');
@@ -57,7 +59,10 @@ export function CalendarEventForm({
   const [eventType, setEventType] = useState<CalendarEventType>(defaultEventType);
   const [linkType, setLinkType] = useState<'ENQUIRY' | 'ACCOUNT' | ''>(lockedEntityType ?? '');
   const [linkId, setLinkId] = useState<string | null>(lockedEntityId ?? null);
-  const [assignedTo, setAssignedTo] = useState<string | null>(defaultAssignedTo);
+  // Default assignee = creator (current user) unless an explicit default is provided
+  const [assignedTo, setAssignedTo] = useState<string | null>(
+    defaultAssignedTo !== undefined ? defaultAssignedTo : (currentUser.user_id || null)
+  );
   const [team, setTeam] = useState<{ id: string; full_name: string }[]>([]);
 
   useEffect(() => {
