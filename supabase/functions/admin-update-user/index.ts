@@ -65,7 +65,8 @@ Deno.serve(async (req) => {
       if (body.is_active !== undefined) patch.is_active = body.is_active;
       const { error: pErr } = await admin.from("profiles").update(patch).eq("id", body.user_id);
       if (pErr) {
-        return new Response(JSON.stringify({ error: `profiles: ${pErr.message}` }), {
+        console.error("admin-update-user profiles error:", pErr);
+        return new Response(JSON.stringify({ error: "Failed to update profile" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -80,7 +81,8 @@ Deno.serve(async (req) => {
     if (body.role) {
       const { error: dErr } = await admin.from("user_roles").delete().eq("user_id", body.user_id);
       if (dErr) {
-        return new Response(JSON.stringify({ error: `roles delete: ${dErr.message}` }), {
+        console.error("admin-update-user roles delete error:", dErr);
+        return new Response(JSON.stringify({ error: "Failed to update role" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -88,7 +90,8 @@ Deno.serve(async (req) => {
         .from("user_roles")
         .insert({ user_id: body.user_id, role: body.role });
       if (iErr) {
-        return new Response(JSON.stringify({ error: `roles insert: ${iErr.message}` }), {
+        console.error("admin-update-user roles insert error:", iErr);
+        return new Response(JSON.stringify({ error: "Failed to update role" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -115,7 +118,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
+    console.error("admin-update-user error:", e);
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

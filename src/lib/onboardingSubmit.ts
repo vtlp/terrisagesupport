@@ -39,19 +39,16 @@ export class AlreadySubmittedError extends Error {
  */
 export async function checkSubmissionLock(enquiryId: string | null): Promise<string | null> {
   if (!enquiryId) return null;
-  const { data, error } = await supabase
-    .from("onboarding_submissions")
-    .select("submitted_at,status")
-    .eq("enquiry_id", enquiryId)
-    .neq("status", "REJECTED")
-    .order("submitted_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Uses a SECURITY DEFINER RPC so the anon role never gets direct SELECT on
+  // onboarding_submissions (which would expose PII payloads).
+  const { data, error } = await supabase.rpc("check_submission_lock", {
+    _enquiry_id: enquiryId,
+  });
   if (error) {
     console.warn("checkSubmissionLock failed", error);
     return null;
   }
-  return data?.submitted_at ?? null;
+  return (data as string | null) ?? null;
 }
 
 export async function submitOnboarding(

@@ -1904,6 +1904,7 @@ export type Database = {
       }
     }
     Functions: {
+      check_submission_lock: { Args: { _enquiry_id: string }; Returns: string }
       convert_enquiry_to_account: {
         Args: { _enquiry_id: string }
         Returns: string
