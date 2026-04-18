@@ -780,7 +780,21 @@ export default function EnquiryDetail() {
                   placeholder="Select property types"
                 />
               </div>
+            </div>
 
+            {/* Current system + Portals side by side */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Current system / software in use</Label>
+                <MultiSelect
+                  options={CURRENT_SYSTEMS.map(o => ({ value: o.v, label: o.l }))}
+                  selected={Array.isArray(draft.payload.current_system)
+                    ? draft.payload.current_system
+                    : (draft.payload.current_system ? [draft.payload.current_system as string] : [])}
+                  onChange={vals => setPayload('current_system', vals)}
+                  placeholder="Select current system(s)"
+                />
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Portals currently in use</Label>
                 <MultiSelect
@@ -792,21 +806,10 @@ export default function EnquiryDetail() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Current system / software in use</Label>
-                <MultiSelect
-                  options={CURRENT_SYSTEMS.map(o => ({ value: o.v, label: o.l }))}
-                  selected={Array.isArray(draft.payload.current_system)
-                    ? draft.payload.current_system
-                    : (draft.payload.current_system ? [draft.payload.current_system as string] : [])}
-                  onChange={vals => setPayload('current_system', vals)}
-                  placeholder="Select current system(s)"
-                />
-              </div>
-              {(Array.isArray(draft.payload.current_system)
-                  ? draft.payload.current_system.includes('OTHER')
-                  : draft.payload.current_system === 'OTHER') && (
+            {(Array.isArray(draft.payload.current_system)
+                ? draft.payload.current_system.includes('OTHER')
+                : draft.payload.current_system === 'OTHER') && (
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label>Specify other system</Label>
                   <Input
@@ -815,8 +818,8 @@ export default function EnquiryDetail() {
                     onChange={e => setPayload('current_system_text', e.target.value)}
                   />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Approx. onboarding date — last field per request */}
             <div className="grid md:grid-cols-2 gap-4">
