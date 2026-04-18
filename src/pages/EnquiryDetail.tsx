@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon, ChevronRight, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -40,12 +40,14 @@ interface EnquiryPayload {
   sales_focus?: string[];
   primary_property_types?: string[];
   team_size_estimate?: number | null;
-  current_system?: string;
+  current_system?: string | string[];
   current_system_text?: string;
   approx_onboarding_date?: string | null;
   portals_in_use?: string[];
   [k: string]: unknown;
 }
+
+type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
 interface Enquiry {
   id: string; full_name: string; phone: string; email: string | null;
@@ -143,13 +145,19 @@ export default function EnquiryDetail() {
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const [newNote, setNewNote] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
+
+  const draftRef = useRef<Enquiry | null>(null);
+  const enquiryRef = useRef<Enquiry | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => { enquiryRef.current = enquiry; }, [enquiry]);
 
   const loadEvents = useCallback(async (id: string) => {
     const nowIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
@@ -162,6 +170,37 @@ export default function EnquiryDetail() {
     setEvents((data ?? []) as EventRow[]);
   }, []);
 
+  const refreshNotes = useCallback(async (id: string) => {
+    const { data } = await supabase.from('enquiry_notes')
+      .select('id, note_text, created_at').eq('enquiry_id', id)
+      .order('created_at', { ascending: false });
+    setNotes((data ?? []) as NoteRow[]);
+  }, []);
+
+  const refreshSubmission = useCallback(async (id: string) => {
+    const { data } = await supabase.from('onboarding_submissions')
+      .select('id, status, submitted_at, reviewed_at, payload, tenancy_type')
+      .eq('enquiry_id', id).order('submitted_at', { ascending: false }).limit(1).maybeSingle();
+    setSubmission(data as Submission | null);
+  }, []);
+
+  const refreshEnquiryMeta = useCallback(async (id: string) => {
+    // Only refresh server-managed fields (stage, conversion, onboarding flags) without
+    // overwriting in-progress edits in the draft.
+    const { data } = await supabase.from('enquiries')
+      .select('stage, converted_account_id, onboarding_pack_sent, onboarding_pack_sent_at, onboarding_form_link, demo_scheduled_at, demo_completed_at')
+      .eq('id', id).maybeSingle();
+    if (!data) return;
+    setEnquiry(prev => prev ? { ...prev, ...data } as Enquiry : prev);
+    setDraft(prev => prev ? {
+      ...prev,
+      stage: data.stage,
+      converted_account_id: data.converted_account_id,
+      onboarding_pack_sent: data.onboarding_pack_sent,
+      onboarding_form_link: data.onboarding_form_link,
+    } as Enquiry : prev);
+  }, []);
+
   const load = useCallback(async () => {
     if (!enquiryId) return;
     setLoading(true);
@@ -171,9 +210,15 @@ export default function EnquiryDetail() {
       supabase.from('onboarding_submissions').select('id, status, submitted_at, reviewed_at, payload, tenancy_type').eq('enquiry_id', enquiryId).order('submitted_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
     if (eErr || !e) { toast.error('Enquiry not found'); navigate('/enquiries'); return; }
-    const enq = { ...e, payload: (e.payload ?? {}) as EnquiryPayload } as Enquiry;
+    const payload = (e.payload ?? {}) as EnquiryPayload;
+    // Backward-compat: normalise current_system from string to array
+    if (typeof payload.current_system === 'string' && payload.current_system) {
+      payload.current_system = [payload.current_system];
+    }
+    const enq = { ...e, payload } as Enquiry;
     setEnquiry(enq);
     setDraft(enq);
+    setSaveState('idle');
     setNotes((n ?? []) as NoteRow[]);
     setSubmission(s as Submission | null);
     loadEvents(enq.id);
@@ -192,6 +237,51 @@ export default function EnquiryDetail() {
 
   const isDirty = useMemo(() => JSON.stringify(enquiry) !== JSON.stringify(draft), [enquiry, draft]);
 
+  // Persist current draft → server. Does NOT reload page.
+  const persistDraft = useCallback(async (): Promise<boolean> => {
+    const d = draftRef.current; const orig = enquiryRef.current;
+    if (!d || !orig) return true;
+    if (JSON.stringify(d) === JSON.stringify(orig)) return true;
+    setSaveState('saving');
+    const update = {
+      full_name: d.full_name,
+      phone: d.phone,
+      email: d.email,
+      city: d.city,
+      company_name: d.company_name,
+      tenancy_type: d.tenancy_type,
+      source: d.source,
+      demo_scheduled_at: d.demo_scheduled_at,
+      demo_completed_at: d.demo_completed_at,
+      lost_reason: d.lost_reason,
+      payload: d.payload as unknown as never,
+    };
+    const { error } = await supabase.from('enquiries').update(update).eq('id', d.id);
+    if (error) { setSaveState('error'); toast.error(error.message); return false; }
+    setEnquiry(d);
+    setSaveState('saved');
+    return true;
+  }, []);
+
+  const flushPendingSave = useCallback(async () => {
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    await persistDraft();
+  }, [persistDraft]);
+
+  // Debounced autosave on draft change
+  useEffect(() => {
+    if (!enquiry || !draft) return;
+    if (JSON.stringify(enquiry) === JSON.stringify(draft)) return;
+    setSaveState('dirty');
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => { persistDraft(); }, 1200);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+
+  // Flush on unmount
+  useEffect(() => () => { flushPendingSave(); }, [flushPendingSave]);
+
   const setField = <K extends keyof Enquiry>(key: K, value: Enquiry[K]) => {
     setDraft(d => d ? { ...d, [key]: value } : d);
   };
@@ -207,54 +297,18 @@ export default function EnquiryDetail() {
     });
   };
 
-  const saveAll = async () => {
-    if (!draft || !enquiry) return;
-    setSaving(true);
-    const update = {
-      full_name: draft.full_name,
-      phone: draft.phone,
-      email: draft.email,
-      city: draft.city,
-      company_name: draft.company_name,
-      tenancy_type: draft.tenancy_type,
-      source: draft.source,
-      demo_scheduled_at: draft.demo_scheduled_at,
-      demo_completed_at: draft.demo_completed_at,
-      lost_reason: draft.lost_reason,
-      payload: draft.payload as unknown as never,
-    };
-    const { error } = await supabase.from('enquiries').update(update).eq('id', enquiry.id);
-    setSaving(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Saved');
-    load();
-  };
+  const saveAll = async () => { await flushPendingSave(); };
 
   const updateStage = async (stage: Stage) => {
-    if (!enquiry || !draft) return;
+    if (!enquiry) return;
     setBusy(true);
-    // Persist any unsaved field edits before changing stage so they aren't lost on reload
-    const update: Record<string, unknown> = { stage };
-    if (JSON.stringify(enquiry) !== JSON.stringify(draft)) {
-      Object.assign(update, {
-        full_name: draft.full_name,
-        phone: draft.phone,
-        email: draft.email,
-        city: draft.city,
-        company_name: draft.company_name,
-        tenancy_type: draft.tenancy_type,
-        source: draft.source,
-        demo_scheduled_at: draft.demo_scheduled_at,
-        demo_completed_at: draft.demo_completed_at,
-        lost_reason: draft.lost_reason,
-        payload: draft.payload as unknown as never,
-      });
-    }
-    const { error } = await supabase.from('enquiries').update(update as never).eq('id', enquiry.id);
+    await flushPendingSave();
+    const { error } = await supabase.from('enquiries').update({ stage }).eq('id', enquiry.id);
     if (error) toast.error(error.message);
     else {
       toast.success('Stage updated');
-      load();
+      setEnquiry(prev => prev ? { ...prev, stage } : prev);
+      setDraft(prev => prev ? { ...prev, stage } : prev);
     }
     setBusy(false);
   };
@@ -262,10 +316,14 @@ export default function EnquiryDetail() {
   const addNote = async () => {
     if (!enquiry || !newNote.trim()) return;
     setBusy(true);
-    const { error } = await supabase.from('enquiry_notes').insert({ enquiry_id: enquiry.id, note_text: newNote.trim() });
+    await flushPendingSave();
+    const { data, error } = await supabase.from('enquiry_notes')
+      .insert({ enquiry_id: enquiry.id, note_text: newNote.trim() })
+      .select('id, note_text, created_at').single();
     setBusy(false);
-    if (error) toast.error(error.message);
-    else { setNewNote(''); load(); }
+    if (error) { toast.error(error.message); return; }
+    setNewNote('');
+    if (data) setNotes(prev => [data as NoteRow, ...prev]);
   };
 
   const generateLink = (): string => {
@@ -276,6 +334,7 @@ export default function EnquiryDetail() {
 
   const handleSendOnboarding = async () => {
     if (!enquiry) return;
+    await flushPendingSave();
     const link = generateLink();
     if (!enquiry.onboarding_pack_sent) {
       await supabase.from('enquiries').update({
@@ -284,33 +343,37 @@ export default function EnquiryDetail() {
         onboarding_form_link: link,
         stage: 'ONBOARDING_PACK_SENT' as Stage,
       }).eq('id', enquiry.id);
-      await supabase.from('enquiry_notes').insert({
+      const { data: noteRow } = await supabase.from('enquiry_notes').insert({
         enquiry_id: enquiry.id, note_text: `Onboarding form link generated: ${link}`,
-      });
-      load();
+      }).select('id, note_text, created_at').single();
+      if (noteRow) setNotes(prev => [noteRow as NoteRow, ...prev]);
+      await refreshEnquiryMeta(enquiry.id);
     }
     setShareOpen(true);
   };
 
   const reviewSubmission = async (status: 'APPROVED' | 'REJECTED') => {
-    if (!submission) return;
+    if (!submission || !enquiry) return;
     setBusy(true);
+    await flushPendingSave();
     const { error } = await supabase.from('onboarding_submissions')
       .update({ status, reviewed_at: new Date().toISOString() })
       .eq('id', submission.id);
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    await supabase.from('enquiry_notes').insert({
-      enquiry_id: enquiry!.id,
+    const { data: noteRow } = await supabase.from('enquiry_notes').insert({
+      enquiry_id: enquiry.id,
       note_text: `Onboarding submission ${status === 'APPROVED' ? 'approved' : 'rejected'}`,
-    });
+    }).select('id, note_text, created_at').single();
+    if (noteRow) setNotes(prev => [noteRow as NoteRow, ...prev]);
     toast.success(`Submission ${status.toLowerCase()}`);
-    load();
+    refreshSubmission(enquiry.id);
   };
 
   const convertToAccount = async () => {
     if (!enquiry) return;
     setBusy(true);
+    await flushPendingSave();
     const { data, error } = await supabase.rpc('convert_enquiry_to_account', { _enquiry_id: enquiry.id });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
@@ -361,9 +424,10 @@ export default function EnquiryDetail() {
             </Badge>
           </Link>
         )}
-        <Button onClick={saveAll} disabled={saving || !isDirty} size="sm" variant={isDirty ? 'default' : 'outline'}>
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          {isDirty ? 'Save changes' : 'Saved'}
+        <SaveStatusIndicator state={saveState} isDirty={isDirty} />
+        <Button onClick={saveAll} disabled={saveState === 'saving' || !isDirty} size="sm" variant={isDirty ? 'default' : 'outline'}>
+          {saveState === 'saving' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          {isDirty ? 'Save now' : 'Saved'}
         </Button>
       </div>
 
@@ -535,18 +599,18 @@ export default function EnquiryDetail() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Current system / software in use</Label>
-                <Select
-                  value={(draft.payload.current_system as string) || NONE}
-                  onValueChange={v => setPayload('current_system', v === NONE ? '' : v)}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select current system" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {CURRENT_SYSTEMS.map(s => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <MultiSelect
+                  options={CURRENT_SYSTEMS.map(o => ({ value: o.v, label: o.l }))}
+                  selected={Array.isArray(draft.payload.current_system)
+                    ? draft.payload.current_system
+                    : (draft.payload.current_system ? [draft.payload.current_system as string] : [])}
+                  onChange={vals => setPayload('current_system', vals)}
+                  placeholder="Select current system(s)"
+                />
               </div>
-              {draft.payload.current_system === 'OTHER' && (
+              {(Array.isArray(draft.payload.current_system)
+                  ? draft.payload.current_system.includes('OTHER')
+                  : draft.payload.current_system === 'OTHER') && (
                 <div className="space-y-1.5">
                   <Label>Specify other system</Label>
                   <Input
@@ -781,6 +845,19 @@ export default function EnquiryDetail() {
       />
     </div>
   );
+}
+
+// ---------------- Save status indicator ----------------
+
+function SaveStatusIndicator({ state, isDirty }: { state: SaveState; isDirty: boolean }) {
+  let label = '';
+  let cls = 'text-muted-foreground';
+  if (state === 'saving') { label = 'Saving…'; }
+  else if (state === 'error') { label = 'Save failed'; cls = 'text-destructive'; }
+  else if (isDirty) { label = 'Unsaved changes'; cls = 'text-warning'; }
+  else if (state === 'saved') { label = 'Saved'; cls = 'text-success'; }
+  if (!label) return null;
+  return <span className={cn('text-xs', cls)}>{label}</span>;
 }
 
 // ---------------- Stage Flow ----------------
