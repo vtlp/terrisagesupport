@@ -229,13 +229,31 @@ export function BillingTab({ accountId }: { accountId: string }) {
               <Input type="number" value={settings.gst_pct} onChange={e => setSettings(s => ({ ...s, gst_pct: Number(e.target.value) || 0 }))} />
             </div>
             <div className="space-y-1.5">
+              <Label>Seats purchased</Label>
+              <Input type="number" min={0} value={settings.seats_purchased}
+                onChange={e => setSettings(s => ({ ...s, seats_purchased: Math.max(0, Number(e.target.value) || 0) }))} />
+            </div>
+            <div className="space-y-1.5">
               <Label>Next renewal</Label>
               <Input type="date" value={settings.next_renewal_at ? settings.next_renewal_at.substring(0, 10) : ''}
                 onChange={e => setSettings(s => ({ ...s, next_renewal_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-            <div className="border rounded p-3"><div className="text-xs text-muted-foreground">Active seats</div><div className="text-lg font-semibold">{seatCount}</div></div>
+            <div className="border rounded p-3">
+              <div className="text-xs text-muted-foreground">Seat capacity</div>
+              <div className="text-lg font-semibold">
+                {seatCount} / {settings.seats_purchased}
+                {settings.seats_purchased > 0 && (
+                  <span className={`ml-2 text-xs font-normal ${seatCount > settings.seats_purchased ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {Math.max(settings.seats_purchased - seatCount, 0)} available
+                  </span>
+                )}
+              </div>
+              {seatCount > settings.seats_purchased && settings.seats_purchased > 0 && (
+                <div className="text-[10px] text-destructive mt-0.5">Over capacity</div>
+              )}
+            </div>
             <div className="border rounded p-3"><div className="text-xs text-muted-foreground">Subtotal / cycle</div><div className="text-lg font-semibold">{fmtINR(settings.base_fee + settings.seat_rate * seatCount)}</div></div>
             <div className="border rounded p-3"><div className="text-xs text-muted-foreground">GST ({settings.gst_pct}%)</div><div className="text-lg font-semibold">{fmtINR((settings.base_fee + settings.seat_rate * seatCount) * settings.gst_pct / 100)}</div></div>
             <div className="border rounded p-3 bg-primary/5"><div className="text-xs text-muted-foreground">Total / cycle</div><div className="text-lg font-semibold text-primary">{fmtINR(monthlyTotal)}</div></div>
