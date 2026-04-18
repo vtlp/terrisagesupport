@@ -3,9 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock } from 'lucide-react';
+import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FULFILLED';
 
@@ -45,6 +49,11 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   const [capacity, setCapacity] = useState<Capacity | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [mockOpen, setMockOpen] = useState(false);
+  const [mockSeats, setMockSeats] = useState<string>('');
+  const [mockEmail, setMockEmail] = useState<string>('');
+  const [mockReason, setMockReason] = useState<string>('');
+  const [submittingMock, setSubmittingMock] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
