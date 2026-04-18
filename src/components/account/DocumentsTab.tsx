@@ -60,7 +60,6 @@ export function DocumentsTab({ payload }: Props) {
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
           No documents were uploaded during onboarding.
-          <p className="text-xs mt-1">Lead and property data files appear under the Imports tab.</p>
         </CardContent>
       </Card>
     );
