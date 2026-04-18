@@ -412,14 +412,15 @@ export default function EnquiryDetail() {
 
   const addNote = async () => {
     if (!enquiry || !newNote.trim()) return;
+    if (!requireClean('add a note')) return;
     setBusy(true);
-    await flushPendingSave();
     const { data, error } = await supabase.from('enquiry_notes')
       .insert({ enquiry_id: enquiry.id, note_text: newNote.trim() })
       .select('id, note_text, created_at').single();
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     setNewNote('');
+    setShowNoteForm(false);
     if (data) setNotes(prev => [data as NoteRow, ...prev]);
   };
 
@@ -431,7 +432,7 @@ export default function EnquiryDetail() {
 
   const handleSendOnboarding = async () => {
     if (!enquiry) return;
-    await flushPendingSave();
+    if (!requireClean('send the onboarding form')) return;
     const link = generateLink();
     if (!enquiry.onboarding_pack_sent) {
       await supabase.from('enquiries').update({
@@ -473,8 +474,8 @@ export default function EnquiryDetail() {
 
   const convertToAccount = async () => {
     if (!enquiry) return;
+    if (!requireClean('convert to account')) return;
     setBusy(true);
-    await flushPendingSave();
     const { data, error } = await supabase.rpc('convert_enquiry_to_account', { _enquiry_id: enquiry.id });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
