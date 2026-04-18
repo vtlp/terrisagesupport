@@ -18,9 +18,11 @@ interface TextFieldProps extends BaseFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
+  readOnly?: boolean;
 }
 
-export function TextField({ label, error, helperText, required, type = "text", value, onChange, placeholder, className }: TextFieldProps) {
+export function TextField({ label, error, helperText, required, type = "text", value, onChange, placeholder, className, disabled, readOnly }: TextFieldProps) {
   return (
     <div className={cn("space-y-1.5", className)}>
       <Label className="text-sm font-medium">
@@ -32,7 +34,12 @@ export function TextField({ label, error, helperText, required, type = "text", v
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={cn(error && "border-destructive focus-visible:ring-destructive")}
+        disabled={disabled}
+        readOnly={readOnly}
+        className={cn(
+          error && "border-destructive focus-visible:ring-destructive",
+          (disabled || readOnly) && "bg-muted/50 cursor-not-allowed",
+        )}
       />
       {helperText && !error && <p className="text-xs text-muted-foreground">{helperText}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
