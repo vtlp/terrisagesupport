@@ -941,7 +941,7 @@ export default function EnquiryDetail() {
             <div className="space-y-2">
               {events.map(ev => (
                 <button key={ev.id} onClick={() => setOpenEvent(ev)}
-                  className="w-full text-left rounded-md border border-primary/30 bg-primary/5 px-3 py-2 hover:bg-primary/10 transition-colors">
+                  className="w-full text-left rounded-md border border-primary/40 bg-primary/15 px-3 py-2 hover:bg-primary/25 transition-colors">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate text-primary">{ev.title}</div>
