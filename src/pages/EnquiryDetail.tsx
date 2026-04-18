@@ -246,6 +246,20 @@ export default function EnquiryDetail() {
 
   const isDirty = useMemo(() => JSON.stringify(enquiry) !== JSON.stringify(draft), [enquiry, draft]);
 
+  // Mark dirty for save indicator (no autosave — manual Save button is required).
+  useEffect(() => {
+    if (!enquiry || !draft) return;
+    if (isDirty) setSaveState('dirty');
+  }, [draft, enquiry, isDirty]);
+
+  // Warn before leaving the page with unsaved changes.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
   // Persist current draft → server. Does NOT reload page.
   const persistDraft = useCallback(async (): Promise<boolean> => {
     const d = draftRef.current; const orig = enquiryRef.current;
@@ -272,24 +286,15 @@ export default function EnquiryDetail() {
     return true;
   }, []);
 
-  const flushPendingSave = useCallback(async () => {
-    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    await persistDraft();
-  }, [persistDraft]);
+  // Backwards-compatible alias used by side actions.
+  const flushPendingSave = useCallback(async () => { await persistDraft(); }, [persistDraft]);
 
-  // Debounced autosave on draft change
-  useEffect(() => {
-    if (!enquiry || !draft) return;
-    if (JSON.stringify(enquiry) === JSON.stringify(draft)) return;
-    setSaveState('dirty');
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => { persistDraft(); }, 1200);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft]);
-
-  // Flush on unmount
-  useEffect(() => () => { flushPendingSave(); }, [flushPendingSave]);
+  // Block side actions when there are unsaved edits.
+  const requireClean = useCallback((label = 'continue'): boolean => {
+    if (!isDirty) return true;
+    toast.error(`Save or cancel your changes first to ${label}.`);
+    return false;
+  }, [isDirty]);
 
   const setField = <K extends keyof Enquiry>(key: K, value: Enquiry[K]) => {
     setDraft(d => d ? { ...d, [key]: value } : d);
@@ -306,7 +311,46 @@ export default function EnquiryDetail() {
     });
   };
 
-  const saveAll = async () => { await flushPendingSave(); };
+  const saveAll = async () => { await persistDraft(); };
+  const cancelEdits = () => { if (enquiry) { setDraft(enquiry); setSaveState('idle'); toast('Changes discarded'); } };
+
+  // ---- Existing-event check + scheduling helpers ----
+  const openSchedulePrompt = useCallback((eventType: CalendarEventType, defaultTitle: string, isDemoFlow = false) => {
+    if (!enquiry) return;
+    setPendingEventType(eventType);
+    setPendingEventTitle(defaultTitle);
+    setPendingDemoSchedule(isDemoFlow);
+    const matching = events.filter(e => e.event_type === eventType && new Date(e.scheduled_at) >= new Date());
+    if (matching.length > 0) {
+      setExistingEventOptions(matching.map(e => ({
+        id: e.id, title: e.title, scheduled_at: e.scheduled_at, event_type: e.event_type,
+      })));
+      setExistingPromptOpen(true);
+    } else {
+      setScheduleOpen(true);
+    }
+  }, [enquiry, events]);
+
+  // Outcome change in Contacted stage.
+  const handleOutcomeChange = (v: string) => {
+    setPayload('outcome', v);
+    if (v === 'INTERESTED') {
+      setShowNoteForm(true);
+      toast('Add a quick note about what they\'re interested in.');
+      setTimeout(() => notesCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+    } else if (v === 'CALL_LATER') {
+      openSchedulePrompt(CalendarEventType.CALL_BACK, `Call back ${enquiry?.full_name ?? ''}`.trim());
+    } else if (v === 'SCHEDULE_DEMO') {
+      openSchedulePrompt(CalendarEventType.DEMO, `Demo · ${enquiry?.company_name || enquiry?.full_name || ''}`.trim(), true);
+    }
+  };
+
+  const handleDemoOutcomeChange = (v: string) => {
+    setPayload('demo_outcome', v);
+    if (v === 'GHOSTED' || v === 'NO_SHOW') {
+      openSchedulePrompt(CalendarEventType.FOLLOW_UP, `Follow up · ${enquiry?.company_name || enquiry?.full_name || ''}`.trim());
+    }
+  };
 
   // Validate that the user can leave the *current* stage based on its mandatory outcome.
   const validateStageGate = (currentStage: Stage, d: Enquiry): string | null => {
