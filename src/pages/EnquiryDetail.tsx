@@ -142,6 +142,7 @@ const NONE = '__none__';
 export default function EnquiryDetail() {
   const { enquiryId } = useParams<{ enquiryId: string }>();
   const navigate = useNavigate();
+  const { currentUser } = useUser();
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
   const [draft, setDraft] = useState<Enquiry | null>(null);
   const [notes, setNotes] = useState<NoteRow[]>([]);
