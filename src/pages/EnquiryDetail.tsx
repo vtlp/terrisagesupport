@@ -652,8 +652,15 @@ export default function EnquiryDetail() {
             <div className="p-4 space-y-2.5">
               <div className="text-sm font-semibold text-foreground mb-1">Actions</div>
               {(() => {
-                const onboardEnabled = enquiry.onboarding_pack_sent
+                const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
+                const baseEnabled = enquiry.onboarding_pack_sent
                   || draft.payload.demo_outcome === 'LIKED_WANT_ONBOARD_SOON';
+                const onboardEnabled = baseEnabled && (enquiry.onboarding_pack_sent || paymentPaid);
+                const blockedReason = !baseEnabled
+                  ? 'Available after demo outcome is "Liked, wants to onboard soon".'
+                  : !paymentPaid
+                  ? 'Mark payment as Paid to unlock onboarding.'
+                  : null;
                 return (
                   <>
                     <Button
@@ -662,14 +669,13 @@ export default function EnquiryDetail() {
                       onClick={handleSendOnboarding}
                       disabled={busy || !onboardEnabled}
                       variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
+                      title={blockedReason ?? undefined}
                     >
                       <Send className="h-4 w-4 mr-2" />
                       {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
                     </Button>
-                    {!onboardEnabled && (
-                      <p className="text-[11px] text-muted-foreground -mt-1 text-center">
-                        Available after demo outcome is "Liked, wants to onboard soon".
-                      </p>
+                    {blockedReason && (
+                      <p className="text-[11px] text-muted-foreground -mt-1 text-center">{blockedReason}</p>
                     )}
                   </>
                 );
