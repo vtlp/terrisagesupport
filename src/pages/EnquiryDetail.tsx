@@ -574,77 +574,81 @@ export default function EnquiryDetail() {
         }
       />
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <Card className="border-2 border-border/80 shadow-sm">
-          <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {(() => {
-              const onboardEnabled = enquiry.onboarding_pack_sent
-                || draft.payload.demo_outcome === 'LIKED_WANT_ONBOARD_SOON';
-              return (
-                <>
-                  <Button
-                    className="w-full"
-                    onClick={handleSendOnboarding}
-                    disabled={busy || !onboardEnabled}
-                    variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
-                  </Button>
-                  {!onboardEnabled && (
-                    <p className="text-[11px] text-muted-foreground -mt-2 text-center">
-                      Available after demo outcome is "Liked, wants to onboard soon".
-                    </p>
-                  )}
-                </>
-              );
-            })()}
-            <Button className="w-full" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
-              <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
-            </Button>
-            <Button className="w-full" disabled={!!convertBlock || busy} onClick={convertToAccount}>
-              Convert to account
-            </Button>
-            {convertBlock && <p className="text-xs text-muted-foreground text-center">{convertBlock}</p>}
-            {enquiry.converted_account_id && (
-              <Link to={`/accounts/${enquiry.converted_account_id}`}>
-                <Button variant="outline" className="w-full">View account</Button>
-              </Link>
-            )}
-            <Separator />
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2"><Phone className="h-3 w-3" /> {enquiry.phone}</div>
-              {enquiry.email && <div className="flex items-center gap-2"><Mail className="h-3 w-3" /> {enquiry.email}</div>}
-              <div>Created {format(new Date(enquiry.created_at), 'dd MMM yyyy')}</div>
+      {/* Actions + Notes — combined compact card */}
+      <Card ref={notesCardRef} className="border-2 border-border shadow-sm">
+        <CardContent className="p-0">
+          <div className="grid lg:grid-cols-3 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-border">
+            {/* Actions column */}
+            <div className="p-4 space-y-2.5">
+              <div className="text-sm font-semibold text-foreground mb-1">Actions</div>
+              {(() => {
+                const onboardEnabled = enquiry.onboarding_pack_sent
+                  || draft.payload.demo_outcome === 'LIKED_WANT_ONBOARD_SOON';
+                return (
+                  <>
+                    <Button
+                      className="w-full"
+                      size="sm"
+                      onClick={handleSendOnboarding}
+                      disabled={busy || !onboardEnabled}
+                      variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
+                    </Button>
+                    {!onboardEnabled && (
+                      <p className="text-[11px] text-muted-foreground -mt-1 text-center">
+                        Available after demo outcome is "Liked, wants to onboard soon".
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+              <Button className="w-full" size="sm" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
+                <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
+              </Button>
+              <Button className="w-full" size="sm" disabled={!!convertBlock || busy} onClick={convertToAccount}>
+                Convert to account
+              </Button>
+              {convertBlock && <p className="text-[11px] text-muted-foreground text-center">{convertBlock}</p>}
+              {enquiry.converted_account_id && (
+                <Link to={`/accounts/${enquiry.converted_account_id}`}>
+                  <Button variant="outline" size="sm" className="w-full">View account</Button>
+                </Link>
+              )}
+              <div className="pt-2 mt-2 border-t border-border/60 space-y-1 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2"><Phone className="h-3 w-3" /> {enquiry.phone}</div>
+                {enquiry.email && <div className="flex items-center gap-2"><Mail className="h-3 w-3" /> {enquiry.email}</div>}
+                <div>Created {format(new Date(enquiry.created_at), 'dd MMM yyyy')}</div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card ref={notesCardRef} className="lg:col-span-2 border-2 border-border/80 shadow-sm">
-          <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Textarea autoFocus={showNoteForm} value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add a note…" rows={2} />
-              <Button onClick={addNote} disabled={!newNote.trim() || busy}>Add</Button>
+            {/* Notes column (spans 2) */}
+            <div className="p-4 space-y-2.5 lg:col-span-2">
+              <div className="text-sm font-semibold text-foreground mb-1">Notes</div>
+              <div className="flex gap-2">
+                <Textarea autoFocus={showNoteForm} value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add a note…" rows={2} className="text-sm" />
+                <Button onClick={addNote} disabled={!newNote.trim() || busy} size="sm">Add</Button>
+              </div>
+              <div className="space-y-1.5 max-h-72 overflow-y-auto pt-1">
+                {notes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-3">No notes yet.</p>
+                ) : (
+                  notes.map(n => (
+                    <div key={n.id} className="text-sm border-l-2 border-primary/40 pl-3 py-0.5">
+                      <p className="leading-snug">{n.note_text}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{format(new Date(n.created_at), 'dd MMM, HH:mm')}</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-            <Separator />
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {notes.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No notes yet.</p> :
-                notes.map(n => (
-                  <div key={n.id} className="text-sm border-l-2 border-primary/30 pl-3 py-1">
-                    <p>{n.note_text}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(n.created_at), 'dd MMM, HH:mm')}</p>
-                  </div>
-                ))
-              }
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Editable detail card */}
-      <Card className="border-2 border-border/80 shadow-sm">
+      <Card className="border-2 border-border shadow-sm">
         <CardHeader><CardTitle className="text-base">Enquiry details</CardTitle></CardHeader>
         <CardContent className="space-y-6">
           {/* Contact block */}
@@ -845,7 +849,7 @@ export default function EnquiryDetail() {
 
       {/* Onboarding submission review */}
       {submission ? (
-        <Card className="border-2 border-border/80 shadow-sm">
+        <Card className="border-2 border-border shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Onboarding submission</CardTitle>
@@ -890,7 +894,7 @@ export default function EnquiryDetail() {
           </CardContent>
         </Card>
       ) : enquiry.onboarding_pack_sent ? (
-        <Card className="border-2 border-border/80 shadow-sm">
+        <Card className="border-2 border-border shadow-sm">
           <CardHeader><CardTitle className="text-base">Onboarding submission</CardTitle></CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -906,7 +910,7 @@ export default function EnquiryDetail() {
       ) : null}
 
       {/* Upcoming events */}
-      <Card className="border-2 border-border/80 shadow-sm">
+      <Card className="border-2 border-border shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Upcoming events</CardTitle>
