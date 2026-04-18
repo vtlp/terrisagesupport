@@ -438,8 +438,35 @@ export default function EnquiryDetail() {
       toast.success('Stage updated');
       setEnquiry(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
       setDraft(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
+      // When entering Payment Link Sent, prompt the dialog if no link exists yet.
+      if (stage === 'PAYMENT_LINK_SENT' && !draft.payload.payment?.short_url) {
+        setPaymentDialogOpen(true);
+      }
     }
     setBusy(false);
+  };
+
+  // Apply the generated Razorpay link locally.
+  const applyPaymentResult = (result: PaymentLinkResult) => {
+    setEnquiry(prev => prev ? { ...prev, payload: { ...prev.payload, payment: result } } : prev);
+    setDraft(prev => prev ? { ...prev, payload: { ...prev.payload, payment: result } } : prev);
+    refreshNotes(enquiry?.id ?? '');
+  };
+
+  // Manually flip payment outcome (PAID / PENDING / FAILED) — used by the
+  // Payment stage outcome panel and unlocks the onboarding action when PAID.
+  const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED') => {
+    if (!enquiry) return;
+    const cur = (draft?.payload.payment ?? {}) as PaymentInfo;
+    const nextPayment: PaymentInfo = { ...cur, status, paid_at: status === 'PAID' ? new Date().toISOString() : cur.paid_at };
+    const nextPayload = { ...draft!.payload, payment: nextPayment };
+    const { error } = await supabase.from('enquiries')
+      .update({ payload: nextPayload as unknown as never })
+      .eq('id', enquiry.id);
+    if (error) { toast.error(error.message); return; }
+    setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    toast.success(`Payment marked ${status}`);
   };
 
   const addNote = async () => {
