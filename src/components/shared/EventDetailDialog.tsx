@@ -62,6 +62,20 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
     onChanged?.();
   };
 
+  const updateAssignee = async (userId: string) => {
+    const newId = userId === 'unassigned' ? null : userId;
+    setBusy(true);
+    const { error } = await supabase.from('calendar_events')
+      .update({ assigned_to: newId })
+      .eq('id', event.id);
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Assignee updated');
+    // resync to Google so owner change reflects there
+    supabase.functions.invoke('sync-calendar-event', { body: { event_id: event.id } });
+    onChanged?.();
+  };
+
   const remove = async () => {
     if (!confirm('Delete this event?')) return;
     setBusy(true);
