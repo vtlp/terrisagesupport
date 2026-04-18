@@ -26,6 +26,8 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
+import { PaymentLinkDialog, PaymentLinkResult } from '@/components/shared/PaymentLinkDialog';
+import { fmtINR } from '@/lib/billing';
 import { useUser } from '@/context/UserContext';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'PAYMENT_LINK_SENT' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
@@ -47,7 +49,19 @@ interface EnquiryPayload {
   current_system_text?: string;
   approx_onboarding_date?: string | null;
   portals_in_use?: string[];
+  payment?: PaymentInfo;
   [k: string]: unknown;
+}
+
+interface PaymentInfo {
+  link_id?: string;
+  short_url?: string;
+  amount?: number;
+  currency?: string;
+  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING';
+  paid_at?: string;
+  created_at?: string;
+  breakdown?: Record<string, unknown>;
 }
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
@@ -160,6 +174,7 @@ export default function EnquiryDetail() {
   const [pendingDemoSchedule, setPendingDemoSchedule] = useState(false);
   const [existingEventOptions, setExistingEventOptions] = useState<ExistingEventOption[]>([]);
   const [existingPromptOpen, setExistingPromptOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
@@ -423,8 +438,35 @@ export default function EnquiryDetail() {
       toast.success('Stage updated');
       setEnquiry(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
       setDraft(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
+      // When entering Payment Link Sent, prompt the dialog if no link exists yet.
+      if (stage === 'PAYMENT_LINK_SENT' && !draft.payload.payment?.short_url) {
+        setPaymentDialogOpen(true);
+      }
     }
     setBusy(false);
+  };
+
+  // Apply the generated Razorpay link locally.
+  const applyPaymentResult = (result: PaymentLinkResult) => {
+    setEnquiry(prev => prev ? { ...prev, payload: { ...prev.payload, payment: result } } : prev);
+    setDraft(prev => prev ? { ...prev, payload: { ...prev.payload, payment: result } } : prev);
+    refreshNotes(enquiry?.id ?? '');
+  };
+
+  // Manually flip payment outcome (PAID / PENDING / FAILED) — used by the
+  // Payment stage outcome panel and unlocks the onboarding action when PAID.
+  const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED') => {
+    if (!enquiry) return;
+    const cur = (draft?.payload.payment ?? {}) as PaymentInfo;
+    const nextPayment: PaymentInfo = { ...cur, status, paid_at: status === 'PAID' ? new Date().toISOString() : cur.paid_at };
+    const nextPayload = { ...draft!.payload, payment: nextPayment };
+    const { error } = await supabase.from('enquiries')
+      .update({ payload: nextPayload as unknown as never })
+      .eq('id', enquiry.id);
+    if (error) { toast.error(error.message); return; }
+    setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    toast.success(`Payment marked ${status}`);
   };
 
   const addNote = async () => {
@@ -598,6 +640,8 @@ export default function EnquiryDetail() {
             setPayload={setPayload}
             onOutcomeChange={handleOutcomeChange}
             onDemoOutcomeChange={handleDemoOutcomeChange}
+            onOpenPaymentDialog={() => setPaymentDialogOpen(true)}
+            onSetPaymentStatus={setPaymentStatus}
           />
         }
       />
@@ -610,8 +654,15 @@ export default function EnquiryDetail() {
             <div className="p-4 space-y-2.5">
               <div className="text-sm font-semibold text-foreground mb-1">Actions</div>
               {(() => {
-                const onboardEnabled = enquiry.onboarding_pack_sent
+                const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
+                const baseEnabled = enquiry.onboarding_pack_sent
                   || draft.payload.demo_outcome === 'LIKED_WANT_ONBOARD_SOON';
+                const onboardEnabled = baseEnabled && (enquiry.onboarding_pack_sent || paymentPaid);
+                const blockedReason = !baseEnabled
+                  ? 'Available after demo outcome is "Liked, wants to onboard soon".'
+                  : !paymentPaid
+                  ? 'Mark payment as Paid to unlock onboarding.'
+                  : null;
                 return (
                   <>
                     <Button
@@ -620,14 +671,13 @@ export default function EnquiryDetail() {
                       onClick={handleSendOnboarding}
                       disabled={busy || !onboardEnabled}
                       variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
+                      title={blockedReason ?? undefined}
                     >
                       <Send className="h-4 w-4 mr-2" />
                       {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
                     </Button>
-                    {!onboardEnabled && (
-                      <p className="text-[11px] text-muted-foreground -mt-1 text-center">
-                        Available after demo outcome is "Liked, wants to onboard soon".
-                      </p>
+                    {blockedReason && (
+                      <p className="text-[11px] text-muted-foreground -mt-1 text-center">{blockedReason}</p>
                     )}
                   </>
                 );
@@ -977,6 +1027,19 @@ export default function EnquiryDetail() {
 
       <ActivityTimeline entityType="ENQUIRY" entityId={enquiry.id} />
 
+      <PaymentLinkDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        enquiryId={enquiry.id}
+        defaults={{
+          seats: (draft.payload.team_size_estimate as number | null | undefined) ?? null,
+          customerName: enquiry.full_name,
+          customerEmail: enquiry.email,
+          customerPhone: enquiry.phone,
+        }}
+        onSuccess={applyPaymentResult}
+      />
+
       <SendOnboardingDialog
         open={shareOpen}
         onOpenChange={setShareOpen}
@@ -1149,7 +1212,7 @@ function StageFlow({
 }
 
 function StageOutcomePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1157,6 +1220,8 @@ function StageOutcomePanel({
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
+  onOpenPaymentDialog: () => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
 }) {
   const isLost = stage === 'LOST';
   const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
@@ -1176,7 +1241,11 @@ function StageOutcomePanel({
       )}
       <div>
         <div className="text-xs font-medium text-primary uppercase tracking-wide mb-2">Current stage · {stageLabels[stage]}</div>
-        <ActiveStagePanel stage={stage} draft={draft} setField={setField} setPayload={setPayload} onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange} />
+        <ActiveStagePanel
+          stage={stage} draft={draft} setField={setField} setPayload={setPayload}
+          onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange}
+          onOpenPaymentDialog={onOpenPaymentDialog} onSetPaymentStatus={onSetPaymentStatus}
+        />
       </div>
     </div>
   );
@@ -1212,6 +1281,11 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
         <div className="text-muted-foreground">Outcome: {lookup(DEMO_OUTCOMES, draft.payload.demo_outcome as string | undefined)}</div>
       </div>
     );
+  } else if (stage === 'PAYMENT_LINK_SENT') {
+    const p = draft.payload.payment;
+    body = p?.short_url
+      ? <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>
+      : <span className="text-muted-foreground">No link generated</span>;
   } else if (stage === 'ONBOARDING_PACK_SENT') {
     body = <span>Onboarding form sent</span>;
   } else if (stage === 'ACCOUNT_CREATED') {
@@ -1227,7 +1301,7 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
 }
 
 function ActiveStagePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1235,6 +1309,8 @@ function ActiveStagePanel({
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
+  onOpenPaymentDialog: () => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
 }) {
   const outcome = (draft.payload.outcome as string) || '';
 
@@ -1330,6 +1406,71 @@ function ActiveStagePanel({
             </SelectContent>
           </Select>
         </div>
+      </div>
+    );
+  }
+
+  if (stage === 'PAYMENT_LINK_SENT') {
+    const payment = draft.payload.payment;
+    const status = payment?.status ?? null;
+    const statusBadge = (s: string) => {
+      const cls = s === 'PAID' ? 'bg-success/15 text-success border-success/30'
+        : s === 'FAILED' ? 'bg-destructive/15 text-destructive border-destructive/30'
+        : s === 'CANCELLED' ? 'bg-muted text-muted-foreground'
+        : 'bg-primary/15 text-primary border-primary/30';
+      return <Badge variant="outline" className={cn('text-[10px]', cls)}>{s}</Badge>;
+    };
+    return (
+      <div className="space-y-3">
+        {payment?.short_url ? (
+          <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold">{fmtINR(payment.amount ?? 0)}</span>
+                {status && statusBadge(status)}
+                {payment.created_at && (
+                  <span className="text-[11px] text-muted-foreground">
+                    Sent {format(new Date(payment.created_at), 'dd MMM, HH:mm')}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(payment.short_url!); toast.success('Link copied'); }}>
+                  <CopyIcon className="h-3.5 w-3.5 mr-1" /> Copy
+                </Button>
+                <a href={payment.short_url} target="_blank" rel="noreferrer">
+                  <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Open</Button>
+                </a>
+              </div>
+            </div>
+            <div className="text-[11px] text-muted-foreground break-all">{payment.short_url}</div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+            No payment link generated yet.
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={onOpenPaymentDialog}>
+            {payment?.short_url ? 'Generate new link' : 'Generate payment link'}
+          </Button>
+          <div className="flex items-center gap-2 ml-auto">
+            <Label className="text-xs text-muted-foreground">Mark as</Label>
+            <Select value={status ?? NONE} onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
+              <SelectTrigger className="h-9 w-36"><SelectValue placeholder="Set status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PAID">Paid</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="FAILED">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground">
+          Onboarding can be sent only after the payment is marked <strong>Paid</strong>.
+        </p>
       </div>
     );
   }
