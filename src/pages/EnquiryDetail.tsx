@@ -648,7 +648,7 @@ export default function EnquiryDetail() {
       </Card>
 
       {/* Editable detail card */}
-      <Card className="border-2 border-border/80 shadow-sm">
+      <Card className="border-2 border-border shadow-sm">
         <CardHeader><CardTitle className="text-base">Enquiry details</CardTitle></CardHeader>
         <CardContent className="space-y-6">
           {/* Contact block */}
@@ -849,7 +849,7 @@ export default function EnquiryDetail() {
 
       {/* Onboarding submission review */}
       {submission ? (
-        <Card className="border-2 border-border/80 shadow-sm">
+        <Card className="border-2 border-border shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Onboarding submission</CardTitle>
@@ -894,7 +894,7 @@ export default function EnquiryDetail() {
           </CardContent>
         </Card>
       ) : enquiry.onboarding_pack_sent ? (
-        <Card className="border-2 border-border/80 shadow-sm">
+        <Card className="border-2 border-border shadow-sm">
           <CardHeader><CardTitle className="text-base">Onboarding submission</CardTitle></CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -910,7 +910,7 @@ export default function EnquiryDetail() {
       ) : null}
 
       {/* Upcoming events */}
-      <Card className="border-2 border-border/80 shadow-sm">
+      <Card className="border-2 border-border shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Upcoming events</CardTitle>
