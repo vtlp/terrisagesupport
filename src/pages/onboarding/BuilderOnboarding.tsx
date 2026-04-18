@@ -271,6 +271,61 @@ export default function BuilderOnboarding() {
 
       await submitOnboarding("BUILDER_DEVELOPER", payload, enquiryId);
       clearDraft("builder");
+      stashOnboardingSummary({
+        companyName,
+        sections: [
+          {
+            title: "Business & Primary Contact",
+            rows: [
+              { label: "Full name", value: fullName },
+              { label: "Mobile number", value: mobile ? `${mobileCode} ${mobile}` : "" },
+              { label: "Email address", value: email },
+              { label: "Company name", value: companyName },
+              { label: "Company tagline", value: companyTagline },
+              { label: "RERA ID", value: reraId },
+              { label: "Head office city", value: headOfficeCity },
+              { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label },
+            ],
+          },
+          {
+            title: "Team Access & Permissions",
+            rows: [
+              { label: "Seats required", value: seatsRequired },
+              ...teamMembers.map((tm, i) => ({
+                label: `Team Member ${i + 1}`,
+                value: `${tm.fullName} (${tm.email || "no email"}) - ${ROLE_OPTIONS.find(r => r.value === tm.role)?.label || "No role"}`,
+              })),
+            ],
+          },
+          ...projects.map((proj, i) => ({
+            title: `Project ${i + 1}`,
+            rows: [
+              { label: "Project name", value: proj.projectName },
+              { label: "Location", value: proj.location },
+              { label: "Contact person", value: proj.contactName },
+              { label: "Property type", value: PROJECT_PROPERTY_TYPE_OPTIONS.find(o => o.value === proj.propertyType)?.label },
+              { label: "Brochure files", value: proj.brochure.length > 0 ? `${proj.brochure.length} file(s)` : "" },
+              { label: "Additional notes", value: proj.additionalNotes },
+            ],
+          })),
+          {
+            title: "Bulk Imports",
+            rows: [
+              { label: "Files", value: bulkImportFiles.length > 0 ? `${bulkImportFiles.length} file(s)` : "" },
+              { label: "Notes", value: bulkImportNotes },
+            ],
+          },
+          { title: "Additional Notes", rows: [{ label: "Notes", value: notes }] },
+        ],
+        fileGroups: [
+          { folder: "company-logo", files: companyLogo },
+          ...projects.map((proj, i) => ({
+            folder: `project-${i + 1}-${proj.projectName || "brochure"}`,
+            files: proj.brochure,
+          })),
+          { folder: "bulk-imports", files: bulkImportFiles },
+        ],
+      });
       navigate("/onboarding/builder/success");
     } catch (err) {
       if (err instanceof AlreadySubmittedError) {

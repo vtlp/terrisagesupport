@@ -269,6 +269,60 @@ export default function AgencyOnboarding() {
 
       await submitOnboarding("AGENCY_BROKERAGE_CONSULTANCY", payload, enquiryId);
       clearDraft("agency");
+      stashOnboardingSummary({
+        companyName,
+        sections: [
+          {
+            title: "Business & Primary Contact",
+            rows: [
+              { label: "Full name", value: fullName },
+              { label: "Mobile number", value: mobile ? `${mobileCode} ${mobile}` : "" },
+              { label: "Email address", value: email },
+              { label: "Company name", value: companyName },
+              { label: "Company tagline", value: companyTagline },
+              { label: "RERA ID", value: reraId },
+              { label: "City / primary market", value: city },
+              { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label },
+            ],
+          },
+          {
+            title: "Team Access & Permissions",
+            rows: [
+              { label: "Seats required", value: seatsRequired },
+              ...teamMembers.map((tm, i) => ({
+                label: `Team Member ${i + 1}`,
+                value: `${tm.fullName} (${tm.email || "no email"}) - ${ROLE_OPTIONS.find(r => r.value === tm.role)?.label || "No role"}`,
+              })),
+            ],
+          },
+          ...projects.map((proj, i) => ({
+            title: `Project ${i + 1}`,
+            rows: [
+              { label: "Project name", value: proj.projectName },
+              { label: "Location", value: proj.location },
+              { label: "Representative", value: proj.repName },
+              { label: "Builder", value: proj.builderName },
+              { label: "Brochure files", value: proj.brochure.length > 0 ? `${proj.brochure.length} file(s)` : "" },
+            ],
+          })),
+          {
+            title: "Bulk Imports",
+            rows: [
+              { label: "Files", value: bulkImportFiles.length > 0 ? `${bulkImportFiles.length} file(s)` : "" },
+              { label: "Notes", value: bulkImportNotes },
+            ],
+          },
+          { title: "Additional Notes", rows: [{ label: "Notes", value: notes }] },
+        ],
+        fileGroups: [
+          { folder: "company-logo", files: companyLogo },
+          ...projects.map((proj, i) => ({
+            folder: `project-${i + 1}-${proj.projectName || "brochure"}`,
+            files: proj.brochure,
+          })),
+          { folder: "bulk-imports", files: bulkImportFiles },
+        ],
+      });
       navigate("/onboarding/agency/success");
     } catch (err) {
       if (err instanceof AlreadySubmittedError) {
