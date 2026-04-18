@@ -29,10 +29,11 @@ interface PhoneFieldProps {
   error?: string;
   helperText?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function PhoneField({
-  label, required, countryCode, onCountryCodeChange, value, onChange, error, helperText, className,
+  label, required, countryCode, onCountryCodeChange, value, onChange, error, helperText, className, disabled,
 }: PhoneFieldProps) {
   const handleChange = (val: string) => {
     const digits = val.replace(/\D/g, "").slice(0, 10);
@@ -46,8 +47,8 @@ export function PhoneField({
         {required && <span className="text-destructive ml-0.5">*</span>}
       </Label>
       <div className="flex gap-2">
-        <Select value={countryCode} onValueChange={onCountryCodeChange}>
-          <SelectTrigger className={cn("w-[110px] shrink-0", error && "border-destructive")}>
+        <Select value={countryCode} onValueChange={onCountryCodeChange} disabled={disabled}>
+          <SelectTrigger className={cn("w-[110px] shrink-0", error && "border-destructive", disabled && "bg-muted/50 cursor-not-allowed opacity-100")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -61,7 +62,13 @@ export function PhoneField({
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           placeholder="10-digit mobile number"
-          className={cn("flex-1", error && "border-destructive focus-visible:ring-destructive")}
+          disabled={disabled}
+          readOnly={disabled}
+          className={cn(
+            "flex-1",
+            error && "border-destructive focus-visible:ring-destructive",
+            disabled && "bg-muted/50 cursor-not-allowed",
+          )}
           maxLength={10}
         />
       </div>

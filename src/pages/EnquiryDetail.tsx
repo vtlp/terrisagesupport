@@ -508,11 +508,19 @@ export default function EnquiryDetail() {
   };
 
   const generateLink = (): string => {
-    if (!enquiry) return '';
+    if (!enquiry || !draft) return '';
     const tenancy = enquiry.tenancy_type === 'BUILDER_DEVELOPER' ? 'builder' : 'agency';
     const host = window.location.hostname;
     const publicOrigin = isInternalHost(host) ? PUBLIC_ORIGIN : window.location.origin;
-    return `${publicOrigin}/onboarding/${tenancy}?enquiry_id=${enquiry.id}`;
+    const params = new URLSearchParams({ enquiry_id: enquiry.id });
+    if (enquiry.full_name) params.set('name', enquiry.full_name);
+    if (enquiry.phone) params.set('phone', enquiry.phone);
+    if (enquiry.email) params.set('email', enquiry.email);
+    const teamSize = draft.payload.team_size_estimate;
+    if (teamSize !== null && teamSize !== undefined && Number(teamSize) > 0) {
+      params.set('team_size', String(teamSize));
+    }
+    return `${publicOrigin}/onboarding/${tenancy}?${params.toString()}`;
   };
 
   const handleSendOnboarding = async () => {
