@@ -797,7 +797,7 @@ export default function EnquiryDetail() {
               </div>
             </div>
 
-            {/* Current system + Portals side by side */}
+            {/* Row: Current system + Specify other (when OTHER selected) */}
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Current system / software in use</Label>
@@ -810,6 +810,22 @@ export default function EnquiryDetail() {
                   placeholder="Select current system(s)"
                 />
               </div>
+              {(Array.isArray(draft.payload.current_system)
+                ? draft.payload.current_system.includes('OTHER')
+                : draft.payload.current_system === 'OTHER') && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Specify other system</Label>
+                  <Input
+                    placeholder="e.g. Custom in-house tool"
+                    value={draft.payload.current_system_text ?? ''}
+                    onChange={e => setPayload('current_system_text', e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Row: Portals + Approx. onboarding date side by side */}
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Portals currently in use</Label>
                 <MultiSelect
@@ -819,27 +835,8 @@ export default function EnquiryDetail() {
                   placeholder="Select portals"
                 />
               </div>
-            </div>
-
-            {(Array.isArray(draft.payload.current_system)
-                ? draft.payload.current_system.includes('OTHER')
-                : draft.payload.current_system === 'OTHER') && (
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Specify other system</Label>
-                  <Input
-                    placeholder="e.g. Custom in-house tool"
-                    value={draft.payload.current_system_text ?? ''}
-                    onChange={e => setPayload('current_system_text', e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Approx. onboarding date — last field per request */}
-            <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Approx. onboarding date</Label>
+                <Label className="text-sm font-medium">Approx. onboarding date</Label>
                 <Input
                   type="date"
                   value={draft.payload.approx_onboarding_date ?? ''}
