@@ -536,7 +536,7 @@ export default function EnquiryDetail() {
           <h1 className="text-xl font-semibold truncate">{enquiry.company_name || enquiry.full_name}</h1>
           <p className="text-sm text-muted-foreground truncate">{enquiry.full_name} · {enquiry.phone}</p>
         </div>
-        <Badge>{stageLabels[enquiry.stage]}</Badge>
+        <Badge variant="secondary">{SOURCES.find(s => s.v === enquiry.source)?.l ?? enquiry.source ?? 'No source'}</Badge>
         {duplicateOf && (
           <Link to={`/enquiries/${duplicateOf.id}`}>
             <Badge variant="outline" className="gap-1 border-warning/40 text-warning hover:bg-warning/10">
