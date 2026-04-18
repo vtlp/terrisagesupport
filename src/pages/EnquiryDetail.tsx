@@ -368,19 +368,17 @@ export default function EnquiryDetail() {
 
   const updateStage = async (stage: Stage) => {
     if (!enquiry || !draft) return;
+    if (!requireClean('change the stage')) return;
 
-    // Block manual selection of ACCOUNT_CREATED — must use Convert to account flow.
     if (stage === 'ACCOUNT_CREATED') {
       toast.error('Account Created is set automatically when you convert the enquiry.');
       return;
     }
-    // Block manual selection of ONBOARDING_PACK_SENT — happens via Send onboarding action.
     if (stage === 'ONBOARDING_PACK_SENT' && !enquiry.onboarding_pack_sent) {
       toast.error('Use "Send onboarding form" to move to this stage.');
       return;
     }
 
-    // Mandatory-outcome gating: only when moving forward in the pipeline (not Lost, not back).
     const fromIdx = STAGE_ORDER.indexOf(enquiry.stage);
     const toIdx = STAGE_ORDER.indexOf(stage);
     if (stage !== 'LOST' && toIdx > fromIdx) {
@@ -388,21 +386,16 @@ export default function EnquiryDetail() {
       if (blocker) { toast.error(blocker); return; }
     }
 
-    // Auto-open scheduling dialog when entering DEMO_SCHEDULED with no upcoming demo event.
     if (stage === 'DEMO_SCHEDULED') {
       const hasDemo = events.some(e => e.event_type === 'DEMO');
       if (!hasDemo) {
-        setPendingDemoSchedule(true);
-        setScheduleOpen(true);
-        // Don't change stage yet — it will auto-set after the demo is scheduled.
+        openSchedulePrompt(CalendarEventType.DEMO, `Demo · ${enquiry.company_name || enquiry.full_name}`, true);
         return;
       }
     }
 
     setBusy(true);
-    await flushPendingSave();
     const updates: { stage: Stage; demo_scheduled_at?: string } = { stage };
-    // When entering DEMO_SCHEDULED, auto-populate demo_scheduled_at from earliest demo event if empty.
     if (stage === 'DEMO_SCHEDULED' && !draft.demo_scheduled_at) {
       const demo = events.filter(e => e.event_type === 'DEMO').sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))[0];
       if (demo) updates.demo_scheduled_at = demo.scheduled_at;
