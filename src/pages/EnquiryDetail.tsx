@@ -227,7 +227,6 @@ export default function EnquiryDetail() {
     const { error } = await supabase.from('enquiries').update({ stage }).eq('id', enquiry.id);
     if (error) toast.error(error.message);
     else {
-      await supabase.from('enquiry_notes').insert({ enquiry_id: enquiry.id, note_text: `Stage changed to ${stageLabels[stage]}` });
       toast.success('Stage updated');
       load();
     }
@@ -315,7 +314,6 @@ export default function EnquiryDetail() {
   const showLost = draft.stage === 'LOST';
   const outcome = draft.payload.outcome ?? '';
   const showNotInterested = outcome === 'NOT_INTERESTED';
-  const showDemoOutcome = ['DEMO_COMPLETED', 'DEMO_SCHEDULED'].includes(draft.stage);
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
@@ -519,50 +517,6 @@ export default function EnquiryDetail() {
                 onChange={e => setPayload('current_system_text', e.target.value)}
               />
             </div>
-          </div>
-
-          <Separator />
-
-          {/* Outcomes & dates */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Call outcome</Label>
-              <Select value={outcome || NONE} onValueChange={v => setPayload('outcome', v === NONE ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>—</SelectItem>
-                  {OUTCOMES.map(o => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Demo scheduled at</Label>
-              <Input
-                type="datetime-local"
-                value={draft.demo_scheduled_at ? draft.demo_scheduled_at.slice(0, 16) : ''}
-                onChange={e => setField('demo_scheduled_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Demo completed at</Label>
-              <Input
-                type="datetime-local"
-                value={draft.demo_completed_at ? draft.demo_completed_at.slice(0, 16) : ''}
-                onChange={e => setField('demo_completed_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
-              />
-            </div>
-            {showDemoOutcome && (
-              <div className="space-y-1.5">
-                <Label>Demo outcome</Label>
-                <Select value={(draft.payload.demo_outcome as string) || NONE} onValueChange={v => setPayload('demo_outcome', v === NONE ? '' : v)}>
-                  <SelectTrigger><SelectValue placeholder="Select demo outcome" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {DEMO_OUTCOMES.map(o => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
 
           {showNotInterested && (
