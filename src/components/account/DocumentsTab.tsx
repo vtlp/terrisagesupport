@@ -79,6 +79,7 @@ export function DocumentsTab({ payload }: Props) {
   const iconFor = (cat: string) => {
     if (cat === 'Company logo') return <FileBadge className="h-4 w-4 text-primary" />;
     if (cat === 'Project brochure') return <FileText className="h-4 w-4 text-primary" />;
+    if (cat === 'Bulk imports') return <FileSpreadsheet className="h-4 w-4 text-primary" />;
     if (cat === 'Lead import files') return <Database className="h-4 w-4 text-primary" />;
     if (cat === 'Property import files') return <Building2 className="h-4 w-4 text-primary" />;
     return <ImageIcon className="h-4 w-4 text-primary" />;
