@@ -742,17 +742,6 @@ export default function EnquiryDetail() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Approx. onboarding date</Label>
-                <Input
-                  type="date"
-                  value={draft.payload.approx_onboarding_date ?? ''}
-                  onChange={e => setPayload('approx_onboarding_date', e.target.value || null)}
-                />
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Focus area</Label>
                 <MultiSelect
                   options={FOCUS_AREAS.map(o => ({ value: o.v, label: o.l }))}
@@ -761,7 +750,9 @@ export default function EnquiryDetail() {
                   placeholder="Select focus areas"
                 />
               </div>
+            </div>
 
+            <div className="grid md:grid-cols-2 gap-4">
               {!isBuilder && (
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium">Sales focus</Label>
@@ -819,6 +810,18 @@ export default function EnquiryDetail() {
                   />
                 </div>
               )}
+            </div>
+
+            {/* Approx. onboarding date — last field per request */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Approx. onboarding date</Label>
+                <Input
+                  type="date"
+                  value={draft.payload.approx_onboarding_date ?? ''}
+                  onChange={e => setPayload('approx_onboarding_date', e.target.value || null)}
+                />
+              </div>
             </div>
           </div>
 
