@@ -575,7 +575,7 @@ export default function EnquiryDetail() {
       />
 
       <div className="grid lg:grid-cols-3 gap-6">
-        <Card>
+        <Card className="border-2 border-border/80 shadow-sm">
           <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {(() => {
@@ -621,7 +621,7 @@ export default function EnquiryDetail() {
           </CardContent>
         </Card>
 
-        <Card ref={notesCardRef} className="lg:col-span-2">
+        <Card ref={notesCardRef} className="lg:col-span-2 border-2 border-border/80 shadow-sm">
           <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2">
@@ -845,7 +845,7 @@ export default function EnquiryDetail() {
 
       {/* Onboarding submission review */}
       {submission ? (
-        <Card>
+        <Card className="border-2 border-border/80 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Onboarding submission</CardTitle>
@@ -890,7 +890,7 @@ export default function EnquiryDetail() {
           </CardContent>
         </Card>
       ) : enquiry.onboarding_pack_sent ? (
-        <Card>
+        <Card className="border-2 border-border/80 shadow-sm">
           <CardHeader><CardTitle className="text-base">Onboarding submission</CardTitle></CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -906,7 +906,7 @@ export default function EnquiryDetail() {
       ) : null}
 
       {/* Upcoming events */}
-      <Card>
+      <Card className="border-2 border-border/80 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Upcoming events</CardTitle>
@@ -1054,7 +1054,7 @@ function StageFlow({
   const currentIdx = isLost ? -1 : STAGE_ORDER.indexOf(currentStage);
 
   return (
-    <Card>
+    <Card className="border-2 border-primary/40 bg-primary/5 shadow-sm">
       <CardContent className="p-4 space-y-4">
         <div className="flex items-center gap-1 overflow-x-auto pb-1">
           {STAGE_ORDER.map((s, i) => {
