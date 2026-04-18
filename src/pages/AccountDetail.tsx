@@ -23,6 +23,8 @@ import { BillingTab } from '@/components/account/BillingTab';
 import { ImportsTab } from '@/components/account/ImportsTab';
 import { SeatsAndRequestsTab } from '@/components/account/SeatsAndRequestsTab';
 import { ApiKeysCard } from '@/components/account/ApiKeysCard';
+import { ProjectsTab } from '@/components/account/ProjectsTab';
+import { DocumentsTab } from '@/components/account/DocumentsTab';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
 import { CalendarEventType } from '@/types/core';
@@ -232,6 +234,8 @@ export default function AccountDetail() {
           <TabsTrigger value="checklist">Onboarding ({doneCount}/{checklist.length})</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="projects">Projects ({Array.isArray((acc.payload as any)?.projects) ? (acc.payload as any).projects.length : 0})</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="imports">Imports</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
           <TabsTrigger value="calendar">Calendar ({events.length})</TabsTrigger>
@@ -434,6 +438,14 @@ export default function AccountDetail() {
           <ApiKeysCard accountId={acc.id} />
         </TabsContent>
 
+
+        <TabsContent value="projects" className="space-y-4">
+          <ProjectsTab payload={acc.payload} />
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-4">
+          <DocumentsTab payload={acc.payload} />
+        </TabsContent>
 
         <TabsContent value="imports" className="space-y-4">
           <ImportsTab accountId={acc.id} />
