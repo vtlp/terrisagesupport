@@ -512,11 +512,8 @@ export default function EnquiryDetail() {
       .eq('id', submission.id);
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    const { data: noteRow } = await supabase.from('enquiry_notes').insert({
-      enquiry_id: enquiry.id,
-      note_text: `Onboarding submission ${status === 'APPROVED' ? 'approved' : 'rejected'}`,
-    }).select('id, note_text, created_at').single();
-    if (noteRow) setNotes(prev => [noteRow as NoteRow, ...prev]);
+    // Note: status change is already captured automatically in the Activity Timeline
+    // via the trg_submissions_activity trigger, so we no longer duplicate it here as a note.
     toast.success(`Submission ${status.toLowerCase()}`);
     refreshSubmission(enquiry.id);
   };
@@ -1003,6 +1000,8 @@ export default function EnquiryDetail() {
               const { error } = await supabase.from('calendar_events').insert({
                 title: d.title, scheduled_at: scheduledIso, notes: d.notes || null,
                 event_type: d.event_type as 'DEMO' | 'FOLLOW_UP' | 'CALL_BACK' | 'CHECK_IN' | 'ONBOARDING' | 'OTHER',
+                created_by: currentUser.user_id,
+                assigned_to: d.assigned_to ?? currentUser.user_id,
                 related_entity_type: 'ENQUIRY', related_entity_id: enquiry.id,
               });
               if (error) { toast.error(error.message); return; }

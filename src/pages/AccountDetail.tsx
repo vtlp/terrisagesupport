@@ -182,7 +182,7 @@ export default function AccountDetail() {
     else load();
   };
 
-  const handleScheduleEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
+  const handleScheduleEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType; assigned_to?: string | null }) => {
     if (!acc) return;
     const scheduled = new Date(data.date);
     const [h, m] = data.time.split(':');
@@ -192,6 +192,7 @@ export default function AccountDetail() {
       title: data.title, scheduled_at: scheduled.toISOString(), notes: data.notes || null,
       event_type: (map[data.event_type] ?? 'OTHER') as 'OTHER',
       created_by: currentUser.user_id,
+      assigned_to: data.assigned_to ?? currentUser.user_id,
       related_entity_type: 'ACCOUNT', related_entity_id: acc.id,
     });
     if (error) { toast.error(error.message); return; }
