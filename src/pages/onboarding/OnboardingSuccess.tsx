@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Check, Download, Mail, Phone, X } from "lucide-react";
+import { downloadOnboardingZip, takeOnboardingSummary } from "@/lib/onboardingZipDownload";
 
 const TIMELINE_ITEMS = [
   "Workspace setup",
