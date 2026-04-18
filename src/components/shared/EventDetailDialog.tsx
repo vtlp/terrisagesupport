@@ -39,7 +39,7 @@ const eventTypeLabels: Record<string, string> = {
 
 const STATUS = ['SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const;
 
-export function EventDetailDialog({ event, ownerName, open, onOpenChange, onChanged }: Props) {
+export function EventDetailDialog({ event, ownerName, teamMembers = [], open, onOpenChange, onChanged }: Props) {
   const [busy, setBusy] = useState(false);
 
   if (!event) return null;
