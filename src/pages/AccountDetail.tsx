@@ -372,6 +372,7 @@ export default function AccountDetail() {
               )}
             </CardContent>
           </Card>
+          <SeatsAndRequestsTab accountId={acc.id} activeSeatsUsed={seats.filter(s => s.is_active).length} />
         </TabsContent>
 
         <TabsContent value="checklist" className="space-y-4">
@@ -432,9 +433,6 @@ export default function AccountDetail() {
           <ApiKeysCard accountId={acc.id} />
         </TabsContent>
 
-        <TabsContent value="seat-requests" className="space-y-4">
-          <SeatRequestsTab accountId={acc.id} />
-        </TabsContent>
 
         <TabsContent value="imports" className="space-y-4">
           <ImportsTab accountId={acc.id} />
