@@ -157,7 +157,10 @@ export default function CalendarPage() {
           <h1 className="text-2xl font-semibold">Calendar</h1>
           <p className="text-sm text-muted-foreground mt-1">View and manage all scheduled events</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4 mr-1" /> Create Event</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={syncAll}><RefreshCw className="h-4 w-4 mr-1" /> Sync all to Google</Button>
+          <Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4 mr-1" /> Create Event</Button>
+        </div>
       </div>
 
       <Card>
