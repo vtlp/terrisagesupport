@@ -289,12 +289,12 @@ export default function EnquiryDetail() {
   // Backwards-compatible alias used by side actions.
   const flushPendingSave = useCallback(async () => { await persistDraft(); }, [persistDraft]);
 
-  // Block side actions when there are unsaved edits.
-  const requireClean = useCallback((label = 'continue'): boolean => {
-    if (!isDirty) return true;
-    toast.error(`Save or cancel your changes first to ${label}.`);
-    return false;
-  }, [isDirty]);
+  // Auto-persist pending edits before running a side action (stage change, note, etc.).
+  // Returns false only if the silent save fails — never blocks the user for being "dirty".
+  const requireClean = useCallback(async (_label = 'continue'): Promise<boolean> => {
+    if (!isDirtyRef.current) return true;
+    return await persistDraft();
+  }, [persistDraft]);
 
   const setField = <K extends keyof Enquiry>(key: K, value: Enquiry[K]) => {
     setDraft(d => d ? { ...d, [key]: value } : d);
