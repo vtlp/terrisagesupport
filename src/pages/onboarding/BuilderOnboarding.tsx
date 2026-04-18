@@ -62,6 +62,7 @@ const validatePhone = (phone: string) => /^\d{10}$/.test(phone);
 
 export default function BuilderOnboarding() {
   const navigate = useNavigate();
+  const prefill = readOnboardingPrefill();
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -69,6 +70,22 @@ export default function BuilderOnboarding() {
   const [submitting, setSubmitting] = useState(false);
   const [lockChecking, setLockChecking] = useState(true);
   const [lockedAt, setLockedAt] = useState<string | null>(null);
+
+  // Force light theme + Poppins font on the public onboarding form, regardless
+  // of the staff app's current theme. We restore on unmount so going back to
+  // the CRM keeps the user's preference.
+  useEffect(() => {
+    const root = document.documentElement;
+    const prevClass = root.className;
+    const prevFont = root.style.fontFamily;
+    root.classList.remove("dark");
+    root.classList.add("light");
+    root.style.fontFamily = "'Poppins', system-ui, sans-serif";
+    return () => {
+      root.className = prevClass;
+      root.style.fontFamily = prevFont;
+    };
+  }, []);
 
   useEffect(() => {
     const enquiryId = getEnquiryIdFromUrl();
@@ -78,10 +95,10 @@ export default function BuilderOnboarding() {
   }, []);
 
   // Step 1
-  const [fullName, setFullName] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [mobileCode, setMobileCode] = useState("+91");
-  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState(prefill.fullName ?? "");
+  const [mobile, setMobile] = useState(prefill.phone ?? "");
+  const [mobileCode, setMobileCode] = useState(prefill.mobileCode ?? "+91");
+  const [email, setEmail] = useState(prefill.email ?? "");
   const [companyName, setCompanyName] = useState("");
   const [companyTagline, setCompanyTagline] = useState("");
   const [companyLogo, setCompanyLogo] = useState<File[]>([]);
@@ -91,8 +108,13 @@ export default function BuilderOnboarding() {
   const [notes, setNotes] = useState("");
 
   // Step 2
-  const [seatsRequired, setSeatsRequired] = useState("");
+  const [seatsRequired, setSeatsRequired] = useState(prefill.teamSize ?? "");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([createTeamMember()]);
+
+  const lockFullName = !!prefill.fullName;
+  const lockMobile = !!prefill.phone;
+  const lockEmail = !!prefill.email;
+  const lockSeats = !!prefill.teamSize;
 
   // Step 3
   const [projects, setProjects] = useState<Project[]>([createProject()]);
@@ -106,17 +128,19 @@ export default function BuilderOnboarding() {
       try {
         const d = draft.data;
         setCurrentStep(draft.currentStep);
-        if (d.fullName) setFullName(d.fullName);
-        if (d.mobile) setMobile(d.mobile);
-        if (d.mobileCode) setMobileCode(d.mobileCode);
-        if (d.email) setEmail(d.email);
+        // Locked fields (prefilled from enquiry) must not be overridden by an
+        // older draft — the CRM-supplied values are authoritative.
+        if (d.fullName && !lockFullName) setFullName(d.fullName);
+        if (d.mobile && !lockMobile) setMobile(d.mobile);
+        if (d.mobileCode && !lockMobile) setMobileCode(d.mobileCode);
+        if (d.email && !lockEmail) setEmail(d.email);
         if (d.companyName) setCompanyName(d.companyName);
         if (d.companyTagline) setCompanyTagline(d.companyTagline);
         if (d.reraId) setReraId(d.reraId);
         if (d.headOfficeCity) setHeadOfficeCity(d.headOfficeCity);
         if (d.propertyTypeFocus) setPropertyTypeFocus(d.propertyTypeFocus);
         if (d.notes) setNotes(d.notes);
-        if (d.seatsRequired) setSeatsRequired(d.seatsRequired);
+        if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
         if (d.projects) setProjects(d.projects.map((p: any) => ({ ...p, brochure: [] })));
         if (d.leadSheetLink) setLeadSheetLink(d.leadSheetLink);
