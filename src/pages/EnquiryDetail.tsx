@@ -250,7 +250,7 @@ export default function EnquiryDetail() {
         payload: draft.payload as unknown as never,
       });
     }
-    const { error } = await supabase.from('enquiries').update(update).eq('id', enquiry.id);
+    const { error } = await supabase.from('enquiries').update(update as never).eq('id', enquiry.id);
     if (error) toast.error(error.message);
     else {
       toast.success('Stage updated');
