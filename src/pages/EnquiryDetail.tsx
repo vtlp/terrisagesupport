@@ -641,6 +641,27 @@ export default function EnquiryDetail() {
 
           {/* Qualification — agency vs builder */}
           <div className="space-y-4">
+            {/* Seat count first, per request */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Estimated team / seat count</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={draft.payload.team_size_estimate ?? ''}
+                  onChange={e => setPayload('team_size_estimate', e.target.value === '' ? null : Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Approx. onboarding date</Label>
+                <Input
+                  type="date"
+                  value={draft.payload.approx_onboarding_date ?? ''}
+                  onChange={e => setPayload('approx_onboarding_date', e.target.value || null)}
+                />
+              </div>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Focus area</Label>
@@ -681,26 +702,6 @@ export default function EnquiryDetail() {
                   selected={(draft.payload.portals_in_use as string[] | undefined) ?? []}
                   onChange={vals => setPayload('portals_in_use', vals)}
                   placeholder="Select portals"
-                />
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Estimated team / seat count</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={draft.payload.team_size_estimate ?? ''}
-                  onChange={e => setPayload('team_size_estimate', e.target.value === '' ? null : Number(e.target.value))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Approx. onboarding date</Label>
-                <Input
-                  type="date"
-                  value={draft.payload.approx_onboarding_date ?? ''}
-                  onChange={e => setPayload('approx_onboarding_date', e.target.value || null)}
                 />
               </div>
             </div>
