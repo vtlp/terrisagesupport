@@ -887,22 +887,35 @@ export default function EnquiryDetail() {
         <DialogContent>
           <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
           <CalendarEventForm
-            defaultEventType={CalendarEventType.FOLLOW_UP}
+            defaultEventType={pendingDemoSchedule ? CalendarEventType.DEMO : CalendarEventType.FOLLOW_UP}
             lockedEntityType="ENQUIRY"
             lockedEntityId={enquiry.id}
             lockedEntityLabel={enquiry.company_name || enquiry.full_name}
-            onCancel={() => setScheduleOpen(false)}
+            onCancel={() => { setScheduleOpen(false); setPendingDemoSchedule(false); }}
             onSubmit={async (d) => {
               const [hh, mm] = d.time.split(':').map(Number);
               const dt = new Date(d.date); dt.setHours(hh ?? 10, mm ?? 0, 0, 0);
+              const scheduledIso = dt.toISOString();
               const { error } = await supabase.from('calendar_events').insert({
-                title: d.title, scheduled_at: dt.toISOString(), notes: d.notes || null,
+                title: d.title, scheduled_at: scheduledIso, notes: d.notes || null,
                 event_type: d.event_type as 'DEMO' | 'FOLLOW_UP' | 'CALL_BACK' | 'CHECK_IN' | 'ONBOARDING' | 'OTHER',
                 related_entity_type: 'ENQUIRY', related_entity_id: enquiry.id,
               });
               if (error) { toast.error(error.message); return; }
               toast.success('Event scheduled');
               setScheduleOpen(false);
+
+              // If a DEMO event was scheduled, auto-advance enquiry to DEMO_SCHEDULED
+              // and populate demo_scheduled_at with the chosen time.
+              if (d.event_type === CalendarEventType.DEMO) {
+                await supabase.from('enquiries').update({
+                  stage: 'DEMO_SCHEDULED' as Stage,
+                  demo_scheduled_at: scheduledIso,
+                }).eq('id', enquiry.id);
+                setEnquiry(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: scheduledIso } : prev);
+                setDraft(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: scheduledIso } : prev);
+              }
+              setPendingDemoSchedule(false);
               loadEvents(enquiry.id);
             }}
           />
