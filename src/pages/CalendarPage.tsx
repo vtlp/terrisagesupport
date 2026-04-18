@@ -73,7 +73,8 @@ export default function CalendarPage() {
 
   const filtered = useMemo(() => events.filter(e => {
     const matchEntity = entityFilter === 'all' || e.related_entity_type === entityFilter;
-    const matchTeam = teamFilter === 'all' || e.created_by === teamFilter;
+    const owner = e.assigned_to ?? e.created_by;
+    const matchTeam = teamFilter === 'all' || owner === teamFilter;
     const matchType = eventTypeFilter === 'all' || e.event_type === eventTypeFilter;
     return matchEntity && matchTeam && matchType;
   }), [events, entityFilter, teamFilter, eventTypeFilter]);
