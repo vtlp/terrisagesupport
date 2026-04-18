@@ -69,20 +69,12 @@ export function AppSidebar({ open }: AppSidebarProps) {
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
   const isGroupActive = (paths: string[]) => paths.some((p) => location.pathname.startsWith(p));
 
-  const NavItem = ({ to, icon: Icon, label, badge }: { to: string; icon: React.ElementType; label: string; badge?: number }) => (
+  const NavItem = ({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string; badge?: number }) => (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={isActive(to)} className={cn('text-sidebar-foreground hover:bg-sidebar-muted', isActive(to) && 'bg-sidebar-primary text-sidebar-primary-foreground')}>
-        <Link to={to} className="flex items-center justify-between w-full">
-          <span className="flex items-center gap-2">
-            <Icon className="h-4 w-4" />
-            {!collapsed && <span>{label}</span>}
-          </span>
-          {!collapsed && badge !== undefined && badge > 0 && (
-            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1.5">{badge}</span>
-          )}
-          {collapsed && badge !== undefined && badge > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-destructive" />
-          )}
+        <Link to={to} className="flex items-center gap-2 w-full">
+          <Icon className="h-4 w-4" />
+          {!collapsed && <span>{label}</span>}
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -101,12 +93,7 @@ export function AppSidebar({ open }: AppSidebarProps) {
               <Icon className="h-4 w-4" />
               {!collapsed && <span>{label}</span>}
             </div>
-            <div className="flex items-center gap-1">
-              {!collapsed && badge !== undefined && badge > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1.5">{badge}</span>
-              )}
-              {!collapsed && (groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
-            </div>
+            {!collapsed && (groupOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
