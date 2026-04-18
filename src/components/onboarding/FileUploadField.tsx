@@ -87,7 +87,8 @@ export function FileUploadField({
         </div>
       )}
 
-      {helperText && !error && <p className="text-xs text-muted-foreground">{helperText}</p>}
+      {helperText && !error && !sizeError && <p className="text-xs text-muted-foreground">{helperText}</p>}
+      {sizeError && <p className="text-sm text-destructive">{sizeError}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
