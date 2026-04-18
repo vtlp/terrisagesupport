@@ -85,6 +85,30 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
 
   useEffect(() => { load(); }, [load]);
 
+  // Realtime subscription: refresh whenever a new activity_log row matches this entity.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`activity-${entityType}-${entityId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'activity_log', filter: `entity_id=eq.${entityId}` },
+        (payload) => {
+          const row = payload.new as LogRow;
+          if (row.entity_type !== entityType) return;
+          if (row.event_type === 'NOTE' || row.event_type === 'STAGE_CHANGE') return;
+          setRows((prev) => (prev.some((r) => r.id === row.id) ? prev : [row, ...prev]));
+          if (row.actor_id && !profiles[row.actor_id]) {
+            supabase.from('profiles').select('id, full_name').eq('id', row.actor_id).maybeSingle()
+              .then(({ data }) => {
+                if (data) setProfiles((p) => ({ ...p, [data.id]: data.full_name }));
+              });
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [entityType, entityId, profiles]);
+
   const visible = showAll ? rows : rows.slice(0, defaultLimit);
 
   return (

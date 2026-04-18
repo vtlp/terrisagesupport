@@ -441,7 +441,14 @@ export default function EnquiryDetail() {
   const generateLink = (): string => {
     if (!enquiry) return '';
     const tenancy = enquiry.tenancy_type === 'BUILDER_DEVELOPER' ? 'builder' : 'agency';
-    return `${window.location.origin}/onboarding/${tenancy}?enquiry_id=${enquiry.id}`;
+    // Always use the public published URL so customers (without Lovable access) can open it.
+    const host = window.location.hostname;
+    const isPreview = host.includes('lovable.app') && host.includes('id-preview--');
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    const publicOrigin = (isPreview || isLocal)
+      ? 'https://terrisagesupport.lovable.app'
+      : window.location.origin;
+    return `${publicOrigin}/onboarding/${tenancy}?enquiry_id=${enquiry.id}`;
   };
 
   const handleSendOnboarding = async () => {
