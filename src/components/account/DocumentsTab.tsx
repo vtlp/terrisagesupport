@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Image as ImageIcon, FileBadge, Loader2, ExternalLink, FolderOpen, Database, Building2 } from 'lucide-react';
+import { FileText, Image as ImageIcon, FileBadge, Loader2, ExternalLink, FolderOpen, Database, Building2, FileSpreadsheet, File as FileIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type DocCategory = 'Company logo' | 'Project brochure' | 'Property images' | 'Lead import files' | 'Property import files';
+type DocCategory = 'Company logo' | 'Project brochure' | 'Property images' | 'Bulk imports' | 'Lead import files' | 'Property import files';
 
 interface DocItem {
   path: string;
@@ -32,6 +32,11 @@ export function DocumentsTab({ payload }: Props) {
       (proj.brochurePaths ?? []).forEach((p) => out.push({ path: p, category: 'Project brochure', projectName }));
     });
 
+    // New unified bulk imports section (current onboarding form)
+    const bulkImports = (payload?.bulk_imports as { paths?: string[] } | undefined) ?? {};
+    (bulkImports.paths ?? []).forEach((p) => out.push({ path: p, category: 'Bulk imports' }));
+
+    // Legacy keys — kept so older submissions still render their files
     const propertyImport = (payload?.property_import as { image_paths?: string[]; file_paths?: string[] } | undefined) ?? {};
     (propertyImport.image_paths ?? []).forEach((p) => out.push({ path: p, category: 'Property images' }));
     (propertyImport.file_paths ?? []).forEach((p) => out.push({ path: p, category: 'Property import files' }));
@@ -74,6 +79,7 @@ export function DocumentsTab({ payload }: Props) {
   const iconFor = (cat: string) => {
     if (cat === 'Company logo') return <FileBadge className="h-4 w-4 text-primary" />;
     if (cat === 'Project brochure') return <FileText className="h-4 w-4 text-primary" />;
+    if (cat === 'Bulk imports') return <FileSpreadsheet className="h-4 w-4 text-primary" />;
     if (cat === 'Lead import files') return <Database className="h-4 w-4 text-primary" />;
     if (cat === 'Property import files') return <Building2 className="h-4 w-4 text-primary" />;
     return <ImageIcon className="h-4 w-4 text-primary" />;
