@@ -105,6 +105,7 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
 
   const insertEnquiry = async (isDuplicateOf: string | null) => {
     setSubmitting(true);
+    const trimmedNotes = notes.trim();
     const { data, error } = await supabase.from('enquiries').insert({
       full_name: contactName.trim(),
       company_name: companyName.trim(),
@@ -118,13 +119,20 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
       payload: {
         contact_phone_alt: phoneAltNumber ? joinPhone(phoneAltCode, phoneAltNumber) : null,
         whatsapp_enabled: whatsappEnabled,
-        initial_notes: notes.trim(),
+        initial_notes: trimmedNotes,
       },
     } as never).select('id').maybeSingle();
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
     toast.success(`Enquiry created for ${companyName.trim()}`);
     const id = (data as { id?: string } | null)?.id;
+    // Persist initial note into enquiry_notes so it shows up in the Notes panel.
+    if (id && trimmedNotes) {
+      await supabase.from('enquiry_notes').insert({
+        enquiry_id: id,
+        note_text: trimmedNotes,
+      } as never);
+    }
     if (id && isDuplicateOf) {
       await supabase.rpc('log_activity', {
         _entity_type: 'ENQUIRY', _entity_id: id, _event_type: 'NOTE',

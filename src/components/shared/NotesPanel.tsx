@@ -12,11 +12,16 @@ interface NotesPanelProps {
   notes: Note[];
   onAddNote?: (text: string) => void;
   compact?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  autoFocus?: boolean;
 }
 
-export function NotesPanel({ notes, onAddNote, compact = false }: NotesPanelProps) {
+export function NotesPanel({ notes, onAddNote, compact = false, open, onOpenChange, autoFocus }: NotesPanelProps) {
   const [newNote, setNewNote] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [internalShow, setInternalShow] = useState(false);
+  const showForm = open ?? internalShow;
+  const setShowForm = (v: boolean) => { onOpenChange?.(v); setInternalShow(v); };
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
