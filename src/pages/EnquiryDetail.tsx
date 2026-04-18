@@ -941,13 +941,13 @@ export default function EnquiryDetail() {
             <div className="space-y-2">
               {events.map(ev => (
                 <button key={ev.id} onClick={() => setOpenEvent(ev)}
-                  className="w-full text-left rounded-md border px-3 py-2 hover:bg-accent transition-colors">
+                  className="w-full text-left rounded-md border border-primary/30 bg-primary/5 px-3 py-2 hover:bg-primary/10 transition-colors">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{ev.title}</div>
+                      <div className="text-sm font-medium truncate text-primary">{ev.title}</div>
                       <div className="text-xs text-muted-foreground">{format(new Date(ev.scheduled_at), 'EEE dd MMM, HH:mm')}</div>
                     </div>
-                    <Badge variant="outline" className="text-[10px] shrink-0">{ev.event_type.replace('_', ' ')}</Badge>
+                    <Badge variant="outline" className="text-[10px] shrink-0 bg-primary/15 text-primary border-primary/30">{ev.event_type.replace('_', ' ')}</Badge>
                   </div>
                 </button>
               ))}

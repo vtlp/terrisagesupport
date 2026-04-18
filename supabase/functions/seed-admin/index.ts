@@ -35,13 +35,23 @@ Deno.serve(async (req) => {
       user = created.user!;
     }
 
-    // Ensure profile
-    await admin
+    // Ensure profile EXISTS — but never overwrite a user-edited full_name.
+    const { data: existingProfile } = await admin
       .from("profiles")
-      .upsert(
-        { id: user.id, full_name: SEED_NAME, email: SEED_EMAIL, is_active: true },
-        { onConflict: "id" }
-      );
+      .select("id, full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!existingProfile) {
+      await admin.from("profiles").insert({
+        id: user.id, full_name: SEED_NAME, email: SEED_EMAIL, is_active: true,
+      });
+    } else {
+      // Only patch email/is_active; preserve full_name as-is.
+      await admin.from("profiles")
+        .update({ email: SEED_EMAIL, is_active: true })
+        .eq("id", user.id);
+    }
 
     // Ensure admin role
     await admin
