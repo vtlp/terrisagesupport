@@ -67,7 +67,7 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
       .select('*')
       .eq('entity_type', entityType)
       .eq('entity_id', entityId)
-      .neq('event_type', 'STAGE_CHANGE')
+      .not('event_type', 'in', '(STAGE_CHANGE,NOTE)')
       .order('created_at', { ascending: false })
       .limit(200);
     const list = (logs ?? []) as LogRow[];
