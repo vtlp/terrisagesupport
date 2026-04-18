@@ -935,7 +935,7 @@ export default function EnquiryDetail() {
               <Clock className="h-4 w-4" /> Awaiting customer to complete the form.
             </div>
             {enquiry.onboarding_form_link && (
-              <a href={enquiry.onboarding_form_link} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 mt-2">
+              <a href={toPublicLink(enquiry.onboarding_form_link)} target="_blank" rel="noreferrer" className="text-xs text-primary inline-flex items-center gap-1 mt-2">
                 <ExternalLink className="h-3 w-3" /> Open form link
               </a>
             )}
