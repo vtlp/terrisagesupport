@@ -393,10 +393,14 @@ export default function EnquiryDetail() {
         onboarding_form_link: link,
         stage: 'ONBOARDING_PACK_SENT' as Stage,
       }).eq('id', enquiry.id);
-      const { data: noteRow } = await supabase.from('enquiry_notes').insert({
-        enquiry_id: enquiry.id, note_text: `Onboarding form link generated: ${link}`,
-      }).select('id, note_text, created_at').single();
-      if (noteRow) setNotes(prev => [noteRow as NoteRow, ...prev]);
+      // Log to activity timeline (not notes) — onboarding link history belongs here.
+      await supabase.from('activity_log').insert({
+        entity_type: 'ENQUIRY',
+        entity_id: enquiry.id,
+        event_type: 'SUBMISSION',
+        summary: 'Onboarding form link generated',
+        details: { link },
+      });
       await refreshEnquiryMeta(enquiry.id);
     }
     setShareOpen(true);
