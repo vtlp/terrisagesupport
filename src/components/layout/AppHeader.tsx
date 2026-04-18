@@ -33,11 +33,30 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
   const { toggleSidebar } = useSidebar();
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
+  const [pendingSeatRequests, setPendingSeatRequests] = useState(0);
 
   // Compute attention count (still uses seed for tickets/accounts pending backend)
   const attentionCount =
     seedTickets.filter(t => (t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2) && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length +
-    seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;
+    seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length +
+    pendingSeatRequests;
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { count } = await supabase
+        .from('seat_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'PENDING');
+      if (!cancelled) setPendingSeatRequests(count ?? 0);
+    };
+    load();
+    const channel = supabase
+      .channel('seat-requests-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'seat_requests' }, load)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
