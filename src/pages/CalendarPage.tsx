@@ -36,7 +36,7 @@ interface CalEvent {
   id: string; title: string; scheduled_at: string;
   event_type: string; status: string; notes: string | null;
   related_entity_type: string | null; related_entity_id: string | null;
-  created_by: string | null;
+  created_by: string | null; assigned_to: string | null;
 }
 interface Profile { id: string; full_name: string; }
 
@@ -73,7 +73,8 @@ export default function CalendarPage() {
 
   const filtered = useMemo(() => events.filter(e => {
     const matchEntity = entityFilter === 'all' || e.related_entity_type === entityFilter;
-    const matchTeam = teamFilter === 'all' || e.created_by === teamFilter;
+    const owner = e.assigned_to ?? e.created_by;
+    const matchTeam = teamFilter === 'all' || owner === teamFilter;
     const matchType = eventTypeFilter === 'all' || e.event_type === eventTypeFilter;
     return matchEntity && matchTeam && matchType;
   }), [events, entityFilter, teamFilter, eventTypeFilter]);
@@ -92,7 +93,7 @@ export default function CalendarPage() {
 
   const userName = (id: string | null) => id ? (profiles.find(p => p.id === id)?.full_name ?? '—') : '—';
 
-  const handleCreateEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType; related_entity_type: 'ENQUIRY' | 'ACCOUNT' | ''; related_entity_id: string | null }) => {
+  const handleCreateEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType; related_entity_type: 'ENQUIRY' | 'ACCOUNT' | ''; related_entity_id: string | null; assigned_to: string | null }) => {
     const scheduled = new Date(data.date);
     const [h, m] = data.time.split(':');
     scheduled.setHours(parseInt(h), parseInt(m));
@@ -100,19 +101,41 @@ export default function CalendarPage() {
       DEMO: 'DEMO', FOLLOW_UP: 'FOLLOW_UP', CALL_BACK: 'CALL_BACK',
       CHECK_IN: 'CHECK_IN', ONBOARDING: 'ONBOARDING', GENERAL: 'OTHER',
     };
-    const { error } = await supabase.from('calendar_events').insert({
+    const { data: created, error } = await supabase.from('calendar_events').insert({
       title: data.title,
       scheduled_at: scheduled.toISOString(),
       notes: data.notes || null,
       event_type: (eventTypeMap[data.event_type] ?? 'OTHER') as 'OTHER',
       created_by: currentUser.user_id,
+      assigned_to: data.assigned_to ?? currentUser.user_id,
       related_entity_type: data.related_entity_type || null,
       related_entity_id: data.related_entity_id || null,
     }).select('id').maybeSingle();
     if (error) { toast.error(error.message); return; }
     toast.success(`Event "${data.title}" created`);
     setShowCreateDialog(false);
+    if (created?.id) {
+      // auto-sync to Google Calendar (silent failure if not connected)
+      supabase.functions.invoke('sync-calendar-event', { body: { event_id: created.id } })
+        .then(({ data: r, error: e }) => {
+          const code = (r as { code?: string })?.code;
+          if (e || (r as { error?: string })?.error) {
+            if (code !== 'NOT_CONNECTED') console.warn('Auto-sync failed', e ?? r);
+          }
+        });
+    }
     load();
+  };
+
+  const syncAll = async () => {
+    if (filtered.length === 0) { toast.info('No events to sync'); return; }
+    toast.loading(`Syncing ${filtered.length} events…`, { id: 'sync-all' });
+    let ok = 0, fail = 0;
+    for (const ev of filtered) {
+      const { data, error } = await supabase.functions.invoke('sync-calendar-event', { body: { event_id: ev.id } });
+      if (error || (data as { error?: string })?.error) fail++; else ok++;
+    }
+    toast.success(`Synced ${ok} • Failed ${fail}`, { id: 'sync-all' });
   };
 
   const syncToGoogle = async (eventId: string, title: string) => {
@@ -134,7 +157,10 @@ export default function CalendarPage() {
           <h1 className="text-2xl font-semibold">Calendar</h1>
           <p className="text-sm text-muted-foreground mt-1">View and manage all scheduled events</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4 mr-1" /> Create Event</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={syncAll}><RefreshCw className="h-4 w-4 mr-1" /> Sync all to Google</Button>
+          <Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4 mr-1" /> Create Event</Button>
+        </div>
       </div>
 
       <Card>
@@ -229,7 +255,7 @@ export default function CalendarPage() {
                     <p className="text-sm font-medium truncate">{e.title}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       <span>{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</span>
-                      <span>•</span><span>{userName(e.created_by)}</span>
+                      <span>•</span><span>{userName(e.assigned_to ?? e.created_by)}</span>
                     </div>
                   </button>
                   <div className="flex items-center gap-2">
@@ -258,7 +284,8 @@ export default function CalendarPage() {
 
       <EventDetailDialog
         event={openEvent}
-        ownerName={userName(openEvent?.created_by ?? null)}
+        ownerName={userName(openEvent?.assigned_to ?? openEvent?.created_by ?? null)}
+        teamMembers={profiles}
         open={!!openEvent}
         onOpenChange={(v) => { if (!v) setOpenEvent(null); }}
         onChanged={load}

@@ -20,11 +20,13 @@ export interface EventRow {
   related_entity_type: string | null;
   related_entity_id: string | null;
   created_by: string | null;
+  assigned_to?: string | null;
 }
 
 interface Props {
   event: EventRow | null;
   ownerName?: string;
+  teamMembers?: { id: string; full_name: string }[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onChanged?: () => void;
@@ -37,7 +39,7 @@ const eventTypeLabels: Record<string, string> = {
 
 const STATUS = ['SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const;
 
-export function EventDetailDialog({ event, ownerName, open, onOpenChange, onChanged }: Props) {
+export function EventDetailDialog({ event, ownerName, teamMembers = [], open, onOpenChange, onChanged }: Props) {
   const [busy, setBusy] = useState(false);
 
   if (!event) return null;
@@ -57,6 +59,20 @@ export function EventDetailDialog({ event, ownerName, open, onOpenChange, onChan
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Status updated');
+    onChanged?.();
+  };
+
+  const updateAssignee = async (userId: string) => {
+    const newId = userId === 'unassigned' ? null : userId;
+    setBusy(true);
+    const { error } = await supabase.from('calendar_events')
+      .update({ assigned_to: newId })
+      .eq('id', event.id);
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Assignee updated');
+    // resync to Google so owner change reflects there
+    supabase.functions.invoke('sync-calendar-event', { body: { event_id: event.id } });
     onChanged?.();
   };
 
@@ -100,8 +116,18 @@ export function EventDetailDialog({ event, ownerName, open, onOpenChange, onChan
               <div className="font-medium">{format(new Date(event.scheduled_at), 'EEE dd MMM yyyy, HH:mm')}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Owner</div>
-              <div className="font-medium">{ownerName ?? '—'}</div>
+              <div className="text-xs text-muted-foreground mb-1">Owner (assigned to)</div>
+              {teamMembers.length > 0 ? (
+                <Select value={event.assigned_to ?? event.created_by ?? 'unassigned'} onValueChange={updateAssignee} disabled={busy}>
+                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {teamMembers.map(m => <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="font-medium">{ownerName ?? '—'}</div>
+              )}
             </div>
           </div>
 

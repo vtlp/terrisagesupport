@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CalendarEventType } from '@/types/core';
 import { EntityPicker } from './EntityPicker';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 const eventTypeLabels: Record<CalendarEventType, string> = {
   [CalendarEventType.DEMO]: 'Demo',
@@ -26,6 +28,7 @@ interface SubmitData {
   event_type: CalendarEventType;
   related_entity_type: 'ENQUIRY' | 'ACCOUNT' | '';
   related_entity_id: string | null;
+  assigned_to: string | null;
 }
 
 interface CalendarEventFormProps {
@@ -34,6 +37,7 @@ interface CalendarEventFormProps {
   defaultTitle?: string;
   defaultDescription?: string;
   defaultEventType?: CalendarEventType;
+  defaultAssignedTo?: string | null;
   /** When provided, the entity link is locked (pre-filled context). */
   lockedEntityType?: 'ENQUIRY' | 'ACCOUNT';
   lockedEntityId?: string;
@@ -43,6 +47,7 @@ interface CalendarEventFormProps {
 export function CalendarEventForm({
   onSubmit, onCancel,
   defaultTitle = '', defaultDescription = '', defaultEventType = CalendarEventType.GENERAL,
+  defaultAssignedTo = null,
   lockedEntityType, lockedEntityId, lockedEntityLabel,
 }: CalendarEventFormProps) {
   const [title, setTitle] = useState(defaultTitle);
@@ -52,6 +57,13 @@ export function CalendarEventForm({
   const [eventType, setEventType] = useState<CalendarEventType>(defaultEventType);
   const [linkType, setLinkType] = useState<'ENQUIRY' | 'ACCOUNT' | ''>(lockedEntityType ?? '');
   const [linkId, setLinkId] = useState<string | null>(lockedEntityId ?? null);
+  const [assignedTo, setAssignedTo] = useState<string | null>(defaultAssignedTo);
+  const [team, setTeam] = useState<{ id: string; full_name: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name').eq('is_active', true)
+      .order('full_name').then(({ data }) => setTeam((data ?? []) as { id: string; full_name: string }[]));
+  }, []);
 
   const handleSubmit = () => {
     if (title && date) {
@@ -59,6 +71,7 @@ export function CalendarEventForm({
         title, date, time, notes, event_type: eventType,
         related_entity_type: linkType,
         related_entity_id: linkId,
+        assigned_to: assignedTo,
       });
     }
   };
@@ -99,6 +112,16 @@ export function CalendarEventForm({
           <Label>Time</Label>
           <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Assign to</Label>
+        <Select value={assignedTo ?? 'unassigned'} onValueChange={(v) => setAssignedTo(v === 'unassigned' ? null : v)}>
+          <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {team.map(m => <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       {lockedEntityType ? (
         <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
