@@ -869,6 +869,82 @@ function StageOutcomePanel({
   setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
 }) {
+  const isLost = stage === 'LOST';
+  const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
+  const pastStages = STAGE_ORDER.slice(0, Math.max(0, currentIdx));
+
+  return (
+    <div className="space-y-4">
+      {pastStages.length > 0 && (
+        <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Past stage outcomes</div>
+          <div className="grid md:grid-cols-2 gap-2">
+            {pastStages.map(s => (
+              <PastStageSummary key={s} stage={s} draft={draft} />
+            ))}
+          </div>
+        </div>
+      )}
+      <div>
+        <div className="text-xs font-medium text-primary uppercase tracking-wide mb-2">Current stage · {stageLabels[stage]}</div>
+        <ActiveStagePanel stage={stage} draft={draft} setField={setField} setPayload={setPayload} />
+      </div>
+    </div>
+  );
+}
+
+function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
+  const lookup = (list: { v: string; l: string }[], v?: string) => list.find(o => o.v === v)?.l ?? v ?? '—';
+  let body: React.ReactNode = <span className="text-muted-foreground">—</span>;
+
+  if (stage === 'NEW_ENQUIRY') {
+    body = <span>Captured {format(new Date(draft.created_at), 'dd MMM yyyy')}</span>;
+  } else if (stage === 'CONTACTED') {
+    const outcome = draft.payload.outcome as string | undefined;
+    body = (
+      <div className="space-y-0.5">
+        <div>Outcome: <span className="font-medium">{lookup(OUTCOMES, outcome)}</span></div>
+        {outcome === 'NOT_INTERESTED' && (
+          <div className="text-muted-foreground">
+            Reason: {lookup(NOT_INTERESTED_REASONS, draft.payload.not_interested_reason as string | undefined)}
+            {draft.payload.not_interested_text ? ` · ${draft.payload.not_interested_text}` : ''}
+          </div>
+        )}
+      </div>
+    );
+  } else if (stage === 'DEMO_SCHEDULED') {
+    body = draft.demo_scheduled_at
+      ? <span>Scheduled <span className="font-medium">{format(new Date(draft.demo_scheduled_at), 'dd MMM yyyy, HH:mm')}</span></span>
+      : <span className="text-muted-foreground">No date recorded</span>;
+  } else if (stage === 'DEMO_COMPLETED') {
+    body = (
+      <div className="space-y-0.5">
+        <div>{draft.demo_completed_at ? <>Completed <span className="font-medium">{format(new Date(draft.demo_completed_at), 'dd MMM yyyy, HH:mm')}</span></> : <span className="text-muted-foreground">Date not set</span>}</div>
+        <div className="text-muted-foreground">Outcome: {lookup(DEMO_OUTCOMES, draft.payload.demo_outcome as string | undefined)}</div>
+      </div>
+    );
+  } else if (stage === 'ONBOARDING_PACK_SENT') {
+    body = <span>Onboarding form sent</span>;
+  } else if (stage === 'ACCOUNT_CREATED') {
+    body = <span>Account created</span>;
+  }
+
+  return (
+    <div className="text-xs rounded border bg-card px-2 py-1.5">
+      <div className="font-medium text-[11px] text-muted-foreground mb-0.5">{stageLabels[stage]}</div>
+      <div>{body}</div>
+    </div>
+  );
+}
+
+function ActiveStagePanel({
+  stage, draft, setField, setPayload,
+}: {
+  stage: Stage;
+  draft: Enquiry;
+  setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
+  setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
+}) {
   const outcome = (draft.payload.outcome as string) || '';
 
   if (stage === 'NEW_ENQUIRY') {
@@ -878,7 +954,6 @@ function StageOutcomePanel({
   if (stage === 'CONTACTED') {
     return (
       <div className="space-y-3">
-        <div className="text-sm font-medium">Call outcome</div>
         <div className="grid md:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Outcome</Label>
