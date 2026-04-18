@@ -117,9 +117,9 @@ Deno.serve(async (req) => {
         synced_at: new Date().toISOString(),
       }, { onConflict: 'calendar_event_id' });
 
+      console.error('Google Calendar sync failed', { status: gResp.status, body: gData });
       return new Response(JSON.stringify({
-        error: `Google Calendar sync failed [${gResp.status}]`,
-        details: gData,
+        error: 'Google Calendar sync failed',
       }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -138,9 +138,8 @@ Deno.serve(async (req) => {
       html_link: gData.htmlLink,
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('sync-calendar-event error:', message);
-    return new Response(JSON.stringify({ error: message }), {
+    console.error('sync-calendar-event error:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

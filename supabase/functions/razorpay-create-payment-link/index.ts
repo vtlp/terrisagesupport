@@ -101,8 +101,9 @@ Deno.serve(async (req) => {
     });
     const rzpJson = await rzpRes.json();
     if (!rzpRes.ok) {
+      console.error('Razorpay request failed', { status: rzpRes.status, body: rzpJson });
       return new Response(
-        JSON.stringify({ success: false, error: rzpJson?.error?.description || 'Razorpay request failed', detail: rzpJson }),
+        JSON.stringify({ success: false, error: rzpJson?.error?.description || 'Razorpay request failed' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -147,8 +148,8 @@ Deno.serve(async (req) => {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    return new Response(JSON.stringify({ success: false, error: msg }), {
+    console.error('razorpay-create-payment-link error:', err);
+    return new Response(JSON.stringify({ success: false, error: 'Internal server error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

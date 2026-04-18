@@ -81,7 +81,8 @@ Deno.serve(async (req) => {
       .single();
 
     if (error) {
-      return new Response(JSON.stringify({ error: error.message }),
+      console.error('seat-request insert error:', error);
+      return new Response(JSON.stringify({ error: 'Failed to create seat request' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
