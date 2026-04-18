@@ -21,7 +21,7 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { VerificationTab } from '@/components/account/VerificationTab';
 import { BillingTab } from '@/components/account/BillingTab';
 import { ImportsTab } from '@/components/account/ImportsTab';
-import { SeatRequestsTab } from '@/components/account/SeatRequestsTab';
+import { SeatsAndRequestsTab } from '@/components/account/SeatsAndRequestsTab';
 import { ApiKeysCard } from '@/components/account/ApiKeysCard';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
@@ -227,8 +227,7 @@ export default function AccountDetail() {
       <Tabs defaultValue="overview">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="seats">Seats ({seats.filter(s => s.is_active).length})</TabsTrigger>
-          <TabsTrigger value="seat-requests">Seat requests</TabsTrigger>
+          <TabsTrigger value="seats">Seats &amp; requests ({seats.filter(s => s.is_active).length})</TabsTrigger>
           <TabsTrigger value="checklist">Onboarding ({doneCount}/{checklist.length})</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
@@ -373,6 +372,7 @@ export default function AccountDetail() {
               )}
             </CardContent>
           </Card>
+          <SeatsAndRequestsTab accountId={acc.id} activeSeatsUsed={seats.filter(s => s.is_active).length} />
         </TabsContent>
 
         <TabsContent value="checklist" className="space-y-4">
@@ -433,9 +433,6 @@ export default function AccountDetail() {
           <ApiKeysCard accountId={acc.id} />
         </TabsContent>
 
-        <TabsContent value="seat-requests" className="space-y-4">
-          <SeatRequestsTab accountId={acc.id} />
-        </TabsContent>
 
         <TabsContent value="imports" className="space-y-4">
           <ImportsTab accountId={acc.id} />

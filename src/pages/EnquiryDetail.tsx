@@ -23,6 +23,7 @@ import { SendOnboardingDialog } from '@/components/shared/SendOnboardingDialog';
 import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/components/shared/PhoneInput';
 import { defaultMarkets, defaultPortals } from '@/data/lookupData';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
+import { MultiSelect } from '@/components/shared/MultiSelect';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
@@ -445,50 +446,47 @@ export default function EnquiryDetail() {
 
           {/* Qualification — agency vs builder */}
           <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Focus area</Label>
-              <div className="flex gap-3 flex-wrap mt-2">
-                {FOCUS_AREAS.map(fa => (
-                  <label key={fa.v} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={(draft.payload.focus_area ?? []).includes(fa.v)}
-                      onCheckedChange={() => togglePayloadArr('focus_area', fa.v)}
-                    />
-                    {fa.l}
-                  </label>
-                ))}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Focus area</Label>
+                <MultiSelect
+                  options={FOCUS_AREAS.map(o => ({ value: o.v, label: o.l }))}
+                  selected={(draft.payload.focus_area as string[] | undefined) ?? []}
+                  onChange={vals => setPayload('focus_area', vals)}
+                  placeholder="Select focus areas"
+                />
               </div>
-            </div>
 
-            {!isBuilder && (
-              <div>
-                <Label className="text-sm font-medium">Sales focus</Label>
-                <div className="flex gap-3 flex-wrap mt-2">
-                  {SALES_FOCUS.map(sf => (
-                    <label key={sf.v} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Checkbox
-                        checked={(draft.payload.sales_focus ?? []).includes(sf.v)}
-                        onCheckedChange={() => togglePayloadArr('sales_focus', sf.v)}
-                      />
-                      {sf.l}
-                    </label>
-                  ))}
+              {!isBuilder && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Sales focus</Label>
+                  <MultiSelect
+                    options={SALES_FOCUS.map(o => ({ value: o.v, label: o.l }))}
+                    selected={(draft.payload.sales_focus as string[] | undefined) ?? []}
+                    onChange={vals => setPayload('sales_focus', vals)}
+                    placeholder="Select sales focus"
+                  />
                 </div>
-              </div>
-            )}
+              )}
 
-            <div>
-              <Label className="text-sm font-medium">Primary property types</Label>
-              <div className="flex gap-3 flex-wrap mt-2">
-                {PROPERTY_TYPES.map(pt => (
-                  <label key={pt.v} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={(draft.payload.primary_property_types ?? []).includes(pt.v)}
-                      onCheckedChange={() => togglePayloadArr('primary_property_types', pt.v)}
-                    />
-                    {pt.l}
-                  </label>
-                ))}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Primary property types</Label>
+                <MultiSelect
+                  options={PROPERTY_TYPES.map(o => ({ value: o.v, label: o.l }))}
+                  selected={(draft.payload.primary_property_types as string[] | undefined) ?? []}
+                  onChange={vals => setPayload('primary_property_types', vals)}
+                  placeholder="Select property types"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Portals currently in use</Label>
+                <MultiSelect
+                  options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                  selected={(draft.payload.portals_in_use as string[] | undefined) ?? []}
+                  onChange={vals => setPayload('portals_in_use', vals)}
+                  placeholder="Select portals"
+                />
               </div>
             </div>
 
@@ -520,21 +518,6 @@ export default function EnquiryDetail() {
                 value={draft.payload.current_system_text ?? ''}
                 onChange={e => setPayload('current_system_text', e.target.value)}
               />
-            </div>
-
-            <div>
-              <Label className="text-sm font-medium">Portals currently in use</Label>
-              <div className="flex gap-3 flex-wrap mt-2">
-                {defaultPortals.map(p => (
-                  <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={(draft.payload.portals_in_use ?? []).includes(p.value)}
-                      onCheckedChange={() => togglePayloadArr('portals_in_use', p.value)}
-                    />
-                    {p.value}
-                  </label>
-                ))}
-              </div>
             </div>
           </div>
 
@@ -886,6 +869,82 @@ function StageOutcomePanel({
   setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
 }) {
+  const isLost = stage === 'LOST';
+  const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
+  const pastStages = STAGE_ORDER.slice(0, Math.max(0, currentIdx));
+
+  return (
+    <div className="space-y-4">
+      {pastStages.length > 0 && (
+        <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Past stage outcomes</div>
+          <div className="grid md:grid-cols-2 gap-2">
+            {pastStages.map(s => (
+              <PastStageSummary key={s} stage={s} draft={draft} />
+            ))}
+          </div>
+        </div>
+      )}
+      <div>
+        <div className="text-xs font-medium text-primary uppercase tracking-wide mb-2">Current stage · {stageLabels[stage]}</div>
+        <ActiveStagePanel stage={stage} draft={draft} setField={setField} setPayload={setPayload} />
+      </div>
+    </div>
+  );
+}
+
+function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
+  const lookup = (list: { v: string; l: string }[], v?: string) => list.find(o => o.v === v)?.l ?? v ?? '—';
+  let body: React.ReactNode = <span className="text-muted-foreground">—</span>;
+
+  if (stage === 'NEW_ENQUIRY') {
+    body = <span>Captured {format(new Date(draft.created_at), 'dd MMM yyyy')}</span>;
+  } else if (stage === 'CONTACTED') {
+    const outcome = draft.payload.outcome as string | undefined;
+    body = (
+      <div className="space-y-0.5">
+        <div>Outcome: <span className="font-medium">{lookup(OUTCOMES, outcome)}</span></div>
+        {outcome === 'NOT_INTERESTED' && (
+          <div className="text-muted-foreground">
+            Reason: {lookup(NOT_INTERESTED_REASONS, draft.payload.not_interested_reason as string | undefined)}
+            {draft.payload.not_interested_text ? ` · ${draft.payload.not_interested_text}` : ''}
+          </div>
+        )}
+      </div>
+    );
+  } else if (stage === 'DEMO_SCHEDULED') {
+    body = draft.demo_scheduled_at
+      ? <span>Scheduled <span className="font-medium">{format(new Date(draft.demo_scheduled_at), 'dd MMM yyyy, HH:mm')}</span></span>
+      : <span className="text-muted-foreground">No date recorded</span>;
+  } else if (stage === 'DEMO_COMPLETED') {
+    body = (
+      <div className="space-y-0.5">
+        <div>{draft.demo_completed_at ? <>Completed <span className="font-medium">{format(new Date(draft.demo_completed_at), 'dd MMM yyyy, HH:mm')}</span></> : <span className="text-muted-foreground">Date not set</span>}</div>
+        <div className="text-muted-foreground">Outcome: {lookup(DEMO_OUTCOMES, draft.payload.demo_outcome as string | undefined)}</div>
+      </div>
+    );
+  } else if (stage === 'ONBOARDING_PACK_SENT') {
+    body = <span>Onboarding form sent</span>;
+  } else if (stage === 'ACCOUNT_CREATED') {
+    body = <span>Account created</span>;
+  }
+
+  return (
+    <div className="text-xs rounded border bg-card px-2 py-1.5">
+      <div className="font-medium text-[11px] text-muted-foreground mb-0.5">{stageLabels[stage]}</div>
+      <div>{body}</div>
+    </div>
+  );
+}
+
+function ActiveStagePanel({
+  stage, draft, setField, setPayload,
+}: {
+  stage: Stage;
+  draft: Enquiry;
+  setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
+  setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
+}) {
   const outcome = (draft.payload.outcome as string) || '';
 
   if (stage === 'NEW_ENQUIRY') {
@@ -895,7 +954,6 @@ function StageOutcomePanel({
   if (stage === 'CONTACTED') {
     return (
       <div className="space-y-3">
-        <div className="text-sm font-medium">Call outcome</div>
         <div className="grid md:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Outcome</Label>

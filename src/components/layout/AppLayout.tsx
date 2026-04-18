@@ -12,7 +12,7 @@ export function AppLayout() {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
         <div className="flex-1 flex flex-col min-w-0">
-          <AppHeader onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+          <AppHeader />
           <main className="flex-1 overflow-auto">
             <Outlet />
           </main>
