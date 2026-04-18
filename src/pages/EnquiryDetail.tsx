@@ -1151,12 +1151,14 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
 }
 
 function ActiveStagePanel({
-  stage, draft, setField, setPayload,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
 }: {
   stage: Stage;
   draft: Enquiry;
   setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
+  onOutcomeChange: (v: string) => void;
+  onDemoOutcomeChange: (v: string) => void;
 }) {
   const outcome = (draft.payload.outcome as string) || '';
 
@@ -1170,7 +1172,7 @@ function ActiveStagePanel({
         <div className="grid md:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Outcome</Label>
-            <Select value={outcome || NONE} onValueChange={v => setPayload('outcome', v === NONE ? '' : v)}>
+            <Select value={outcome || NONE} onValueChange={v => onOutcomeChange(v === NONE ? '' : v)}>
               <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>—</SelectItem>
@@ -1192,7 +1194,11 @@ function ActiveStagePanel({
               </div>
               <div className="space-y-1.5 md:col-span-2">
                 <Label className="text-xs">Additional context</Label>
-                <Input value={draft.payload.not_interested_text ?? ''} onChange={e => setPayload('not_interested_text', e.target.value)} />
+                <VoiceTextarea
+                  as="input"
+                  value={(draft.payload.not_interested_text as string) ?? ''}
+                  onChange={v => setPayload('not_interested_text', v)}
+                />
               </div>
             </>
           )}
