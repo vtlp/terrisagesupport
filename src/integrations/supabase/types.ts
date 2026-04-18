@@ -1927,6 +1927,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_stalled_accounts: { Args: never; Returns: number }
       validate_account_api_key: { Args: { _key_hash: string }; Returns: string }
     }
     Enums: {
