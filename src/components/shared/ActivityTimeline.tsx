@@ -4,7 +4,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, ChevronDown, ChevronUp, Activity, ArrowRightLeft, Pencil, MessageSquare, CalendarDays, Users, ListChecks, FileText, ArrowRight, ShieldCheck, Receipt, Upload } from 'lucide-react';
+import { Loader2, RefreshCw, Activity, ArrowRightLeft, Pencil, MessageSquare, CalendarDays, Users, ListChecks, FileText, ArrowRight, ShieldCheck, Receipt, Upload } from 'lucide-react';
 
 type EventType = 'STAGE_CHANGE' | 'FIELD_EDIT' | 'NOTE' | 'CALENDAR_EVENT' | 'SEAT_CHANGE' | 'CHECKLIST' | 'SUBMISSION' | 'CONVERSION' | 'VERIFICATION' | 'INVOICE' | 'IMPORT';
 
@@ -58,7 +58,6 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
   const [rows, setRows] = useState<LogRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(async () => {
@@ -68,6 +67,7 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
       .select('*')
       .eq('entity_type', entityType)
       .eq('entity_id', entityId)
+      .neq('event_type', 'STAGE_CHANGE')
       .order('created_at', { ascending: false })
       .limit(200);
     const list = (logs ?? []) as LogRow[];
@@ -84,14 +84,6 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
   }, [entityType, entityId]);
 
   useEffect(() => { load(); }, [load]);
-
-  const toggleExpanded = (id: string) => {
-    setExpanded(s => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-  };
 
   const visible = showAll ? rows : rows.slice(0, defaultLimit);
 
@@ -118,33 +110,21 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
             <ol className="relative border-l border-border ml-2 space-y-4">
               {visible.map(r => {
                 const Icon = iconMap[r.event_type] ?? Activity;
-                const hasDetails = r.details && Object.keys(r.details).length > 0;
-                const isOpen = expanded.has(r.id);
                 return (
                   <li key={r.id} className="ml-4">
                     <span className={`absolute -left-[11px] flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-background ${colorMap[r.event_type]}`}>
                       <Icon className="h-3 w-3" />
                     </span>
-                    <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className={`text-[10px] ${colorMap[r.event_type]}`}>{labelMap[r.event_type]}</Badge>
-                          <p className="text-sm">{r.summary}</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {r.actor_id ? (profiles[r.actor_id] ?? 'Staff') : 'System'} · {format(new Date(r.created_at), 'dd MMM yyyy, HH:mm')}
-                          <span className="ml-1">({formatDistanceToNow(new Date(r.created_at), { addSuffix: true })})</span>
-                        </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={`text-[10px] ${colorMap[r.event_type]}`}>{labelMap[r.event_type]}</Badge>
+                        <p className="text-sm">{r.summary}</p>
                       </div>
-                      {hasDetails && (
-                        <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => toggleExpanded(r.id)}>
-                          {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {r.actor_id ? (profiles[r.actor_id] ?? 'Staff') : 'System'} · {format(new Date(r.created_at), 'dd MMM yyyy, HH:mm')}
+                        <span className="ml-1">({formatDistanceToNow(new Date(r.created_at), { addSuffix: true })})</span>
+                      </p>
                     </div>
-                    {isOpen && hasDetails && (
-                      <pre className="mt-2 text-[11px] bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">{JSON.stringify(r.details, null, 2)}</pre>
-                    )}
                   </li>
                 );
               })}
