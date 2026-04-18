@@ -1281,6 +1281,11 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
         <div className="text-muted-foreground">Outcome: {lookup(DEMO_OUTCOMES, draft.payload.demo_outcome as string | undefined)}</div>
       </div>
     );
+  } else if (stage === 'PAYMENT_LINK_SENT') {
+    const p = draft.payload.payment;
+    body = p?.short_url
+      ? <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>
+      : <span className="text-muted-foreground">No link generated</span>;
   } else if (stage === 'ONBOARDING_PACK_SENT') {
     body = <span>Onboarding form sent</span>;
   } else if (stage === 'ACCOUNT_CREATED') {
@@ -1296,7 +1301,7 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
 }
 
 function ActiveStagePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1304,6 +1309,8 @@ function ActiveStagePanel({
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
+  onOpenPaymentDialog: () => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
 }) {
   const outcome = (draft.payload.outcome as string) || '';
 
@@ -1399,6 +1406,71 @@ function ActiveStagePanel({
             </SelectContent>
           </Select>
         </div>
+      </div>
+    );
+  }
+
+  if (stage === 'PAYMENT_LINK_SENT') {
+    const payment = draft.payload.payment;
+    const status = payment?.status ?? null;
+    const statusBadge = (s: string) => {
+      const cls = s === 'PAID' ? 'bg-success/15 text-success border-success/30'
+        : s === 'FAILED' ? 'bg-destructive/15 text-destructive border-destructive/30'
+        : s === 'CANCELLED' ? 'bg-muted text-muted-foreground'
+        : 'bg-primary/15 text-primary border-primary/30';
+      return <Badge variant="outline" className={cn('text-[10px]', cls)}>{s}</Badge>;
+    };
+    return (
+      <div className="space-y-3">
+        {payment?.short_url ? (
+          <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold">{fmtINR(payment.amount ?? 0)}</span>
+                {status && statusBadge(status)}
+                {payment.created_at && (
+                  <span className="text-[11px] text-muted-foreground">
+                    Sent {format(new Date(payment.created_at), 'dd MMM, HH:mm')}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(payment.short_url!); toast.success('Link copied'); }}>
+                  <CopyIcon className="h-3.5 w-3.5 mr-1" /> Copy
+                </Button>
+                <a href={payment.short_url} target="_blank" rel="noreferrer">
+                  <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Open</Button>
+                </a>
+              </div>
+            </div>
+            <div className="text-[11px] text-muted-foreground break-all">{payment.short_url}</div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+            No payment link generated yet.
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={onOpenPaymentDialog}>
+            {payment?.short_url ? 'Generate new link' : 'Generate payment link'}
+          </Button>
+          <div className="flex items-center gap-2 ml-auto">
+            <Label className="text-xs text-muted-foreground">Mark as</Label>
+            <Select value={status ?? NONE} onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
+              <SelectTrigger className="h-9 w-36"><SelectValue placeholder="Set status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PAID">Paid</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="FAILED">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground">
+          Onboarding can be sent only after the payment is marked <strong>Paid</strong>.
+        </p>
       </div>
     );
   }
