@@ -199,13 +199,14 @@ export default function AgencyOnboarding() {
 
   const validateStep3 = () => {
     const e: Record<string, string> = {};
+    // Per request: project fields are no longer mandatory for the agency form.
+    // Only the project name is required when a project card is filled in, and
+    // representative mobile (if provided) must be 10 digits. Bulk imports are
+    // entirely optional.
     projects.forEach((p, i) => {
-      if (!p.projectName.trim()) e[`proj_${i}_projectName`] = "Please enter the project name.";
-      if (!p.location.trim()) e[`proj_${i}_location`] = "Please enter the project location.";
-      if (!p.repName.trim()) e[`proj_${i}_repName`] = "Please enter the representative's name.";
-      if (!p.repMobile.trim()) e[`proj_${i}_repMobile`] = "Please provide a mobile number.";
-      else if (!validatePhone(p.repMobile)) e[`proj_${i}_repMobile`] = "Please enter a 10-digit mobile number.";
-      if (!p.builderName.trim()) e[`proj_${i}_builderName`] = "Please enter the builder name.";
+      if (p.repMobile.trim() && !validatePhone(p.repMobile)) {
+        e[`proj_${i}_repMobile`] = "Please enter a 10-digit mobile number.";
+      }
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -239,11 +240,9 @@ export default function AgencyOnboarding() {
     try {
       const enquiryId = getEnquiryIdFromUrl();
       const folder = `agency/${enquiryId ?? "anon"}/${Date.now()}`;
-      const [logoPaths, leadPaths, propertyPaths, propertyImagePaths] = await Promise.all([
+      const [logoPaths, bulkImportPaths] = await Promise.all([
         uploadFiles(companyLogo, `${folder}/logo`),
-        uploadFiles(leadFile, `${folder}/leads`),
-        uploadFiles(propertyFile, `${folder}/properties`),
-        uploadFiles(propertyImages, `${folder}/property-images`),
+        uploadFiles(bulkImportFiles, `${folder}/bulk-imports`),
       ]);
       const projectsWithBrochures = await Promise.all(projects.map(async (p, i) => ({
         ...p,
@@ -263,8 +262,7 @@ export default function AgencyOnboarding() {
         team: { seats_required: seatsRequired, members: teamMembers },
         team_members: teamMembers.map(tm => ({ full_name: tm.fullName, email: tm.email, phone: `${tm.mobileCode}${tm.mobile}`, role: tm.role })),
         projects: projectsWithBrochures,
-        lead_import: { paths: leadPaths, sheet_link: leadSheetLink, notes: leadFileNotes },
-        property_import: { paths: propertyPaths, image_paths: propertyImagePaths, sheet_link: propertySheetLink, notes: propertyFileNotes },
+        bulk_imports: { paths: bulkImportPaths, notes: bulkImportNotes },
         notes,
       };
 
