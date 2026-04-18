@@ -39,6 +39,7 @@ const stageColors: Record<Stage, string> = {
   CONTACTED: 'bg-info/15 text-info',
   DEMO_SCHEDULED: 'bg-primary/15 text-primary',
   DEMO_COMPLETED: 'bg-accent/20 text-accent-foreground',
+  PAYMENT_LINK_SENT: 'bg-warning/15 text-warning',
   ONBOARDING_PACK_SENT: 'bg-warning/15 text-warning',
   ACCOUNT_CREATED: 'bg-success/15 text-success',
   LOST: 'bg-destructive/15 text-destructive',

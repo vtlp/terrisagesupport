@@ -14,6 +14,8 @@ const stageLabels: Record<EnquiryStage, string> = {
   [EnquiryStage.CONTACTED]: 'Contacted',
   [EnquiryStage.DEMO_SCHEDULED]: 'Demo Sched.',
   [EnquiryStage.DEMO_COMPLETED]: 'Demo Done',
+  [EnquiryStage.PAYMENT_LINK_SENT]: 'Payment Sent',
+  [EnquiryStage.ONBOARDING_PACK_SENT]: 'Onboarding Sent',
   [EnquiryStage.ACCOUNT_CREATED]: 'Converted',
 };
 
@@ -22,6 +24,8 @@ const stageColors: Record<EnquiryStage, string> = {
   [EnquiryStage.CONTACTED]: 'bg-info/15 text-info',
   [EnquiryStage.DEMO_SCHEDULED]: 'bg-primary/15 text-primary',
   [EnquiryStage.DEMO_COMPLETED]: 'bg-accent/20 text-accent-foreground',
+  [EnquiryStage.PAYMENT_LINK_SENT]: 'bg-warning/15 text-warning',
+  [EnquiryStage.ONBOARDING_PACK_SENT]: 'bg-warning/15 text-warning',
   [EnquiryStage.ACCOUNT_CREATED]: 'bg-success/15 text-success',
 };
 
