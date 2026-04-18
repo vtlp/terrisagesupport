@@ -2,13 +2,15 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Image as ImageIcon, FileBadge, Loader2, ExternalLink, FolderOpen } from 'lucide-react';
+import { FileText, Image as ImageIcon, FileBadge, Loader2, ExternalLink, FolderOpen, Database, Building2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+type DocCategory = 'Company logo' | 'Project brochure' | 'Property images' | 'Lead import files' | 'Property import files';
+
 interface DocItem {
   path: string;
-  category: 'Company logo' | 'Project brochure' | 'Property images';
+  category: DocCategory;
   projectName?: string;
 }
 
@@ -30,8 +32,12 @@ export function DocumentsTab({ payload }: Props) {
       (proj.brochurePaths ?? []).forEach((p) => out.push({ path: p, category: 'Project brochure', projectName }));
     });
 
-    const propertyImport = (payload?.property_import as { image_paths?: string[] } | undefined) ?? {};
+    const propertyImport = (payload?.property_import as { image_paths?: string[]; file_paths?: string[] } | undefined) ?? {};
     (propertyImport.image_paths ?? []).forEach((p) => out.push({ path: p, category: 'Property images' }));
+    (propertyImport.file_paths ?? []).forEach((p) => out.push({ path: p, category: 'Property import files' }));
+
+    const leadImport = (payload?.lead_import as { file_paths?: string[] } | undefined) ?? {};
+    (leadImport.file_paths ?? []).forEach((p) => out.push({ path: p, category: 'Lead import files' }));
 
     return out;
   }, [payload]);
@@ -54,7 +60,6 @@ export function DocumentsTab({ payload }: Props) {
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
           No documents were uploaded during onboarding.
-          <p className="text-xs mt-1">Lead and property data files appear under the Imports tab.</p>
         </CardContent>
       </Card>
     );
@@ -69,6 +74,8 @@ export function DocumentsTab({ payload }: Props) {
   const iconFor = (cat: string) => {
     if (cat === 'Company logo') return <FileBadge className="h-4 w-4 text-primary" />;
     if (cat === 'Project brochure') return <FileText className="h-4 w-4 text-primary" />;
+    if (cat === 'Lead import files') return <Database className="h-4 w-4 text-primary" />;
+    if (cat === 'Property import files') return <Building2 className="h-4 w-4 text-primary" />;
     return <ImageIcon className="h-4 w-4 text-primary" />;
   };
 

@@ -52,6 +52,8 @@ export default function Accounts() {
     let active = true;
     (async () => {
       setLoading(true);
+      // Auto-mark accounts stuck in onboarding >7 days as stalled
+      await (supabase.rpc as unknown as (fn: string) => Promise<unknown>)('mark_stalled_accounts');
       const [{ data: accs }, { data: seats }] = await Promise.all([
         supabase.from('accounts').select('id, account_name, city, tenancy_type, status, owner_name, owner_phone').order('created_at', { ascending: false }),
         supabase.from('account_seats').select('account_id, is_active'),
