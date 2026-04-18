@@ -724,6 +724,7 @@ export default function EnquiryDetail() {
               <div className="space-y-1.5">
                 <Label>Estimated team / seat count</Label>
                 <Input
+                  data-field="team_size_estimate"
                   type="number"
                   min={0}
                   value={draft.payload.team_size_estimate ?? ''}
