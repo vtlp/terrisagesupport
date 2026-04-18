@@ -365,7 +365,7 @@ export default function BuilderOnboarding() {
                   <SelectField label="Property type" required value={proj.propertyType} onChange={(v) => updateProject(idx, "propertyType", v)} options={PROJECT_PROPERTY_TYPE_OPTIONS} error={errors[`proj_${idx}_propertyType`]} />
                 </div>
                 <div className="mt-2 p-4 bg-accent/10 border border-accent/30 rounded-lg">
-                  <FileUploadField label="Project brochure" required acceptedFormats={BROCHURE_EXTENSIONS} acceptedMimeTypes={BROCHURE_FORMATS} files={proj.brochure} onChange={(files) => updateProject(idx, "brochure", files)} helperText="Upload the latest brochure for this project. This is critical for builder onboarding." />
+                  <FileUploadField label="Project brochure (Optional)" acceptedFormats={BROCHURE_EXTENSIONS} acceptedMimeTypes={BROCHURE_FORMATS} files={proj.brochure} onChange={(files) => updateProject(idx, "brochure", files)} helperText="Upload the latest brochure if available. You can also share it later — not required to submit this form." />
                 </div>
                 <TextAreaField label="Additional project notes" value={proj.additionalNotes} onChange={(v) => updateProject(idx, "additionalNotes", v)} rows={2} />
               </RepeatableCard>
@@ -375,8 +375,8 @@ export default function BuilderOnboarding() {
 
           <section className="space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Lead Import Files</h3>
-              <p className="text-sm text-muted-foreground mt-1">Please ensure your lead file includes the following fields: name, contact number, budget, project interested (project name), and notes.</p>
+              <h3 className="text-lg font-semibold text-foreground">Lead Import Files <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">If you have lead data ready, share it now or send it later — none of these files are required to submit this form. Recommended fields: name, contact number, budget, project interested, notes.</p>
             </div>
             <FileUploadField label="Upload lead file" acceptedFormats={IMPORT_EXTENSIONS} acceptedMimeTypes={IMPORT_FILE_FORMATS} files={leadFile} onChange={setLeadFile} multiple />
             <TextField label="Google Sheet link" type="url" value={leadSheetLink} onChange={setLeadSheetLink} placeholder="https://docs.google.com/spreadsheets/..." />
