@@ -23,11 +23,54 @@ export async function uploadFiles(files: File[], folder: string): Promise<string
   return paths;
 }
 
+export class AlreadySubmittedError extends Error {
+  submittedAt?: string;
+  constructor(message: string, submittedAt?: string) {
+    super(message);
+    this.name = "AlreadySubmittedError";
+    this.submittedAt = submittedAt;
+  }
+}
+
+/**
+ * Check if the onboarding link (enquiry_id) has already been used for a
+ * successful (non-rejected) submission. Returns the submitted_at timestamp
+ * when locked, or null when the link is still open.
+ */
+export async function checkSubmissionLock(enquiryId: string | null): Promise<string | null> {
+  if (!enquiryId) return null;
+  const { data, error } = await supabase
+    .from("onboarding_submissions")
+    .select("submitted_at,status")
+    .eq("enquiry_id", enquiryId)
+    .neq("status", "REJECTED")
+    .order("submitted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.warn("checkSubmissionLock failed", error);
+    return null;
+  }
+  return data?.submitted_at ?? null;
+}
+
 export async function submitOnboarding(
   tenancy: Tenancy,
   payload: Record<string, unknown>,
   enquiryId: string | null,
 ) {
+  // Pre-check: refuse if link is already locked. The DB unique index is the
+  // authoritative guard; this just gives a friendlier error before insert.
+  if (enquiryId) {
+    const lockedAt = await checkSubmissionLock(enquiryId);
+    if (lockedAt) {
+      throw new AlreadySubmittedError(
+        "This onboarding form has already been submitted for this link.",
+        lockedAt,
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from("onboarding_submissions")
     .insert({ tenancy_type: tenancy, payload: payload as never, enquiry_id: enquiryId })
@@ -35,6 +78,12 @@ export async function submitOnboarding(
     .single();
   if (error) {
     console.error("Onboarding submission insert failed", error);
+    // Postgres unique-violation code = 23505. Surfaces when two submissions race.
+    if ((error as { code?: string }).code === "23505") {
+      throw new AlreadySubmittedError(
+        "This onboarding form has already been submitted for this link.",
+      );
+    }
     throw new Error(`Submission failed: ${error.message}`);
   }
   return data.id as string;
