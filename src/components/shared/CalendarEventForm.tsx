@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CalendarEventType } from '@/types/core';
 import { EntityPicker } from './EntityPicker';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 const eventTypeLabels: Record<CalendarEventType, string> = {
   [CalendarEventType.DEMO]: 'Demo',
