@@ -68,7 +68,22 @@ export default function OnboardingSuccess() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={async () => {
+              const summary = takeOnboardingSummary();
+              if (!summary) {
+                toast.error("Summary is no longer available. Please reopen the form to download again.");
+                return;
+              }
+              try {
+                await downloadOnboardingZip(summary);
+              } catch {
+                toast.error("Could not generate the ZIP. Please try again.");
+              }
+            }}
+          >
             <Download className="w-4 h-4" />
             Download submission summary
           </Button>
