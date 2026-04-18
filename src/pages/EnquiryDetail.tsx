@@ -161,6 +161,8 @@ export default function EnquiryDetail() {
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
   const notesCardRef = useRef<HTMLDivElement | null>(null);
+  const [notesPage, setNotesPage] = useState(0);
+  const NOTES_PER_PAGE = 4;
 
   const draftRef = useRef<Enquiry | null>(null);
   const enquiryRef = useRef<Enquiry | null>(null);
