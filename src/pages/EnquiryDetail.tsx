@@ -340,6 +340,7 @@ export default function EnquiryDetail() {
     if (stage === 'DEMO_SCHEDULED') {
       const hasDemo = events.some(e => e.event_type === 'DEMO');
       if (!hasDemo) {
+        setPendingDemoSchedule(true);
         setScheduleOpen(true);
         // Don't change stage yet — it will auto-set after the demo is scheduled.
         return;
