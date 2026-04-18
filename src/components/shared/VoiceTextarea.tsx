@@ -22,7 +22,7 @@ type Props = TextareaPropsX | InputPropsX;
 export const VoiceTextarea = forwardRef<HTMLTextAreaElement | HTMLInputElement, Props>(function VoiceTextarea(props, ref) {
   const { value, onChange, placeholder, className, disabled, id } = props;
   const [listening, setListening] = useState(false);
-  const recRef = useRef<SR | null>(null);
+  const recRef = useRef<SpeechRecognitionInstance | null>(null);
 
   const toggle = () => {
     const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -30,7 +30,7 @@ export const VoiceTextarea = forwardRef<HTMLTextAreaElement | HTMLInputElement, 
     if (listening && recRef.current) { recRef.current.stop(); setListening(false); return; }
     const r = new Ctor();
     r.lang = 'en-IN'; r.interimResults = false; r.continuous = false;
-    r.onresult = (e) => {
+    r.onresult = (e: SpeechRecognitionEvent) => {
       const t = e.results[0][0].transcript;
       onChange(value ? `${value} ${t}` : t);
     };
