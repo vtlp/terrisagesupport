@@ -26,6 +26,7 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
+import { useUser } from '@/context/UserContext';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
