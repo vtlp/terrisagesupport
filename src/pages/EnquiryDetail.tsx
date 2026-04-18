@@ -26,6 +26,8 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
+import { PaymentLinkDialog, PaymentLinkResult } from '@/components/shared/PaymentLinkDialog';
+import { fmtINR } from '@/lib/billing';
 import { useUser } from '@/context/UserContext';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'PAYMENT_LINK_SENT' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
