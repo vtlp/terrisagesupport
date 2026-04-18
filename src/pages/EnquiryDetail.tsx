@@ -1073,12 +1073,14 @@ function StageFlow({
 }
 
 function StageOutcomePanel({
-  stage, draft, setField, setPayload,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
 }: {
   stage: Stage;
   draft: Enquiry;
   setField: <K extends keyof Enquiry>(k: K, v: Enquiry[K]) => void;
   setPayload: <K extends keyof EnquiryPayload>(k: K, v: EnquiryPayload[K]) => void;
+  onOutcomeChange: (v: string) => void;
+  onDemoOutcomeChange: (v: string) => void;
 }) {
   const isLost = stage === 'LOST';
   const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
@@ -1098,7 +1100,7 @@ function StageOutcomePanel({
       )}
       <div>
         <div className="text-xs font-medium text-primary uppercase tracking-wide mb-2">Current stage · {stageLabels[stage]}</div>
-        <ActiveStagePanel stage={stage} draft={draft} setField={setField} setPayload={setPayload} />
+        <ActiveStagePanel stage={stage} draft={draft} setField={setField} setPayload={setPayload} onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange} />
       </div>
     </div>
   );
