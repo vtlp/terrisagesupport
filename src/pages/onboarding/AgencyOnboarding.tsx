@@ -408,25 +408,24 @@ export default function AgencyOnboarding() {
       {currentStep === 3 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-32 space-y-10">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Projects & Data Files</h2>
-            <p className="text-sm text-muted-foreground mt-1">Capture the projects your agency works on and gather the data files required for import preparation.</p>
+            <h2 className="text-2xl font-bold text-foreground">Projects & Bulk Imports</h2>
+            <p className="text-sm text-muted-foreground mt-1">Tell us about the projects your agency works on. Bulk imports are optional — share them now if ready, or send them later.</p>
           </div>
 
           <section className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Projects You Work On</h3>
-              <p className="text-sm text-muted-foreground mt-1">Please add the projects your team is actively marketing, selling, renting, or managing. Uploading the latest brochure helps us understand the project more quickly and configure it more accurately.</p>
+              <h3 className="text-lg font-semibold text-foreground">Projects You Work On <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">Add the projects your team is actively marketing, selling, renting, or managing. None of the project fields are required — share whatever you have available.</p>
             </div>
             {projects.map((proj, idx) => (
               <RepeatableCard key={proj.id} title={`Project ${idx + 1}`} subtitle={proj.projectName || undefined} index={idx} onRemove={() => setProjects((prev) => prev.filter((_, i) => i !== idx))} canRemove={projects.length > 1}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <TextField label="Project name" required value={proj.projectName} onChange={(v) => updateProject(idx, "projectName", v)} error={errors[`proj_${idx}_projectName`]} />
-                  <TextField label="Google Maps address / project location" required value={proj.location} onChange={(v) => updateProject(idx, "location", v)} error={errors[`proj_${idx}_location`]} />
-                  <TextField label="Project representative name" required value={proj.repName} onChange={(v) => updateProject(idx, "repName", v)} error={errors[`proj_${idx}_repName`]} placeholder="e.g. Arjun Agnihotri" />
-                  <PhoneField label="Project representative mobile number" required countryCode={proj.repMobileCode} onCountryCodeChange={(v) => updateProject(idx, "repMobileCode", v)} value={proj.repMobile} onChange={(v) => updateProject(idx, "repMobile", v)} error={errors[`proj_${idx}_repMobile`]} />
+                  <TextField label="Project name" value={proj.projectName} onChange={(v) => updateProject(idx, "projectName", v)} error={errors[`proj_${idx}_projectName`]} />
+                  <TextField label="Google Maps address / project location" value={proj.location} onChange={(v) => updateProject(idx, "location", v)} error={errors[`proj_${idx}_location`]} />
+                  <TextField label="Project representative name" value={proj.repName} onChange={(v) => updateProject(idx, "repName", v)} error={errors[`proj_${idx}_repName`]} placeholder="e.g. Arjun Agnihotri" />
+                  <PhoneField label="Project representative mobile number" countryCode={proj.repMobileCode} onCountryCodeChange={(v) => updateProject(idx, "repMobileCode", v)} value={proj.repMobile} onChange={(v) => updateProject(idx, "repMobile", v)} error={errors[`proj_${idx}_repMobile`]} />
                   <TextField label="Project representative email" type="email" value={proj.repEmail} onChange={(v) => updateProject(idx, "repEmail", v)} />
-                  <TextField label="Builder name" required value={proj.builderName} onChange={(v) => updateProject(idx, "builderName", v)} error={errors[`proj_${idx}_builderName`]} />
-                  <div className="sm:col-span-2"><TextField label="Builder details" value={proj.builderDetails} onChange={(v) => updateProject(idx, "builderDetails", v)} /></div>
+                  <TextField label="Builder name" value={proj.builderName} onChange={(v) => updateProject(idx, "builderName", v)} error={errors[`proj_${idx}_builderName`]} />
                 </div>
                 <FileUploadField label="Project brochure" acceptedFormats={BROCHURE_EXTENSIONS} acceptedMimeTypes={BROCHURE_FORMATS} files={proj.brochure} onChange={(files) => updateProject(idx, "brochure", files)} helperText="Upload the latest brochure for this project." />
               </RepeatableCard>
@@ -436,25 +435,20 @@ export default function AgencyOnboarding() {
 
           <section className="space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Lead Import Files <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
-              <p className="text-sm text-muted-foreground mt-1">If you have lead data ready, share it now. You can also send it later — none of these files are required to submit this form.</p>
+              <h3 className="text-lg font-semibold text-foreground">Bulk Imports <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">Upload any files you'd like us to import — leads, properties, contacts, or anything else. PDF, Word, Excel, CSV and image formats are supported, up to 100 MB per file.</p>
             </div>
-            <FileUploadField label="Upload lead file" acceptedFormats={IMPORT_EXTENSIONS} acceptedMimeTypes={IMPORT_FILE_FORMATS} files={leadFile} onChange={setLeadFile} multiple />
-            <TextField label="Google Sheet link" type="url" value={leadSheetLink} onChange={setLeadSheetLink} placeholder="https://docs.google.com/spreadsheets/..." />
-            <TextAreaField label="Lead file notes" value={leadFileNotes} onChange={setLeadFileNotes} rows={2} />
-            <ReferencePanel title="Expected Lead Fields" fields={["Lead name", "Contact number", "Looking for: Rent or Sale", "Budget", "Area requirement in sq ft", "Property type", "Property category", "Preferred locality", "Preferred city"]} />
-          </section>
-
-          <section className="space-y-5">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Property Import Files <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
-              <p className="text-sm text-muted-foreground mt-1">Existing property stock you want imported into the CRM. Share it now or send it later — these files are not required to submit this form.</p>
-            </div>
-            <FileUploadField label="Upload property file" acceptedFormats={IMPORT_EXTENSIONS} acceptedMimeTypes={IMPORT_FILE_FORMATS} files={propertyFile} onChange={setPropertyFile} multiple />
-            <FileUploadField label="Upload property images" acceptedFormats={IMAGE_EXTENSIONS} acceptedMimeTypes={IMAGE_FORMATS} files={propertyImages} onChange={setPropertyImages} multiple />
-            <TextField label="Google Sheet link" type="url" value={propertySheetLink} onChange={setPropertySheetLink} placeholder="https://docs.google.com/spreadsheets/..." />
-            <TextAreaField label="Property file notes" value={propertyFileNotes} onChange={setPropertyFileNotes} rows={2} />
-            <ReferencePanel title="Expected Property Fields" fields={["Property title or identifier", "Owner, broker, or representative name", "Contact number", "Sale or rent", "Property location", "Price", "Configuration", "Locality", "Availability status", "Images, if available"]} />
+            <FileUploadField
+              label="Upload import files"
+              acceptedFormats={IMPORT_EXTENSIONS}
+              acceptedMimeTypes={IMPORT_FILE_FORMATS}
+              files={bulkImportFiles}
+              onChange={setBulkImportFiles}
+              multiple
+              maxSizeBytes={BULK_IMPORT_MAX_BYTES}
+              helperText="Maximum file size: 100 MB."
+            />
+            <TextAreaField label="Import notes" value={bulkImportNotes} onChange={setBulkImportNotes} rows={3} helperText="Add any context that will help us process these imports correctly." />
           </section>
         </motion.div>
       )}
