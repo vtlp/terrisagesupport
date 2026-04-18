@@ -6,11 +6,6 @@ import { Mic, MicOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-interface SpeechRecognitionResult { transcript: string; }
-interface SpeechRecognitionEvt { results: { [k: number]: { [k: number]: SpeechRecognitionResult } }; }
-interface SR { lang: string; interimResults: boolean; continuous: boolean; onresult: (e: SpeechRecognitionEvt) => void; onerror: () => void; onend: () => void; start: () => void; stop: () => void; }
-type SRCtor = new () => SR;
-declare global { interface Window { SpeechRecognition?: SRCtor; webkitSpeechRecognition?: SRCtor; } }
 
 interface BaseProps {
   value: string;
