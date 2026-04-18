@@ -6,10 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { seedTickets, getUserName, seedNotes, seedCalendarEvents, seedAccounts, getAccountName } from '@/data/seedData';
-import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, CalendarEventStatus, CalendarEventType, TimelineEventType } from '@/types/core';
+import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, CalendarEventStatus, CalendarEventType, TimelineEventType, type SupportTicket } from '@/types/core';
 import { NotesPanel } from '@/components/shared/NotesPanel';
 import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
@@ -24,6 +22,12 @@ import {
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
 import { getCityOptions, getTagOptions } from '@/data/lookupData';
 import { toast } from 'sonner';
+import {
+  fetchTicketList, fetchTicketDetail, fetchProfiles, fetchAccountsLite,
+  updateTicket, addTicketMessage, subscribeTicketChanges,
+  type ProfileRow, type AccountRow,
+} from '@/lib/ticketsApi';
+import { seedNotes } from '@/data/seedData';
 
 const priorityColors: Record<TicketPriority, string> = {
   [TicketPriority.P1]: 'bg-destructive/15 text-destructive font-semibold',
@@ -71,7 +75,14 @@ export default function Tickets() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [isListCollapsed, setIsListCollapsed] = useState(false);
 
-  const selected = ticketId ? seedTickets.find(t => t.ticket_id === ticketId) ?? null : null;
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [selected, setSelected] = useState<SupportTicket | null>(null);
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+
+  const profileMap = new Map(profiles.map(p => [p.id, p.full_name]));
+  const accountMap = new Map(accounts.map(a => [a.id, a]));
+  const getUserName = (id: string | null) => id ? (profileMap.get(id) ?? 'User') : 'Unassigned';
 
   // Editable state
   const [ticketStatus, setTicketStatus] = useState<TicketStatus | null>(null);
@@ -94,8 +105,37 @@ export default function Tickets() {
   const [closeDialog, setCloseDialog] = useState(false);
   const [closingComment, setClosingComment] = useState('');
 
+  // Initial load
+  const reloadList = useCallback(async () => {
+    try {
+      const list = await fetchTicketList();
+      setTickets(list);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to load tickets');
+    }
+  }, []);
+
+  useEffect(() => {
+    reloadList();
+    fetchProfiles().then(setProfiles).catch(() => {});
+    fetchAccountsLite().then(setAccounts).catch(() => {});
+    const unsub = subscribeTicketChanges(() => {
+      reloadList();
+      if (ticketId) fetchTicketDetail(ticketId).then(t => t && setSelected(t)).catch(() => {});
+    });
+    return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load detail when route changes
+  useEffect(() => {
+    if (!ticketId) { setSelected(null); return; }
+    fetchTicketDetail(ticketId).then(t => setSelected(t)).catch(() => setSelected(null));
+  }, [ticketId]);
+
   // Initialize editable fields when ticket changes
-  const initEditFields = useCallback((t: typeof selected) => {
+  const initEditFields = useCallback((t: SupportTicket | null) => {
     if (!t) return;
     setEditSubject(t.subject);
     setEditDescription(t.description);
@@ -139,7 +179,7 @@ export default function Tickets() {
     setHasEdits(detectEdits());
   }, [editSubject, editDescription, editType, editCategory, editCity, editRequesterName, editRequesterEmail, editTags, ticketStatus, ticketPriority, assignedTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = seedTickets.filter(t => {
+  const filtered = tickets.filter(t => {
     const matchSearch = t.subject.toLowerCase().includes(search.toLowerCase()) ||
       t.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()));
     const matchStatus = statusFilter === 'all' || t.status === statusFilter;
@@ -152,102 +192,78 @@ export default function Tickets() {
     : [];
   void noteRefresh;
 
-  const handleAddNote = (text: string) => {
+  const handleAddNote = async (text: string) => {
     if (!selected) return;
-    seedNotes.push({
-      note_id: `N${Date.now()}`,
-      entity_type: EntityType.TICKET,
-      entity_id: selected.ticket_id,
-      note_text: text,
-      created_by_user_id: 'U001',
-      created_at: new Date().toISOString(),
-    });
-    setNoteRefresh(prev => prev + 1);
+    try {
+      await addTicketMessage(selected.ticket_id, text, true);
+      const fresh = await fetchTicketDetail(selected.ticket_id);
+      if (fresh) setSelected(fresh);
+      setNoteRefresh(prev => prev + 1);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to add note');
+    }
   };
 
-  const handleCreateEvent = (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
-    if (!selected) return;
-    const scheduled = new Date(data.date);
-    const [h, m] = data.time.split(':');
-    scheduled.setHours(parseInt(h), parseInt(m));
-    seedCalendarEvents.push({
-      event_id: `CE${Date.now()}`,
-      entity_type: EntityType.TICKET,
-      entity_id: selected.ticket_id,
-      title: data.title,
-      scheduled_at: scheduled.toISOString(),
-      created_by_user_id: 'U001',
-      notes: data.notes || undefined,
-      status: CalendarEventStatus.UPCOMING,
-      event_type: data.event_type,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
+  const handleCreateEvent = (_data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
+    void _data; void CalendarEventStatus;
     setShowEventForm(false);
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!selected) return;
-    const idx = seedTickets.findIndex(t => t.ticket_id === selected.ticket_id);
-    if (idx === -1) return;
-    const now = new Date().toISOString();
-    seedTickets[idx] = {
-      ...seedTickets[idx],
-      subject: editSubject,
-      description: editDescription,
-      type: editType,
-      category: editCategory,
-      market_field: editCity,
-      requester_name: editRequesterName,
-      requester_email: editRequesterEmail,
-      tags: editTags,
-      status: currentStatus,
-      priority: currentPriority,
-      assigned_to_user_id: currentAssigned,
-      updated_at: now,
-    };
-    seedTickets[idx].timeline.push({
-      id: `TL_${Date.now()}`,
-      type: TimelineEventType.SYSTEM,
-      content: 'Ticket updated',
-      user_id: 'U001',
-      created_at: now,
-    });
-    setHasEdits(false);
-    setTicketStatus(null);
-    setTicketPriority(null);
-    setAssignedTo(null);
-    toast.success('Ticket updated');
-    navigate(`/tickets/${selected.ticket_id}`);
+    try {
+      await updateTicket(selected.ticket_id, {
+        subject: editSubject,
+        description: editDescription,
+        type: editType,
+        category: editCategory,
+        market_city: editCity || null,
+        requester_name: editRequesterName,
+        requester_email: editRequesterEmail || null,
+        tags: editTags,
+        status: currentStatus,
+        priority: currentPriority,
+        assigned_to: currentAssigned,
+      });
+      setHasEdits(false);
+      setTicketStatus(null);
+      setTicketPriority(null);
+      setAssignedTo(null);
+      toast.success('Ticket updated');
+      const fresh = await fetchTicketDetail(selected.ticket_id);
+      if (fresh) setSelected(fresh);
+      reloadList();
+    } catch (e) {
+      console.error(e);
+      toast.error('Update failed');
+    }
   };
 
   const handleCancel = () => {
     if (selected) initEditFields(selected);
   };
 
-  const handleCloseTicket = () => {
+  const handleCloseTicket = async () => {
     if (!closingComment.trim()) {
       toast.error('Closing comments are required');
       return;
     }
     if (!selected) return;
-    const idx = seedTickets.findIndex(t => t.ticket_id === selected.ticket_id);
-    if (idx === -1) return;
-    const now = new Date().toISOString();
-    seedTickets[idx].status = TicketStatus.CLOSED;
-    seedTickets[idx].resolved_at = now;
-    seedTickets[idx].updated_at = now;
-    seedTickets[idx].timeline.push({
-      id: `TL_${Date.now()}`,
-      type: TimelineEventType.SYSTEM,
-      content: `Ticket closed: ${closingComment.trim()}`,
-      user_id: 'U001',
-      created_at: now,
-    });
-    setCloseDialog(false);
-    setClosingComment('');
-    setTicketStatus(null);
-    toast.success('Ticket closed');
+    try {
+      await addTicketMessage(selected.ticket_id, `Ticket closed: ${closingComment.trim()}`, true);
+      await updateTicket(selected.ticket_id, { status: TicketStatus.CLOSED, resolution_notes: closingComment.trim() });
+      setCloseDialog(false);
+      setClosingComment('');
+      setTicketStatus(null);
+      toast.success('Ticket closed');
+      const fresh = await fetchTicketDetail(selected.ticket_id);
+      if (fresh) setSelected(fresh);
+      reloadList();
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to close');
+    }
   };
 
   const selectTicket = (id: string) => {
@@ -265,8 +281,9 @@ export default function Tickets() {
   };
 
   // Get linked account for call/whatsapp
-  const linkedAccount = selected?.account_id ? seedAccounts.find(a => a.account_id === selected.account_id) : null;
+  const linkedAccount = selected?.account_id ? accountMap.get(selected.account_id) : null;
   const phoneNumber = linkedAccount?.owner_phone || '';
+  const linkedAccountName = (id: string | null) => id ? (accountMap.get(id)?.account_name ?? '—') : '—';
 
   return (
     <div className="flex h-full">
@@ -274,7 +291,7 @@ export default function Tickets() {
         open={createTicketOpen}
         onOpenChange={setCreateTicketOpen}
         onCreated={(ticket) => {
-          seedTickets.unshift(ticket);
+          reloadList();
           navigate(`/tickets/${ticket.ticket_id}`);
         }}
       />
@@ -472,7 +489,7 @@ export default function Tickets() {
                     <span className="text-muted-foreground">Account:</span>
                     {selected.account_id ? (
                       <Link to={`/accounts/${selected.account_id}`} className="text-primary hover:underline inline-flex items-center gap-1">
-                        {getAccountName(selected.account_id)} <ExternalLink className="h-3 w-3" />
+                        {linkedAccountName(selected.account_id)} <ExternalLink className="h-3 w-3" />
                       </Link>
                     ) : <span>—</span>}
                   </div>

@@ -22,8 +22,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useUser } from '@/context/UserContext';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
-import { seedTickets, seedAccounts } from '@/data/seedData';
-import { TicketPriority, TicketStatus, AccountStatus } from '@/types/core';
+import { seedAccounts } from '@/data/seedData';
+import { AccountStatus } from '@/types/core';
 
 interface SeatReqItem {
   id: string;
@@ -34,6 +34,14 @@ interface SeatReqItem {
   account_name?: string;
 }
 
+interface UrgentTicketItem {
+  id: string;
+  ticket_code: string | null;
+  subject: string;
+  priority: string;
+  status: string;
+}
+
 export function AppHeader() {
   const navigate = useNavigate();
   const { currentUser, signOut } = useUser();
@@ -41,25 +49,31 @@ export function AppHeader() {
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
   const [pendingSeatReqs, setPendingSeatReqs] = useState<SeatReqItem[]>([]);
+  const [urgentTickets, setUrgentTickets] = useState<UrgentTicketItem[]>([]);
 
-  const urgentTickets = seedTickets.filter(
-    t => (t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2)
-      && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED
-  );
   const stalledAccounts = seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING);
   const attentionCount = urgentTickets.length + stalledAccounts.length + pendingSeatReqs.length;
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const { data } = await supabase
-        .from('seat_requests')
-        .select('id, account_id, requested_seats, requested_by_email, created_at')
-        .eq('status', 'PENDING')
-        .order('created_at', { ascending: false })
-        .limit(20);
+      const [{ data: seatData }, { data: ticketData }] = await Promise.all([
+        supabase
+          .from('seat_requests')
+          .select('id, account_id, requested_seats, requested_by_email, created_at')
+          .eq('status', 'PENDING')
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('tickets')
+          .select('id, ticket_code, subject, priority, status')
+          .in('priority', ['P1', 'P2'])
+          .in('status', ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL'])
+          .order('updated_at', { ascending: false })
+          .limit(20),
+      ]);
       if (cancelled) return;
-      const rows = (data ?? []) as Omit<SeatReqItem, 'account_name'>[];
+      const rows = (seatData ?? []) as Omit<SeatReqItem, 'account_name'>[];
       const ids = Array.from(new Set(rows.map(r => r.account_id)));
       let nameMap = new Map<string, string>();
       if (ids.length > 0) {
@@ -71,11 +85,13 @@ export function AppHeader() {
       }
       if (cancelled) return;
       setPendingSeatReqs(rows.map(r => ({ ...r, account_name: nameMap.get(r.account_id) })));
+      setUrgentTickets((ticketData ?? []) as UrgentTicketItem[]);
     };
     load();
     const channel = supabase
-      .channel('seat-requests-badge')
+      .channel('header-attention')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'seat_requests' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, load)
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, []);
@@ -209,16 +225,16 @@ export function AppHeader() {
                   </DropdownMenuLabel>
                   {urgentTickets.slice(0, 6).map(t => (
                     <DropdownMenuItem
-                      key={t.ticket_id}
+                      key={t.id}
                       className="flex-col items-start gap-0.5 py-2"
-                      onClick={() => navigate(`/tickets/${t.ticket_id}`)}
+                      onClick={() => navigate(`/tickets/${t.id}`)}
                     >
                       <div className="flex items-center gap-2 w-full">
                         <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
                         <span className="text-sm font-medium truncate flex-1">{t.subject}</span>
                         <Badge variant="outline" className="text-[10px]">{t.priority}</Badge>
                       </div>
-                      <div className="text-[11px] text-muted-foreground pl-5 truncate w-full">{t.ticket_id} · {t.status}</div>
+                      <div className="text-[11px] text-muted-foreground pl-5 truncate w-full">{t.ticket_code ?? t.id.slice(0, 8)} · {t.status}</div>
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -290,7 +306,6 @@ export function AppHeader() {
         open={createTicketOpen}
         onOpenChange={setCreateTicketOpen}
         onCreated={(ticket) => {
-          seedTickets.unshift(ticket);
           navigate(`/tickets/${ticket.ticket_id}`);
         }}
       />

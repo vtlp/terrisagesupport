@@ -15,8 +15,9 @@ import {
 } from '@/components/ui/collapsible';
 import { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
-import { seedEnquiries, seedTickets, seedAccounts } from '@/data/seedData';
-import { EnquiryStage, TicketPriority, TicketStatus, AccountStatus } from '@/types/core';
+import { seedEnquiries, seedAccounts } from '@/data/seedData';
+import { EnquiryStage, AccountStatus } from '@/types/core';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AppSidebarProps {
   open: boolean;
@@ -31,11 +32,24 @@ const adminSubItems = [
 
 function useNotificationCounts() {
   const newEnquiries = seedEnquiries.filter(e => e.stage === EnquiryStage.NEW_ENQUIRY).length;
-  const urgentTickets = seedTickets.filter(t =>
-    (t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2) &&
-    t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED
-  ).length;
   const stalledAccounts = seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;
+  const [urgentTickets, setUrgentTickets] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { count } = await supabase
+        .from('tickets')
+        .select('id', { count: 'exact', head: true })
+        .in('priority', ['P1', 'P2'])
+        .in('status', ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL']);
+      if (!cancelled) setUrgentTickets(count ?? 0);
+    };
+    load();
+    const ch = supabase.channel('sidebar-tickets')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, load)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(ch); };
+  }, []);
   return { newEnquiries, urgentTickets, stalledAccounts };
 }
 

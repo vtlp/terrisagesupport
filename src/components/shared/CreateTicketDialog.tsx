@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -9,11 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
-import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, TimelineEventType, type SupportTicket } from '@/types/core';
-import { seedAccounts } from '@/data/seedData';
+import { TicketPriority, TicketStatus, TicketType, TicketCategory, type SupportTicket } from '@/types/core';
 import { getCityOptions, getTagOptions } from '@/data/lookupData';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
 import { toast } from 'sonner';
+import { createTicket, fetchAccountsLite, fetchQueues, type AccountRow, type QueueRow } from '@/lib/ticketsApi';
 
 interface CreateTicketDialogProps {
   open: boolean;
@@ -28,15 +28,26 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
   const [type, setType] = useState<TicketType>(TicketType.INCIDENT);
   const [category, setCategory] = useState<TicketCategory>(TicketCategory.OTHER);
   const [accountId, setAccountId] = useState<string>('none');
+  const [queueId, setQueueId] = useState<string>('none');
   const [assignedTo, setAssignedTo] = useState<string | null>(null);
   const [market, setMarket] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [requesterName, setRequesterName] = useState('');
   const [requesterEmail, setRequesterEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [queues, setQueues] = useState<QueueRow[]>([]);
 
   const cities = getCityOptions();
   const availableTags = getTagOptions();
+
+  useEffect(() => {
+    if (!open) return;
+    fetchAccountsLite().then(setAccounts).catch(() => {});
+    fetchQueues().then(setQueues).catch(() => {});
+  }, [open]);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -51,53 +62,40 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
   const reset = () => {
     setSubject(''); setDescription(''); setPriority(TicketPriority.P3);
     setType(TicketType.INCIDENT); setCategory(TicketCategory.OTHER);
-    setAccountId('none'); setAssignedTo(null);
+    setAccountId('none'); setQueueId('none'); setAssignedTo(null);
     setMarket(''); setTags([]); setTagInput('');
     setRequesterName(''); setRequesterEmail('');
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!subject.trim()) { toast.error('Subject is required'); return; }
-    const now = new Date().toISOString();
-    const ticket: SupportTicket = {
-      ticket_id: `TKT${Date.now()}`,
-      subject: subject.trim(),
-      description: description.trim(),
-      priority,
-      status: TicketStatus.OPEN,
-      type,
-      category,
-      account_id: accountId !== 'none' ? accountId : null,
-      requester_name: requesterName || 'Unknown',
-      requester_email: requesterEmail,
-      assigned_to_user_id: assignedTo,
-      queue: 'Ticket Routing',
-      tags,
-      sla_first_response: new Date(Date.now() + (
-        priority === TicketPriority.P1 ? 1 * 3600000 :
-        priority === TicketPriority.P2 ? 4 * 3600000 :
-        priority === TicketPriority.P3 ? 8 * 3600000 : 24 * 3600000
-      )).toISOString(),
-      sla_resolution: new Date(Date.now() + (
-        priority === TicketPriority.P1 ? 4 * 3600000 :
-        priority === TicketPriority.P2 ? 8 * 3600000 :
-        priority === TicketPriority.P3 ? 24 * 3600000 : 72 * 3600000
-      )).toISOString(),
-      first_response_at: null,
-      resolved_at: null,
-      timeline: [{ id: `TL_${Date.now()}`, type: TimelineEventType.SYSTEM, content: `Ticket created: ${subject.trim()}`, user_id: 'U001', created_at: now }],
-      attachments: [],
-      notes_thread: [],
-      linked_entity_type: accountId !== 'none' ? EntityType.ACCOUNT : null,
-      linked_entity_id: accountId !== 'none' ? accountId : null,
-      market_field: market,
-      created_at: now,
-      updated_at: now,
-    };
-    onCreated(ticket);
-    toast.success('Ticket created');
-    reset();
-    onOpenChange(false);
+    setSubmitting(true);
+    try {
+      const ticket = await createTicket({
+        subject: subject.trim(),
+        description: description.trim(),
+        priority,
+        status: TicketStatus.OPEN,
+        type,
+        category,
+        account_id: accountId !== 'none' ? accountId : null,
+        requester_name: requesterName || 'Unknown',
+        requester_email: requesterEmail || null,
+        assigned_to: assignedTo,
+        queue_id: queueId !== 'none' ? queueId : null,
+        tags,
+        market_city: market || null,
+      });
+      onCreated(ticket);
+      toast.success('Ticket created');
+      reset();
+      onOpenChange(false);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to create ticket');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -151,7 +149,7 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
                 <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent className="bg-card max-h-48">
                   <SelectItem value="none">None</SelectItem>
-                  {seedAccounts.map(a => <SelectItem key={a.account_id} value={a.account_id}>{a.account_name}</SelectItem>)}
+                  {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.account_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -166,9 +164,21 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
               <Input value={requesterEmail} onChange={e => setRequesterEmail(e.target.value)} placeholder="Email" />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Assigned To</Label>
-            <AssignmentSelect value={assignedTo} onChange={setAssignedTo} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Queue</Label>
+              <Select value={queueId} onValueChange={setQueueId}>
+                <SelectTrigger><SelectValue placeholder="Select queue…" /></SelectTrigger>
+                <SelectContent className="bg-card">
+                  <SelectItem value="none">Unassigned</SelectItem>
+                  {queues.filter(q => q.is_active).map(q => <SelectItem key={q.id} value={q.id}>{q.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Assigned To</Label>
+              <AssignmentSelect value={assignedTo} onChange={setAssignedTo} />
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label>City</Label>
@@ -213,8 +223,8 @@ export function CreateTicketDialog({ open, onOpenChange, onCreated }: CreateTick
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>Create Ticket</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={submitting}>{submitting ? 'Creating…' : 'Create Ticket'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
