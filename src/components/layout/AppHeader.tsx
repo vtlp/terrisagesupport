@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket, LogOut } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
