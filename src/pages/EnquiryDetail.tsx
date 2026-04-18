@@ -383,6 +383,16 @@ export default function EnquiryDetail() {
 
     const fromIdx = STAGE_ORDER.indexOf(enquiry.stage);
     const toIdx = STAGE_ORDER.indexOf(stage);
+    const onboardingIdx = STAGE_ORDER.indexOf('ONBOARDING_PACK_SENT');
+
+    // Once the onboarding pack has been sent, do not allow moving back into
+    // pre-onboarding stages (NEW_ENQUIRY … DEMO_COMPLETED). Backward moves
+    // among those earlier stages remain allowed.
+    if (stage !== 'LOST' && fromIdx >= onboardingIdx && toIdx < onboardingIdx) {
+      toast.error('Cannot move back to earlier stages once the onboarding form has been sent.');
+      return;
+    }
+
     if (stage !== 'LOST' && toIdx > fromIdx) {
       const blocker = validateStageGate(enquiry.stage, draft);
       if (blocker) { toast.error(blocker); return; }
