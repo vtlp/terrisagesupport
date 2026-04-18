@@ -111,6 +111,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "account_billing_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
+          },
         ]
       }
       account_checklist_items: {
@@ -161,6 +168,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_checklist_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
           },
         ]
       }
@@ -249,6 +263,13 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "account_invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
+          },
         ]
       }
       account_notes: {
@@ -287,6 +308,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_notes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
           },
         ]
       }
@@ -338,6 +366,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_seats_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
           },
         ]
       }
@@ -395,6 +430,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_verifications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
           },
         ]
       }
@@ -601,6 +643,82 @@ export type Database = {
         }
         Relationships: []
       }
+      content_calendar: {
+        Row: {
+          asset_path: string | null
+          body_text: string | null
+          campaign_id: string | null
+          channel_id: string | null
+          created_at: string
+          created_by: string | null
+          format: string | null
+          id: string
+          notes: string | null
+          owner_id: string | null
+          published_at: string | null
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["content_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          asset_path?: string | null
+          body_text?: string | null
+          campaign_id?: string | null
+          channel_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          format?: string | null
+          id?: string
+          notes?: string | null
+          owner_id?: string | null
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["content_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          asset_path?: string | null
+          body_text?: string | null
+          campaign_id?: string | null
+          channel_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          format?: string | null
+          id?: string
+          notes?: string | null
+          owner_id?: string | null
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["content_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_calendar_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_calendar_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_marketing_performance"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "content_calendar_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_imports: {
         Row: {
           account_id: string
@@ -661,6 +779,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_imports_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
           },
         ]
       }
@@ -894,6 +1019,367 @@ export type Database = {
           },
         ]
       }
+      lead_sources: {
+        Row: {
+          channel_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_sources_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lookup_cities: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          state: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          state?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          state?: string | null
+        }
+        Relationships: []
+      }
+      lookup_enquiry_sources: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      lookup_portals: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          prerequisites: Json
+          sort_order: number
+          website: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          prerequisites?: Json
+          sort_order?: number
+          website?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          prerequisites?: Json
+          sort_order?: number
+          website?: string | null
+        }
+        Relationships: []
+      }
+      lookup_tags: {
+        Row: {
+          category: string | null
+          color: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          category?: string | null
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          category?: string | null
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      marketing_campaigns: {
+        Row: {
+          budget: number
+          channel_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          end_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          objective: string | null
+          owner_id: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          updated_at: string
+        }
+        Insert: {
+          budget?: number
+          channel_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          objective?: string | null
+          owner_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+        }
+        Update: {
+          budget?: number
+          channel_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          objective?: string | null
+          owner_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaigns_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_channels: {
+        Row: {
+          channel_type: Database["public"]["Enums"]["marketing_channel_type"]
+          created_at: string
+          default_cost_type:
+            | Database["public"]["Enums"]["marketing_cost_type"]
+            | null
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          channel_type?: Database["public"]["Enums"]["marketing_channel_type"]
+          created_at?: string
+          default_cost_type?:
+            | Database["public"]["Enums"]["marketing_cost_type"]
+            | null
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_type?: Database["public"]["Enums"]["marketing_channel_type"]
+          created_at?: string
+          default_cost_type?:
+            | Database["public"]["Enums"]["marketing_cost_type"]
+            | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_costs: {
+        Row: {
+          amount: number
+          campaign_id: string
+          clicks: number | null
+          cost_type: Database["public"]["Enums"]["marketing_cost_type"]
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          impressions: number | null
+          leads: number | null
+          notes: string | null
+          period_from: string | null
+          period_to: string | null
+        }
+        Insert: {
+          amount: number
+          campaign_id: string
+          clicks?: number | null
+          cost_type: Database["public"]["Enums"]["marketing_cost_type"]
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          notes?: string | null
+          period_from?: string | null
+          period_to?: string | null
+        }
+        Update: {
+          amount?: number
+          campaign_id?: string
+          clicks?: number | null
+          cost_type?: Database["public"]["Enums"]["marketing_cost_type"]
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          notes?: string | null
+          period_from?: string | null
+          period_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_costs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_costs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_marketing_performance"
+            referencedColumns: ["campaign_id"]
+          },
+        ]
+      }
+      marketing_governance: {
+        Row: {
+          approver_id: string | null
+          created_at: string
+          decided_at: string | null
+          decision: Database["public"]["Enums"]["governance_decision"]
+          decision_notes: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          approver_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["governance_decision"]
+          decision_notes?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approver_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["governance_decision"]
+          decision_notes?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       onboarding_submissions: {
         Row: {
           created_at: string
@@ -1013,6 +1499,259 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          message_id: string | null
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string
+          ticket_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          message_id?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path: string
+          ticket_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          message_id?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string
+          ticket_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_messages: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          ticket_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_queues: {
+        Row: {
+          created_at: string
+          default_assignee: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_assignee?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_assignee?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          account_id: string | null
+          assigned_to: string | null
+          category: Database["public"]["Enums"]["ticket_category"]
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          csat_comment: string | null
+          csat_rating: number | null
+          description: string
+          first_response_at: string | null
+          id: string
+          market_city: string | null
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          queue_id: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          requester_email: string | null
+          requester_name: string
+          requester_phone: string | null
+          resolution_code: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          sla_first_response_at: string | null
+          sla_resolution_at: string | null
+          status: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          tags: string[]
+          ticket_code: string | null
+          type: Database["public"]["Enums"]["ticket_type"]
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          assigned_to?: string | null
+          category?: Database["public"]["Enums"]["ticket_category"]
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          csat_comment?: string | null
+          csat_rating?: number | null
+          description?: string
+          first_response_at?: string | null
+          id?: string
+          market_city?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          queue_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          requester_email?: string | null
+          requester_name: string
+          requester_phone?: string | null
+          resolution_code?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          sla_first_response_at?: string | null
+          sla_resolution_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          tags?: string[]
+          ticket_code?: string | null
+          type?: Database["public"]["Enums"]["ticket_type"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          assigned_to?: string | null
+          category?: Database["public"]["Enums"]["ticket_category"]
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          csat_comment?: string | null
+          csat_rating?: number | null
+          description?: string
+          first_response_at?: string | null
+          id?: string
+          market_city?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          queue_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          requester_email?: string | null
+          requester_name?: string
+          requester_phone?: string | null
+          resolution_code?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          sla_first_response_at?: string | null
+          sla_resolution_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject?: string
+          tags?: string[]
+          ticket_code?: string | null
+          type?: Database["public"]["Enums"]["ticket_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "tickets_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_queues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1034,6 +1773,69 @@ export type Database = {
         }
         Relationships: []
       }
+      utm_links: {
+        Row: {
+          campaign_id: string | null
+          click_count: number
+          created_at: string
+          created_by: string | null
+          destination: string
+          full_url: string
+          id: string
+          short_code: string | null
+          utm_campaign: string
+          utm_content: string | null
+          utm_medium: string
+          utm_source: string
+          utm_term: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          click_count?: number
+          created_at?: string
+          created_by?: string | null
+          destination: string
+          full_url: string
+          id?: string
+          short_code?: string | null
+          utm_campaign: string
+          utm_content?: string | null
+          utm_medium: string
+          utm_source: string
+          utm_term?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          click_count?: number
+          created_at?: string
+          created_by?: string | null
+          destination?: string
+          full_url?: string
+          id?: string
+          short_code?: string | null
+          utm_campaign?: string
+          utm_content?: string | null
+          utm_medium?: string
+          utm_source?: string
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utm_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utm_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "v_marketing_performance"
+            referencedColumns: ["campaign_id"]
+          },
+        ]
+      }
     }
     Views: {
       account_seat_capacity: {
@@ -1047,6 +1849,56 @@ export type Database = {
           subscription_status:
             | Database["public"]["Enums"]["subscription_status"]
             | null
+        }
+        Relationships: []
+      }
+      v_account_usage: {
+        Row: {
+          account_created_at: string | null
+          account_id: string | null
+          account_name: string | null
+          account_status: string | null
+          city: string | null
+          last_activity_at: string | null
+          plan_name: string | null
+          seats_purchased: number | null
+          seats_used: number | null
+          tenancy_type: string | null
+        }
+        Relationships: []
+      }
+      v_marketing_performance: {
+        Row: {
+          budget: number | null
+          campaign_id: string | null
+          campaign_name: string | null
+          channel_name: string | null
+          clicks: number | null
+          cost_per_lead: number | null
+          impressions: number | null
+          leads: number | null
+          spend: number | null
+          status: string | null
+        }
+        Relationships: []
+      }
+      v_pipeline_funnel: {
+        Row: {
+          enquiry_count: number | null
+          last_30d: number | null
+          last_7d: number | null
+          stage: string | null
+        }
+        Relationships: []
+      }
+      v_ticket_sla_compliance: {
+        Row: {
+          awaiting_first_response: number | null
+          first_response_met: number | null
+          priority: string | null
+          resolution_met: number | null
+          status: string | null
+          ticket_count: number | null
         }
         Relationships: []
       }
@@ -1095,6 +1947,7 @@ export type Database = {
         | "VERIFICATION"
         | "INVOICE"
         | "IMPORT"
+        | "TICKET"
       app_role: "admin" | "support_agent"
       billing_cycle: "MONTHLY" | "QUARTERLY" | "ANNUAL"
       calendar_event_status: "SCHEDULED" | "COMPLETED" | "CANCELLED" | "NO_SHOW"
@@ -1105,6 +1958,8 @@ export type Database = {
         | "CHECK_IN"
         | "ONBOARDING"
         | "OTHER"
+      campaign_status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED"
+      content_status: "IDEA" | "DRAFT" | "SCHEDULED" | "PUBLISHED" | "ARCHIVED"
       enquiry_stage:
         | "NEW_ENQUIRY"
         | "CONTACTED"
@@ -1113,6 +1968,11 @@ export type Database = {
         | "ONBOARDING_PACK_SENT"
         | "ACCOUNT_CREATED"
         | "LOST"
+      governance_decision:
+        | "PENDING"
+        | "APPROVED"
+        | "CHANGES_REQUESTED"
+        | "REJECTED"
       import_status:
         | "UPLOADED"
         | "MAPPING"
@@ -1121,10 +1981,35 @@ export type Database = {
         | "FAILED"
       import_type: "LISTINGS" | "LEADS" | "CONTACTS" | "OTHER"
       invoice_status: "DRAFT" | "SENT" | "PAID" | "OVERDUE" | "CANCELLED"
+      marketing_channel_type:
+        | "PAID"
+        | "ORGANIC"
+        | "REFERRAL"
+        | "DIRECT"
+        | "EVENT"
+        | "OTHER"
+      marketing_cost_type: "CPM" | "CPC" | "CPL" | "FIXED" | "RETAINER"
       seat_request_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
       subscription_status: "ACTIVE" | "PAUSED" | "CANCELLED" | "OVERDUE"
       tenancy_type: "AGENCY_BROKERAGE_CONSULTANCY" | "BUILDER_DEVELOPER"
+      ticket_category:
+        | "LISTINGS_INVENTORY"
+        | "BILLING_PLAN"
+        | "API_INTEGRATIONS"
+        | "ONBOARDING_MIGRATION"
+        | "SECURITY_ACCESS"
+        | "COMPLIANCE_LEGAL"
+        | "PERFORMANCE_RELIABILITY"
+        | "OTHER"
+      ticket_priority: "P1" | "P2" | "P3" | "P4"
+      ticket_status:
+        | "OPEN"
+        | "PENDING_CUSTOMER"
+        | "PENDING_INTERNAL"
+        | "RESOLVED"
+        | "CLOSED"
+      ticket_type: "INCIDENT" | "QUESTION" | "TASK" | "FEEDBACK"
       verification_kind: "PAN" | "GST" | "RERA" | "BANK" | "IDENTITY"
       verification_status: "PENDING" | "VERIFIED" | "REJECTED"
     }
@@ -1272,6 +2157,7 @@ export const Constants = {
         "VERIFICATION",
         "INVOICE",
         "IMPORT",
+        "TICKET",
       ],
       app_role: ["admin", "support_agent"],
       billing_cycle: ["MONTHLY", "QUARTERLY", "ANNUAL"],
@@ -1284,6 +2170,8 @@ export const Constants = {
         "ONBOARDING",
         "OTHER",
       ],
+      campaign_status: ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"],
+      content_status: ["IDEA", "DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"],
       enquiry_stage: [
         "NEW_ENQUIRY",
         "CONTACTED",
@@ -1292,6 +2180,12 @@ export const Constants = {
         "ONBOARDING_PACK_SENT",
         "ACCOUNT_CREATED",
         "LOST",
+      ],
+      governance_decision: [
+        "PENDING",
+        "APPROVED",
+        "CHANGES_REQUESTED",
+        "REJECTED",
       ],
       import_status: [
         "UPLOADED",
@@ -1302,10 +2196,38 @@ export const Constants = {
       ],
       import_type: ["LISTINGS", "LEADS", "CONTACTS", "OTHER"],
       invoice_status: ["DRAFT", "SENT", "PAID", "OVERDUE", "CANCELLED"],
+      marketing_channel_type: [
+        "PAID",
+        "ORGANIC",
+        "REFERRAL",
+        "DIRECT",
+        "EVENT",
+        "OTHER",
+      ],
+      marketing_cost_type: ["CPM", "CPC", "CPL", "FIXED", "RETAINER"],
       seat_request_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
       subscription_status: ["ACTIVE", "PAUSED", "CANCELLED", "OVERDUE"],
       tenancy_type: ["AGENCY_BROKERAGE_CONSULTANCY", "BUILDER_DEVELOPER"],
+      ticket_category: [
+        "LISTINGS_INVENTORY",
+        "BILLING_PLAN",
+        "API_INTEGRATIONS",
+        "ONBOARDING_MIGRATION",
+        "SECURITY_ACCESS",
+        "COMPLIANCE_LEGAL",
+        "PERFORMANCE_RELIABILITY",
+        "OTHER",
+      ],
+      ticket_priority: ["P1", "P2", "P3", "P4"],
+      ticket_status: [
+        "OPEN",
+        "PENDING_CUSTOMER",
+        "PENDING_INTERNAL",
+        "RESOLVED",
+        "CLOSED",
+      ],
+      ticket_type: ["INCIDENT", "QUESTION", "TASK", "FEEDBACK"],
       verification_kind: ["PAN", "GST", "RERA", "BANK", "IDENTITY"],
       verification_status: ["PENDING", "VERIFIED", "REJECTED"],
     },
