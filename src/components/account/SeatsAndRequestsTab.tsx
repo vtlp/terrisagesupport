@@ -3,9 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock } from 'lucide-react';
+import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FULFILLED';
 
@@ -45,6 +49,11 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   const [capacity, setCapacity] = useState<Capacity | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [mockOpen, setMockOpen] = useState(false);
+  const [mockSeats, setMockSeats] = useState<string>('');
+  const [mockEmail, setMockEmail] = useState<string>('');
+  const [mockReason, setMockReason] = useState<string>('');
+  const [submittingMock, setSubmittingMock] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +97,33 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
     load();
   };
 
+  const submitMockRequest = async () => {
+    const totalRequested = parseInt(mockSeats, 10);
+    if (!Number.isInteger(totalRequested) || totalRequested < 1) {
+      toast.error('Enter a valid total seat count');
+      return;
+    }
+    const purchasedNow = capacity?.seats_purchased ?? 0;
+    const delta = totalRequested - purchasedNow;
+    if (delta <= 0) {
+      toast.error(`Requested total must be greater than current allocation (${purchasedNow})`);
+      return;
+    }
+    setSubmittingMock(true);
+    const { error } = await supabase.from('seat_requests').insert({
+      account_id: accountId,
+      requested_seats: delta,
+      requested_by_email: mockEmail.trim() || null,
+      reason: mockReason.trim() || `Requested via Terrisage app — new total ${totalRequested} seats`,
+    });
+    setSubmittingMock(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Mock request submitted from Terrisage app');
+    setMockOpen(false);
+    setMockSeats(''); setMockEmail(''); setMockReason('');
+    load();
+  };
+
   const purchased = capacity?.seats_purchased ?? 0;
   const used = capacity?.seats_used ?? activeSeatsUsed;
   const available = Math.max(0, purchased - used);
@@ -123,8 +159,11 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
 
       {/* Requests list */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <CardTitle className="text-base">Seat requests ({rows.length})</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setMockOpen(true)}>
+            <Smartphone className="h-4 w-4 mr-1" /> Mock request from Terrisage app
+          </Button>
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (
@@ -168,6 +207,39 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Mock Terrisage app request dialog */}
+      <Dialog open={mockOpen} onOpenChange={setMockOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request more seats</DialogTitle>
+            <DialogDescription>
+              Current allocation: {capacity?.seats_purchased ?? 0} seats. Simulates a request submitted from the Terrisage mobile app.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="mock-seats">Requested total seats</Label>
+              <Input id="mock-seats" type="number" min={1} placeholder="e.g. 15" value={mockSeats} onChange={e => setMockSeats(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mock-email">Requester email (optional)</Label>
+              <Input id="mock-email" type="email" placeholder="owner@example.com" value={mockEmail} onChange={e => setMockEmail(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mock-reason">Notes</Label>
+              <Textarea id="mock-reason" rows={3} placeholder="Share the names of new members or any additional context." value={mockReason} onChange={e => setMockReason(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMockOpen(false)}>Cancel</Button>
+            <Button onClick={submitMockRequest} disabled={submittingMock}>
+              {submittingMock && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Submit request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
