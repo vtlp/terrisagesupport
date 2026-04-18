@@ -503,8 +503,6 @@ export default function EnquiryDetail() {
   const altSplit = splitPhone(draft.payload.contact_phone_alt || '');
   const isBuilder = draft.tenancy_type === 'BUILDER_DEVELOPER';
   const showLost = draft.stage === 'LOST';
-  const outcome = draft.payload.outcome ?? '';
-  const showNotInterested = outcome === 'NOT_INTERESTED';
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
