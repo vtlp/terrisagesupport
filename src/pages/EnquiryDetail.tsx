@@ -438,16 +438,35 @@ export default function EnquiryDetail() {
     if (data) setNotes(prev => [data as NoteRow, ...prev]);
   };
 
+  const PUBLIC_ORIGIN = 'https://terrisagesupport.lovable.app';
+
+  const isInternalHost = (host: string): boolean => {
+    return (
+      host.endsWith('.lovableproject.com') ||
+      (host.endsWith('.lovable.app') && host.includes('id-preview--')) ||
+      host === 'localhost' ||
+      host === '127.0.0.1'
+    );
+  };
+
+  const toPublicLink = (url: string | null | undefined): string => {
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      if (isInternalHost(u.hostname)) {
+        return `${PUBLIC_ORIGIN}${u.pathname}${u.search}${u.hash}`;
+      }
+      return url;
+    } catch {
+      return url ?? '';
+    }
+  };
+
   const generateLink = (): string => {
     if (!enquiry) return '';
     const tenancy = enquiry.tenancy_type === 'BUILDER_DEVELOPER' ? 'builder' : 'agency';
-    // Always use the public published URL so customers (without Lovable access) can open it.
     const host = window.location.hostname;
-    const isPreview = host.includes('lovable.app') && host.includes('id-preview--');
-    const isLocal = host === 'localhost' || host === '127.0.0.1';
-    const publicOrigin = (isPreview || isLocal)
-      ? 'https://terrisagesupport.lovable.app'
-      : window.location.origin;
+    const publicOrigin = isInternalHost(host) ? PUBLIC_ORIGIN : window.location.origin;
     return `${publicOrigin}/onboarding/${tenancy}?enquiry_id=${enquiry.id}`;
   };
 
