@@ -844,6 +844,7 @@ export default function EnquiryDetail() {
                 />
               </div>
             </div>
+          </div>
 
           {showLost && (
             <div className="space-y-1.5">
