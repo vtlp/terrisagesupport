@@ -98,23 +98,17 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   };
 
   const submitMockRequest = async () => {
-    const totalRequested = parseInt(mockSeats, 10);
-    if (!Number.isInteger(totalRequested) || totalRequested < 1) {
-      toast.error('Enter a valid total seat count');
-      return;
-    }
-    const purchasedNow = capacity?.seats_purchased ?? 0;
-    const delta = totalRequested - purchasedNow;
-    if (delta <= 0) {
-      toast.error(`Requested total must be greater than current allocation (${purchasedNow})`);
+    const additional = parseInt(mockSeats, 10);
+    if (!Number.isInteger(additional) || additional < 1) {
+      toast.error('Enter a valid number of additional seats');
       return;
     }
     setSubmittingMock(true);
     const { error } = await supabase.from('seat_requests').insert({
       account_id: accountId,
-      requested_seats: delta,
+      requested_seats: additional,
       requested_by_email: mockEmail.trim() || null,
-      reason: mockReason.trim() || `Requested via Terrisage app — new total ${totalRequested} seats`,
+      reason: mockReason.trim() || `Requested via Terrisage app — +${additional} additional seats`,
     });
     setSubmittingMock(false);
     if (error) { toast.error(error.message); return; }
@@ -214,13 +208,13 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
           <DialogHeader>
             <DialogTitle>Request more seats</DialogTitle>
             <DialogDescription>
-              Current allocation: {capacity?.seats_purchased ?? 0} seats. Simulates a request submitted from the Terrisage mobile app.
+              Current allocation: {capacity?.seats_purchased ?? 0} seats. Enter how many additional seats are needed — these will be added to the allocation once approved.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="mock-seats">Requested total seats</Label>
-              <Input id="mock-seats" type="number" min={1} placeholder="e.g. 15" value={mockSeats} onChange={e => setMockSeats(e.target.value)} />
+              <Label htmlFor="mock-seats">Additional seats requested</Label>
+              <Input id="mock-seats" type="number" min={1} placeholder="e.g. 5" value={mockSeats} onChange={e => setMockSeats(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="mock-email">Requester email (optional)</Label>
