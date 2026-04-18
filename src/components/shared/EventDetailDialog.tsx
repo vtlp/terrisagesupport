@@ -90,10 +90,13 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
   const syncToGoogle = async () => {
     toast.loading('Syncing to Google Calendar…', { id: `sync-${event.id}` });
     const { data, error } = await supabase.functions.invoke('sync-calendar-event', { body: { event_id: event.id } });
-    if (error || (data && (data as { error?: string }).error)) {
-      const msg = (data as { error?: string; code?: string })?.error ?? error?.message ?? 'Sync failed';
-      const code = (data as { code?: string })?.code;
-      toast.error(code === 'NOT_CONNECTED' ? 'Connect Google Calendar from Settings first.' : msg, { id: `sync-${event.id}` });
+    const resp = data as { error?: string; code?: string; skipped?: boolean } | null;
+    if (error || resp?.error) {
+      toast.error(resp?.error ?? error?.message ?? 'Sync failed', { id: `sync-${event.id}` });
+      return;
+    }
+    if (resp?.skipped) {
+      toast.message('Google Calendar is optional. Connect from Settings to enable sync.', { id: `sync-${event.id}` });
       return;
     }
     toast.success('Synced to Google Calendar', { id: `sync-${event.id}` });

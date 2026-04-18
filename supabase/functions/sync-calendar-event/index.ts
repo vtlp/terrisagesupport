@@ -26,10 +26,13 @@ Deno.serve(async (req) => {
       });
     }
     if (!GOOGLE_CALENDAR_API_KEY) {
+      // Optional integration — silently skip if not connected
       return new Response(JSON.stringify({
-        error: 'Google Calendar is not connected. Please connect a Google account first.',
+        success: true,
+        skipped: true,
+        reason: 'Google Calendar not connected',
         code: 'NOT_CONNECTED',
-      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const authHeader = req.headers.get('Authorization');
