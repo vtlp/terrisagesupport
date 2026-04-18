@@ -26,7 +26,7 @@ import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmitted
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
   { number: 2, label: "Team Access & Permissions" },
-  { number: 3, label: "Projects & Data Files" },
+  { number: 3, label: "Projects & Bulk Imports" },
   { number: 4, label: "Review & Submit" },
 ];
 
@@ -47,7 +47,7 @@ function createTeamMember() {
 }
 
 function createProject() {
-  return { id: crypto.randomUUID(), projectName: "", location: "", repName: "", repMobile: "", repMobileCode: "+91", repEmail: "", builderName: "", builderDetails: "", brochure: [] as File[] };
+  return { id: crypto.randomUUID(), projectName: "", location: "", repName: "", repMobile: "", repMobileCode: "+91", repEmail: "", builderName: "", brochure: [] as File[] };
 }
 
 type TeamMember = ReturnType<typeof createTeamMember>;
@@ -113,13 +113,9 @@ export default function AgencyOnboarding() {
 
   // Step 3
   const [projects, setProjects] = useState<Project[]>([createProject()]);
-  const [leadFile, setLeadFile] = useState<File[]>([]);
-  const [leadSheetLink, setLeadSheetLink] = useState("");
-  const [leadFileNotes, setLeadFileNotes] = useState("");
-  const [propertyFile, setPropertyFile] = useState<File[]>([]);
-  const [propertyImages, setPropertyImages] = useState<File[]>([]);
-  const [propertySheetLink, setPropertySheetLink] = useState("");
-  const [propertyFileNotes, setPropertyFileNotes] = useState("");
+  // Bulk imports (optional) — replaces the previous Lead/Property import sections.
+  const [bulkImportFiles, setBulkImportFiles] = useState<File[]>([]);
+  const [bulkImportNotes, setBulkImportNotes] = useState("");
 
   useEffect(() => {
     const draft = loadDraft("agency");
