@@ -126,17 +126,19 @@ export default function AgencyOnboarding() {
       try {
         const d = draft.data;
         setCurrentStep(draft.currentStep);
-        if (d.fullName) setFullName(d.fullName);
-        if (d.mobile) setMobile(d.mobile);
-        if (d.mobileCode) setMobileCode(d.mobileCode);
-        if (d.email) setEmail(d.email);
+        // Locked fields (prefilled from enquiry) must not be overridden by an
+        // older draft — the CRM-supplied values are authoritative.
+        if (d.fullName && !lockFullName) setFullName(d.fullName);
+        if (d.mobile && !lockMobile) setMobile(d.mobile);
+        if (d.mobileCode && !lockMobile) setMobileCode(d.mobileCode);
+        if (d.email && !lockEmail) setEmail(d.email);
         if (d.companyName) setCompanyName(d.companyName);
         if (d.companyTagline) setCompanyTagline(d.companyTagline);
         if (d.reraId) setReraId(d.reraId);
         if (d.city) setCity(d.city);
         if (d.businessArea) setBusinessArea(d.businessArea);
         if (d.notes) setNotes(d.notes);
-        if (d.seatsRequired) setSeatsRequired(d.seatsRequired);
+        if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
         if (d.projects) setProjects(d.projects.map((p: any) => ({ ...p, brochure: [] })));
         if (d.leadSheetLink) setLeadSheetLink(d.leadSheetLink);
