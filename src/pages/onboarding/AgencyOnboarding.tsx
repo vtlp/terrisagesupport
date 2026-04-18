@@ -18,7 +18,8 @@ import {
   LOGO_FORMATS, BROCHURE_FORMATS, IMPORT_FILE_FORMATS, IMAGE_FORMATS,
   LOGO_EXTENSIONS, BROCHURE_EXTENSIONS, IMPORT_EXTENSIONS, IMAGE_EXTENSIONS,
 } from "@/lib/onboardingValidation";
-import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl } from "@/lib/onboardingSubmit";
+import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock, AlreadySubmittedError } from "@/lib/onboardingSubmit";
+import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -59,6 +60,15 @@ export default function AgencyOnboarding() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [lockChecking, setLockChecking] = useState(true);
+  const [lockedAt, setLockedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    const enquiryId = getEnquiryIdFromUrl();
+    checkSubmissionLock(enquiryId)
+      .then((ts) => setLockedAt(ts))
+      .finally(() => setLockChecking(false));
+  }, []);
 
   // Step 1
   const [fullName, setFullName] = useState("");
@@ -236,6 +246,11 @@ export default function AgencyOnboarding() {
       clearDraft("agency");
       navigate("/onboarding/agency/success");
     } catch (err) {
+      if (err instanceof AlreadySubmittedError) {
+        setLockedAt(err.submittedAt ?? new Date().toISOString());
+        setSubmitting(false);
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Submission failed. Please try again.";
       toast.error(msg);
       setSubmitting(false);
@@ -249,6 +264,13 @@ export default function AgencyOnboarding() {
   const updateProject = (index: number, field: string, value: any) => {
     setProjects((prev) => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
   };
+
+  if (lockChecking) {
+    return <div className="min-h-screen bg-background flex items-center justify-center text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (lockedAt) {
+    return <AlreadySubmittedScreen submittedAt={lockedAt} tenancy="agency" />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
