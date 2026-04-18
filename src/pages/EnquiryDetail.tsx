@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon, ChevronRight, Check } from 'lucide-react';
+import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon, ChevronRight, Check, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
@@ -24,6 +24,8 @@ import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/compo
 import { defaultMarkets, defaultPortals } from '@/data/lookupData';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
+import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
+import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
 type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
