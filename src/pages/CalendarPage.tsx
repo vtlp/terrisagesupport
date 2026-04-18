@@ -36,7 +36,7 @@ interface CalEvent {
   id: string; title: string; scheduled_at: string;
   event_type: string; status: string; notes: string | null;
   related_entity_type: string | null; related_entity_id: string | null;
-  created_by: string | null;
+  created_by: string | null; assigned_to: string | null;
 }
 interface Profile { id: string; full_name: string; }
 
