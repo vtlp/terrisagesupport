@@ -1,49 +1,64 @@
 
-The user has 7 distinct requests. Let me investigate the relevant files first to plan precisely.
+Goal: make the enquiry page safe for real work so data never disappears, even if you add notes, schedule a demo, or change stage in any order.
 
-## Investigation needed
-1. EnquiryDetail.tsx — notes panel, fields to remove, multi-select usage
-2. ActivityTimeline.tsx — remove arrow + JSON output, filter out stage changes
-3. Notes API/component — exclude stage_change events from notes
-4. Dashboard.tsx — redesign while preserving metrics
-5. CreateTicketDialog.tsx — focus ring clipping (likely overflow on scroll container)
+1. Fix the data-loss root cause in Enquiry Details
+- Stop using the full `load()` refresh after note creation and other side actions when it is not needed.
+- Split page loading into separate refresh paths:
+  - enquiry record
+  - notes list
+  - events list
+  - submission state
+- This prevents unsaved form edits from being overwritten by a full re-fetch.
 
-## Plan
+2. Add proper autosave for enquiry edits
+- Introduce debounced autosave for enquiry field changes, including payload fields.
+- Keep a visible save state such as:
+  - Saving…
+  - Saved
+  - Unsaved changes
+- Keep the existing Save button as a manual fallback, but make autosave the primary behaviour.
+- Before stage change, scheduling, onboarding actions, or note submission, flush any pending autosave first so the latest draft is persisted.
 
-### 1. Activity Timeline cleanup (`ActivityTimeline.tsx`)
-- Remove the "→" arrow rendering and any raw JSON/details dump.
-- Render only summary + actor + timestamp.
-- Filter out `STAGE_CHANGE` events (those belong to the enquiry stage tracker, not the audit trail).
+3. Make Notes safe
+- Update “Add note” so it does not reset or rebuild the enquiry draft.
+- After adding a note, refresh only the notes list or optimistically append the new note.
+- Ensure adding notes can happen at any point in the workflow without losing enquiry details.
 
-### 2. Notes — exclude stage-change activities
-- Wherever notes are sourced (likely `enquiry_notes` table only — confirm), ensure no activity_log STAGE_CHANGE entries leak in. If notes panel currently merges activity_log + notes, change it to show only `enquiry_notes` rows.
+4. Change “Current system / software” to a multi-select dropdown
+- Replace the current single Select with the shared `MultiSelect` component.
+- Options:
+  - Sell.do
+  - LeadRat
+  - Houssed
+  - Excel sheet only
+  - Other
+- If “Other” is selected, show a free-text input.
+- Store this as an array in the enquiry payload and keep backward compatibility by normalising older single-value data.
 
-### 3. EnquiryDetail.tsx — remove four fields
-- Remove inputs/labels for: Demo outcome, Demo scheduled, Call outcome, Demo completed (since they're shown at the top stage tracker).
+5. Make the enquiry workflow order-independent
+- Support this sequence cleanly:
+  - create enquiry
+  - call customer
+  - fill details
+  - add notes
+  - schedule demo
+  - save or autosave
+  - update stage whenever needed
+- Apply the same protection to other side actions on the page, not just notes, so no action wipes draft data.
 
-### 4. Multi-select for multi-option fields
-- Audit enquiry fields in EnquiryDetail (focus area, sales focus, primary property types, portals currently in use). Replace single Select with `MultiSelect` component (already exists at `src/components/shared/MultiSelect.tsx`).
-- Persist as arrays in `enquiries.payload` JSONB.
+6. Technical details
+- Files likely involved:
+  - `src/pages/EnquiryDetail.tsx`
+  - possibly `src/components/shared/MultiSelect.tsx` only if minor UX tweaks are needed
+- No database schema change is required.
+- Data model adjustment is inside `payload` only:
+  - `current_system` becomes array-friendly
+  - `current_system_text` remains the free-text companion for “Other”
 
-### 5. Dashboard redesign (`Dashboard.tsx`)
-- Keep all current metrics, but restructure with:
-  - Hero KPI strip (large numbers, deltas, trend arrows)
-  - Sectioned cards: "Pipeline health", "Today's actions", "Service & SLA", "Conversion"
-  - Use semantic tokens, consistent card heights, clear hierarchy.
-- No new data sources — same queries, better presentation.
-
-### 6. Ticket dialog focus clipping (`CreateTicketDialog.tsx`)
-- Scroll container `overflow-y-auto` clips the focus ring. Add horizontal padding (e.g., `px-1`) and/or `-mx-1` so the ring isn't cut off; or change to `overflow-y-auto overflow-x-visible` with adequate padding.
-
-## Files to edit
-- `src/components/shared/ActivityTimeline.tsx`
-- `src/pages/EnquiryDetail.tsx`
-- `src/components/shared/NotesPanel.tsx` (if it merges activity)
-- `src/pages/Dashboard.tsx`
-- `src/components/shared/CreateTicketDialog.tsx`
-
-## Out of scope
-- Marketing / Lookups / Reports backend wiring (paused per user).
-- Any change to underlying database schema.
-
-I'll read the relevant files first, then implement.
+7. QA after implementation
+- Test creating/editing an enquiry without manually saving.
+- Type into multiple enquiry fields, add a note, confirm data stays.
+- Type into fields, schedule an event, confirm data stays.
+- Change stage after editing, confirm the latest data is still present.
+- Test multi-select current system with and without “Other”.
+- Test re-opening the enquiry to confirm all saved values persist correctly.
