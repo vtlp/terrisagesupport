@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket, LogOut } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,11 +33,30 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
   const { toggleSidebar } = useSidebar();
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
+  const [pendingSeatRequests, setPendingSeatRequests] = useState(0);
 
   // Compute attention count (still uses seed for tickets/accounts pending backend)
   const attentionCount =
     seedTickets.filter(t => (t.priority === TicketPriority.P1 || t.priority === TicketPriority.P2) && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length +
-    seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;
+    seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length +
+    pendingSeatRequests;
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { count } = await supabase
+        .from('seat_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'PENDING');
+      if (!cancelled) setPendingSeatRequests(count ?? 0);
+    };
+    load();
+    const channel = supabase
+      .channel('seat-requests-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'seat_requests' }, load)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -106,7 +126,7 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
           variant="ghost"
           size="icon"
           className="text-secondary-foreground hover:bg-sidebar-muted relative"
-          onClick={() => toast.info(`${attentionCount} items need attention`)}
+          onClick={() => toast.info(`${attentionCount} items need attention${pendingSeatRequests ? ` · ${pendingSeatRequests} pending seat request${pendingSeatRequests === 1 ? '' : 's'}` : ''}`)}
         >
           <Bell className="h-5 w-5" />
           <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 bg-accent text-accent-foreground text-xs">
