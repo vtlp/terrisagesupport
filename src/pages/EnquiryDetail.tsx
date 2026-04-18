@@ -1233,7 +1233,7 @@ function ActiveStagePanel({
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Demo outcome</Label>
-          <Select value={(draft.payload.demo_outcome as string) || NONE} onValueChange={v => setPayload('demo_outcome', v === NONE ? '' : v)}>
+          <Select value={(draft.payload.demo_outcome as string) || NONE} onValueChange={v => onDemoOutcomeChange(v === NONE ? '' : v)}>
             <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={NONE}>—</SelectItem>
