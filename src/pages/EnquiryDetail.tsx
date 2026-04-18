@@ -1025,6 +1025,19 @@ export default function EnquiryDetail() {
 
       <ActivityTimeline entityType="ENQUIRY" entityId={enquiry.id} />
 
+      <PaymentLinkDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        enquiryId={enquiry.id}
+        defaults={{
+          seats: (draft.payload.team_size_estimate as number | null | undefined) ?? null,
+          customerName: enquiry.full_name,
+          customerEmail: enquiry.email,
+          customerPhone: enquiry.phone,
+        }}
+        onSuccess={applyPaymentResult}
+      />
+
       <SendOnboardingDialog
         open={shareOpen}
         onOpenChange={setShareOpen}
