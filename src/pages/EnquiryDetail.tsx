@@ -847,6 +847,19 @@ export default function EnquiryDetail() {
   );
 }
 
+// ---------------- Save status indicator ----------------
+
+function SaveStatusIndicator({ state, isDirty }: { state: SaveState; isDirty: boolean }) {
+  let label = '';
+  let cls = 'text-muted-foreground';
+  if (state === 'saving') { label = 'Saving…'; }
+  else if (state === 'error') { label = 'Save failed'; cls = 'text-destructive'; }
+  else if (isDirty) { label = 'Unsaved changes'; cls = 'text-warning'; }
+  else if (state === 'saved') { label = 'Saved'; cls = 'text-success'; }
+  if (!label) return null;
+  return <span className={cn('text-xs', cls)}>{label}</span>;
+}
+
 // ---------------- Stage Flow ----------------
 
 const STAGE_ORDER: Stage[] = [
