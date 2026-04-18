@@ -347,7 +347,7 @@ export default function EnquiryDetail() {
 
     setBusy(true);
     await flushPendingSave();
-    const updates: Record<string, unknown> = { stage };
+    const updates: { stage: Stage; demo_scheduled_at?: string } = { stage };
     // When entering DEMO_SCHEDULED, auto-populate demo_scheduled_at from earliest demo event if empty.
     if (stage === 'DEMO_SCHEDULED' && !draft.demo_scheduled_at) {
       const demo = events.filter(e => e.event_type === 'DEMO').sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))[0];
