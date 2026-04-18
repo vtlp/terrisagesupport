@@ -116,8 +116,18 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
               <div className="font-medium">{format(new Date(event.scheduled_at), 'EEE dd MMM yyyy, HH:mm')}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Owner</div>
-              <div className="font-medium">{ownerName ?? '—'}</div>
+              <div className="text-xs text-muted-foreground mb-1">Owner (assigned to)</div>
+              {teamMembers.length > 0 ? (
+                <Select value={event.assigned_to ?? event.created_by ?? 'unassigned'} onValueChange={updateAssignee} disabled={busy}>
+                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {teamMembers.map(m => <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="font-medium">{ownerName ?? '—'}</div>
+              )}
             </div>
           </div>
 
