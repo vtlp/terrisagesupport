@@ -113,6 +113,16 @@ export function CalendarEventForm({
           <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
       </div>
+      <div className="space-y-2">
+        <Label>Assign to</Label>
+        <Select value={assignedTo ?? 'unassigned'} onValueChange={(v) => setAssignedTo(v === 'unassigned' ? null : v)}>
+          <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {team.map(m => <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
       {lockedEntityType ? (
         <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
           Linking to <span className="font-medium">{lockedEntityType === 'ENQUIRY' ? 'Enquiry' : 'Account'}</span>
