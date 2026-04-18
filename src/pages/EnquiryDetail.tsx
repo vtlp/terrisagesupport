@@ -757,7 +757,7 @@ export default function EnquiryDetail() {
           {showLost && (
             <div className="space-y-1.5">
               <Label>Lost reason</Label>
-              <Textarea rows={2} value={draft.lost_reason ?? ''} onChange={e => setField('lost_reason', e.target.value)} />
+              <VoiceTextarea rows={2} value={draft.lost_reason ?? ''} onChange={v => setField('lost_reason', v)} />
             </div>
           )}
         </CardContent>
