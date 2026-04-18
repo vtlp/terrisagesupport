@@ -424,9 +424,10 @@ export default function EnquiryDetail() {
             </Badge>
           </Link>
         )}
-        <Button onClick={saveAll} disabled={saving || !isDirty} size="sm" variant={isDirty ? 'default' : 'outline'}>
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          {isDirty ? 'Save changes' : 'Saved'}
+        <SaveStatusIndicator state={saveState} isDirty={isDirty} />
+        <Button onClick={saveAll} disabled={saveState === 'saving' || !isDirty} size="sm" variant={isDirty ? 'default' : 'outline'}>
+          {saveState === 'saving' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          {isDirty ? 'Save now' : 'Saved'}
         </Button>
       </div>
 
