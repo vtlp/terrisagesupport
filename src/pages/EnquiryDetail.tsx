@@ -527,9 +527,14 @@ export default function EnquiryDetail() {
           </Link>
         )}
         <SaveStatusIndicator state={saveState} isDirty={isDirty} />
+        {isDirty && (
+          <Button onClick={cancelEdits} disabled={saveState === 'saving'} size="sm" variant="outline">
+            <Undo2 className="h-4 w-4 mr-2" /> Cancel
+          </Button>
+        )}
         <Button onClick={saveAll} disabled={saveState === 'saving' || !isDirty} size="sm" variant={isDirty ? 'default' : 'outline'}>
           {saveState === 'saving' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          {isDirty ? 'Save now' : 'Saved'}
+          {isDirty ? 'Save' : 'Saved'}
         </Button>
       </div>
 
