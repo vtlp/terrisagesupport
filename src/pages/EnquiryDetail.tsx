@@ -245,6 +245,8 @@ export default function EnquiryDetail() {
   useEffect(() => { load(); }, [load]);
 
   const isDirty = useMemo(() => JSON.stringify(enquiry) !== JSON.stringify(draft), [enquiry, draft]);
+  const isDirtyRef = useRef(false);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
 
   // Mark dirty for save indicator (no autosave — manual Save button is required).
   useEffect(() => {
@@ -289,12 +291,12 @@ export default function EnquiryDetail() {
   // Backwards-compatible alias used by side actions.
   const flushPendingSave = useCallback(async () => { await persistDraft(); }, [persistDraft]);
 
-  // Block side actions when there are unsaved edits.
-  const requireClean = useCallback((label = 'continue'): boolean => {
-    if (!isDirty) return true;
-    toast.error(`Save or cancel your changes first to ${label}.`);
-    return false;
-  }, [isDirty]);
+  // Auto-persist pending edits before running a side action (stage change, note, etc.).
+  // Returns false only if the silent save fails — never blocks the user for being "dirty".
+  const requireClean = useCallback(async (_label = 'continue'): Promise<boolean> => {
+    if (!isDirtyRef.current) return true;
+    return await persistDraft();
+  }, [persistDraft]);
 
   const setField = <K extends keyof Enquiry>(key: K, value: Enquiry[K]) => {
     setDraft(d => d ? { ...d, [key]: value } : d);
@@ -368,7 +370,7 @@ export default function EnquiryDetail() {
 
   const updateStage = async (stage: Stage) => {
     if (!enquiry || !draft) return;
-    if (!requireClean('change the stage')) return;
+    if (!(await requireClean('change the stage'))) return;
 
     if (stage === 'ACCOUNT_CREATED') {
       toast.error('Account Created is set automatically when you convert the enquiry.');
@@ -412,7 +414,7 @@ export default function EnquiryDetail() {
 
   const addNote = async () => {
     if (!enquiry || !newNote.trim()) return;
-    if (!requireClean('add a note')) return;
+    if (!(await requireClean('add a note'))) return;
     setBusy(true);
     const { data, error } = await supabase.from('enquiry_notes')
       .insert({ enquiry_id: enquiry.id, note_text: newNote.trim() })
@@ -432,7 +434,7 @@ export default function EnquiryDetail() {
 
   const handleSendOnboarding = async () => {
     if (!enquiry) return;
-    if (!requireClean('send the onboarding form')) return;
+    if (!(await requireClean('send the onboarding form'))) return;
     const link = generateLink();
     if (!enquiry.onboarding_pack_sent) {
       await supabase.from('enquiries').update({
@@ -474,7 +476,7 @@ export default function EnquiryDetail() {
 
   const convertToAccount = async () => {
     if (!enquiry) return;
-    if (!requireClean('convert to account')) return;
+    if (!(await requireClean('convert to account'))) return;
     setBusy(true);
     const { data, error } = await supabase.rpc('convert_enquiry_to_account', { _enquiry_id: enquiry.id });
     setBusy(false);
