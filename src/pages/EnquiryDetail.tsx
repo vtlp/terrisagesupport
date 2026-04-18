@@ -40,6 +40,7 @@ interface EnquiryPayload {
   sales_focus?: string[];
   primary_property_types?: string[];
   team_size_estimate?: number | null;
+  current_system?: string;
   current_system_text?: string;
   approx_onboarding_date?: string | null;
   portals_in_use?: string[];
@@ -121,6 +122,14 @@ const DEMO_OUTCOMES = [
   { v: 'NO_SHOW', l: 'No show' },
   { v: 'LIKED_WANT_ONBOARD_SOON', l: 'Liked, wants to onboard soon' },
   { v: 'GHOSTED', l: 'Ghosted' },
+];
+
+const CURRENT_SYSTEMS = [
+  { v: 'SELL_DO', l: 'Sell.do' },
+  { v: 'LEADRAT', l: 'LeadRat' },
+  { v: 'HOUSSED', l: 'Houssed' },
+  { v: 'EXCEL_ONLY', l: 'Excel sheet only' },
+  { v: 'OTHER', l: 'Other' },
 ];
 
 const NONE = '__none__';
@@ -222,9 +231,26 @@ export default function EnquiryDetail() {
   };
 
   const updateStage = async (stage: Stage) => {
-    if (!enquiry) return;
+    if (!enquiry || !draft) return;
     setBusy(true);
-    const { error } = await supabase.from('enquiries').update({ stage }).eq('id', enquiry.id);
+    // Persist any unsaved field edits before changing stage so they aren't lost on reload
+    const update: Record<string, unknown> = { stage };
+    if (JSON.stringify(enquiry) !== JSON.stringify(draft)) {
+      Object.assign(update, {
+        full_name: draft.full_name,
+        phone: draft.phone,
+        email: draft.email,
+        city: draft.city,
+        company_name: draft.company_name,
+        tenancy_type: draft.tenancy_type,
+        source: draft.source,
+        demo_scheduled_at: draft.demo_scheduled_at,
+        demo_completed_at: draft.demo_completed_at,
+        lost_reason: draft.lost_reason,
+        payload: draft.payload as unknown as never,
+      });
+    }
+    const { error } = await supabase.from('enquiries').update(update as never).eq('id', enquiry.id);
     if (error) toast.error(error.message);
     else {
       toast.success('Stage updated');
@@ -335,12 +361,10 @@ export default function EnquiryDetail() {
             </Badge>
           </Link>
         )}
-        {isDirty && (
-          <Button onClick={saveAll} disabled={saving} size="sm">
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Save changes
-          </Button>
-        )}
+        <Button onClick={saveAll} disabled={saving || !isDirty} size="sm" variant={isDirty ? 'default' : 'outline'}>
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          {isDirty ? 'Save changes' : 'Saved'}
+        </Button>
       </div>
 
       {/* Horizontal stage flow */}
@@ -508,14 +532,30 @@ export default function EnquiryDetail() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Current system / software in use</Label>
-              <Textarea
-                rows={2}
-                placeholder="e.g. Excel, PropTech CRM, in-house tool…"
-                value={draft.payload.current_system_text ?? ''}
-                onChange={e => setPayload('current_system_text', e.target.value)}
-              />
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Current system / software in use</Label>
+                <Select
+                  value={(draft.payload.current_system as string) || NONE}
+                  onValueChange={v => setPayload('current_system', v === NONE ? '' : v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select current system" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>—</SelectItem>
+                    {CURRENT_SYSTEMS.map(s => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {draft.payload.current_system === 'OTHER' && (
+                <div className="space-y-1.5">
+                  <Label>Specify other system</Label>
+                  <Input
+                    placeholder="e.g. Custom in-house tool"
+                    value={draft.payload.current_system_text ?? ''}
+                    onChange={e => setPayload('current_system_text', e.target.value)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
