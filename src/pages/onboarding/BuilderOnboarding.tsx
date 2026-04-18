@@ -111,9 +111,9 @@ export default function BuilderOnboarding() {
   const [seatsRequired, setSeatsRequired] = useState(prefill.teamSize ?? "");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([createTeamMember()]);
 
-  const lockFullName = !!prefill.fullName;
-  const lockMobile = !!prefill.phone;
-  const lockEmail = !!prefill.email;
+  const lockFullName = false;
+  const lockMobile = false;
+  const lockEmail = false;
   const lockSeats = !!prefill.teamSize;
 
   // Step 3

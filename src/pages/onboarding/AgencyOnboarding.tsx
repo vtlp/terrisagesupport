@@ -105,9 +105,9 @@ export default function AgencyOnboarding() {
   const [seatsRequired, setSeatsRequired] = useState(prefill.teamSize ?? "");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([createTeamMember()]);
 
-  const lockFullName = !!prefill.fullName;
-  const lockMobile = !!prefill.phone;
-  const lockEmail = !!prefill.email;
+  const lockFullName = false;
+  const lockMobile = false;
+  const lockEmail = false;
   const lockSeats = !!prefill.teamSize;
 
   // Step 3
@@ -316,9 +316,9 @@ export default function AgencyOnboarding() {
                 <p className="text-sm text-muted-foreground mt-1">This person will receive the primary account access and will be our main point of contact during onboarding, setup, and training.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div data-field="fullName"><TextField label="Full name" required value={fullName} onChange={setFullName} error={errors.fullName} disabled={lockFullName} helperText={lockFullName ? "Provided by the Terrisage team — contact us if this needs to change." : undefined} /></div>
-                <div data-field="mobile"><PhoneField label="Mobile number" required countryCode={mobileCode} onCountryCodeChange={setMobileCode} value={mobile} onChange={setMobile} error={errors.mobile} disabled={lockMobile} helperText={lockMobile ? "Provided by the Terrisage team." : undefined} /></div>
-                <div data-field="email" className="sm:col-span-2"><TextField label="Email address" type="email" required value={email} onChange={setEmail} error={errors.email} disabled={lockEmail} helperText={lockEmail ? "Provided by the Terrisage team — contact us if this needs to change." : undefined} /></div>
+                <div data-field="fullName"><TextField label="Full name" required value={fullName} onChange={setFullName} error={errors.fullName} /></div>
+                <div data-field="mobile"><PhoneField label="Mobile number" required countryCode={mobileCode} onCountryCodeChange={setMobileCode} value={mobile} onChange={setMobile} error={errors.mobile} /></div>
+                <div data-field="email" className="sm:col-span-2"><TextField label="Email address" type="email" required value={email} onChange={setEmail} error={errors.email} /></div>
               </div>
             </section>
 
