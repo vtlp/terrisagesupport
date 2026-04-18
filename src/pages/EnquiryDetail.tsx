@@ -370,7 +370,7 @@ export default function EnquiryDetail() {
 
   const updateStage = async (stage: Stage) => {
     if (!enquiry || !draft) return;
-    if (!requireClean('change the stage')) return;
+    if (!(await requireClean('change the stage'))) return;
 
     if (stage === 'ACCOUNT_CREATED') {
       toast.error('Account Created is set automatically when you convert the enquiry.');
@@ -414,7 +414,7 @@ export default function EnquiryDetail() {
 
   const addNote = async () => {
     if (!enquiry || !newNote.trim()) return;
-    if (!requireClean('add a note')) return;
+    if (!(await requireClean('add a note'))) return;
     setBusy(true);
     const { data, error } = await supabase.from('enquiry_notes')
       .insert({ enquiry_id: enquiry.id, note_text: newNote.trim() })
@@ -434,7 +434,7 @@ export default function EnquiryDetail() {
 
   const handleSendOnboarding = async () => {
     if (!enquiry) return;
-    if (!requireClean('send the onboarding form')) return;
+    if (!(await requireClean('send the onboarding form'))) return;
     const link = generateLink();
     if (!enquiry.onboarding_pack_sent) {
       await supabase.from('enquiries').update({
@@ -476,7 +476,7 @@ export default function EnquiryDetail() {
 
   const convertToAccount = async () => {
     if (!enquiry) return;
-    if (!requireClean('convert to account')) return;
+    if (!(await requireClean('convert to account'))) return;
     setBusy(true);
     const { data, error } = await supabase.rpc('convert_enquiry_to_account', { _enquiry_id: enquiry.id });
     setBusy(false);
