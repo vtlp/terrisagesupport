@@ -255,7 +255,7 @@ export default function CalendarPage() {
                     <p className="text-sm font-medium truncate">{e.title}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       <span>{format(new Date(e.scheduled_at), 'EEE dd MMM, HH:mm')}</span>
-                      <span>•</span><span>{userName(e.created_by)}</span>
+                      <span>•</span><span>{userName(e.assigned_to ?? e.created_by)}</span>
                     </div>
                   </button>
                   <div className="flex items-center gap-2">
