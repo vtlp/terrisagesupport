@@ -2,13 +2,15 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Image as ImageIcon, FileBadge, Loader2, ExternalLink, FolderOpen } from 'lucide-react';
+import { FileText, Image as ImageIcon, FileBadge, Loader2, ExternalLink, FolderOpen, Database, Building2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+type DocCategory = 'Company logo' | 'Project brochure' | 'Property images' | 'Lead import files' | 'Property import files';
+
 interface DocItem {
   path: string;
-  category: 'Company logo' | 'Project brochure' | 'Property images';
+  category: DocCategory;
   projectName?: string;
 }
 
