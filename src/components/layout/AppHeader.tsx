@@ -126,7 +126,7 @@ export function AppHeader({ onMenuClick }: AppHeaderProps) {
           variant="ghost"
           size="icon"
           className="text-secondary-foreground hover:bg-sidebar-muted relative"
-          onClick={() => toast.info(`${attentionCount} items need attention`)}
+          onClick={() => toast.info(`${attentionCount} items need attention${pendingSeatRequests ? ` · ${pendingSeatRequests} pending seat request${pendingSeatRequests === 1 ? '' : 's'}` : ''}`)}
         >
           <Bell className="h-5 w-5" />
           <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 bg-accent text-accent-foreground text-xs">
