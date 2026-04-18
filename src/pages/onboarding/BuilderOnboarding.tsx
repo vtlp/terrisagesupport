@@ -348,7 +348,7 @@ export default function BuilderOnboarding() {
           </div>
 
           <div data-field="seatsRequired">
-            <TextField label="Number of seats required" type="number" required value={seatsRequired} onChange={setSeatsRequired} error={errors.seatsRequired} helperText="This helps us prepare the correct number of user accounts for your initial setup." className="max-w-xs" />
+            <TextField label="Number of seats required" type="number" required value={seatsRequired} onChange={setSeatsRequired} error={errors.seatsRequired} disabled={lockSeats} helperText={lockSeats ? "Set during your enquiry. Contact the Terrisage team if you need to add more seats." : "This helps us prepare the correct number of user accounts for your initial setup."} className="max-w-xs" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
