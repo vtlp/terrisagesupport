@@ -599,18 +599,18 @@ export default function EnquiryDetail() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Current system / software in use</Label>
-                <Select
-                  value={(draft.payload.current_system as string) || NONE}
-                  onValueChange={v => setPayload('current_system', v === NONE ? '' : v)}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select current system" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {CURRENT_SYSTEMS.map(s => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <MultiSelect
+                  options={CURRENT_SYSTEMS.map(o => ({ value: o.v, label: o.l }))}
+                  selected={Array.isArray(draft.payload.current_system)
+                    ? draft.payload.current_system
+                    : (draft.payload.current_system ? [draft.payload.current_system as string] : [])}
+                  onChange={vals => setPayload('current_system', vals)}
+                  placeholder="Select current system(s)"
+                />
               </div>
-              {draft.payload.current_system === 'OTHER' && (
+              {(Array.isArray(draft.payload.current_system)
+                  ? draft.payload.current_system.includes('OTHER')
+                  : draft.payload.current_system === 'OTHER') && (
                 <div className="space-y-1.5">
                   <Label>Specify other system</Label>
                   <Input
