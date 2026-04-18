@@ -70,7 +70,7 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
       .neq('event_type', 'NOTE')
       .order('created_at', { ascending: false })
       .limit(200);
-    const list = (logs ?? []) as LogRow[];
+    const list = ((logs ?? []) as LogRow[]).filter((row) => row.event_type !== 'STAGE_CHANGE');
     setRows(list);
 
     const actorIds = Array.from(new Set(list.map(r => r.actor_id).filter(Boolean) as string[]));

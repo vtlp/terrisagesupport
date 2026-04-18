@@ -555,6 +555,75 @@ export default function EnquiryDetail() {
         }
       />
 
+      <div className="grid lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {(() => {
+              const onboardEnabled = enquiry.onboarding_pack_sent
+                || draft.payload.demo_outcome === 'LIKED_WANT_ONBOARD_SOON';
+              return (
+                <>
+                  <Button
+                    className="w-full"
+                    onClick={handleSendOnboarding}
+                    disabled={busy || !onboardEnabled}
+                    variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
+                  </Button>
+                  {!onboardEnabled && (
+                    <p className="text-[11px] text-muted-foreground -mt-2 text-center">
+                      Available after demo outcome is "Liked, wants to onboard soon".
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+            <Button className="w-full" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
+              <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
+            </Button>
+            <Button className="w-full" disabled={!!convertBlock || busy} onClick={convertToAccount}>
+              Convert to account
+            </Button>
+            {convertBlock && <p className="text-xs text-muted-foreground text-center">{convertBlock}</p>}
+            {enquiry.converted_account_id && (
+              <Link to={`/accounts/${enquiry.converted_account_id}`}>
+                <Button variant="outline" className="w-full">View account</Button>
+              </Link>
+            )}
+            <Separator />
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2"><Phone className="h-3 w-3" /> {enquiry.phone}</div>
+              {enquiry.email && <div className="flex items-center gap-2"><Mail className="h-3 w-3" /> {enquiry.email}</div>}
+              <div>Created {format(new Date(enquiry.created_at), 'dd MMM yyyy')}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card ref={notesCardRef} className="lg:col-span-2">
+          <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <Textarea autoFocus={showNoteForm} value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add a note…" rows={2} />
+              <Button onClick={addNote} disabled={!newNote.trim() || busy}>Add</Button>
+            </div>
+            <Separator />
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {notes.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No notes yet.</p> :
+                notes.map(n => (
+                  <div key={n.id} className="text-sm border-l-2 border-primary/30 pl-3 py-1">
+                    <p>{n.note_text}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(n.created_at), 'dd MMM, HH:mm')}</p>
+                  </div>
+                ))
+              }
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Editable detail card */}
       <Card>
         <CardHeader><CardTitle className="text-base">Enquiry details</CardTitle></CardHeader>
@@ -857,76 +926,6 @@ export default function EnquiryDetail() {
           )}
         </CardContent>
       </Card>
-
-      {/* Bottom row — Notes & Actions side-by-side */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base">Notes & activity</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Textarea value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add a note…" rows={2} />
-              <Button onClick={addNote} disabled={!newNote.trim() || busy}>Add</Button>
-            </div>
-            <Separator />
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {notes.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No notes yet.</p> :
-                notes.map(n => (
-                  <div key={n.id} className="text-sm border-l-2 border-primary/30 pl-3 py-1">
-                    <p>{n.note_text}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(n.created_at), 'dd MMM, HH:mm')}</p>
-                  </div>
-                ))
-              }
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Actions</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {(() => {
-              const onboardEnabled = enquiry.onboarding_pack_sent
-                || draft.payload.demo_outcome === 'LIKED_WANT_ONBOARD_SOON';
-              return (
-                <>
-                  <Button
-                    className="w-full"
-                    onClick={handleSendOnboarding}
-                    disabled={busy || !onboardEnabled}
-                    variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
-                  </Button>
-                  {!onboardEnabled && (
-                    <p className="text-[11px] text-muted-foreground -mt-2 text-center">
-                      Available after demo outcome is "Liked, wants to onboard soon".
-                    </p>
-                  )}
-                </>
-              );
-            })()}
-            <Button className="w-full" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
-              <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
-            </Button>
-            <Button className="w-full" disabled={!!convertBlock || busy} onClick={convertToAccount}>
-              Convert to account
-            </Button>
-            {convertBlock && <p className="text-xs text-muted-foreground text-center">{convertBlock}</p>}
-            {enquiry.converted_account_id && (
-              <Link to={`/accounts/${enquiry.converted_account_id}`}>
-                <Button variant="outline" className="w-full">View account</Button>
-              </Link>
-            )}
-            <Separator />
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2"><Phone className="h-3 w-3" /> {enquiry.phone}</div>
-              {enquiry.email && <div className="flex items-center gap-2"><Mail className="h-3 w-3" /> {enquiry.email}</div>}
-              <div>Created {format(new Date(enquiry.created_at), 'dd MMM yyyy')}</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       <ActivityTimeline entityType="ENQUIRY" entityId={enquiry.id} />
 
