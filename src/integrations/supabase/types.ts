@@ -601,6 +601,75 @@ export type Database = {
         }
         Relationships: []
       }
+      content_calendar: {
+        Row: {
+          asset_path: string | null
+          body_text: string | null
+          campaign_id: string | null
+          channel_id: string | null
+          created_at: string
+          created_by: string | null
+          format: string | null
+          id: string
+          notes: string | null
+          owner_id: string | null
+          published_at: string | null
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["content_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          asset_path?: string | null
+          body_text?: string | null
+          campaign_id?: string | null
+          channel_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          format?: string | null
+          id?: string
+          notes?: string | null
+          owner_id?: string | null
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["content_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          asset_path?: string | null
+          body_text?: string | null
+          campaign_id?: string | null
+          channel_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          format?: string | null
+          id?: string
+          notes?: string | null
+          owner_id?: string | null
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["content_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_calendar_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_calendar_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_imports: {
         Row: {
           account_id: string
@@ -893,6 +962,243 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lead_sources: {
+        Row: {
+          channel_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_sources_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_campaigns: {
+        Row: {
+          budget: number
+          channel_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          end_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          objective: string | null
+          owner_id: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          updated_at: string
+        }
+        Insert: {
+          budget?: number
+          channel_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          objective?: string | null
+          owner_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+        }
+        Update: {
+          budget?: number
+          channel_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          objective?: string | null
+          owner_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaigns_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_channels: {
+        Row: {
+          channel_type: Database["public"]["Enums"]["marketing_channel_type"]
+          created_at: string
+          default_cost_type:
+            | Database["public"]["Enums"]["marketing_cost_type"]
+            | null
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          channel_type?: Database["public"]["Enums"]["marketing_channel_type"]
+          created_at?: string
+          default_cost_type?:
+            | Database["public"]["Enums"]["marketing_cost_type"]
+            | null
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          channel_type?: Database["public"]["Enums"]["marketing_channel_type"]
+          created_at?: string
+          default_cost_type?:
+            | Database["public"]["Enums"]["marketing_cost_type"]
+            | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_costs: {
+        Row: {
+          amount: number
+          campaign_id: string
+          clicks: number | null
+          cost_type: Database["public"]["Enums"]["marketing_cost_type"]
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          impressions: number | null
+          leads: number | null
+          notes: string | null
+          period_from: string | null
+          period_to: string | null
+        }
+        Insert: {
+          amount: number
+          campaign_id: string
+          clicks?: number | null
+          cost_type: Database["public"]["Enums"]["marketing_cost_type"]
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          notes?: string | null
+          period_from?: string | null
+          period_to?: string | null
+        }
+        Update: {
+          amount?: number
+          campaign_id?: string
+          clicks?: number | null
+          cost_type?: Database["public"]["Enums"]["marketing_cost_type"]
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          notes?: string | null
+          period_from?: string | null
+          period_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_costs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_governance: {
+        Row: {
+          approver_id: string | null
+          created_at: string
+          decided_at: string | null
+          decision: Database["public"]["Enums"]["governance_decision"]
+          decision_notes: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          approver_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["governance_decision"]
+          decision_notes?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approver_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["governance_decision"]
+          decision_notes?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       onboarding_submissions: {
         Row: {
@@ -1280,6 +1586,62 @@ export type Database = {
         }
         Relationships: []
       }
+      utm_links: {
+        Row: {
+          campaign_id: string | null
+          click_count: number
+          created_at: string
+          created_by: string | null
+          destination: string
+          full_url: string
+          id: string
+          short_code: string | null
+          utm_campaign: string
+          utm_content: string | null
+          utm_medium: string
+          utm_source: string
+          utm_term: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          click_count?: number
+          created_at?: string
+          created_by?: string | null
+          destination: string
+          full_url: string
+          id?: string
+          short_code?: string | null
+          utm_campaign: string
+          utm_content?: string | null
+          utm_medium: string
+          utm_source: string
+          utm_term?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          click_count?: number
+          created_at?: string
+          created_by?: string | null
+          destination?: string
+          full_url?: string
+          id?: string
+          short_code?: string | null
+          utm_campaign?: string
+          utm_content?: string | null
+          utm_medium?: string
+          utm_source?: string
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utm_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       account_seat_capacity: {
@@ -1352,6 +1714,8 @@ export type Database = {
         | "CHECK_IN"
         | "ONBOARDING"
         | "OTHER"
+      campaign_status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED"
+      content_status: "IDEA" | "DRAFT" | "SCHEDULED" | "PUBLISHED" | "ARCHIVED"
       enquiry_stage:
         | "NEW_ENQUIRY"
         | "CONTACTED"
@@ -1360,6 +1724,11 @@ export type Database = {
         | "ONBOARDING_PACK_SENT"
         | "ACCOUNT_CREATED"
         | "LOST"
+      governance_decision:
+        | "PENDING"
+        | "APPROVED"
+        | "CHANGES_REQUESTED"
+        | "REJECTED"
       import_status:
         | "UPLOADED"
         | "MAPPING"
@@ -1368,6 +1737,14 @@ export type Database = {
         | "FAILED"
       import_type: "LISTINGS" | "LEADS" | "CONTACTS" | "OTHER"
       invoice_status: "DRAFT" | "SENT" | "PAID" | "OVERDUE" | "CANCELLED"
+      marketing_channel_type:
+        | "PAID"
+        | "ORGANIC"
+        | "REFERRAL"
+        | "DIRECT"
+        | "EVENT"
+        | "OTHER"
+      marketing_cost_type: "CPM" | "CPC" | "CPL" | "FIXED" | "RETAINER"
       seat_request_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
       subscription_status: "ACTIVE" | "PAUSED" | "CANCELLED" | "OVERDUE"
@@ -1549,6 +1926,8 @@ export const Constants = {
         "ONBOARDING",
         "OTHER",
       ],
+      campaign_status: ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"],
+      content_status: ["IDEA", "DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"],
       enquiry_stage: [
         "NEW_ENQUIRY",
         "CONTACTED",
@@ -1557,6 +1936,12 @@ export const Constants = {
         "ONBOARDING_PACK_SENT",
         "ACCOUNT_CREATED",
         "LOST",
+      ],
+      governance_decision: [
+        "PENDING",
+        "APPROVED",
+        "CHANGES_REQUESTED",
+        "REJECTED",
       ],
       import_status: [
         "UPLOADED",
@@ -1567,6 +1952,15 @@ export const Constants = {
       ],
       import_type: ["LISTINGS", "LEADS", "CONTACTS", "OTHER"],
       invoice_status: ["DRAFT", "SENT", "PAID", "OVERDUE", "CANCELLED"],
+      marketing_channel_type: [
+        "PAID",
+        "ORGANIC",
+        "REFERRAL",
+        "DIRECT",
+        "EVENT",
+        "OTHER",
+      ],
+      marketing_cost_type: ["CPM", "CPC", "CPL", "FIXED", "RETAINER"],
       seat_request_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
       subscription_status: ["ACTIVE", "PAUSED", "CANCELLED", "OVERDUE"],
