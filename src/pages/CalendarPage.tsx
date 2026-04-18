@@ -93,7 +93,7 @@ export default function CalendarPage() {
 
   const userName = (id: string | null) => id ? (profiles.find(p => p.id === id)?.full_name ?? '—') : '—';
 
-  const handleCreateEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType; related_entity_type: 'ENQUIRY' | 'ACCOUNT' | ''; related_entity_id: string | null }) => {
+  const handleCreateEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType; related_entity_type: 'ENQUIRY' | 'ACCOUNT' | ''; related_entity_id: string | null; assigned_to: string | null }) => {
     const scheduled = new Date(data.date);
     const [h, m] = data.time.split(':');
     scheduled.setHours(parseInt(h), parseInt(m));
@@ -101,19 +101,41 @@ export default function CalendarPage() {
       DEMO: 'DEMO', FOLLOW_UP: 'FOLLOW_UP', CALL_BACK: 'CALL_BACK',
       CHECK_IN: 'CHECK_IN', ONBOARDING: 'ONBOARDING', GENERAL: 'OTHER',
     };
-    const { error } = await supabase.from('calendar_events').insert({
+    const { data: created, error } = await supabase.from('calendar_events').insert({
       title: data.title,
       scheduled_at: scheduled.toISOString(),
       notes: data.notes || null,
       event_type: (eventTypeMap[data.event_type] ?? 'OTHER') as 'OTHER',
       created_by: currentUser.user_id,
+      assigned_to: data.assigned_to ?? currentUser.user_id,
       related_entity_type: data.related_entity_type || null,
       related_entity_id: data.related_entity_id || null,
     }).select('id').maybeSingle();
     if (error) { toast.error(error.message); return; }
     toast.success(`Event "${data.title}" created`);
     setShowCreateDialog(false);
+    if (created?.id) {
+      // auto-sync to Google Calendar (silent failure if not connected)
+      supabase.functions.invoke('sync-calendar-event', { body: { event_id: created.id } })
+        .then(({ data: r, error: e }) => {
+          const code = (r as { code?: string })?.code;
+          if (e || (r as { error?: string })?.error) {
+            if (code !== 'NOT_CONNECTED') console.warn('Auto-sync failed', e ?? r);
+          }
+        });
+    }
     load();
+  };
+
+  const syncAll = async () => {
+    if (filtered.length === 0) { toast.info('No events to sync'); return; }
+    toast.loading(`Syncing ${filtered.length} events…`, { id: 'sync-all' });
+    let ok = 0, fail = 0;
+    for (const ev of filtered) {
+      const { data, error } = await supabase.functions.invoke('sync-calendar-event', { body: { event_id: ev.id } });
+      if (error || (data as { error?: string })?.error) fail++; else ok++;
+    }
+    toast.success(`Synced ${ok} • Failed ${fail}`, { id: 'sync-all' });
   };
 
   const syncToGoogle = async (eventId: string, title: string) => {
