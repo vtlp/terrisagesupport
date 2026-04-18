@@ -54,31 +54,23 @@ export function AppHeader() {
     const load = async () => {
       const { data } = await supabase
         .from('seat_requests')
-        .select('id, account_id, requested_seats, requested_by_email, created_at, accounts!inner(account_name)')
+        .select('id, account_id, requested_seats, requested_by_email, created_at')
         .eq('status', 'PENDING')
         .order('created_at', { ascending: false })
         .limit(20);
       if (cancelled) return;
-      const items: SeatReqItem[] = (data ?? []).map((r) => {
-        const row = r as unknown as {
-          id: string;
-          account_id: string;
-          requested_seats: number;
-          requested_by_email: string | null;
-          created_at: string;
-          accounts: { account_name: string } | { account_name: string }[] | null;
-        };
-        const acct = Array.isArray(row.accounts) ? row.accounts[0] : row.accounts;
-        return {
-          id: row.id,
-          account_id: row.account_id,
-          requested_seats: row.requested_seats,
-          requested_by_email: row.requested_by_email,
-          created_at: row.created_at,
-          account_name: acct?.account_name,
-        };
-      });
-      setPendingSeatReqs(items);
+      const rows = (data ?? []) as Omit<SeatReqItem, 'account_name'>[];
+      const ids = Array.from(new Set(rows.map(r => r.account_id)));
+      let nameMap = new Map<string, string>();
+      if (ids.length > 0) {
+        const { data: accts } = await supabase
+          .from('accounts')
+          .select('id, account_name')
+          .in('id', ids);
+        nameMap = new Map((accts ?? []).map(a => [a.id, a.account_name]));
+      }
+      if (cancelled) return;
+      setPendingSeatReqs(rows.map(r => ({ ...r, account_name: nameMap.get(r.account_id) })));
     };
     load();
     const channel = supabase
