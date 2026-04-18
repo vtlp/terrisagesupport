@@ -350,29 +350,42 @@ export default function AccountDetail() {
                 <p className="text-sm text-muted-foreground text-center py-6">No seats yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {seats.map(s => (
-                    <div key={s.id} className={`flex items-center justify-between border rounded p-3 ${!s.is_active ? 'opacity-60' : ''}`}>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{s.full_name}</span>
-                          <Badge variant="outline" className="text-[10px]">{s.role ?? 'Agent'}</Badge>
-                          {!s.is_active && <Badge variant="outline" className="text-[10px]">Inactive</Badge>}
+                  {seats.map(s => {
+                    const teamFromForm = ((acc.payload as any)?.team?.members ?? []) as Array<{ email?: string; orgWideAccess?: boolean; agentNetworksAccess?: boolean }>;
+                    const formMatch = teamFromForm.find(m => (m.email ?? '').toLowerCase() === (s.email ?? '').toLowerCase());
+                    const perms: string[] = [];
+                    if (formMatch?.orgWideAccess) perms.push('Org-wide access');
+                    if (formMatch?.agentNetworksAccess) perms.push('Agent networks');
+                    return (
+                      <div key={s.id} className={`flex items-center justify-between border rounded p-3 ${!s.is_active ? 'opacity-60' : ''}`}>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm">{s.full_name}</span>
+                            <Badge variant="outline" className="text-[10px]">{s.role ?? 'Agent'}</Badge>
+                            {!s.is_active && <Badge variant="outline" className="text-[10px]">Inactive</Badge>}
+                            {perms.map(p => (
+                              <Badge key={p} variant="secondary" className="text-[10px]">{p}</Badge>
+                            ))}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {s.email ?? '—'} · {s.phone ?? '—'}
+                          </div>
+                          {perms.length === 0 && formMatch && (
+                            <div className="text-[11px] text-muted-foreground mt-0.5">No special permissions granted</div>
+                          )}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {s.email ?? '—'} · {s.phone ?? '—'}
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEditSeat(s)}>Edit</Button>
+                          <Button variant="ghost" size="sm" onClick={() => toggleSeatActive(s)}>
+                            {s.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => removeSeat(s.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openEditSeat(s)}>Edit</Button>
-                        <Button variant="ghost" size="sm" onClick={() => toggleSeatActive(s)}>
-                          {s.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => removeSeat(s.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
