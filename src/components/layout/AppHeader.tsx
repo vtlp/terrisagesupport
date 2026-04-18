@@ -225,16 +225,16 @@ export function AppHeader() {
                   </DropdownMenuLabel>
                   {urgentTickets.slice(0, 6).map(t => (
                     <DropdownMenuItem
-                      key={t.ticket_id}
+                      key={t.id}
                       className="flex-col items-start gap-0.5 py-2"
-                      onClick={() => navigate(`/tickets/${t.ticket_id}`)}
+                      onClick={() => navigate(`/tickets/${t.id}`)}
                     >
                       <div className="flex items-center gap-2 w-full">
                         <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
                         <span className="text-sm font-medium truncate flex-1">{t.subject}</span>
                         <Badge variant="outline" className="text-[10px]">{t.priority}</Badge>
                       </div>
-                      <div className="text-[11px] text-muted-foreground pl-5 truncate w-full">{t.ticket_id} · {t.status}</div>
+                      <div className="text-[11px] text-muted-foreground pl-5 truncate w-full">{t.ticket_code ?? t.id.slice(0, 8)} · {t.status}</div>
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -306,7 +306,6 @@ export function AppHeader() {
         open={createTicketOpen}
         onOpenChange={setCreateTicketOpen}
         onCreated={(ticket) => {
-          seedTickets.unshift(ticket);
           navigate(`/tickets/${ticket.ticket_id}`);
         }}
       />
