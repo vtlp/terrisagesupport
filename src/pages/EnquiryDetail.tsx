@@ -549,6 +549,8 @@ export default function EnquiryDetail() {
             draft={draft}
             setField={setField}
             setPayload={setPayload}
+            onOutcomeChange={handleOutcomeChange}
+            onDemoOutcomeChange={handleDemoOutcomeChange}
           />
         }
       />
