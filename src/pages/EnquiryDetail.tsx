@@ -644,11 +644,11 @@ export default function EnquiryDetail() {
       </div>
 
       {/* Editable detail card */}
-      <Card>
+      <Card className="border-2 border-border/80 shadow-sm">
         <CardHeader><CardTitle className="text-base">Enquiry details</CardTitle></CardHeader>
         <CardContent className="space-y-6">
           {/* Contact block */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-x-4 gap-y-4">
             <div className="space-y-1.5">
               <Label>Company name</Label>
               <Input value={draft.company_name ?? ''} onChange={e => setField('company_name', e.target.value)} />
@@ -657,6 +657,8 @@ export default function EnquiryDetail() {
               <Label>Contact name</Label>
               <Input value={draft.full_name} onChange={e => setField('full_name', e.target.value)} />
             </div>
+
+            {/* Primary phone + WhatsApp toggle directly under it */}
             <div className="space-y-1.5">
               <Label>Primary phone</Label>
               <PhoneInput
@@ -665,7 +667,18 @@ export default function EnquiryDetail() {
                 number={phoneSplit.number}
                 onNumberChange={n => setField('phone', joinPhone(phoneSplit.code, n))}
               />
+              <div className="flex items-center gap-2 pt-1">
+                <Switch
+                  id="wa"
+                  checked={!!draft.payload.whatsapp_enabled}
+                  onCheckedChange={v => setPayload('whatsapp_enabled', v)}
+                />
+                <Label htmlFor="wa" className="cursor-pointer text-xs text-muted-foreground font-normal">
+                  WhatsApp enabled on primary number
+                </Label>
+              </div>
             </div>
+
             <div className="space-y-1.5">
               <Label>Alternate phone</Label>
               <PhoneInput
@@ -675,6 +688,7 @@ export default function EnquiryDetail() {
                 onNumberChange={n => setPayload('contact_phone_alt', n ? joinPhone(altSplit.code || DEFAULT_COUNTRY_CODE, n) : '')}
               />
             </div>
+
             <div className="space-y-1.5">
               <Label>Email</Label>
               <Input type="email" value={draft.email ?? ''} onChange={e => setField('email', e.target.value)} />
@@ -688,14 +702,6 @@ export default function EnquiryDetail() {
                   {defaultMarkets.map(m => <SelectItem key={m.id} value={m.value}>{m.value}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex items-center gap-3 pt-6">
-              <Switch
-                id="wa"
-                checked={!!draft.payload.whatsapp_enabled}
-                onCheckedChange={v => setPayload('whatsapp_enabled', v)}
-              />
-              <Label htmlFor="wa" className="cursor-pointer">WhatsApp enabled on primary number</Label>
             </div>
           </div>
 
