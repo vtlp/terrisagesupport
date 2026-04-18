@@ -21,6 +21,8 @@ import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { VerificationTab } from '@/components/account/VerificationTab';
 import { BillingTab } from '@/components/account/BillingTab';
 import { ImportsTab } from '@/components/account/ImportsTab';
+import { SeatRequestsTab } from '@/components/account/SeatRequestsTab';
+import { ApiKeysCard } from '@/components/account/ApiKeysCard';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
 import { CalendarEventType } from '@/types/core';
@@ -226,6 +228,7 @@ export default function AccountDetail() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="seats">Seats ({seats.filter(s => s.is_active).length})</TabsTrigger>
+          <TabsTrigger value="seat-requests">Seat requests</TabsTrigger>
           <TabsTrigger value="checklist">Onboarding ({doneCount}/{checklist.length})</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
