@@ -313,9 +313,9 @@ export default function BuilderOnboarding() {
                 <p className="text-sm text-muted-foreground mt-1">This person will receive the main account access and will be our primary point of contact during setup and onboarding.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div data-field="fullName"><TextField label="Full name" required value={fullName} onChange={setFullName} error={errors.fullName} /></div>
-                <div data-field="mobile"><PhoneField label="Mobile number" required countryCode={mobileCode} onCountryCodeChange={setMobileCode} value={mobile} onChange={setMobile} error={errors.mobile} /></div>
-                <div data-field="email" className="sm:col-span-2"><TextField label="Email address" type="email" required value={email} onChange={setEmail} error={errors.email} /></div>
+                <div data-field="fullName"><TextField label="Full name" required value={fullName} onChange={setFullName} error={errors.fullName} disabled={lockFullName} helperText={lockFullName ? "Provided by the Terrisage team — contact us if this needs to change." : undefined} /></div>
+                <div data-field="mobile"><PhoneField label="Mobile number" required countryCode={mobileCode} onCountryCodeChange={setMobileCode} value={mobile} onChange={setMobile} error={errors.mobile} disabled={lockMobile} helperText={lockMobile ? "Provided by the Terrisage team." : undefined} /></div>
+                <div data-field="email" className="sm:col-span-2"><TextField label="Email address" type="email" required value={email} onChange={setEmail} error={errors.email} disabled={lockEmail} helperText={lockEmail ? "Provided by the Terrisage team — contact us if this needs to change." : undefined} /></div>
               </div>
             </section>
 
