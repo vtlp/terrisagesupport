@@ -1,45 +1,75 @@
 
-Updated plan covering all 3 items, with Feb-16 enquiry layout and full builder onboarding parity included (no scope-outs).
 
-### 1. EnquiryDetail — restore Feb 16 layout + add scheduling/duplicate badge
+## Plan — Seat capacity API for the CRM app
 
-**Layout (Feb 16 grouping)** — two-column grid, fieldset cards in this order:
-- **Left column**: Contact card → Classification card → Qualification card (context-aware: agency vs builder fields) → Outcomes & Dates card → Lost reason card (only when stage = LOST)
-- **Right column (sticky)**: Header summary (code, stage chip, owner, **Duplicate-of badge** when `is_duplicate_of` set) → Actions card (Convert / Send onboarding / **Schedule event** / Mark lost) → Upcoming Events list → Notes panel → Activity timeline
+The Support Console (this app) already manages seat counts and billing settings per account. We need to expose a **read-only seat capacity endpoint** plus an optional **seat-request workflow** that the external CRM app can call. The CRM never writes seats directly — it only reads availability and posts requests; staff fulfil requests here, which keeps billing/subscription as the source of truth.
 
-**Behaviour**
-- Stage transitions gated by validations (phone+email, demo date before CONVERTED, onboarding pack sent before CONVERTED) — same rules as Feb 16.
-- "Schedule event" opens dialog with `CalendarEventForm` pre-filled `lockedEntityType='ENQUIRY'`, `lockedEntityId=enquiry.id`, label = company or full_name.
-- Upcoming Events: query `calendar_events` where `related_entity_type='ENQUIRY'` and id matches, ordered by `scheduled_at asc`, only future + today. Click row → `EventDetailDialog`.
-- Duplicate-of badge: fetch original enquiry's `enquiry_code`, render as link to `/enquiries/{original_id}`.
+---
 
-### 2. Onboarding — full replica of reference 943a756d (Agency AND Builder)
+### 1. Capacity model (no schema change needed for the basics)
 
-**Copy verbatim from reference project**:
-- Libs: `src/lib/onboardingStorage.ts`, `src/lib/onboardingValidation.ts`
-- Shared components: `StepperNav`, `StickyActionBar`, `HeroSection`, `FormField`, `PhoneField`, `FileUploadField`, `RepeatableCard`, `GuidanceCard`, `ReferencePanel`, `ReviewSummaryCard`
-- Pages: `AgencyOnboarding.tsx`, `BuilderOnboarding.tsx`, `OnboardingSuccess.tsx`
+Capacity per account is derived:
+- `seats_purchased` = new column on `account_billing_settings` (integer, default 0). Drives the cap.
+- `seats_used` = `count(account_seats where is_active = true)`
+- `seats_available` = `seats_purchased - seats_used`
 
-**Builder flow (NOT scoped out)** — full parity with reference:
-- Step 1: Business & Primary Contact (builder name, RERA, HQ city, contact)
-- Step 2: Team Access & Permissions (seats + repeatable members + role enum)
-- Step 3: Project Portfolio (repeatable projects with per-project RERA, location, type, status)
-- Step 4: Inventory & Data Files (lead file, inventory file, sheet links)
-- Step 5: Review & Submit with declaration checkbox
+Add one column + a SQL view for fast reads.
 
-**Adaptations to fit our backend**:
-- File uploads → `onboarding-uploads` storage bucket; paths stored in payload
-- On submit → insert into `onboarding_submissions(tenancy_type, payload, enquiry_id)` where `enquiry_id` comes from `?enquiry_id=` query param
-- Install `framer-motion` if missing
-- Routes added to `App.tsx`: `/onboarding/agency`, `/onboarding/builder`, `/onboarding/agency/success`, `/onboarding/builder/success`. Legacy `/onboarding/:tenancy` redirects to the appropriate new route.
+```text
+account_billing_settings
+  + seats_purchased INT NOT NULL DEFAULT 0
 
-### 3. Storage & migration
-- Migration: ensure `onboarding-uploads` private bucket exists with policies — anon INSERT, staff SELECT.
+account_seat_capacity (VIEW)
+  account_id, seats_purchased, seats_used, seats_available, plan_name, status
+```
 
-### Files
-- **Edited**: `src/pages/EnquiryDetail.tsx`, `src/App.tsx`
-- **New (copied from reference)**: 13 files listed above
-- **Migration**: `onboarding-uploads` bucket + RLS
+### 2. Seat-request table (CRM → Support Console workflow)
 
-### Out of scope
-- Google Calendar OAuth (still gated on connector approval — manual sync button remains).
+```text
+seat_requests
+  id, account_id, requested_by_email, requested_seats INT,
+  status ENUM('PENDING','APPROVED','REJECTED','FULFILLED'),
+  reason TEXT, decided_by, decided_at, created_at
+RLS: staff full access; anon INSERT allowed via edge function only.
+```
+
+When staff approve & fulfil → bump `seats_purchased` and (optionally) generate an invoice line. Activity log entry written automatically.
+
+### 3. Edge functions (the CRM's integration surface)
+
+Three functions, all secured by a per-account API key the CRM stores:
+
+- `GET  seat-capacity`      → `{ purchased, used, available, plan, status }`
+- `POST seat-request`        → body `{ account_id, requested_seats, requested_by_email, reason }`
+- `GET  seat-request/:id`    → status polling
+
+Auth: `x-account-api-key` header validated against a new `account_api_keys` table (hashed). Rate-limit: 60 req/min per key.
+
+### 4. Support Console UI additions
+
+- **BillingTab**: add "Seats purchased" input next to base/seat rate; show live `Used X / Purchased Y · Available Z` chip; warn when used > purchased.
+- **New tab "Seat requests"** on AccountDetail: list pending requests with Approve / Reject / Fulfil buttons; fulfilling auto-increments `seats_purchased` by the requested amount.
+- **Notifications**: pending seat requests appear in the global attention badge.
+
+### 5. What the CRM dev needs (deliverables doc)
+
+A short integration doc generated at `/mnt/documents/seat-integration.md` covering:
+- Endpoints, payloads, error codes
+- How to render `2 / 3 seats used` from `GET seat-capacity`
+- Invite gate: if `available <= 0` → block + show "No available seats remaining"
+- Request flow: POST → poll → on `FULFILLED` re-fetch capacity
+- Refresh triggers: after invite, revoke, deactivation, or webhook receipt
+- Optional webhook: we POST `seat.capacity.changed` to a CRM URL when `seats_purchased` or active seat count changes
+
+### 6. Files
+
+- **Migration**: add `seats_purchased`, create `seat_requests`, `account_api_keys`, view `account_seat_capacity`, RLS, triggers (activity log + capacity-change notify).
+- **Edge functions**: `supabase/functions/seat-capacity/index.ts`, `seat-request/index.ts`.
+- **Edited**: `src/components/account/BillingTab.tsx` (purchased seats field + capacity chip), `src/pages/AccountDetail.tsx` (new "Seat requests" tab).
+- **New**: `src/components/account/SeatRequestsTab.tsx`, `src/components/account/ApiKeysCard.tsx` (generate/rotate key for the CRM).
+- **Doc**: `/mnt/documents/seat-integration.md`.
+
+### Out of scope (will skip unless asked)
+- Auto-charging the customer when seats are increased (manual invoice for now).
+- Per-seat metadata sync (CRM keeps member details; Console only tracks counts + optional name).
+
