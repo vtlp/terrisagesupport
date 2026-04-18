@@ -56,6 +56,7 @@ const validatePhone = (phone: string) => /^\d{10}$/.test(phone);
 
 export default function AgencyOnboarding() {
   const navigate = useNavigate();
+  const prefill = readOnboardingPrefill();
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -63,6 +64,22 @@ export default function AgencyOnboarding() {
   const [submitting, setSubmitting] = useState(false);
   const [lockChecking, setLockChecking] = useState(true);
   const [lockedAt, setLockedAt] = useState<string | null>(null);
+
+  // Force light theme + Poppins font on the public onboarding form, regardless
+  // of the staff app's current theme. We restore on unmount so going back to
+  // the CRM keeps the user's preference.
+  useEffect(() => {
+    const root = document.documentElement;
+    const prevClass = root.className;
+    const prevFont = root.style.fontFamily;
+    root.classList.remove("dark");
+    root.classList.add("light");
+    root.style.fontFamily = "'Poppins', system-ui, sans-serif";
+    return () => {
+      root.className = prevClass;
+      root.style.fontFamily = prevFont;
+    };
+  }, []);
 
   useEffect(() => {
     const enquiryId = getEnquiryIdFromUrl();
@@ -72,10 +89,10 @@ export default function AgencyOnboarding() {
   }, []);
 
   // Step 1
-  const [fullName, setFullName] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [mobileCode, setMobileCode] = useState("+91");
-  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState(prefill.fullName ?? "");
+  const [mobile, setMobile] = useState(prefill.phone ?? "");
+  const [mobileCode, setMobileCode] = useState(prefill.mobileCode ?? "+91");
+  const [email, setEmail] = useState(prefill.email ?? "");
   const [companyName, setCompanyName] = useState("");
   const [companyTagline, setCompanyTagline] = useState("");
   const [companyLogo, setCompanyLogo] = useState<File[]>([]);
@@ -85,8 +102,13 @@ export default function AgencyOnboarding() {
   const [notes, setNotes] = useState("");
 
   // Step 2
-  const [seatsRequired, setSeatsRequired] = useState("");
+  const [seatsRequired, setSeatsRequired] = useState(prefill.teamSize ?? "");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([createTeamMember()]);
+
+  const lockFullName = !!prefill.fullName;
+  const lockMobile = !!prefill.phone;
+  const lockEmail = !!prefill.email;
+  const lockSeats = !!prefill.teamSize;
 
   // Step 3
   const [projects, setProjects] = useState<Project[]>([createProject()]);
