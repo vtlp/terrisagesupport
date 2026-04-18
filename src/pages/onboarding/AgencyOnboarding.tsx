@@ -390,8 +390,8 @@ export default function AgencyOnboarding() {
 
           <section className="space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Lead Import Files</h3>
-              <p className="text-sm text-muted-foreground mt-1">Structured spreadsheets are preferred. This helps us prepare your lead import with fewer corrections and less back-and-forth.</p>
+              <h3 className="text-lg font-semibold text-foreground">Lead Import Files <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">If you have lead data ready, share it now. You can also send it later — none of these files are required to submit this form.</p>
             </div>
             <FileUploadField label="Upload lead file" acceptedFormats={IMPORT_EXTENSIONS} acceptedMimeTypes={IMPORT_FILE_FORMATS} files={leadFile} onChange={setLeadFile} multiple />
             <TextField label="Google Sheet link" type="url" value={leadSheetLink} onChange={setLeadSheetLink} placeholder="https://docs.google.com/spreadsheets/..." />
@@ -401,8 +401,8 @@ export default function AgencyOnboarding() {
 
           <section className="space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Property Import Files</h3>
-              <p className="text-sm text-muted-foreground mt-1">This is for any existing property stock you want us to prepare for import into the CRM.</p>
+              <h3 className="text-lg font-semibold text-foreground">Property Import Files <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">Existing property stock you want imported into the CRM. Share it now or send it later — these files are not required to submit this form.</p>
             </div>
             <FileUploadField label="Upload property file" acceptedFormats={IMPORT_EXTENSIONS} acceptedMimeTypes={IMPORT_FILE_FORMATS} files={propertyFile} onChange={setPropertyFile} multiple />
             <FileUploadField label="Upload property images" acceptedFormats={IMAGE_EXTENSIONS} acceptedMimeTypes={IMAGE_FORMATS} files={propertyImages} onChange={setPropertyImages} multiple />

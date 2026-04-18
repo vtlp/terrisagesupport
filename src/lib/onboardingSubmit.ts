@@ -5,6 +5,7 @@ export type Tenancy = "AGENCY_BROKERAGE_CONSULTANCY" | "BUILDER_DEVELOPER";
 const BUCKET = "onboarding-uploads";
 
 export async function uploadFiles(files: File[], folder: string): Promise<string[]> {
+  if (!files || files.length === 0) return [];
   const paths: string[] = [];
   for (const file of files) {
     const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -13,7 +14,10 @@ export async function uploadFiles(files: File[], folder: string): Promise<string
       contentType: file.type || "application/octet-stream",
       upsert: false,
     });
-    if (error) throw error;
+    if (error) {
+      console.error("Onboarding upload failed", { path, file: file.name, error });
+      throw new Error(`Could not upload "${file.name}": ${error.message}`);
+    }
     paths.push(path);
   }
   return paths;
@@ -29,7 +33,10 @@ export async function submitOnboarding(
     .insert({ tenancy_type: tenancy, payload: payload as never, enquiry_id: enquiryId })
     .select("id")
     .single();
-  if (error) throw error;
+  if (error) {
+    console.error("Onboarding submission insert failed", error);
+    throw new Error(`Submission failed: ${error.message}`);
+  }
   return data.id as string;
 }
 
