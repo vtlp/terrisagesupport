@@ -49,7 +49,19 @@ interface EnquiryPayload {
   current_system_text?: string;
   approx_onboarding_date?: string | null;
   portals_in_use?: string[];
+  payment?: PaymentInfo;
   [k: string]: unknown;
+}
+
+interface PaymentInfo {
+  link_id?: string;
+  short_url?: string;
+  amount?: number;
+  currency?: string;
+  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING';
+  paid_at?: string;
+  created_at?: string;
+  breakdown?: Record<string, unknown>;
 }
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
@@ -162,6 +174,7 @@ export default function EnquiryDetail() {
   const [pendingDemoSchedule, setPendingDemoSchedule] = useState(false);
   const [existingEventOptions, setExistingEventOptions] = useState<ExistingEventOption[]>([]);
   const [existingPromptOpen, setExistingPromptOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
