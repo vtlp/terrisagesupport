@@ -245,6 +245,8 @@ export default function EnquiryDetail() {
   useEffect(() => { load(); }, [load]);
 
   const isDirty = useMemo(() => JSON.stringify(enquiry) !== JSON.stringify(draft), [enquiry, draft]);
+  const isDirtyRef = useRef(false);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
 
   // Mark dirty for save indicator (no autosave — manual Save button is required).
   useEffect(() => {
