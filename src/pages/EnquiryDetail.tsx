@@ -943,11 +943,12 @@ export default function EnquiryDetail() {
         <DialogContent>
           <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
           <CalendarEventForm
-            defaultEventType={pendingDemoSchedule ? CalendarEventType.DEMO : CalendarEventType.FOLLOW_UP}
+            defaultEventType={pendingEventType !== CalendarEventType.GENERAL ? pendingEventType : (pendingDemoSchedule ? CalendarEventType.DEMO : CalendarEventType.FOLLOW_UP)}
+            defaultTitle={pendingEventTitle}
             lockedEntityType="ENQUIRY"
             lockedEntityId={enquiry.id}
             lockedEntityLabel={enquiry.company_name || enquiry.full_name}
-            onCancel={() => { setScheduleOpen(false); setPendingDemoSchedule(false); }}
+            onCancel={() => { setScheduleOpen(false); setPendingDemoSchedule(false); setPendingEventTitle(''); setPendingEventType(CalendarEventType.GENERAL); }}
             onSubmit={async (d) => {
               const [hh, mm] = d.time.split(':').map(Number);
               const dt = new Date(d.date); dt.setHours(hh ?? 10, mm ?? 0, 0, 0);
@@ -961,8 +962,6 @@ export default function EnquiryDetail() {
               toast.success('Event scheduled');
               setScheduleOpen(false);
 
-              // If a DEMO event was scheduled, auto-advance enquiry to DEMO_SCHEDULED
-              // and populate demo_scheduled_at with the chosen time.
               if (d.event_type === CalendarEventType.DEMO) {
                 await supabase.from('enquiries').update({
                   stage: 'DEMO_SCHEDULED' as Stage,
@@ -972,11 +971,38 @@ export default function EnquiryDetail() {
                 setDraft(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: scheduledIso } : prev);
               }
               setPendingDemoSchedule(false);
+              setPendingEventTitle('');
+              setPendingEventType(CalendarEventType.GENERAL);
               loadEvents(enquiry.id);
             }}
           />
         </DialogContent>
       </Dialog>
+
+      <ExistingEventPrompt
+        open={existingPromptOpen}
+        onOpenChange={setExistingPromptOpen}
+        events={existingEventOptions}
+        eventTypeLabel={pendingEventType.replace('_', ' ')}
+        onUseExisting={async (ev) => {
+          setExistingPromptOpen(false);
+          if (pendingDemoSchedule && enquiry) {
+            await supabase.from('enquiries').update({
+              stage: 'DEMO_SCHEDULED' as Stage,
+              demo_scheduled_at: ev.scheduled_at,
+            }).eq('id', enquiry.id);
+            setEnquiry(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: ev.scheduled_at } : prev);
+            setDraft(prev => prev ? { ...prev, stage: 'DEMO_SCHEDULED', demo_scheduled_at: ev.scheduled_at } : prev);
+            toast.success('Linked existing demo');
+          } else {
+            toast.success('Using existing event');
+          }
+          setPendingDemoSchedule(false);
+          setPendingEventTitle('');
+          setPendingEventType(CalendarEventType.GENERAL);
+        }}
+        onCreateNew={() => { setExistingPromptOpen(false); setScheduleOpen(true); }}
+      />
 
       <EventDetailDialog
         event={openEvent}
