@@ -640,6 +640,8 @@ export default function EnquiryDetail() {
             setPayload={setPayload}
             onOutcomeChange={handleOutcomeChange}
             onDemoOutcomeChange={handleDemoOutcomeChange}
+            onOpenPaymentDialog={() => setPaymentDialogOpen(true)}
+            onSetPaymentStatus={setPaymentStatus}
           />
         }
       />
