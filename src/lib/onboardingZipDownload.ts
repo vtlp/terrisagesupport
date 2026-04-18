@@ -11,10 +11,20 @@ export interface ZipFileGroup {
   files: File[];
 }
 
-interface BuildArgs {
+export interface BuildArgs {
   companyName: string;
   sections: ZipSection[];
   fileGroups: ZipFileGroup[];
+}
+
+// Module-level cache so the post-submit success screen can build a ZIP with the
+// original File blobs (which can't survive a route change via router state).
+let cachedSummary: BuildArgs | null = null;
+export function stashOnboardingSummary(args: BuildArgs) {
+  cachedSummary = args;
+}
+export function takeOnboardingSummary(): BuildArgs | null {
+  return cachedSummary;
 }
 
 function buildSummaryText({ companyName, sections }: BuildArgs): string {
