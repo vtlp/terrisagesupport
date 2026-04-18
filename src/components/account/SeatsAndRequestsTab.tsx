@@ -98,23 +98,17 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   };
 
   const submitMockRequest = async () => {
-    const totalRequested = parseInt(mockSeats, 10);
-    if (!Number.isInteger(totalRequested) || totalRequested < 1) {
-      toast.error('Enter a valid total seat count');
-      return;
-    }
-    const purchasedNow = capacity?.seats_purchased ?? 0;
-    const delta = totalRequested - purchasedNow;
-    if (delta <= 0) {
-      toast.error(`Requested total must be greater than current allocation (${purchasedNow})`);
+    const additional = parseInt(mockSeats, 10);
+    if (!Number.isInteger(additional) || additional < 1) {
+      toast.error('Enter a valid number of additional seats');
       return;
     }
     setSubmittingMock(true);
     const { error } = await supabase.from('seat_requests').insert({
       account_id: accountId,
-      requested_seats: delta,
+      requested_seats: additional,
       requested_by_email: mockEmail.trim() || null,
-      reason: mockReason.trim() || `Requested via Terrisage app — new total ${totalRequested} seats`,
+      reason: mockReason.trim() || `Requested via Terrisage app — +${additional} additional seats`,
     });
     setSubmittingMock(false);
     if (error) { toast.error(error.message); return; }
