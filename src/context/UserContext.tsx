@@ -56,6 +56,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Live-update the current user's profile so name/role changes propagate everywhere.
+  useEffect(() => {
+    if (!authUser?.id) return;
+    const channel = supabase
+      .channel(`profile-self-${authUser.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${authUser.id}`,
+      }, (payload) => {
+        setProfile(payload.new as Profile);
+      })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'user_roles', filter: `user_id=eq.${authUser.id}`,
+      }, () => {
+        loadProfileAndRole(authUser.id);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [authUser?.id]);
+
   const loadProfileAndRole = async (userId: string) => {
     const [{ data: p }, { data: r }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
