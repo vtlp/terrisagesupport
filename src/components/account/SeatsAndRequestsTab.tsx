@@ -207,6 +207,39 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Mock Terrisage app request dialog */}
+      <Dialog open={mockOpen} onOpenChange={setMockOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request more seats</DialogTitle>
+            <DialogDescription>
+              Current allocation: {capacity?.seats_purchased ?? 0} seats. Simulates a request submitted from the Terrisage mobile app.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="mock-seats">Requested total seats</Label>
+              <Input id="mock-seats" type="number" min={1} placeholder="e.g. 15" value={mockSeats} onChange={e => setMockSeats(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mock-email">Requester email (optional)</Label>
+              <Input id="mock-email" type="email" placeholder="owner@example.com" value={mockEmail} onChange={e => setMockEmail(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mock-reason">Notes</Label>
+              <Textarea id="mock-reason" rows={3} placeholder="Share the names of new members or any additional context." value={mockReason} onChange={e => setMockReason(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMockOpen(false)}>Cancel</Button>
+            <Button onClick={submitMockRequest} disabled={submittingMock}>
+              {submittingMock && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Submit request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
