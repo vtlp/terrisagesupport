@@ -138,24 +138,28 @@ export default function AgencyOnboarding() {
         if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
         if (d.projects) setProjects(d.projects.map((p: any) => ({ ...p, brochure: [] })));
-        if (d.leadSheetLink) setLeadSheetLink(d.leadSheetLink);
-        if (d.leadFileNotes) setLeadFileNotes(d.leadFileNotes);
-        if (d.propertySheetLink) setPropertySheetLink(d.propertySheetLink);
-        if (d.propertyFileNotes) setPropertyFileNotes(d.propertyFileNotes);
+        // Restore the previously uploaded company logo so it doesn't disappear
+        // when the user reopens the form from a saved draft.
+        if (d.companyLogoSerialized) setCompanyLogo(serializableToFiles(d.companyLogoSerialized));
+        if (d.bulkImportNotes) setBulkImportNotes(d.bulkImportNotes);
         toast.info("Draft restored. You may continue where you left off.");
       } catch { /* ignore */ }
     }
   }, []);
 
-  const getFormData = () => ({
-    fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea, notes,
-    seatsRequired, teamMembers,
-    projects: projects.map(p => ({ ...p, brochure: undefined })),
-    leadSheetLink, leadFileNotes, propertySheetLink, propertyFileNotes,
-  });
-
-  const handleSaveDraft = () => {
-    saveDraft("agency", getFormData(), currentStep);
+  const handleSaveDraft = async () => {
+    // Persist company logo as base64 so it survives page reloads. Bulk import
+    // files can be very large (up to 100 MB each), so we deliberately do NOT
+    // serialise them — users re-attach those before final submission.
+    const companyLogoSerialized = await filesToSerializable(companyLogo);
+    const data = {
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea, notes,
+      seatsRequired, teamMembers,
+      projects: projects.map(p => ({ ...p, brochure: undefined })),
+      companyLogoSerialized,
+      bulkImportNotes,
+    };
+    saveDraft("agency", data, currentStep);
     toast.success("Draft saved successfully.");
   };
 
