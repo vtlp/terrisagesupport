@@ -4,9 +4,9 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, Activity, ArrowRightLeft, Pencil, MessageSquare, CalendarDays, Users, ListChecks, FileText, ArrowRight, ShieldCheck, Receipt, Upload } from 'lucide-react';
+import { Loader2, RefreshCw, Activity, ArrowRightLeft, Pencil, MessageSquare, CalendarDays, Users, ListChecks, FileText, ArrowRight, ShieldCheck, Receipt, Upload, Ticket } from 'lucide-react';
 
-type EventType = 'STAGE_CHANGE' | 'FIELD_EDIT' | 'NOTE' | 'CALENDAR_EVENT' | 'SEAT_CHANGE' | 'CHECKLIST' | 'SUBMISSION' | 'CONVERSION' | 'VERIFICATION' | 'INVOICE' | 'IMPORT';
+type EventType = 'STAGE_CHANGE' | 'FIELD_EDIT' | 'NOTE' | 'CALENDAR_EVENT' | 'SEAT_CHANGE' | 'CHECKLIST' | 'SUBMISSION' | 'CONVERSION' | 'VERIFICATION' | 'INVOICE' | 'IMPORT' | 'TICKET';
 
 interface LogRow {
   id: string;
@@ -25,7 +25,7 @@ const iconMap: Record<EventType, React.ComponentType<{ className?: string }>> = 
   STAGE_CHANGE: ArrowRightLeft, FIELD_EDIT: Pencil, NOTE: MessageSquare,
   CALENDAR_EVENT: CalendarDays, SEAT_CHANGE: Users, CHECKLIST: ListChecks,
   SUBMISSION: FileText, CONVERSION: ArrowRight, VERIFICATION: ShieldCheck,
-  INVOICE: Receipt, IMPORT: Upload,
+  INVOICE: Receipt, IMPORT: Upload, TICKET: Ticket,
 };
 
 const colorMap: Record<EventType, string> = {
@@ -40,23 +40,26 @@ const colorMap: Record<EventType, string> = {
   VERIFICATION: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
   INVOICE: 'bg-pink-500/15 text-pink-600 dark:text-pink-400',
   IMPORT: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
+  TICKET: 'bg-primary/15 text-primary',
 };
 
 const labelMap: Record<EventType, string> = {
   STAGE_CHANGE: 'Stage', FIELD_EDIT: 'Edit', NOTE: 'Note',
   CALENDAR_EVENT: 'Calendar', SEAT_CHANGE: 'Seat', CHECKLIST: 'Checklist',
   SUBMISSION: 'Submission', CONVERSION: 'Conversion', VERIFICATION: 'Verification',
-  INVOICE: 'Invoice', IMPORT: 'Import',
+  INVOICE: 'Invoice', IMPORT: 'Import', TICKET: 'Ticket',
 };
 
 interface Props {
-  entityType: 'ENQUIRY' | 'ACCOUNT';
+  entityType: 'ENQUIRY' | 'ACCOUNT' | 'TICKET';
   entityId: string;
   title?: string;
   defaultLimit?: number;
+  /** When true, NOTE/STAGE_CHANGE events are included (used for tickets). */
+  includeAll?: boolean;
 }
 
-export function ActivityTimeline({ entityType, entityId, title = 'Activity timeline', defaultLimit = 25 }: Props) {
+export function ActivityTimeline({ entityType, entityId, title = 'Activity timeline', defaultLimit = 25, includeAll = false }: Props) {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -64,15 +67,18 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: logs } = await supabase
+    let q = supabase
       .from('activity_log')
       .select('*')
       .eq('entity_type', entityType)
       .eq('entity_id', entityId)
-      .neq('event_type', 'NOTE')
       .order('created_at', { ascending: false })
       .limit(200);
-    const list = ((logs ?? []) as LogRow[]).filter((row) => row.event_type !== 'STAGE_CHANGE');
+    if (!includeAll) q = q.neq('event_type', 'NOTE');
+    const { data: logs } = await q;
+    const list = includeAll
+      ? ((logs ?? []) as LogRow[])
+      : ((logs ?? []) as LogRow[]).filter((row) => row.event_type !== 'STAGE_CHANGE');
     setRows(list);
 
     const actorIds = Array.from(new Set(list.map(r => r.actor_id).filter(Boolean) as string[]));
@@ -83,7 +89,7 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
       setProfiles(map);
     }
     setLoading(false);
-  }, [entityType, entityId]);
+  }, [entityType, entityId, includeAll]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -97,7 +103,7 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
         (payload) => {
           const row = payload.new as LogRow;
           if (row.entity_type !== entityType) return;
-          if (row.event_type === 'NOTE' || row.event_type === 'STAGE_CHANGE') return;
+          if (!includeAll && (row.event_type === 'NOTE' || row.event_type === 'STAGE_CHANGE')) return;
           setRows((prev) => (prev.some((r) => r.id === row.id) ? prev : [row, ...prev]));
           if (row.actor_id && !profiles[row.actor_id]) {
             supabase.from('profiles').select('id, full_name').eq('id', row.actor_id).maybeSingle()
@@ -109,7 +115,7 @@ export function ActivityTimeline({ entityType, entityId, title = 'Activity timel
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [entityType, entityId, profiles]);
+  }, [entityType, entityId, profiles, includeAll]);
 
   const visible = showAll ? rows : rows.slice(0, defaultLimit);
 
