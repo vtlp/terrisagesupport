@@ -12,7 +12,7 @@ import { isToday, isThisWeek, format } from 'date-fns';
 interface CalEvent {
   id: string; title: string; scheduled_at: string;
   event_type: string; related_entity_type: string | null; related_entity_id: string | null;
-  created_by: string | null;
+  created_by: string | null; assigned_to: string | null;
 }
 
 const eventTypeColors: Record<string, string> = {
@@ -113,7 +113,7 @@ export default function Dashboard() {
       const [enq, acc, ev] = await Promise.all([
         supabase.from('enquiries').select('id, stage, created_at'),
         supabase.from('accounts').select('id, status'),
-        supabase.from('calendar_events').select('id, title, scheduled_at, event_type, related_entity_type, related_entity_id, created_by'),
+        supabase.from('calendar_events').select('id, title, scheduled_at, event_type, related_entity_type, related_entity_id, created_by, assigned_to'),
       ]);
       if (!active) return;
       const enqs = enq.data ?? [];
@@ -139,7 +139,7 @@ export default function Dashboard() {
 
   const upcoming = events.filter(e => new Date(e.scheduled_at) >= new Date(new Date().setHours(0, 0, 0, 0)));
   const filteredEvents = calendarScope === 'my'
-    ? upcoming.filter(e => e.created_by === currentUser.user_id)
+    ? upcoming.filter(e => e.assigned_to === currentUser.user_id || e.created_by === currentUser.user_id)
     : upcoming;
   const todayEvents = filteredEvents
     .filter(e => isToday(new Date(e.scheduled_at)))
@@ -287,9 +287,14 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" /> Today's actions
             </CardTitle>
-            <div className="flex gap-1">
-              <Button variant={calendarScope === 'my' ? 'default' : 'outline'} size="sm" className="text-xs h-7" onClick={() => setCalendarScope('my')}>Mine</Button>
-              <Button variant={calendarScope === 'all' ? 'default' : 'outline'} size="sm" className="text-xs h-7" onClick={() => setCalendarScope('all')}>Team</Button>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                <Button variant={calendarScope === 'my' ? 'default' : 'outline'} size="sm" className="text-xs h-7" onClick={() => setCalendarScope('my')}>Mine</Button>
+                <Button variant={calendarScope === 'all' ? 'default' : 'outline'} size="sm" className="text-xs h-7" onClick={() => setCalendarScope('all')}>Team</Button>
+              </div>
+              <Link to="/calendar" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                Open calendar <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
           </div>
         </CardHeader>
