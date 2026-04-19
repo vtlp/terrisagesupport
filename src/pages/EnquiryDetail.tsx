@@ -472,6 +472,15 @@ export default function EnquiryDetail() {
     if (error) { toast.error(error.message); return; }
     setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
     setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    // Log the outcome to the enquiry timeline for traceability.
+    if (prevStatus !== status) {
+      const amt = cur.amount ? ` ${fmtINR(cur.amount)}` : '';
+      await supabase.from('enquiry_notes').insert({
+        enquiry_id: enquiry.id,
+        note_text: `[Payment]${amt} marked ${status}${prevStatus ? ` (was ${prevStatus})` : ''}`,
+      });
+      await refreshNotes(enquiry.id);
+    }
     toast.success(`Payment marked ${status}`);
   };
 
