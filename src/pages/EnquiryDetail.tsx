@@ -740,7 +740,7 @@ export default function EnquiryDetail() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={regenerateOnboardingLink}
+                          onClick={requestRegenerateOnboardingLink}
                           disabled={busy}
                           title="Generate a fresh onboarding link. The previous submission is unlocked so the customer can resubmit updated details."
                           aria-label="Generate new onboarding link"
