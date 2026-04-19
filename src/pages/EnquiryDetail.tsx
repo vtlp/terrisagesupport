@@ -1196,6 +1196,23 @@ export default function EnquiryDetail() {
         customerEmail={enquiry.email ?? undefined}
       />
 
+      <AlertDialog open={regenConfirmOpen} onOpenChange={setRegenConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate a new onboarding link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The customer can submit fresh details. The previous submission stays on file as a historical version — you can compare both and approve whichever is correct. If you approve the new one, the account will be created from it; otherwise the original approved submission is used.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={regenerateOnboardingLink} disabled={busy}>
+              {busy ? 'Generating…' : 'Generate new link'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Schedule event</DialogTitle></DialogHeader>
