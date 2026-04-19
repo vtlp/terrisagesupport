@@ -128,9 +128,27 @@ export const defaultPortals: LookupItem[] = [
   { id: 'P6', value: 'Square Yards' },
 ];
 
-// Helper to get city names as a simple string array
-export const getCityOptions = (): string[] => defaultMarkets.map(m => m.value);
-export const getTagOptions = (): string[] => defaultTags.map(t => t.value);
+// Helper to get city names as a simple string array.
+// NOTE: For live admin-managed values, prefer the `useLookup`/`useLookupNames`
+// hook from `@/hooks/useLookups`. These helpers fall back to the seeded list
+// when the DB cache is empty (e.g. first render before realtime hydrates).
+import { __lookupCacheNames } from '@/hooks/useLookupsCache';
+export const getCityOptions = (): string[] => {
+  const live = __lookupCacheNames('cities');
+  return live.length ? live : defaultMarkets.map(m => m.value);
+};
+export const getTagOptions = (): string[] => {
+  const live = __lookupCacheNames('tags');
+  return live.length ? live : defaultTags.map(t => t.value);
+};
+export const getPortalOptions = (): string[] => {
+  const live = __lookupCacheNames('portals');
+  return live.length ? live : defaultPortals.map(p => p.value);
+};
+export const getSourceOptions = (): string[] => {
+  const live = __lookupCacheNames('sources');
+  return live.length ? live : defaultSources.map(s => s.value);
+};
 
 // Shared business area options (Agency onboarding + Account overview)
 export const BUSINESS_AREA_OPTIONS = [

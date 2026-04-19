@@ -3,49 +3,56 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, X, Pencil, Check, ListChecks, Tag, MapPin, Globe } from 'lucide-react';
+import { Plus, X, Pencil, Check, ListChecks, Tag, MapPin, Globe, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { defaultSources, defaultTags, defaultMarkets, defaultPortals, type LookupItem } from '@/data/lookupData';
+import {
+  useLookup, createLookup, updateLookup, deleteLookup, type LookupKind, type LookupRow,
+} from '@/hooks/useLookups';
 
-function LookupEditor({ title, icon: Icon, items: initial, description }: {
+function LookupEditor({ kind, title, icon: Icon, description, withState }: {
+  kind: LookupKind;
   title: string;
   icon: React.ElementType;
-  items: LookupItem[];
   description: string;
+  withState?: boolean;
 }) {
-  const [items, setItems] = useState<LookupItem[]>(initial);
+  const items = useLookup(kind, { activeOnly: false });
   const [newValue, setNewValue] = useState('');
+  const [newState, setNewState] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const addItem = () => {
-    const v = newValue.trim();
+  const add = async () => {
+    if (!newValue.trim()) return;
+    setBusy(true);
+    try {
+      await createLookup(kind, newValue, withState ? { state: newState.trim() || undefined } : undefined);
+      setNewValue(''); setNewState('');
+      toast.success(`Added "${newValue.trim()}"`);
+    } catch (e) {
+      toast.error((e as Error).message || 'Failed to add');
+    } finally { setBusy(false); }
+  };
+
+  const remove = async (id: string, name: string) => {
+    if (!window.confirm(`Remove "${name}"? This cannot be undone.`)) return;
+    try { await deleteLookup(kind, id); toast.success('Removed'); }
+    catch (e) { toast.error((e as Error).message || 'Failed to remove'); }
+  };
+
+  const saveEdit = async (item: LookupRow) => {
+    const v = editValue.trim();
     if (!v) return;
-    if (items.some(i => i.value.toLowerCase() === v.toLowerCase())) {
-      toast.error('Already exists');
-      return;
-    }
-    setItems([...items, { id: `LK${Date.now()}`, value: v }]);
-    setNewValue('');
-    toast.success(`Added "${v}"`);
+    try { await updateLookup(kind, item.id, { name: v }); setEditingId(null); toast.success('Updated'); }
+    catch (e) { toast.error((e as Error).message || 'Failed to update'); }
   };
 
-  const removeItem = (id: string) => {
-    setItems(items.filter(i => i.id !== id));
-    toast.success('Removed');
-  };
-
-  const startEdit = (item: LookupItem) => {
-    setEditingId(item.id);
-    setEditValue(item.value);
-  };
-
-  const saveEdit = () => {
-    if (!editValue.trim()) return;
-    setItems(items.map(i => i.id === editingId ? { ...i, value: editValue.trim() } : i));
-    setEditingId(null);
-    toast.success('Updated');
+  const toggleActive = async (item: LookupRow) => {
+    try { await updateLookup(kind, item.id, { is_active: !item.is_active }); }
+    catch (e) { toast.error((e as Error).message || 'Failed to update'); }
   };
 
   return (
@@ -63,10 +70,22 @@ function LookupEditor({ title, icon: Icon, items: initial, description }: {
             value={newValue}
             onChange={e => setNewValue(e.target.value)}
             placeholder={`Add new ${title.toLowerCase().replace(/s$/, '')}…`}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
             className="flex-1"
+            disabled={busy}
           />
-          <Button size="sm" onClick={addItem}><Plus className="h-4 w-4" /></Button>
+          {withState && (
+            <Input
+              value={newState}
+              onChange={e => setNewState(e.target.value)}
+              placeholder="State (optional)"
+              className="w-40"
+              disabled={busy}
+            />
+          )}
+          <Button size="sm" onClick={add} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </Button>
         </div>
         <div className="flex flex-wrap gap-2 min-h-[40px]">
           {items.map(item => (
@@ -76,21 +95,31 @@ function LookupEditor({ title, icon: Icon, items: initial, description }: {
                   <Input
                     value={editValue}
                     onChange={e => setEditValue(e.target.value)}
-                    className="h-7 w-32 text-xs"
-                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                    className="h-7 w-40 text-xs"
+                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(item); if (e.key === 'Escape') setEditingId(null); }}
                     autoFocus
                   />
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={saveEdit}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => saveEdit(item)}>
                     <Check className="h-3 w-3" />
                   </Button>
                 </div>
               ) : (
-                <Badge variant="secondary" className="gap-1 pr-1 cursor-default">
-                  {item.value}
-                  <button onClick={() => startEdit(item)} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Badge
+                  variant={item.is_active ? 'secondary' : 'outline'}
+                  className={`gap-1 pr-1 cursor-default ${!item.is_active ? 'opacity-50 line-through' : ''}`}
+                >
+                  {item.name}
+                  {withState && item.state && <span className="text-[10px] text-muted-foreground">· {item.state}</span>}
+                  <Switch
+                    checked={item.is_active}
+                    onCheckedChange={() => toggleActive(item)}
+                    className="ml-1 scale-50 -my-2"
+                    aria-label={`Toggle ${item.name}`}
+                  />
+                  <button onClick={() => { setEditingId(item.id); setEditValue(item.name); }} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Pencil className="h-2.5 w-2.5" />
                   </button>
-                  <button onClick={() => removeItem(item.id)} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive">
+                  <button onClick={() => remove(item.id, item.name)} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive">
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
@@ -101,7 +130,9 @@ function LookupEditor({ title, icon: Icon, items: initial, description }: {
             <p className="text-xs text-muted-foreground italic">No items yet. Add one above.</p>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs text-muted-foreground">
+          {items.filter(i => i.is_active).length} active · {items.length} total
+        </p>
       </CardContent>
     </Card>
   );
@@ -112,7 +143,9 @@ export default function AdminLookups() {
     <div className="p-4 md:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Lookup Management</h1>
-        <p className="text-muted-foreground">Configure system-wide dropdown lists and tags</p>
+        <p className="text-muted-foreground">
+          Configure system-wide dropdown lists. Changes propagate live across the entire application.
+        </p>
       </div>
 
       <Tabs defaultValue="sources">
@@ -125,36 +158,37 @@ export default function AdminLookups() {
 
         <TabsContent value="sources">
           <LookupEditor
+            kind="sources"
             title="Enquiry Sources"
             icon={ListChecks}
-            items={defaultSources}
             description="These options appear in the enquiry source dropdown when creating or editing enquiries."
           />
         </TabsContent>
 
         <TabsContent value="tags">
           <LookupEditor
+            kind="tags"
             title="Ticket Tags"
             icon={Tag}
-            items={defaultTags}
-            description="Tags available for categorising support tickets. Users can also add custom tags."
+            description="Tags available for categorising support tickets. Inactive tags are hidden from selectors."
           />
         </TabsContent>
 
         <TabsContent value="markets">
           <LookupEditor
-            title="Market Field Values"
+            kind="cities"
+            title="Cities / Markets"
             icon={MapPin}
-            items={defaultMarkets}
-            description="City/market options used in tickets and marketing geo-tagging."
+            description="City/market options used in tickets, enquiries, and onboarding forms."
+            withState
           />
         </TabsContent>
 
         <TabsContent value="portals">
           <LookupEditor
+            kind="portals"
             title="Real Estate Portals"
             icon={Globe}
-            items={defaultPortals}
             description="Property portals list used in enquiry and account profiles."
           />
         </TabsContent>
