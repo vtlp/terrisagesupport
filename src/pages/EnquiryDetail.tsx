@@ -390,6 +390,9 @@ export default function EnquiryDetail() {
     if (currentStage === 'DEMO_COMPLETED' && !d.payload.demo_outcome) {
       return 'Please select a demo outcome before moving on.';
     }
+    if (currentStage === 'PAYMENT_LINK_SENT' && !d.payload.payment?.status) {
+      return 'Please capture the payment outcome (Paid / Pending / Failed) before moving on.';
+    }
     return null;
   };
 
