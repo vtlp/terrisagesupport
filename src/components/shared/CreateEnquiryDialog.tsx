@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { getCityOptions } from '@/data/lookupData';
+import { useLookup } from '@/hooks/useLookups';
 import { toast } from 'sonner';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -20,13 +21,6 @@ interface CreateEnquiryDialogProps {
   onCreated?: (id: string) => void;
 }
 
-const SOURCES = [
-  { v: 'CALL_DIRECT', l: 'Direct Call' },
-  { v: 'LANDING_PAGE', l: 'Landing Page' },
-  { v: 'META_ADS', l: 'Meta Ads' },
-  { v: 'CHAMPION_PARTNER', l: 'Champion Partner' },
-  { v: 'CP_REQUEST_PROJECTS', l: 'CP Request' },
-];
 
 const PHONE_RE = /^[0-9\s\-]{6,15}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
