@@ -463,6 +463,7 @@ export default function EnquiryDetail() {
   const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED') => {
     if (!enquiry) return;
     const cur = (draft?.payload.payment ?? {}) as PaymentInfo;
+    const prevStatus = cur.status ?? null;
     const nextPayment: PaymentInfo = { ...cur, status, paid_at: status === 'PAID' ? new Date().toISOString() : cur.paid_at };
     const nextPayload = { ...draft!.payload, payment: nextPayment };
     const { error } = await supabase.from('enquiries')
