@@ -62,15 +62,20 @@ Deno.serve(async (req) => {
 
     const keyId = Deno.env.get('RAZORPAY_KEY_ID');
     const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
-    if (!keyId || !keySecret) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Razorpay is not configured yet. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to enable payment links.',
-        }),
-        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
+    const useDummy = !keyId || !keySecret;
+
+    let rzpJson: { id: string; short_url: string };
+    if (useDummy) {
+      // Test-mode fallback: generates a dummy payment link so staff can rehearse
+      // the flow before Razorpay credentials are wired up. Replace by setting
+      // RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET secrets.
+      const id = `plink_dummy_${Date.now().toString(36)}`;
+      rzpJson = {
+        id,
+        short_url: `https://rzp.io/test/${id}`,
+      };
+      console.log('Razorpay credentials missing — issuing dummy payment link', { id });
+    } else {
 
     const amountPaise = Math.round(body.total * 100);
     const auth = btoa(`${keyId}:${keySecret}`);
