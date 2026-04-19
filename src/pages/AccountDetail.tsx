@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { defaultMarkets } from '@/data/lookupData';
+import { defaultMarkets, BUSINESS_AREA_OPTIONS, PROPERTY_TYPE_FOCUS_OPTIONS } from '@/data/lookupData';
 import { PhoneInput, splitPhone, joinPhone } from '@/components/shared/PhoneInput';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { VerificationTab } from '@/components/account/VerificationTab';
@@ -113,6 +113,14 @@ export default function AccountDetail() {
 
   const setField = <K extends keyof Account>(k: K, v: Account[K]) => setDraft(d => d ? { ...d, [k]: v } : d);
 
+  const setCompanyField = (key: 'business_area' | 'property_type_focus', value: string) => {
+    setDraft(d => {
+      if (!d) return d;
+      const company = { ...((d.payload?.company as Record<string, unknown> | undefined) ?? {}), [key]: value };
+      return { ...d, payload: { ...d.payload, company } };
+    });
+  };
+
   const save = async () => {
     if (!draft || !acc) return;
     setSaving(true);
@@ -120,6 +128,7 @@ export default function AccountDetail() {
       account_name: draft.account_name, city: draft.city, status: draft.status, tenancy_type: draft.tenancy_type,
       owner_name: draft.owner_name, owner_phone: draft.owner_phone, owner_email: draft.owner_email,
       gst_number: draft.gst_number, pan_number: draft.pan_number, rera_number: draft.rera_number, website: draft.website,
+      payload: draft.payload as never,
     }).eq('id', acc.id);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
@@ -238,12 +247,12 @@ export default function AccountDetail() {
 
         <TabsContent value="overview" className="space-y-4">
           {(() => {
-            const company = (acc.payload?.company as Record<string, unknown> | undefined) ?? {};
+            const company = (draft.payload?.company as Record<string, unknown> | undefined) ?? {};
             const tagline = (company.tagline as string | undefined)?.trim();
-            const businessArea = (company.business_area as string | undefined)?.trim();
-            const propertyTypeFocus = (company.property_type_focus as string | undefined)?.trim();
-            const labelize = (val?: string | null) =>
-              (val ?? '').toString().replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+            const businessArea = (company.business_area as string | undefined) ?? '';
+            const propertyTypeFocus = (company.property_type_focus as string | undefined) ?? '';
+            const isAgency = draft.tenancy_type === 'AGENCY_BROKERAGE_CONSULTANCY';
+            const isBuilder = draft.tenancy_type === 'BUILDER_DEVELOPER';
 
             return (
               <Card>
@@ -286,16 +295,28 @@ export default function AccountDetail() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {businessArea && (
+                    {isAgency && (
                       <div className="space-y-1.5">
-                        <Label className="text-muted-foreground">Business area</Label>
-                        <div><Badge variant="outline" className="text-xs">{labelize(businessArea)}</Badge></div>
+                        <Label>Business area</Label>
+                        <Select value={businessArea || NONE} onValueChange={v => setCompanyField('business_area', v === NONE ? '' : v)}>
+                          <SelectTrigger><SelectValue placeholder="Select business area" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NONE}>—</SelectItem>
+                            {BUSINESS_AREA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
-                    {propertyTypeFocus && (
+                    {isBuilder && (
                       <div className="space-y-1.5">
-                        <Label className="text-muted-foreground">Property type focus</Label>
-                        <div><Badge variant="outline" className="text-xs">{labelize(propertyTypeFocus)}</Badge></div>
+                        <Label>Property type focus</Label>
+                        <Select value={propertyTypeFocus || NONE} onValueChange={v => setCompanyField('property_type_focus', v === NONE ? '' : v)}>
+                          <SelectTrigger><SelectValue placeholder="Select property type focus" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NONE}>—</SelectItem>
+                            {PROPERTY_TYPE_FOCUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                   </div>

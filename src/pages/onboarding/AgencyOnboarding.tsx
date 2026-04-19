@@ -23,6 +23,7 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
+import { BUSINESS_AREA_OPTIONS, defaultMarkets } from "@/data/lookupData";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -31,12 +32,7 @@ const STEPS = [
   { number: 4, label: "Review & Submit" },
 ];
 
-const BUSINESS_AREA_OPTIONS = [
-  { label: "Primary Market Sales Only", value: "primary-sales", description: "Focused exclusively on selling new launch or under-construction projects directly from builders and developers." },
-  { label: "Primary and Secondary Market Sales", value: "primary-secondary-sales", description: "Handles both new project sales and resale of existing properties across markets." },
-  { label: "Sales and Rentals in All Markets", value: "sales-rentals-all", description: "Full-service operations covering sales and rentals across primary, secondary, and all property markets." },
-  { label: "Rental Only", value: "rental-only", description: "Specialised in rental and leasing services for residential or commercial properties." },
-];
+const CITY_OPTIONS = defaultMarkets.map(m => ({ label: m.value, value: m.value }));
 
 const ROLE_OPTIONS = [
   { label: "Admin", value: "admin" },
@@ -172,7 +168,7 @@ export default function AgencyOnboarding() {
     if (!email.trim()) e.email = "Please enter an email address.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Please enter a valid email address.";
     if (!companyName.trim()) e.companyName = "Please enter the company name.";
-    if (!city.trim()) e.city = "Please select the city or primary market.";
+    if (!city.trim()) e.city = "Please select your city.";
     if (!businessArea) e.businessArea = "Please select your business area.";
     setErrors(e);
     if (Object.keys(e).length > 0) {
@@ -281,7 +277,7 @@ export default function AgencyOnboarding() {
               { label: "Company name", value: companyName },
               { label: "Company tagline", value: companyTagline },
               { label: "RERA ID", value: reraId },
-              { label: "City / primary market", value: city },
+              { label: "City", value: city },
               { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label },
             ],
           },
@@ -388,7 +384,7 @@ export default function AgencyOnboarding() {
                   <FileUploadField label="Company logo" acceptedFormats={LOGO_EXTENSIONS} acceptedMimeTypes={LOGO_FORMATS} files={companyLogo} onChange={setCompanyLogo} helperText="Upload your company logo for workspace branding." />
                 </div>
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
-                <div data-field="city"><TextField label="City / primary market served" required value={city} onChange={setCity} error={errors.city} /></div>
+                <div data-field="city"><SelectField label="City" required value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.city} /></div>
                 <div data-field="businessArea"><SelectField label="Business area" required value={businessArea} onChange={setBusinessArea} options={BUSINESS_AREA_OPTIONS} error={errors.businessArea} /></div>
               </div>
             </section>
@@ -522,7 +518,7 @@ export default function AgencyOnboarding() {
             { label: "Company name", value: companyName, required: true },
             { label: "Company tagline", value: companyTagline },
             { label: "RERA ID", value: reraId },
-            { label: "City / primary market", value: city, required: true },
+            { label: "City", value: city, required: true },
             { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label, required: true },
           ]} />
 

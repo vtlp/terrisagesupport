@@ -23,6 +23,7 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
+import { PROPERTY_TYPE_FOCUS_OPTIONS, defaultMarkets } from "@/data/lookupData";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -31,12 +32,7 @@ const STEPS = [
   { number: 4, label: "Review & Submit" },
 ];
 
-const PROPERTY_TYPE_FOCUS_OPTIONS = [
-  { label: "Apartments", value: "apartments" },
-  { label: "Villas", value: "villas" },
-  { label: "Plots", value: "plots" },
-  { label: "Mix", value: "mix" },
-];
+const CITY_OPTIONS = defaultMarkets.map(m => ({ label: m.value, value: m.value }));
 
 const PROJECT_PROPERTY_TYPE_OPTIONS = [
   { label: "Apartments", value: "apartments" },
@@ -175,7 +171,7 @@ export default function BuilderOnboarding() {
     if (!email.trim()) e.email = "Please enter an email address.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Please enter a valid email address.";
     if (!companyName.trim()) e.companyName = "Please enter the company name.";
-    if (!headOfficeCity.trim()) e.headOfficeCity = "Please enter the head office city.";
+    if (!headOfficeCity.trim()) e.headOfficeCity = "Please select your city.";
     if (!propertyTypeFocus) e.propertyTypeFocus = "Please select your property type focus.";
     setErrors(e);
     if (Object.keys(e).length > 0) {
@@ -283,7 +279,7 @@ export default function BuilderOnboarding() {
               { label: "Company name", value: companyName },
               { label: "Company tagline", value: companyTagline },
               { label: "RERA ID", value: reraId },
-              { label: "Head office city", value: headOfficeCity },
+              { label: "City", value: headOfficeCity },
               { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label },
             ],
           },
@@ -391,7 +387,7 @@ export default function BuilderOnboarding() {
                   <FileUploadField label="Company logo" acceptedFormats={LOGO_EXTENSIONS} acceptedMimeTypes={LOGO_FORMATS} files={companyLogo} onChange={setCompanyLogo} helperText="Upload your company logo for workspace branding." />
                 </div>
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
-                <div data-field="headOfficeCity"><TextField label="Head office city" required value={headOfficeCity} onChange={setHeadOfficeCity} error={errors.headOfficeCity} /></div>
+                <div data-field="headOfficeCity"><SelectField label="City" required value={headOfficeCity} onChange={setHeadOfficeCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.headOfficeCity} /></div>
                 <div data-field="propertyTypeFocus"><SelectField label="Property type focus" required value={propertyTypeFocus} onChange={setPropertyTypeFocus} options={PROPERTY_TYPE_FOCUS_OPTIONS} error={errors.propertyTypeFocus} /></div>
               </div>
               <TextAreaField label="Notes for onboarding team" value={notes} onChange={setNotes} rows={4} helperText="Use this space for anything we should know before setup begins." />
@@ -514,7 +510,7 @@ export default function BuilderOnboarding() {
             { label: "Company name", value: companyName, required: true },
             { label: "Company tagline", value: companyTagline },
             { label: "RERA ID", value: reraId },
-            { label: "Head office city", value: headOfficeCity, required: true },
+            { label: "City", value: headOfficeCity, required: true },
             { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label, required: true },
           ]} />
 
