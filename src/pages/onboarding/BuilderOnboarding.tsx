@@ -23,7 +23,8 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
-import { PROPERTY_TYPE_FOCUS_OPTIONS, defaultMarkets } from "@/data/lookupData";
+import { PROPERTY_TYPE_FOCUS_OPTIONS, defaultMarkets, defaultPortals } from "@/data/lookupData";
+import { MultiSelect } from "@/components/shared/MultiSelect";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -103,6 +104,12 @@ export default function BuilderOnboarding() {
   const [reraId, setReraId] = useState("");
   const [headOfficeCity, setHeadOfficeCity] = useState("");
   const [propertyTypeFocus, setPropertyTypeFocus] = useState("");
+  const [website, setWebsite] = useState("");
+  const [whatsappChannel, setWhatsappChannel] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [portals, setPortals] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
   // Step 2
@@ -137,6 +144,12 @@ export default function BuilderOnboarding() {
         if (d.reraId) setReraId(d.reraId);
         if (d.headOfficeCity) setHeadOfficeCity(d.headOfficeCity);
         if (d.propertyTypeFocus) setPropertyTypeFocus(d.propertyTypeFocus);
+        if (d.website) setWebsite(d.website);
+        if (d.whatsappChannel) setWhatsappChannel(d.whatsappChannel);
+        if (d.youtube) setYoutube(d.youtube);
+        if (d.instagram) setInstagram(d.instagram);
+        if (d.facebook) setFacebook(d.facebook);
+        if (Array.isArray(d.portals)) setPortals(d.portals);
         if (d.notes) setNotes(d.notes);
         if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
@@ -153,7 +166,9 @@ export default function BuilderOnboarding() {
   const handleSaveDraft = async () => {
     const companyLogoSerialized = await filesToSerializable(companyLogo);
     const data = {
-      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus, notes,
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus,
+      website, whatsappChannel, youtube, instagram, facebook, portals,
+      notes,
       seatsRequired, teamMembers,
       projects: projects.map(p => ({ ...p, brochure: undefined })),
       companyLogoSerialized,
@@ -252,11 +267,13 @@ export default function BuilderOnboarding() {
       const payload = {
         primary_contact: { full_name: fullName, mobile, mobile_code: mobileCode, email },
         company: { name: companyName, tagline: companyTagline, rera_id: reraId, head_office_city: headOfficeCity, property_type_focus: propertyTypeFocus, logo_paths: logoPaths },
+        online_presence: { website, whatsapp_channel: whatsappChannel, youtube, instagram, facebook, portals },
         company_name: companyName,
         owner_name: fullName,
         owner_phone: `${mobileCode}${mobile}`,
         owner_email: email,
         city: headOfficeCity,
+        website,
         rera_number: reraId,
         team: { seats_required: seatsRequired, members: teamMembers },
         team_members: teamMembers.map(tm => ({ full_name: tm.fullName, email: tm.email, phone: `${tm.mobileCode}${tm.mobile}`, role: tm.role })),
