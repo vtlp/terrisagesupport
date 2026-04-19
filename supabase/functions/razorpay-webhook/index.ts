@@ -52,10 +52,15 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    const { data: enq } = await admin.from('enquiries').select('payload').eq('id', enquiryId).maybeSingle();
+    const { data: enq } = await admin
+      .from('enquiries')
+      .select('payload, converted_account_id')
+      .eq('id', enquiryId)
+      .maybeSingle();
     const payload = (enq?.payload ?? {}) as Record<string, unknown>;
     const payment = (payload.payment ?? {}) as Record<string, unknown>;
-    const nextPayment = { ...payment, status: 'PAID', paid_at: new Date().toISOString(), link_id: payment.link_id ?? linkId };
+    const paidAtIso = new Date().toISOString();
+    const nextPayment = { ...payment, status: 'PAID', paid_at: paidAtIso, link_id: payment.link_id ?? linkId };
     await admin.from('enquiries').update({ payload: { ...payload, payment: nextPayment } }).eq('id', enquiryId);
 
     await admin.from('activity_log').insert({
@@ -63,6 +68,50 @@ Deno.serve(async (req) => {
       summary: '[Payment] Marked Paid via Razorpay webhook',
       details: { link_id: payment.link_id ?? linkId },
     });
+
+    // If the enquiry is already converted to an account, mirror this as a PAID invoice
+    // on the account so the Billing tab reflects the Razorpay payment immediately.
+    const accountId = enq?.converted_account_id as string | null | undefined;
+    if (accountId) {
+      const breakdown = (payment.breakdown ?? {}) as Record<string, unknown>;
+      const planName = (breakdown.plan_name as string) || 'Standard';
+      const baseFee = Number(breakdown.base_fee ?? 33000);
+      const seatRate = Number(breakdown.per_seat_rate ?? 7000);
+      const seats = Number(breakdown.seats ?? 0);
+      const gstPct = Number(breakdown.gst_pct ?? 18);
+      const subtotal = Number(breakdown.subtotal ?? baseFee + seatRate * Math.max(seats - 3, 0));
+      const gstAmount = Number(breakdown.gst_amount ?? (subtotal * gstPct) / 100);
+      const total = Number(breakdown.total ?? subtotal + gstAmount);
+      const shortUrl = (payment.short_url as string) || '';
+      const dedupeKey = shortUrl || (linkId ?? '');
+
+      const { data: existing } = await admin
+        .from('account_invoices')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('status', 'PAID')
+        .ilike('notes', `%${dedupeKey}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existing && dedupeKey) {
+        await admin.from('account_invoices').insert({
+          account_id: accountId,
+          plan_name: planName,
+          seat_count: seats,
+          seat_rate: seatRate,
+          base_fee: baseFee,
+          subtotal,
+          gst_pct: gstPct,
+          gst_amount: gstAmount,
+          total,
+          status: 'PAID',
+          issued_at: (payment.created_at as string) || paidAtIso,
+          paid_at: paidAtIso,
+          notes: `Razorpay payment link · ${shortUrl || linkId || '—'}`,
+        });
+      }
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
