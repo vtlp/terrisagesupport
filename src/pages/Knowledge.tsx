@@ -75,9 +75,15 @@ export default function Knowledge() {
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Sidebar folder expand/collapse + drag-to-reorganize
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | 'root' | null>(null);
+
   // Preview state
   const [previewFile, setPreviewFile] = useState<KFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
