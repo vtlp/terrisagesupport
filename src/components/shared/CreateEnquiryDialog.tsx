@@ -50,7 +50,8 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
   const [phoneAltNumber, setPhoneAltNumber] = useState('');
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
-  const [source, setSource] = useState('CALL_DIRECT');
+  const [source, setSource] = useState('');
+  const sources = useLookup('sources');
   const [tenancyType, setTenancyType] = useState<string>('AGENCY_BROKERAGE_CONSULTANCY');
   const [whatsappEnabled, setWhatsappEnabled] = useState(true);
   const [notes, setNotes] = useState('');
