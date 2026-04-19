@@ -390,6 +390,9 @@ export default function EnquiryDetail() {
     if (currentStage === 'DEMO_COMPLETED' && !d.payload.demo_outcome) {
       return 'Please select a demo outcome before moving on.';
     }
+    if (currentStage === 'PAYMENT_LINK_SENT' && !d.payload.payment?.status) {
+      return 'Please capture the payment outcome (Paid / Pending / Failed) before moving on.';
+    }
     return null;
   };
 
@@ -463,6 +466,7 @@ export default function EnquiryDetail() {
   const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED') => {
     if (!enquiry) return;
     const cur = (draft?.payload.payment ?? {}) as PaymentInfo;
+    const prevStatus = cur.status ?? null;
     const nextPayment: PaymentInfo = { ...cur, status, paid_at: status === 'PAID' ? new Date().toISOString() : cur.paid_at };
     const nextPayload = { ...draft!.payload, payment: nextPayment };
     const { error } = await supabase.from('enquiries')
@@ -471,6 +475,15 @@ export default function EnquiryDetail() {
     if (error) { toast.error(error.message); return; }
     setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
     setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    // Log the outcome to the enquiry timeline for traceability.
+    if (prevStatus !== status) {
+      const amt = cur.amount ? ` ${fmtINR(cur.amount)}` : '';
+      await supabase.from('enquiry_notes').insert({
+        enquiry_id: enquiry.id,
+        note_text: `[Payment]${amt} marked ${status}${prevStatus ? ` (was ${prevStatus})` : ''}`,
+      });
+      await refreshNotes(enquiry.id);
+    }
     toast.success(`Payment marked ${status}`);
   };
 
