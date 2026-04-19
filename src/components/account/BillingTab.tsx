@@ -46,7 +46,7 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
 const fmtINR = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 const DEFAULT_SETTINGS: Settings = {
-  plan_name: 'Standard', billing_cycle: 'MONTHLY', base_fee: 0, seat_rate: 0, seats_purchased: 0,
+  plan_name: 'Standard', billing_cycle: 'MONTHLY', base_fee: 33000, seat_rate: 7000, seats_purchased: 0,
   gst_pct: 18, next_renewal_at: null, status: 'ACTIVE',
 };
 

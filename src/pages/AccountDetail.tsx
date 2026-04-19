@@ -365,13 +365,9 @@ export default function AccountDetail() {
                       <Label>PAN number</Label>
                       <Input value={draft.pan_number ?? ''} onChange={e => setField('pan_number', e.target.value)} />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 md:col-span-2">
                       <Label>RERA number</Label>
                       <Input value={draft.rera_number ?? ''} onChange={e => setField('rera_number', e.target.value)} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Website</Label>
-                      <Input type="url" value={draft.website ?? ''} onChange={e => setField('website', e.target.value)} />
                     </div>
                   </div>
                 </CardContent>
