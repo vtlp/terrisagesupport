@@ -249,23 +249,24 @@ export default function CalendarPage() {
                     {days.map(day => {
                       const dayEvents = getEventsForDay(day);
                       return (
-                        <div key={day.toISOString()} className={`h-24 md:h-28 border rounded-md p-1 text-xs overflow-hidden ${isToday(day) ? 'border-primary bg-primary/5' : 'border-border'}`}>
-                          <button onClick={() => setDayDrillDown(day)} className={`font-medium mb-0.5 hover:underline ${isToday(day) ? 'text-primary' : ''}`}>
+                        <button type="button" key={day.toISOString()} onClick={() => setDayDrillDown(day)}
+                          className={`h-24 md:h-28 border rounded-md p-1 text-xs overflow-hidden text-left hover:bg-muted/40 transition-colors ${isToday(day) ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                          <div className={`font-medium mb-0.5 ${isToday(day) ? 'text-primary' : ''}`}>
                             {format(day, 'd')}
-                          </button>
+                          </div>
                           <div className="space-y-0.5 overflow-hidden">
                             {dayEvents.slice(0, 2).map(e => (
-                              <button key={e.id} onClick={() => setOpenEvent(e as EventRow)}
-                                className={`block w-full text-left rounded px-1 py-0.5 truncate hover:opacity-80 ${eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary'}`}
-                                title={e.title}>{e.title.length > 15 ? `${e.title.substring(0, 15)}…` : e.title}</button>
+                              <span key={e.id}
+                                className={`block w-full text-left rounded px-1 py-0.5 truncate ${eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary'}`}
+                                title={e.title}>{e.title.length > 15 ? `${e.title.substring(0, 15)}…` : e.title}</span>
                             ))}
                             {dayEvents.length > 2 && (
-                              <button onClick={() => setDayDrillDown(day)} className="text-[11px] text-primary hover:underline">
+                              <span className="text-[11px] text-primary block">
                                 +{dayEvents.length - 2} more
-                              </button>
+                              </span>
                             )}
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -297,29 +298,6 @@ export default function CalendarPage() {
                 </div>
               )}
 
-              {viewMode === 'day' && (
-                <div className="space-y-2">
-                  {(() => {
-                    const dayEvents = getEventsForDay(days[0]);
-                    if (dayEvents.length === 0) return <p className="text-sm text-muted-foreground py-6 text-center">No events on this day.</p>;
-                    return dayEvents.map(e => (
-                      <div key={e.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70 gap-2">
-                        <button onClick={() => setOpenEvent(e as EventRow)} className="min-w-0 flex-1 text-left">
-                          <p className="text-sm font-medium truncate">{e.title}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                            <span>{format(new Date(e.scheduled_at), 'HH:mm')}</span>
-                            <span>•</span><span>{userName(e.assigned_to ?? e.created_by)}</span>
-                          </div>
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? ''}`}>{eventTypeLabels[e.event_type] ?? e.event_type}</Badge>
-                          {e.related_entity_type && <Badge className={`text-[10px] ${entityColors[e.related_entity_type] ?? ''}`}>{e.related_entity_type}</Badge>}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              )}
             </>
           )}
         </CardContent>
