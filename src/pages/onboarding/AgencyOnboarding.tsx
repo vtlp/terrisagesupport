@@ -299,6 +299,17 @@ export default function AgencyOnboarding() {
             ],
           },
           {
+            title: "Online Presence",
+            rows: [
+              { label: "Website", value: website },
+              { label: "WhatsApp channel link", value: whatsappChannel },
+              { label: "YouTube", value: youtube },
+              { label: "Instagram", value: instagram },
+              { label: "Facebook", value: facebook },
+              { label: "Property portals in use", value: portals.map(p => defaultPortals.find(d => d.value === p)?.value || p).join(", ") },
+            ],
+          },
+          {
             title: "Team Access & Permissions",
             rows: [
               { label: "Seats required", value: seatsRequired },
@@ -408,6 +419,29 @@ export default function AgencyOnboarding() {
 
             <section className="space-y-6">
               <div>
+                <h2 className="text-xl font-bold text-foreground">Online Presence</h2>
+                <p className="text-sm text-muted-foreground mt-1">Share your website, social channels, and the property portals you currently use. These help us configure your CRM and integrations correctly.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <TextField label="Website" type="url" value={website} onChange={setWebsite} placeholder="https://" />
+                <TextField label="WhatsApp channel link" type="url" value={whatsappChannel} onChange={setWhatsappChannel} placeholder="https://whatsapp.com/channel/..." />
+                <TextField label="YouTube" type="url" value={youtube} onChange={setYoutube} placeholder="https://youtube.com/@..." />
+                <TextField label="Instagram" type="url" value={instagram} onChange={setInstagram} placeholder="https://instagram.com/..." />
+                <TextField label="Facebook" type="url" value={facebook} onChange={setFacebook} placeholder="https://facebook.com/..." />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Property portals in use</label>
+                  <MultiSelect
+                    options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                    selected={portals}
+                    onChange={setPortals}
+                    placeholder="Select portals…"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-6">
+              <div>
                 <h2 className="text-xl font-bold text-foreground">Additional Onboarding Notes</h2>
                 <p className="text-sm text-muted-foreground mt-1">Use this space for anything we should know before setup begins, such as operating structure, key priorities, or specific requests.</p>
               </div>
@@ -482,8 +516,8 @@ export default function AgencyOnboarding() {
 
           <section className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Projects You Work On <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
-              <p className="text-sm text-muted-foreground mt-1">Add the projects your team is actively marketing, selling, renting, or managing. None of the project fields are required — share whatever you have available.</p>
+              <h3 className="text-lg font-semibold text-foreground">Projects You Work On / Projects you are working as a CP <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">Add the projects your team is actively marketing, selling, renting, or managing — including projects you are working as a Channel Partner (CP). None of the project fields are required — share whatever you have available.</p>
             </div>
             {projects.map((proj, idx) => (
               <RepeatableCard key={proj.id} title={`Project ${idx + 1}`} subtitle={proj.projectName || undefined} index={idx} onRemove={() => setProjects((prev) => prev.filter((_, i) => i !== idx))} canRemove={projects.length > 1}>
