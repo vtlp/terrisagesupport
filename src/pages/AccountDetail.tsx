@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { defaultMarkets, BUSINESS_AREA_OPTIONS, PROPERTY_TYPE_FOCUS_OPTIONS, defaultPortals } from '@/data/lookupData';
+import { getCityOptions, BUSINESS_AREA_OPTIONS, PROPERTY_TYPE_FOCUS_OPTIONS, getPortalOptions } from '@/data/lookupData';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { PhoneInput, splitPhone, joinPhone } from '@/components/shared/PhoneInput';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
@@ -292,7 +292,7 @@ export default function AccountDetail() {
                         <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
                         <SelectContent className="max-h-72">
                           <SelectItem value={NONE}>—</SelectItem>
-                          {defaultMarkets.map(m => <SelectItem key={m.id} value={m.value}>{m.value}</SelectItem>)}
+                          {getCityOptions().map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -410,7 +410,7 @@ export default function AccountDetail() {
                   <div className="space-y-1.5">
                     <Label>Property portals in use</Label>
                     <MultiSelect
-                      options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                      options={getPortalOptions().map(v => ({ value: v, label: v }))}
                       selected={portals}
                       onChange={v => setOnlinePresenceField('portals', v)}
                       placeholder="Select portals…"

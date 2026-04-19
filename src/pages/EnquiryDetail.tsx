@@ -22,7 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SendOnboardingDialog } from '@/components/shared/SendOnboardingDialog';
 import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/components/shared/PhoneInput';
-import { defaultMarkets, defaultPortals } from '@/data/lookupData';
+import { getCityOptions, getPortalOptions } from '@/data/lookupData';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
@@ -879,7 +879,7 @@ export default function EnquiryDetail() {
                 <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
                 <SelectContent className="max-h-72">
                   <SelectItem value={NONE}>—</SelectItem>
-                  {defaultMarkets.map(m => <SelectItem key={m.id} value={m.value}>{m.value}</SelectItem>)}
+                  {getCityOptions().map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -994,7 +994,7 @@ export default function EnquiryDetail() {
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Portals currently in use</Label>
                 <MultiSelect
-                  options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                  options={getPortalOptions().map(v => ({ value: v, label: v }))}
                   selected={(draft.payload.portals_in_use as string[] | undefined) ?? []}
                   onChange={vals => setPayload('portals_in_use', vals)}
                   placeholder="Select portals"
