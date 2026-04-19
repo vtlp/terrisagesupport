@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, Send, CheckCircle2, XCircle, Clock, Phone, Mail, Save, ExternalLink, CalendarPlus, Copy as CopyIcon, ChevronRight, ChevronDown, Check, Undo2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
 import { EventDetailDialog, EventRow } from '@/components/shared/EventDetailDialog';
 import { CalendarEventType } from '@/types/core';
@@ -171,6 +172,7 @@ export default function EnquiryDetail() {
   const [newNote, setNewNote] = useState('');
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [pendingEventType, setPendingEventType] = useState<CalendarEventType>(CalendarEventType.GENERAL);
   const [pendingEventTitle, setPendingEventTitle] = useState<string>('');
@@ -559,7 +561,7 @@ export default function EnquiryDetail() {
     setShareOpen(true);
   };
 
-  const regenerateOnboardingLink = async () => {
+  const requestRegenerateOnboardingLink = async () => {
     if (!enquiry || !draft) return;
     const teamSize = draft.payload.team_size_estimate;
     if (teamSize === null || teamSize === undefined || Number(teamSize) <= 0) {
@@ -567,10 +569,12 @@ export default function EnquiryDetail() {
       return;
     }
     if (!(await requireClean('generate a new onboarding link'))) return;
-    const confirmed = window.confirm(
-      'Generate a new onboarding link?\n\nThe customer can submit fresh details. The previous submission stays on file as a historical version — you can compare both and approve whichever is correct. If you approve the new one, the account will be created from it; otherwise the original approved submission is used.',
-    );
-    if (!confirmed) return;
+    setRegenConfirmOpen(true);
+  };
+
+  const regenerateOnboardingLink = async () => {
+    if (!enquiry) return;
+    setRegenConfirmOpen(false);
     setBusy(true);
     try {
       const link = generateLink();
@@ -736,7 +740,7 @@ export default function EnquiryDetail() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={regenerateOnboardingLink}
+                          onClick={requestRegenerateOnboardingLink}
                           disabled={busy}
                           title="Generate a fresh onboarding link. The previous submission is unlocked so the customer can resubmit updated details."
                           aria-label="Generate new onboarding link"
@@ -1191,6 +1195,23 @@ export default function EnquiryDetail() {
         customerPhone={enquiry.phone}
         customerEmail={enquiry.email ?? undefined}
       />
+
+      <AlertDialog open={regenConfirmOpen} onOpenChange={setRegenConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate a new onboarding link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The customer can submit fresh details. The previous submission stays on file as a historical version — you can compare both and approve whichever is correct. If you approve the new one, the account will be created from it; otherwise the original approved submission is used.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={regenerateOnboardingLink} disabled={busy}>
+              {busy ? 'Generating…' : 'Generate new link'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
         <DialogContent>
