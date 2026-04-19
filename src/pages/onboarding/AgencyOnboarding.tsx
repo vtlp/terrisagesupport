@@ -23,7 +23,8 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
-import { BUSINESS_AREA_OPTIONS, defaultMarkets } from "@/data/lookupData";
+import { BUSINESS_AREA_OPTIONS, defaultMarkets, defaultPortals } from "@/data/lookupData";
+import { MultiSelect } from "@/components/shared/MultiSelect";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -97,6 +98,12 @@ export default function AgencyOnboarding() {
   const [reraId, setReraId] = useState("");
   const [city, setCity] = useState("");
   const [businessArea, setBusinessArea] = useState("");
+  const [website, setWebsite] = useState("");
+  const [whatsappChannel, setWhatsappChannel] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [portals, setPortals] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
   // Step 2
@@ -131,6 +138,12 @@ export default function AgencyOnboarding() {
         if (d.reraId) setReraId(d.reraId);
         if (d.city) setCity(d.city);
         if (d.businessArea) setBusinessArea(d.businessArea);
+        if (d.website) setWebsite(d.website);
+        if (d.whatsappChannel) setWhatsappChannel(d.whatsappChannel);
+        if (d.youtube) setYoutube(d.youtube);
+        if (d.instagram) setInstagram(d.instagram);
+        if (d.facebook) setFacebook(d.facebook);
+        if (Array.isArray(d.portals)) setPortals(d.portals);
         if (d.notes) setNotes(d.notes);
         if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
@@ -150,7 +163,9 @@ export default function AgencyOnboarding() {
     // serialise them — users re-attach those before final submission.
     const companyLogoSerialized = await filesToSerializable(companyLogo);
     const data = {
-      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea, notes,
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea,
+      website, whatsappChannel, youtube, instagram, facebook, portals,
+      notes,
       seatsRequired, teamMembers,
       projects: projects.map(p => ({ ...p, brochure: undefined })),
       companyLogoSerialized,
@@ -250,11 +265,13 @@ export default function AgencyOnboarding() {
       const payload = {
         primary_contact: { full_name: fullName, mobile, mobile_code: mobileCode, email },
         company: { name: companyName, tagline: companyTagline, rera_id: reraId, city, business_area: businessArea, logo_paths: logoPaths },
+        online_presence: { website, whatsapp_channel: whatsappChannel, youtube, instagram, facebook, portals },
         company_name: companyName,
         owner_name: fullName,
         owner_phone: `${mobileCode}${mobile}`,
         owner_email: email,
         city,
+        website,
         rera_number: reraId,
         team: { seats_required: seatsRequired, members: teamMembers },
         team_members: teamMembers.map(tm => ({ full_name: tm.fullName, email: tm.email, phone: `${tm.mobileCode}${tm.mobile}`, role: tm.role })),
@@ -279,6 +296,17 @@ export default function AgencyOnboarding() {
               { label: "RERA ID", value: reraId },
               { label: "City", value: city },
               { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label },
+            ],
+          },
+          {
+            title: "Online Presence",
+            rows: [
+              { label: "Website", value: website },
+              { label: "WhatsApp channel link", value: whatsappChannel },
+              { label: "YouTube", value: youtube },
+              { label: "Instagram", value: instagram },
+              { label: "Facebook", value: facebook },
+              { label: "Property portals in use", value: portals.map(p => defaultPortals.find(d => d.value === p)?.value || p).join(", ") },
             ],
           },
           {
@@ -391,6 +419,29 @@ export default function AgencyOnboarding() {
 
             <section className="space-y-6">
               <div>
+                <h2 className="text-xl font-bold text-foreground">Online Presence</h2>
+                <p className="text-sm text-muted-foreground mt-1">Share your website, social channels, and the property portals you currently use. These help us configure your CRM and integrations correctly.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <TextField label="Website" type="url" value={website} onChange={setWebsite} placeholder="https://" />
+                <TextField label="WhatsApp channel link" type="url" value={whatsappChannel} onChange={setWhatsappChannel} placeholder="https://whatsapp.com/channel/..." />
+                <TextField label="YouTube" type="url" value={youtube} onChange={setYoutube} placeholder="https://youtube.com/@..." />
+                <TextField label="Instagram" type="url" value={instagram} onChange={setInstagram} placeholder="https://instagram.com/..." />
+                <TextField label="Facebook" type="url" value={facebook} onChange={setFacebook} placeholder="https://facebook.com/..." />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Property portals in use</label>
+                  <MultiSelect
+                    options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                    selected={portals}
+                    onChange={setPortals}
+                    placeholder="Select portals…"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-6">
+              <div>
                 <h2 className="text-xl font-bold text-foreground">Additional Onboarding Notes</h2>
                 <p className="text-sm text-muted-foreground mt-1">Use this space for anything we should know before setup begins, such as operating structure, key priorities, or specific requests.</p>
               </div>
@@ -465,8 +516,8 @@ export default function AgencyOnboarding() {
 
           <section className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Projects You Work On <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
-              <p className="text-sm text-muted-foreground mt-1">Add the projects your team is actively marketing, selling, renting, or managing. None of the project fields are required — share whatever you have available.</p>
+              <h3 className="text-lg font-semibold text-foreground">Projects You Work On / Projects you are working as a CP <span className="text-sm font-normal text-muted-foreground">(Optional)</span></h3>
+              <p className="text-sm text-muted-foreground mt-1">Add the projects your team is actively marketing, selling, renting, or managing — including projects you are working as a Channel Partner (CP). None of the project fields are required — share whatever you have available.</p>
             </div>
             {projects.map((proj, idx) => (
               <RepeatableCard key={proj.id} title={`Project ${idx + 1}`} subtitle={proj.projectName || undefined} index={idx} onRemove={() => setProjects((prev) => prev.filter((_, i) => i !== idx))} canRemove={projects.length > 1}>
@@ -520,6 +571,15 @@ export default function AgencyOnboarding() {
             { label: "RERA ID", value: reraId },
             { label: "City", value: city, required: true },
             { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label, required: true },
+          ]} />
+
+          <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(1)} fields={[
+            { label: "Website", value: website },
+            { label: "WhatsApp channel link", value: whatsappChannel },
+            { label: "YouTube", value: youtube },
+            { label: "Instagram", value: instagram },
+            { label: "Facebook", value: facebook },
+            { label: "Property portals in use", value: portals.length ? portals.join(", ") : undefined },
           ]} />
 
           <ReviewSummaryCard title="Team Access & Permissions" onEdit={() => setCurrentStep(2)} fields={[

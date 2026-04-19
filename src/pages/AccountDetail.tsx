@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { defaultMarkets, BUSINESS_AREA_OPTIONS, PROPERTY_TYPE_FOCUS_OPTIONS } from '@/data/lookupData';
+import { defaultMarkets, BUSINESS_AREA_OPTIONS, PROPERTY_TYPE_FOCUS_OPTIONS, defaultPortals } from '@/data/lookupData';
+import { MultiSelect } from '@/components/shared/MultiSelect';
 import { PhoneInput, splitPhone, joinPhone } from '@/components/shared/PhoneInput';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { VerificationTab } from '@/components/account/VerificationTab';
@@ -118,6 +119,16 @@ export default function AccountDetail() {
       if (!d) return d;
       const company = { ...((d.payload?.company as Record<string, unknown> | undefined) ?? {}), [key]: value };
       return { ...d, payload: { ...d.payload, company } };
+    });
+  };
+
+  const setOnlinePresenceField = (key: 'website' | 'whatsapp_channel' | 'youtube' | 'instagram' | 'facebook' | 'portals', value: string | string[]) => {
+    setDraft(d => {
+      if (!d) return d;
+      const op = { ...((d.payload?.online_presence as Record<string, unknown> | undefined) ?? {}), [key]: value };
+      const next: Account = { ...d, payload: { ...d.payload, online_presence: op } };
+      if (key === 'website') next.website = (value as string) || null;
+      return next;
     });
   };
 
@@ -362,6 +373,52 @@ export default function AccountDetail() {
                       <Label>Website</Label>
                       <Input type="url" value={draft.website ?? ''} onChange={e => setField('website', e.target.value)} />
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {(() => {
+            const op = (draft.payload?.online_presence as Record<string, unknown> | undefined) ?? {};
+            const website = (op.website as string | undefined) ?? draft.website ?? '';
+            const whatsapp = (op.whatsapp_channel as string | undefined) ?? '';
+            const youtube = (op.youtube as string | undefined) ?? '';
+            const instagram = (op.instagram as string | undefined) ?? '';
+            const facebook = (op.facebook as string | undefined) ?? '';
+            const portals = Array.isArray(op.portals) ? (op.portals as string[]) : [];
+            return (
+              <Card>
+                <CardHeader><CardTitle className="text-base">Online presence</CardTitle></CardHeader>
+                <CardContent className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Website</Label>
+                    <Input type="url" placeholder="https://" value={website} onChange={e => setOnlinePresenceField('website', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>WhatsApp channel link</Label>
+                    <Input type="url" placeholder="https://whatsapp.com/channel/..." value={whatsapp} onChange={e => setOnlinePresenceField('whatsapp_channel', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>YouTube</Label>
+                    <Input type="url" placeholder="https://youtube.com/@..." value={youtube} onChange={e => setOnlinePresenceField('youtube', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Instagram</Label>
+                    <Input type="url" placeholder="https://instagram.com/..." value={instagram} onChange={e => setOnlinePresenceField('instagram', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Facebook</Label>
+                    <Input type="url" placeholder="https://facebook.com/..." value={facebook} onChange={e => setOnlinePresenceField('facebook', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Property portals in use</Label>
+                    <MultiSelect
+                      options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                      selected={portals}
+                      onChange={v => setOnlinePresenceField('portals', v)}
+                      placeholder="Select portals…"
+                    />
                   </div>
                 </CardContent>
               </Card>

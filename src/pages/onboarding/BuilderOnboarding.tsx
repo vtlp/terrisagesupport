@@ -23,7 +23,8 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
-import { PROPERTY_TYPE_FOCUS_OPTIONS, defaultMarkets } from "@/data/lookupData";
+import { PROPERTY_TYPE_FOCUS_OPTIONS, defaultMarkets, defaultPortals } from "@/data/lookupData";
+import { MultiSelect } from "@/components/shared/MultiSelect";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -103,6 +104,12 @@ export default function BuilderOnboarding() {
   const [reraId, setReraId] = useState("");
   const [headOfficeCity, setHeadOfficeCity] = useState("");
   const [propertyTypeFocus, setPropertyTypeFocus] = useState("");
+  const [website, setWebsite] = useState("");
+  const [whatsappChannel, setWhatsappChannel] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [portals, setPortals] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
   // Step 2
@@ -137,6 +144,12 @@ export default function BuilderOnboarding() {
         if (d.reraId) setReraId(d.reraId);
         if (d.headOfficeCity) setHeadOfficeCity(d.headOfficeCity);
         if (d.propertyTypeFocus) setPropertyTypeFocus(d.propertyTypeFocus);
+        if (d.website) setWebsite(d.website);
+        if (d.whatsappChannel) setWhatsappChannel(d.whatsappChannel);
+        if (d.youtube) setYoutube(d.youtube);
+        if (d.instagram) setInstagram(d.instagram);
+        if (d.facebook) setFacebook(d.facebook);
+        if (Array.isArray(d.portals)) setPortals(d.portals);
         if (d.notes) setNotes(d.notes);
         if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
@@ -153,7 +166,9 @@ export default function BuilderOnboarding() {
   const handleSaveDraft = async () => {
     const companyLogoSerialized = await filesToSerializable(companyLogo);
     const data = {
-      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus, notes,
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus,
+      website, whatsappChannel, youtube, instagram, facebook, portals,
+      notes,
       seatsRequired, teamMembers,
       projects: projects.map(p => ({ ...p, brochure: undefined })),
       companyLogoSerialized,
@@ -252,11 +267,13 @@ export default function BuilderOnboarding() {
       const payload = {
         primary_contact: { full_name: fullName, mobile, mobile_code: mobileCode, email },
         company: { name: companyName, tagline: companyTagline, rera_id: reraId, head_office_city: headOfficeCity, property_type_focus: propertyTypeFocus, logo_paths: logoPaths },
+        online_presence: { website, whatsapp_channel: whatsappChannel, youtube, instagram, facebook, portals },
         company_name: companyName,
         owner_name: fullName,
         owner_phone: `${mobileCode}${mobile}`,
         owner_email: email,
         city: headOfficeCity,
+        website,
         rera_number: reraId,
         team: { seats_required: seatsRequired, members: teamMembers },
         team_members: teamMembers.map(tm => ({ full_name: tm.fullName, email: tm.email, phone: `${tm.mobileCode}${tm.mobile}`, role: tm.role })),
@@ -281,6 +298,17 @@ export default function BuilderOnboarding() {
               { label: "RERA ID", value: reraId },
               { label: "City", value: headOfficeCity },
               { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label },
+            ],
+          },
+          {
+            title: "Online Presence",
+            rows: [
+              { label: "Website", value: website },
+              { label: "WhatsApp channel link", value: whatsappChannel },
+              { label: "YouTube", value: youtube },
+              { label: "Instagram", value: instagram },
+              { label: "Facebook", value: facebook },
+              { label: "Property portals in use", value: portals.join(", ") },
             ],
           },
           {
@@ -389,6 +417,29 @@ export default function BuilderOnboarding() {
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
                 <div data-field="headOfficeCity"><SelectField label="City" required value={headOfficeCity} onChange={setHeadOfficeCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.headOfficeCity} /></div>
                 <div data-field="propertyTypeFocus"><SelectField label="Property type focus" required value={propertyTypeFocus} onChange={setPropertyTypeFocus} options={PROPERTY_TYPE_FOCUS_OPTIONS} error={errors.propertyTypeFocus} /></div>
+              </div>
+            </section>
+
+            <section className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Online Presence</h2>
+                <p className="text-sm text-muted-foreground mt-1">Share your website, social channels, and the property portals you currently use. These help us configure your CRM and integrations correctly.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <TextField label="Website" type="url" value={website} onChange={setWebsite} placeholder="https://" />
+                <TextField label="WhatsApp channel link" type="url" value={whatsappChannel} onChange={setWhatsappChannel} placeholder="https://whatsapp.com/channel/..." />
+                <TextField label="YouTube" type="url" value={youtube} onChange={setYoutube} placeholder="https://youtube.com/@..." />
+                <TextField label="Instagram" type="url" value={instagram} onChange={setInstagram} placeholder="https://instagram.com/..." />
+                <TextField label="Facebook" type="url" value={facebook} onChange={setFacebook} placeholder="https://facebook.com/..." />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Property portals in use</label>
+                  <MultiSelect
+                    options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                    selected={portals}
+                    onChange={setPortals}
+                    placeholder="Select portals…"
+                  />
+                </div>
               </div>
               <TextAreaField label="Notes for onboarding team" value={notes} onChange={setNotes} rows={4} helperText="Use this space for anything we should know before setup begins." />
             </section>
@@ -512,6 +563,15 @@ export default function BuilderOnboarding() {
             { label: "RERA ID", value: reraId },
             { label: "City", value: headOfficeCity, required: true },
             { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label, required: true },
+          ]} />
+
+          <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(1)} fields={[
+            { label: "Website", value: website },
+            { label: "WhatsApp channel link", value: whatsappChannel },
+            { label: "YouTube", value: youtube },
+            { label: "Instagram", value: instagram },
+            { label: "Facebook", value: facebook },
+            { label: "Property portals in use", value: portals.length ? portals.join(", ") : undefined },
           ]} />
 
           <ReviewSummaryCard title="Team Access & Permissions" onEdit={() => setCurrentStep(2)} fields={[
