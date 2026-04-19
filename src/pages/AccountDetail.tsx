@@ -247,12 +247,12 @@ export default function AccountDetail() {
 
         <TabsContent value="overview" className="space-y-4">
           {(() => {
-            const company = (acc.payload?.company as Record<string, unknown> | undefined) ?? {};
+            const company = (draft.payload?.company as Record<string, unknown> | undefined) ?? {};
             const tagline = (company.tagline as string | undefined)?.trim();
-            const businessArea = (company.business_area as string | undefined)?.trim();
-            const propertyTypeFocus = (company.property_type_focus as string | undefined)?.trim();
-            const labelize = (val?: string | null) =>
-              (val ?? '').toString().replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+            const businessArea = (company.business_area as string | undefined) ?? '';
+            const propertyTypeFocus = (company.property_type_focus as string | undefined) ?? '';
+            const isAgency = draft.tenancy_type === 'AGENCY_BROKERAGE_CONSULTANCY';
+            const isBuilder = draft.tenancy_type === 'BUILDER_DEVELOPER';
 
             return (
               <Card>
@@ -295,16 +295,28 @@ export default function AccountDetail() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {businessArea && (
+                    {isAgency && (
                       <div className="space-y-1.5">
-                        <Label className="text-muted-foreground">Business area</Label>
-                        <div><Badge variant="outline" className="text-xs">{labelize(businessArea)}</Badge></div>
+                        <Label>Business area</Label>
+                        <Select value={businessArea || NONE} onValueChange={v => setCompanyField('business_area', v === NONE ? '' : v)}>
+                          <SelectTrigger><SelectValue placeholder="Select business area" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NONE}>—</SelectItem>
+                            {BUSINESS_AREA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
-                    {propertyTypeFocus && (
+                    {isBuilder && (
                       <div className="space-y-1.5">
-                        <Label className="text-muted-foreground">Property type focus</Label>
-                        <div><Badge variant="outline" className="text-xs">{labelize(propertyTypeFocus)}</Badge></div>
+                        <Label>Property type focus</Label>
+                        <Select value={propertyTypeFocus || NONE} onValueChange={v => setCompanyField('property_type_focus', v === NONE ? '' : v)}>
+                          <SelectTrigger><SelectValue placeholder="Select property type focus" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NONE}>—</SelectItem>
+                            {PROPERTY_TYPE_FOCUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                   </div>
