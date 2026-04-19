@@ -239,7 +239,7 @@ export default function EnquiryDetail() {
     const [{ data: e, error: eErr }, { data: n }, { data: s }] = await Promise.all([
       supabase.from('enquiries').select('*').eq('id', enquiryId).maybeSingle(),
       supabase.from('enquiry_notes').select('id, note_text, created_at').eq('enquiry_id', enquiryId).order('created_at', { ascending: false }),
-      supabase.from('onboarding_submissions').select('id, status, submitted_at, reviewed_at, payload, tenancy_type').eq('enquiry_id', enquiryId).order('submitted_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('onboarding_submissions').select('id, status, submitted_at, reviewed_at, payload, tenancy_type').eq('enquiry_id', enquiryId).order('submitted_at', { ascending: false }),
     ]);
     if (eErr || !e) { toast.error('Enquiry not found'); navigate('/enquiries'); return; }
     const payload = (e.payload ?? {}) as EnquiryPayload;
@@ -252,7 +252,7 @@ export default function EnquiryDetail() {
     setDraft(enq);
     setSaveState('idle');
     setNotes((n ?? []) as NoteRow[]);
-    setSubmission(s as Submission | null);
+    setSubmissions((s ?? []) as Submission[]);
     loadEvents(enq.id);
     if (enq.is_duplicate_of) {
       const { data: dup } = await supabase.from('enquiries')
