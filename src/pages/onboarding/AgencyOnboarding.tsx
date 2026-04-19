@@ -168,7 +168,7 @@ export default function AgencyOnboarding() {
     if (!email.trim()) e.email = "Please enter an email address.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Please enter a valid email address.";
     if (!companyName.trim()) e.companyName = "Please enter the company name.";
-    if (!city.trim()) e.city = "Please select the city or primary market.";
+    if (!city.trim()) e.city = "Please select your city.";
     if (!businessArea) e.businessArea = "Please select your business area.";
     setErrors(e);
     if (Object.keys(e).length > 0) {
