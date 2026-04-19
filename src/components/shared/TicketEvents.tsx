@@ -126,7 +126,9 @@ export function TicketEvents({ ticketId, ticketSubject, accountId }: Props) {
             onCancel={() => setOpenForm(false)}
             defaultTitle={`Follow-up — ${ticketSubject.slice(0, 60)}`}
             defaultEventType={CalendarEventType.FOLLOW_UP}
-            lockedEntityType={accountId ? undefined : 'ENQUIRY' /* unused — TICKET uses internal link */}
+            lockedEntityType={accountId ? 'ACCOUNT' : 'ENQUIRY'}
+            lockedEntityId={accountId ?? ticketId}
+            lockedEntityLabel={`Ticket: ${ticketSubject.slice(0, 40)}`}
           />
         </DialogContent>
       </Dialog>
