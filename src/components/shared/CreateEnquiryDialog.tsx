@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { getCityOptions } from '@/data/lookupData';
+import { useLookup } from '@/hooks/useLookups';
 import { toast } from 'sonner';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -20,13 +21,6 @@ interface CreateEnquiryDialogProps {
   onCreated?: (id: string) => void;
 }
 
-const SOURCES = [
-  { v: 'CALL_DIRECT', l: 'Direct Call' },
-  { v: 'LANDING_PAGE', l: 'Landing Page' },
-  { v: 'META_ADS', l: 'Meta Ads' },
-  { v: 'CHAMPION_PARTNER', l: 'Champion Partner' },
-  { v: 'CP_REQUEST_PROJECTS', l: 'CP Request' },
-];
 
 const PHONE_RE = /^[0-9\s\-]{6,15}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,7 +50,8 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
   const [phoneAltNumber, setPhoneAltNumber] = useState('');
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
-  const [source, setSource] = useState('CALL_DIRECT');
+  const [source, setSource] = useState('');
+  const sources = useLookup('sources');
   const [tenancyType, setTenancyType] = useState<string>('AGENCY_BROKERAGE_CONSULTANCY');
   const [whatsappEnabled, setWhatsappEnabled] = useState(true);
   const [notes, setNotes] = useState('');
@@ -84,7 +79,7 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
     setCompanyName(''); setContactName('');
     setPhoneCode(DEFAULT_COUNTRY_CODE); setPhoneNumber('');
     setPhoneAltCode(DEFAULT_COUNTRY_CODE); setPhoneAltNumber('');
-    setEmail(''); setCity(''); setSource('CALL_DIRECT');
+    setEmail(''); setCity(''); setSource('');
     setTenancyType('AGENCY_BROKERAGE_CONSULTANCY');
     setWhatsappEnabled(true); setNotes(''); setErrors({}); setDuplicate(null);
   };
@@ -258,10 +253,10 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
             </div>
             <div className="space-y-1.5">
               <Label>Source</Label>
-              <Select value={source} onValueChange={setSource}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {SOURCES.map(s => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
+              <Select value={source || undefined} onValueChange={setSource}>
+                <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {sources.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { SendOnboardingDialog } from '@/components/shared/SendOnboardingDialog';
 import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/components/shared/PhoneInput';
 import { getCityOptions, getPortalOptions } from '@/data/lookupData';
+import { useLookup } from '@/hooks/useLookups';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
@@ -96,13 +97,6 @@ const stageLabels: Record<Stage, string> = {
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
 
-const SOURCES = [
-  { v: 'CALL_DIRECT', l: 'Call (Direct)' },
-  { v: 'LANDING_PAGE', l: 'Landing Page' },
-  { v: 'META_ADS', l: 'Meta Ads' },
-  { v: 'CHAMPION_PARTNER', l: 'Champion / Partner' },
-  { v: 'CP_REQUEST_PROJECTS', l: 'CP Request (Projects)' },
-];
 
 const FOCUS_AREAS = [
   { v: 'SALES', l: 'Sales' },
@@ -158,6 +152,7 @@ const NONE = '__none__';
 export default function EnquiryDetail() {
   const { enquiryId } = useParams<{ enquiryId: string }>();
   const navigate = useNavigate();
+  const sources = useLookup('sources');
   const { currentUser } = useUser();
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
   const [draft, setDraft] = useState<Enquiry | null>(null);
@@ -683,7 +678,7 @@ export default function EnquiryDetail() {
           <h1 className="text-xl font-semibold truncate">{enquiry.company_name || enquiry.full_name}</h1>
           <p className="text-sm text-muted-foreground truncate">{enquiry.full_name} · {enquiry.phone}</p>
         </div>
-        <Badge variant="secondary">{SOURCES.find(s => s.v === enquiry.source)?.l ?? enquiry.source ?? 'No source'}</Badge>
+        <Badge variant="secondary">{enquiry.source ?? 'No source'}</Badge>
         {duplicateOf && (
           <Link to={`/enquiries/${duplicateOf.id}`}>
             <Badge variant="outline" className="gap-1 border-warning/40 text-warning hover:bg-warning/10">
@@ -903,9 +898,12 @@ export default function EnquiryDetail() {
               <Label>Source</Label>
               <Select value={draft.source ?? NONE} onValueChange={v => setField('source', v === NONE ? null : v)}>
                 <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-72">
                   <SelectItem value={NONE}>—</SelectItem>
-                  {SOURCES.map(s => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
+                  {sources.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                  {draft.source && !sources.some(s => s.name === draft.source) && (
+                    <SelectItem value={draft.source}>{draft.source} (legacy)</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
