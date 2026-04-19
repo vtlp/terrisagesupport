@@ -811,9 +811,15 @@ export default function Knowledge() {
       </Dialog>
 
       {/* In-app file preview dialog */}
-      <Dialog open={!!previewFile} onOpenChange={(o) => { if (!o) { setPreviewFile(null); setPreviewUrl(null); setPreviewText(null); } }}>
+      <Dialog open={!!previewFile} onOpenChange={(o) => {
+        if (!o) {
+          if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+          setPreviewBlobUrl(null);
+          setPreviewFile(null); setPreviewUrl(null); setPreviewText(null);
+        }
+      }}>
         <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="p-4 border-b flex-row items-center justify-between space-y-0">
+          <div className="p-4 border-b flex flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {previewFile && fileIcon(previewFile.mime_type, previewFile.name)}
               <div className="min-w-0">
@@ -823,14 +829,19 @@ export default function Knowledge() {
                 </DialogDescription>
               </div>
             </div>
-            <div className="flex gap-2 mr-6">
+            <div className="flex gap-2 mr-6 flex-shrink-0">
+              {previewFile && previewUrl && (
+                <Button size="sm" variant="outline" onClick={() => window.open(previewBlobUrl ?? previewUrl, '_blank')}>
+                  Open in new tab
+                </Button>
+              )}
               {previewFile && (
                 <Button size="sm" variant="outline" onClick={() => downloadFile(previewFile)}>
                   <Download className="h-3.5 w-3.5 mr-1" /> Download
                 </Button>
               )}
             </div>
-          </DialogHeader>
+          </div>
           <div className="flex-1 min-h-0 overflow-auto bg-muted/30">
             {previewLoading && (
               <div className="h-full flex items-center justify-center">
@@ -845,7 +856,11 @@ export default function Knowledge() {
                   </div>
                 )}
                 {previewKind === 'pdf' && (
-                  <iframe src={previewUrl} title={previewFile.name} className="w-full h-full border-0" />
+                  previewBlobUrl ? (
+                    <iframe src={previewBlobUrl} title={previewFile.name} className="w-full h-full border-0" />
+                  ) : (
+                    <div className="h-full flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                  )
                 )}
                 {previewKind === 'video' && (
                   <div className="h-full flex items-center justify-center p-4">
