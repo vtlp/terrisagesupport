@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { SendOnboardingDialog } from '@/components/shared/SendOnboardingDialog';
 import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/components/shared/PhoneInput';
 import { getCityOptions, getPortalOptions } from '@/data/lookupData';
+import { useLookup } from '@/hooks/useLookups';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
@@ -96,13 +97,6 @@ const stageLabels: Record<Stage, string> = {
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
 
-const SOURCES = [
-  { v: 'CALL_DIRECT', l: 'Call (Direct)' },
-  { v: 'LANDING_PAGE', l: 'Landing Page' },
-  { v: 'META_ADS', l: 'Meta Ads' },
-  { v: 'CHAMPION_PARTNER', l: 'Champion / Partner' },
-  { v: 'CP_REQUEST_PROJECTS', l: 'CP Request (Projects)' },
-];
 
 const FOCUS_AREAS = [
   { v: 'SALES', l: 'Sales' },
