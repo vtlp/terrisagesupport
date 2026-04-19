@@ -23,6 +23,7 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
+import { PROPERTY_TYPE_FOCUS_OPTIONS, defaultMarkets } from "@/data/lookupData";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -31,12 +32,7 @@ const STEPS = [
   { number: 4, label: "Review & Submit" },
 ];
 
-const PROPERTY_TYPE_FOCUS_OPTIONS = [
-  { label: "Apartments", value: "apartments" },
-  { label: "Villas", value: "villas" },
-  { label: "Plots", value: "plots" },
-  { label: "Mix", value: "mix" },
-];
+const CITY_OPTIONS = defaultMarkets.map(m => ({ label: m.value, value: m.value }));
 
 const PROJECT_PROPERTY_TYPE_OPTIONS = [
   { label: "Apartments", value: "apartments" },
