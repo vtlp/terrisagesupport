@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
       const planName = (breakdown.plan_name as string) || 'Standard';
       const baseFee = Number(breakdown.base_fee ?? 33000);
       const seatRate = Number(breakdown.per_seat_rate ?? 7000);
+      // Invoice seats reflect what was PURCHASED on the payment link, not active members.
       const seats = Number(breakdown.seats ?? 0);
       const gstPct = Number(breakdown.gst_pct ?? 18);
       const subtotal = Number(breakdown.subtotal ?? baseFee + seatRate * Math.max(seats - 3, 0));

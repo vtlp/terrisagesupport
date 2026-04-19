@@ -93,10 +93,13 @@ export function BillingTab({ accountId }: { accountId: string }) {
 
   const settingsDirty = useMemo(() => JSON.stringify(settings) !== JSON.stringify(savedSettings), [settings, savedSettings]);
 
+  // Billing is driven by seats PURCHASED, never by active-user count.
+  // Pricing rule: base fee covers the first 3 seats, additional seats × per-seat rate.
+  const billedSeats = Math.max(settings.seats_purchased - 3, 0);
   const monthlyTotal = useMemo(() => {
-    const sub = settings.base_fee + settings.seat_rate * seatCount;
+    const sub = settings.base_fee + settings.seat_rate * billedSeats;
     return sub + sub * (settings.gst_pct / 100);
-  }, [settings, seatCount]);
+  }, [settings, billedSeats]);
 
   const draftSubtotal = (Number(draft.base_fee) || 0) + (Number(draft.seat_rate) || 0) * (Number(draft.seat_count) || 0);
   const draftGst = draftSubtotal * (Number(draft.gst_pct) || 0) / 100;
@@ -123,7 +126,8 @@ export function BillingTab({ accountId }: { accountId: string }) {
   const openNew = () => {
     setDraft({
       invoice_no: '', period_from: null, period_to: null, plan_name: settings.plan_name,
-      seat_count: seatCount, seat_rate: settings.seat_rate, base_fee: settings.base_fee,
+      // Default to seats purchased (billing source of truth), not active seat count.
+      seat_count: settings.seats_purchased, seat_rate: settings.seat_rate, base_fee: settings.base_fee,
       gst_pct: settings.gst_pct, status: 'DRAFT', notes: '',
     });
     setOpen(true);
@@ -254,8 +258,8 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 <div className="text-[10px] text-destructive mt-0.5">Over capacity</div>
               )}
             </div>
-            <div className="border rounded p-3"><div className="text-xs text-muted-foreground">Subtotal / cycle</div><div className="text-lg font-semibold">{fmtINR(settings.base_fee + settings.seat_rate * seatCount)}</div></div>
-            <div className="border rounded p-3"><div className="text-xs text-muted-foreground">GST ({settings.gst_pct}%)</div><div className="text-lg font-semibold">{fmtINR((settings.base_fee + settings.seat_rate * seatCount) * settings.gst_pct / 100)}</div></div>
+            <div className="border rounded p-3"><div className="text-xs text-muted-foreground">Subtotal / cycle</div><div className="text-lg font-semibold">{fmtINR(settings.base_fee + settings.seat_rate * billedSeats)}</div></div>
+            <div className="border rounded p-3"><div className="text-xs text-muted-foreground">GST ({settings.gst_pct}%)</div><div className="text-lg font-semibold">{fmtINR((settings.base_fee + settings.seat_rate * billedSeats) * settings.gst_pct / 100)}</div></div>
             <div className="border rounded p-3 bg-primary/5"><div className="text-xs text-muted-foreground">Total / cycle</div><div className="text-lg font-semibold text-primary">{fmtINR(monthlyTotal)}</div></div>
           </div>
         </CardContent>
@@ -277,7 +281,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 <div key={i.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{i.invoice_no ?? '(draft)'}</span>
+                      <span className="font-medium text-sm">{i.invoice_no ?? '—'}</span>
                       <Badge className={`text-[10px] ${STATUS_COLORS[i.status]}`}>{i.status}</Badge>
                       {i.period_from && i.period_to && (
                         <span className="text-xs text-muted-foreground">{format(new Date(i.period_from), 'dd MMM')} – {format(new Date(i.period_to), 'dd MMM yyyy')}</span>
