@@ -212,8 +212,8 @@ export default function EnquiryDetail() {
   const refreshSubmission = useCallback(async (id: string) => {
     const { data } = await supabase.from('onboarding_submissions')
       .select('id, status, submitted_at, reviewed_at, payload, tenancy_type')
-      .eq('enquiry_id', id).order('submitted_at', { ascending: false }).limit(1).maybeSingle();
-    setSubmission(data as Submission | null);
+      .eq('enquiry_id', id).order('submitted_at', { ascending: false });
+    setSubmissions((data ?? []) as Submission[]);
   }, []);
 
   const refreshEnquiryMeta = useCallback(async (id: string) => {
