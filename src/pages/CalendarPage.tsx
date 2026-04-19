@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday,
-  addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, subDays,
+  addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, CalendarIcon, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
