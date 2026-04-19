@@ -23,6 +23,7 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
+import { BUSINESS_AREA_OPTIONS, defaultMarkets } from "@/data/lookupData";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -31,12 +32,7 @@ const STEPS = [
   { number: 4, label: "Review & Submit" },
 ];
 
-const BUSINESS_AREA_OPTIONS = [
-  { label: "Primary Market Sales Only", value: "primary-sales", description: "Focused exclusively on selling new launch or under-construction projects directly from builders and developers." },
-  { label: "Primary and Secondary Market Sales", value: "primary-secondary-sales", description: "Handles both new project sales and resale of existing properties across markets." },
-  { label: "Sales and Rentals in All Markets", value: "sales-rentals-all", description: "Full-service operations covering sales and rentals across primary, secondary, and all property markets." },
-  { label: "Rental Only", value: "rental-only", description: "Specialised in rental and leasing services for residential or commercial properties." },
-];
+const CITY_OPTIONS = defaultMarkets.map(m => ({ label: m.value, value: m.value }));
 
 const ROLE_OPTIONS = [
   { label: "Admin", value: "admin" },
