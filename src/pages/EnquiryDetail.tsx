@@ -739,6 +739,18 @@ export default function EnquiryDetail() {
                   </>
                 );
               })()}
+              {enquiry.onboarding_pack_sent && (
+                <Button
+                  className="w-full"
+                  size="sm"
+                  variant="outline"
+                  onClick={regenerateOnboardingLink}
+                  disabled={busy}
+                  title="Reset the previous submission and share a fresh onboarding link with the customer."
+                >
+                  <Send className="h-4 w-4 mr-2" /> Generate new onboarding link
+                </Button>
+              )}
               <Button className="w-full" size="sm" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
                 <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
               </Button>
