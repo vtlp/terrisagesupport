@@ -248,9 +248,11 @@ export default function CalendarPage() {
                     {Array.from({ length: (rangeStart.getDay() + 6) % 7 }).map((_, i) => <div key={`b-${i}`} className="h-24 md:h-28" />)}
                     {days.map(day => {
                       const dayEvents = getEventsForDay(day);
+                      const hasEvents = dayEvents.length > 0;
                       return (
-                        <button type="button" key={day.toISOString()} onClick={() => setDayDrillDown(day)}
-                          className={`h-24 md:h-28 border rounded-md p-1 text-xs overflow-hidden text-left hover:bg-muted/40 transition-colors ${isToday(day) ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                        <button type="button" key={day.toISOString()}
+                          onClick={() => { if (hasEvents) setDayDrillDown(day); }}
+                          className={`h-24 md:h-28 border rounded-md p-1 text-xs overflow-hidden text-left transition-colors ${hasEvents ? 'hover:bg-muted/40 cursor-pointer' : 'cursor-default'} ${isToday(day) ? 'border-primary bg-primary/5' : 'border-border'}`}>
                           <div className={`font-medium mb-0.5 ${isToday(day) ? 'text-primary' : ''}`}>
                             {format(day, 'd')}
                           </div>
@@ -277,9 +279,13 @@ export default function CalendarPage() {
                 <div className="grid grid-cols-7 gap-2">
                   {days.map(day => {
                     const dayEvents = getEventsForDay(day);
+                    const hasEvents = dayEvents.length > 0;
                     return (
                       <div key={day.toISOString()} className={`min-h-[200px] border rounded-md p-2 ${isToday(day) ? 'border-primary bg-primary/5' : 'border-border'}`}>
-                        <button onClick={() => setDayDrillDown(day)} className={`text-xs font-semibold hover:underline ${isToday(day) ? 'text-primary' : ''}`}>
+                        <button
+                          onClick={() => { if (hasEvents) setDayDrillDown(day); }}
+                          disabled={!hasEvents}
+                          className={`text-xs font-semibold ${hasEvents ? 'hover:underline cursor-pointer' : 'cursor-default'} ${isToday(day) ? 'text-primary' : ''}`}>
                           {format(day, 'EEE d')}
                         </button>
                         <div className="mt-2 space-y-1">

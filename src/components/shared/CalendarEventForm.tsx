@@ -70,15 +70,30 @@ export function CalendarEventForm({
       .order('full_name').then(({ data }) => setTeam((data ?? []) as { id: string; full_name: string }[]));
   }, []);
 
+  // Compute minimum allowed time when the selected date is today
+  const isToday = date ? new Date().toDateString() === date.toDateString() : false;
+  const nowHHMM = (() => {
+    const n = new Date();
+    return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
+  })();
+  const minTime = isToday ? nowHHMM : undefined;
+  const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+
   const handleSubmit = () => {
-    if (title && date) {
-      onSubmit({
-        title, date, time, notes, event_type: eventType,
-        related_entity_type: linkType,
-        related_entity_id: linkId,
-        assigned_to: assignedTo,
-      });
+    if (!title || !date) return;
+    const scheduled = new Date(date);
+    const [h, m] = time.split(':');
+    scheduled.setHours(parseInt(h), parseInt(m), 0, 0);
+    if (scheduled.getTime() < Date.now()) {
+      // Block past date/time on same day
+      return;
     }
+    onSubmit({
+      title, date, time, notes, event_type: eventType,
+      related_entity_type: linkType,
+      related_entity_id: linkId,
+      assigned_to: assignedTo,
+    });
   };
 
   return (
@@ -109,13 +124,18 @@ export function CalendarEventForm({
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={date} onSelect={setDate} initialFocus className="p-3 pointer-events-auto" />
+              <Calendar mode="single" selected={date} onSelect={setDate} initialFocus
+                disabled={(d) => d < todayMidnight}
+                className="p-3 pointer-events-auto" />
             </PopoverContent>
           </Popover>
         </div>
         <div className="space-y-2">
           <Label>Time</Label>
-          <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <Input type="time" value={time} min={minTime} onChange={(e) => setTime(e.target.value)} />
+          {isToday && time < nowHHMM && (
+            <p className="text-[11px] text-destructive">Time must be in the future</p>
+          )}
         </div>
       </div>
       <div className="space-y-2">
@@ -142,7 +162,7 @@ export function CalendarEventForm({
       </div>
       <div className="flex gap-2 justify-end">
         <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-        <Button onClick={handleSubmit} disabled={!title || !date}>Create Event</Button>
+        <Button onClick={handleSubmit} disabled={!title || !date || (isToday && time < nowHHMM)}>Create Event</Button>
       </div>
     </div>
   );
