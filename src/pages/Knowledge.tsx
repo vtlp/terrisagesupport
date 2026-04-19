@@ -410,15 +410,48 @@ export default function Knowledge() {
     const children = getChildren(folder.id);
     const isActive = currentFolderId === folder.id;
     const fileCount = getFilesInFolder(folder.id).length;
+    const isExpanded = expandedFolders.has(folder.id);
+    const hasChildren = children.length > 0;
+    const isDropTarget = dragOverFolderId === folder.id;
+    const isBeingDragged = draggedFolderId === folder.id;
+
     return (
       <div>
         <div
-          className={`group flex items-center gap-1 w-full text-sm rounded-md hover:bg-muted/50 ${isActive ? 'bg-primary/10 text-primary font-medium' : ''}`}
+          className={`group flex items-center gap-1 w-full text-sm rounded-md hover:bg-muted/50 ${isActive ? 'bg-primary/10 text-primary font-medium' : ''} ${isDropTarget ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''} ${isBeingDragged ? 'opacity-40' : ''}`}
           style={{ paddingLeft: `${4 + depth * 12}px` }}
+          draggable
+          onDragStart={(e) => { e.stopPropagation(); setDraggedFolderId(folder.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', folder.id); }}
+          onDragEnd={() => { setDraggedFolderId(null); setDragOverFolderId(null); }}
+          onDragOver={(e) => {
+            if (!draggedFolderId || draggedFolderId === folder.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            setDragOverFolderId(folder.id);
+          }}
+          onDragLeave={(e) => { e.stopPropagation(); if (dragOverFolderId === folder.id) setDragOverFolderId(null); }}
+          onDrop={(e) => {
+            if (!draggedFolderId || draggedFolderId === folder.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const id = draggedFolderId;
+            setDraggedFolderId(null); setDragOverFolderId(null);
+            moveFolder(id, folder.id);
+          }}
+          title="Drag to move into another folder"
         >
           <button
+            className="p-0.5 rounded hover:bg-muted flex-shrink-0"
+            onClick={(e) => { e.stopPropagation(); if (hasChildren) toggleExpanded(folder.id); }}
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+            style={{ visibility: hasChildren ? 'visible' : 'hidden' }}
+          >
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          </button>
+          <button
             className="flex items-center gap-2 flex-1 min-w-0 text-left py-1.5 pr-1"
-            onClick={() => { setCurrentFolderId(folder.id); setActiveTab('files'); }}
+            onClick={() => { setCurrentFolderId(folder.id); setActiveTab('files'); if (hasChildren && !isExpanded) toggleExpanded(folder.id); }}
           >
             {isActive ? <FolderOpen className="h-4 w-4 flex-shrink-0" /> : <Folder className="h-4 w-4 flex-shrink-0" />}
             <span className="truncate flex-1">{folder.name}</span>
@@ -429,7 +462,7 @@ export default function Knowledge() {
               <TooltipTrigger asChild>
                 <button
                   className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-opacity"
-                  onClick={(e) => { e.stopPropagation(); openNewFolder(folder.id); }}
+                  onClick={(e) => { e.stopPropagation(); openNewFolder(folder.id); if (!isExpanded) toggleExpanded(folder.id); }}
                   aria-label={`New subfolder inside ${folder.name}`}
                 >
                   <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />
@@ -439,7 +472,7 @@ export default function Knowledge() {
             </Tooltip>
           </TooltipProvider>
         </div>
-        {children.map(c => <FolderTreeItem key={c.id} folder={c} depth={depth + 1} />)}
+        {isExpanded && children.map(c => <FolderTreeItem key={c.id} folder={c} depth={depth + 1} />)}
       </div>
     );
   }
