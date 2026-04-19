@@ -1,8 +1,9 @@
 // Centralised lookup hook — reads from DB tables, caches in-memory, refreshes via realtime.
 // Any change in Admin → Lookup Management instantly propagates everywhere.
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { __setLookupCache } from '@/hooks/useLookupsCache';
 
 export type LookupKind = 'tags' | 'cities' | 'portals' | 'sources';
 
@@ -42,6 +43,7 @@ async function loadKind(kind: LookupKind) {
     if (!error && data) {
       cache[kind] = data as unknown as LookupRow[];
       loaded[kind] = true;
+      __setLookupCache(kind, cache[kind]);
       notify();
     }
   })();

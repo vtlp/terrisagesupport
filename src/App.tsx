@@ -9,6 +9,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { UserProvider } from "@/context/UserContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { supabase } from "@/integrations/supabase/client";
+import { preloadAllLookups } from "@/hooks/useLookups";
 import Auth from "@/pages/Auth";
 import OnboardingForm from "@/pages/OnboardingForm";
 import AgencyOnboarding from "@/pages/onboarding/AgencyOnboarding";
@@ -43,6 +44,8 @@ const App = () => {
       localStorage.removeItem('session_persist');
     }
     sessionStorage.setItem('session_alive', '1');
+    // Hydrate global lookup cache + start realtime once at app boot
+    preloadAllLookups();
   }, []);
 
   return (
