@@ -373,6 +373,9 @@ export default function Knowledge() {
   };
 
   const openPreview = async (f: KFile) => {
+    // revoke previous blob if any
+    if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); }
+    setPreviewBlobUrl(null);
     setPreviewFile(f);
     setPreviewUrl(null);
     setPreviewText(null);
@@ -385,6 +388,18 @@ export default function Knowledge() {
       return;
     }
     setPreviewUrl(data.signedUrl);
+    // For PDFs, fetch as blob so the browser renders it inline (avoids Chrome
+    // blocking iframes when storage returns Content-Disposition: attachment).
+    if (kind === 'pdf') {
+      try {
+        const res = await fetch(data.signedUrl);
+        const blob = await res.blob();
+        const typedBlob = blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
+        setPreviewBlobUrl(URL.createObjectURL(typedBlob));
+      } catch {
+        toast.error('Could not load PDF for preview');
+      }
+    }
     if (kind === 'text') {
       try {
         const res = await fetch(data.signedUrl);
