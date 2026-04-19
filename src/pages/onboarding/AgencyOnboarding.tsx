@@ -23,7 +23,8 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
-import { BUSINESS_AREA_OPTIONS, defaultMarkets } from "@/data/lookupData";
+import { BUSINESS_AREA_OPTIONS, defaultMarkets, defaultPortals } from "@/data/lookupData";
+import { MultiSelect } from "@/components/shared/MultiSelect";
 
 const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
@@ -97,6 +98,12 @@ export default function AgencyOnboarding() {
   const [reraId, setReraId] = useState("");
   const [city, setCity] = useState("");
   const [businessArea, setBusinessArea] = useState("");
+  const [website, setWebsite] = useState("");
+  const [whatsappChannel, setWhatsappChannel] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [portals, setPortals] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
   // Step 2
@@ -131,6 +138,12 @@ export default function AgencyOnboarding() {
         if (d.reraId) setReraId(d.reraId);
         if (d.city) setCity(d.city);
         if (d.businessArea) setBusinessArea(d.businessArea);
+        if (d.website) setWebsite(d.website);
+        if (d.whatsappChannel) setWhatsappChannel(d.whatsappChannel);
+        if (d.youtube) setYoutube(d.youtube);
+        if (d.instagram) setInstagram(d.instagram);
+        if (d.facebook) setFacebook(d.facebook);
+        if (Array.isArray(d.portals)) setPortals(d.portals);
         if (d.notes) setNotes(d.notes);
         if (d.seatsRequired && !lockSeats) setSeatsRequired(d.seatsRequired);
         if (d.teamMembers) setTeamMembers(d.teamMembers);
@@ -150,7 +163,9 @@ export default function AgencyOnboarding() {
     // serialise them — users re-attach those before final submission.
     const companyLogoSerialized = await filesToSerializable(companyLogo);
     const data = {
-      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea, notes,
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea,
+      website, whatsappChannel, youtube, instagram, facebook, portals,
+      notes,
       seatsRequired, teamMembers,
       projects: projects.map(p => ({ ...p, brochure: undefined })),
       companyLogoSerialized,
@@ -250,11 +265,13 @@ export default function AgencyOnboarding() {
       const payload = {
         primary_contact: { full_name: fullName, mobile, mobile_code: mobileCode, email },
         company: { name: companyName, tagline: companyTagline, rera_id: reraId, city, business_area: businessArea, logo_paths: logoPaths },
+        online_presence: { website, whatsapp_channel: whatsappChannel, youtube, instagram, facebook, portals },
         company_name: companyName,
         owner_name: fullName,
         owner_phone: `${mobileCode}${mobile}`,
         owner_email: email,
         city,
+        website,
         rera_number: reraId,
         team: { seats_required: seatsRequired, members: teamMembers },
         team_members: teamMembers.map(tm => ({ full_name: tm.fullName, email: tm.email, phone: `${tm.mobileCode}${tm.mobile}`, role: tm.role })),
