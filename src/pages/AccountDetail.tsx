@@ -484,51 +484,6 @@ export default function AccountDetail() {
           <ApiKeysCard accountId={acc.id} />
         </TabsContent>
 
-          {(() => {
-            const op = (draft.payload?.online_presence as Record<string, unknown> | undefined) ?? {};
-            const website = (op.website as string | undefined) ?? draft.website ?? '';
-            const whatsapp = (op.whatsapp_channel as string | undefined) ?? '';
-            const youtube = (op.youtube as string | undefined) ?? '';
-            const instagram = (op.instagram as string | undefined) ?? '';
-            const facebook = (op.facebook as string | undefined) ?? '';
-            const portals = Array.isArray(op.portals) ? (op.portals as string[]) : [];
-            return (
-              <Card>
-                <CardHeader><CardTitle className="text-base">Online presence</CardTitle></CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Website</Label>
-                    <Input type="url" placeholder="https://" value={website} onChange={e => setOnlinePresenceField('website', e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>WhatsApp channel link</Label>
-                    <Input type="url" placeholder="https://whatsapp.com/channel/..." value={whatsapp} onChange={e => setOnlinePresenceField('whatsapp_channel', e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>YouTube</Label>
-                    <Input type="url" placeholder="https://youtube.com/@..." value={youtube} onChange={e => setOnlinePresenceField('youtube', e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Instagram</Label>
-                    <Input type="url" placeholder="https://instagram.com/..." value={instagram} onChange={e => setOnlinePresenceField('instagram', e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Facebook</Label>
-                    <Input type="url" placeholder="https://facebook.com/..." value={facebook} onChange={e => setOnlinePresenceField('facebook', e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Property portals in use</Label>
-                    <MultiSelect
-                      options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
-                      selected={portals}
-                      onChange={v => setOnlinePresenceField('portals', v)}
-                      placeholder="Select portals…"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
 
         <TabsContent value="projects" className="space-y-4">
           <ProjectsTab payload={acc.payload} />
