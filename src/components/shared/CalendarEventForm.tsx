@@ -70,15 +70,30 @@ export function CalendarEventForm({
       .order('full_name').then(({ data }) => setTeam((data ?? []) as { id: string; full_name: string }[]));
   }, []);
 
+  // Compute minimum allowed time when the selected date is today
+  const isToday = date ? new Date().toDateString() === date.toDateString() : false;
+  const nowHHMM = (() => {
+    const n = new Date();
+    return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
+  })();
+  const minTime = isToday ? nowHHMM : undefined;
+  const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+
   const handleSubmit = () => {
-    if (title && date) {
-      onSubmit({
-        title, date, time, notes, event_type: eventType,
-        related_entity_type: linkType,
-        related_entity_id: linkId,
-        assigned_to: assignedTo,
-      });
+    if (!title || !date) return;
+    const scheduled = new Date(date);
+    const [h, m] = time.split(':');
+    scheduled.setHours(parseInt(h), parseInt(m), 0, 0);
+    if (scheduled.getTime() < Date.now()) {
+      // Block past date/time on same day
+      return;
     }
+    onSubmit({
+      title, date, time, notes, event_type: eventType,
+      related_entity_type: linkType,
+      related_entity_id: linkId,
+      assigned_to: assignedTo,
+    });
   };
 
   return (
