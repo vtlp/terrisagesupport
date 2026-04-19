@@ -30,7 +30,8 @@ const STEPS = [
   { number: 1, label: "Business & Primary Contact" },
   { number: 2, label: "Team Access & Permissions" },
   { number: 3, label: "Projects & Bulk Imports" },
-  { number: 4, label: "Review & Submit" },
+  { number: 4, label: "Online Presence" },
+  { number: 5, label: "Review & Submit" },
 ];
 
 const CITY_OPTIONS = defaultMarkets.map(m => ({ label: m.value, value: m.value }));
@@ -234,7 +235,7 @@ export default function BuilderOnboarding() {
     else valid = true;
     if (valid) {
       setCompletedSteps((prev) => [...new Set([...prev, currentStep])]);
-      setCurrentStep((s) => Math.min(s + 1, 4));
+      setCurrentStep((s) => Math.min(s + 1, 5));
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -422,26 +423,10 @@ export default function BuilderOnboarding() {
 
             <section className="space-y-6">
               <div>
-                <h2 className="text-xl font-bold text-foreground">Online Presence</h2>
-                <p className="text-sm text-muted-foreground mt-1">Share your website, social channels, and the property portals you currently use. These help us configure your CRM and integrations correctly.</p>
+                <h2 className="text-xl font-bold text-foreground">Additional Onboarding Notes</h2>
+                <p className="text-sm text-muted-foreground mt-1">Use this space for anything we should know before setup begins.</p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <TextField label="Website" type="url" value={website} onChange={setWebsite} placeholder="https://" />
-                <TextField label="WhatsApp channel link" type="url" value={whatsappChannel} onChange={setWhatsappChannel} placeholder="https://whatsapp.com/channel/..." />
-                <TextField label="YouTube" type="url" value={youtube} onChange={setYoutube} placeholder="https://youtube.com/@..." />
-                <TextField label="Instagram" type="url" value={instagram} onChange={setInstagram} placeholder="https://instagram.com/..." />
-                <TextField label="Facebook" type="url" value={facebook} onChange={setFacebook} placeholder="https://facebook.com/..." />
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Property portals in use</label>
-                  <MultiSelect
-                    options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
-                    selected={portals}
-                    onChange={setPortals}
-                    placeholder="Select portals…"
-                  />
-                </div>
-              </div>
-              <TextAreaField label="Notes for onboarding team" value={notes} onChange={setNotes} rows={4} helperText="Use this space for anything we should know before setup begins." />
+              <TextAreaField label="Notes for onboarding team" value={notes} onChange={setNotes} rows={4} />
             </section>
           </motion.div>
         </>
@@ -550,6 +535,31 @@ export default function BuilderOnboarding() {
       {currentStep === 4 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-32 space-y-6">
           <div>
+            <h2 className="text-2xl font-bold text-foreground">Online Presence</h2>
+            <p className="text-sm text-muted-foreground mt-1">Share your website, social channels, and the property portals you currently use. These help us configure your CRM and integrations correctly.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <TextField label="Website" type="url" value={website} onChange={setWebsite} placeholder="https://" />
+            <TextField label="WhatsApp channel link" type="url" value={whatsappChannel} onChange={setWhatsappChannel} placeholder="https://whatsapp.com/channel/..." />
+            <TextField label="YouTube" type="url" value={youtube} onChange={setYoutube} placeholder="https://youtube.com/@..." />
+            <TextField label="Instagram" type="url" value={instagram} onChange={setInstagram} placeholder="https://instagram.com/..." />
+            <TextField label="Facebook" type="url" value={facebook} onChange={setFacebook} placeholder="https://facebook.com/..." />
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Property portals in use</label>
+              <MultiSelect
+                options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                selected={portals}
+                onChange={setPortals}
+                placeholder="Select portals…"
+              />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {currentStep === 5 && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-32 space-y-6">
+          <div>
             <h2 className="text-2xl font-bold text-foreground">Review & Submit</h2>
             <p className="text-sm text-muted-foreground mt-1">Please review your details carefully before final submission.</p>
           </div>
@@ -565,7 +575,7 @@ export default function BuilderOnboarding() {
             { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label, required: true },
           ]} />
 
-          <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(1)} fields={[
+          <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(4)} fields={[
             { label: "Website", value: website },
             { label: "WhatsApp channel link", value: whatsappChannel },
             { label: "YouTube", value: youtube },
@@ -613,7 +623,7 @@ export default function BuilderOnboarding() {
         </motion.div>
       )}
 
-      <StickyActionBar currentStep={currentStep} totalSteps={4} onBack={handleBack} onSaveDraft={handleSaveDraft} onContinue={handleContinue} onSubmit={handleSubmit} isSubmitting={submitting} />
+      <StickyActionBar currentStep={currentStep} totalSteps={5} onBack={handleBack} onSaveDraft={handleSaveDraft} onContinue={handleContinue} onSubmit={handleSubmit} isSubmitting={submitting} />
     </div>
   );
 }
