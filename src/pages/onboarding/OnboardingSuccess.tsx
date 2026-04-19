@@ -67,6 +67,8 @@ export default function OnboardingSuccess() {
 
         <p className="text-sm text-muted-foreground">
           If we need any clarification, we will contact your primary account owner.
+          <br />
+          To generate a new onboarding link or share additional details, please contact support.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
