@@ -23,7 +23,6 @@ import { toast } from 'sonner';
 import { SendOnboardingDialog } from '@/components/shared/SendOnboardingDialog';
 import { PhoneInput, splitPhone, joinPhone, DEFAULT_COUNTRY_CODE } from '@/components/shared/PhoneInput';
 import { getCityOptions, getPortalOptions } from '@/data/lookupData';
-import { useLookup } from '@/hooks/useLookups';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
