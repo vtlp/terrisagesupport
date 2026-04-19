@@ -1642,3 +1642,23 @@ function ActiveStagePanel({
 
   return null;
 }
+
+function DiffField({ label, value, previous }: { label: string; value: unknown; previous: unknown }) {
+  const cur = value === null || value === undefined || value === '' ? '—' : String(value);
+  const prev = previous === null || previous === undefined || previous === '' ? '—' : String(previous);
+  const changed = previous !== undefined && cur !== prev;
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+        {label}
+        {changed && (
+          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-warning/10 text-warning border-warning/30 leading-none">
+            Changed
+          </Badge>
+        )}
+      </div>
+      <div className={changed ? 'text-warning font-medium' : ''}>{cur}</div>
+      {changed && <div className="text-[10px] text-muted-foreground line-through truncate">was {prev}</div>}
+    </div>
+  );
+}
