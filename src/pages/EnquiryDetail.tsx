@@ -1644,10 +1644,6 @@ function ActiveStagePanel({
             </Select>
           </div>
         </div>
-
-        <p className="text-[11px] text-muted-foreground">
-          Onboarding can be sent only after the payment is marked <strong>Paid</strong>.
-        </p>
       </div>
     );
   }
