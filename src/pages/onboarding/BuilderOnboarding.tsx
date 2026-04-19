@@ -421,7 +421,7 @@ export default function BuilderOnboarding() {
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
                 <div data-field="propertyTypeFocus"><SelectField label="Property type focus" required value={propertyTypeFocus} onChange={setPropertyTypeFocus} options={PROPERTY_TYPE_FOCUS_OPTIONS} error={errors.propertyTypeFocus} /></div>
                 <div data-field="headOfficeCity"><SelectField label="City" required value={headOfficeCity} onChange={setHeadOfficeCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.headOfficeCity} /></div>
-                <TextField label="Company Address (Maps Link)" value={googleAddress} onChange={setGoogleAddress} placeholder="Paste your Google Maps business link" helperText="e.g. https://maps.app.goo.gl/R7y5Vq62om2fC3b69" />
+                <TextField label="Company Address (Maps Link)" value={googleAddress} onChange={setGoogleAddress} helperText="e.g. https://maps.app.goo.gl/R7y5Vq62om2fC3b69" />
               </div>
             </section>
 
