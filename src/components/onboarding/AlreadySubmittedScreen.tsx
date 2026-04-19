@@ -1,7 +1,5 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, Mail, Phone, LifeBuoy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
 
 interface Props {
   submittedAt?: string | null;
