@@ -40,8 +40,7 @@ export function AlreadySubmittedScreen({ submittedAt, tenancy }: Props) {
             This onboarding form has already been submitted
           </h1>
           <p className="text-base text-muted-foreground">
-            Need to add or correct information? Contact Terrisage support and
-            we will share a fresh onboarding link with you.
+            To generate a new onboarding link or update your details, please contact Terrisage support using the details below.
           </p>
           {formatted && (
             <p className="text-sm text-muted-foreground">
