@@ -23,7 +23,7 @@ import { submitOnboarding, uploadFiles, getEnquiryIdFromUrl, checkSubmissionLock
 import { readOnboardingPrefill } from "@/lib/onboardingPrefill";
 import { AlreadySubmittedScreen } from "@/components/onboarding/AlreadySubmittedScreen";
 import { stashOnboardingSummary } from "@/lib/onboardingZipDownload";
-import { PROPERTY_TYPE_FOCUS_OPTIONS, defaultMarkets, defaultPortals } from "@/data/lookupData";
+import { PROPERTY_TYPE_FOCUS_OPTIONS, getCityOptions, getPortalOptions } from "@/data/lookupData";
 import { MultiSelect } from "@/components/shared/MultiSelect";
 
 const STEPS = [
@@ -34,7 +34,7 @@ const STEPS = [
   { number: 5, label: "Review & Submit" },
 ];
 
-const CITY_OPTIONS = defaultMarkets.map(m => ({ label: m.value, value: m.value }));
+const CITY_OPTIONS = getCityOptions().map(v => ({ label: v, value: v }));
 
 const PROJECT_PROPERTY_TYPE_OPTIONS = [
   { label: "Apartments", value: "apartments" },
@@ -551,7 +551,7 @@ export default function BuilderOnboarding() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Property portals in use</label>
               <MultiSelect
-                options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                options={getPortalOptions().map(v => ({ value: v, label: v }))}
                 selected={portals}
                 onChange={setPortals}
                 placeholder="Select portals…"
