@@ -418,6 +418,29 @@ export default function BuilderOnboarding() {
                 <div data-field="headOfficeCity"><SelectField label="City" required value={headOfficeCity} onChange={setHeadOfficeCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.headOfficeCity} /></div>
                 <div data-field="propertyTypeFocus"><SelectField label="Property type focus" required value={propertyTypeFocus} onChange={setPropertyTypeFocus} options={PROPERTY_TYPE_FOCUS_OPTIONS} error={errors.propertyTypeFocus} /></div>
               </div>
+            </section>
+
+            <section className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Online Presence</h2>
+                <p className="text-sm text-muted-foreground mt-1">Share your website, social channels, and the property portals you currently use. These help us configure your CRM and integrations correctly.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <TextField label="Website" type="url" value={website} onChange={setWebsite} placeholder="https://" />
+                <TextField label="WhatsApp channel link" type="url" value={whatsappChannel} onChange={setWhatsappChannel} placeholder="https://whatsapp.com/channel/..." />
+                <TextField label="YouTube" type="url" value={youtube} onChange={setYoutube} placeholder="https://youtube.com/@..." />
+                <TextField label="Instagram" type="url" value={instagram} onChange={setInstagram} placeholder="https://instagram.com/..." />
+                <TextField label="Facebook" type="url" value={facebook} onChange={setFacebook} placeholder="https://facebook.com/..." />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Property portals in use</label>
+                  <MultiSelect
+                    options={defaultPortals.map(p => ({ value: p.value, label: p.value }))}
+                    selected={portals}
+                    onChange={setPortals}
+                    placeholder="Select portals…"
+                  />
+                </div>
+              </div>
               <TextAreaField label="Notes for onboarding team" value={notes} onChange={setNotes} rows={4} helperText="Use this space for anything we should know before setup begins." />
             </section>
           </motion.div>
