@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, BookOpen, Copy, Folder, FolderOpen, File as FileIcon, Upload, Plus, FolderPlus, ChevronRight, Download, FileText, Image as ImageIcon, Table2, Loader2, Trash2, Eye } from 'lucide-react';
+import { Search, BookOpen, Copy, Folder, FolderOpen, File as FileIcon, Upload, Plus, FolderPlus, ChevronRight, ChevronDown, Download, FileText, Image as ImageIcon, Table2, Loader2, Trash2, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -75,9 +75,15 @@ export default function Knowledge() {
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Sidebar folder expand/collapse + drag-to-reorganize
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | 'root' | null>(null);
+
   // Preview state
   const [previewFile, setPreviewFile] = useState<KFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -117,6 +123,51 @@ export default function Knowledge() {
     while (cur) { trail.unshift(cur); cur = folders.find(f => f.id === cur!.parent_id) ?? null; }
     return trail;
   })();
+
+  // Auto-expand ancestors of the currently selected folder
+  useEffect(() => {
+    if (!currentFolderId) return;
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      let cur = folders.find(f => f.id === currentFolderId) ?? null;
+      while (cur && cur.parent_id) { next.add(cur.parent_id); cur = folders.find(f => f.id === cur!.parent_id) ?? null; }
+      next.add(currentFolderId);
+      return next;
+    });
+  }, [currentFolderId, folders]);
+
+  const toggleExpanded = (id: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Move a folder under a new parent (null = root). Prevents cycles.
+  const moveFolder = async (folderId: string, newParentId: string | null) => {
+    if (folderId === newParentId) return;
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+    if (folder.parent_id === newParentId) return;
+    // Prevent moving into own descendant
+    if (newParentId) {
+      let cur = folders.find(f => f.id === newParentId) ?? null;
+      while (cur) {
+        if (cur.id === folderId) { toast.error('Cannot move a folder into one of its subfolders.'); return; }
+        cur = folders.find(f => f.id === cur!.parent_id) ?? null;
+      }
+    }
+    // Prevent name clash at destination
+    if (folders.some(f => f.parent_id === newParentId && f.name === folder.name && f.id !== folderId)) {
+      toast.error(`A folder named “${folder.name}” already exists here.`);
+      return;
+    }
+    const { error } = await supabase.from('kb_folders').update({ parent_id: newParentId }).eq('id', folderId);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Moved “${folder.name}”`);
+    load();
+  };
 
   const filteredArticles = articles.filter(a => {
     const q = searchQuery.toLowerCase();
@@ -322,6 +373,9 @@ export default function Knowledge() {
   };
 
   const openPreview = async (f: KFile) => {
+    // revoke previous blob if any
+    if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); }
+    setPreviewBlobUrl(null);
     setPreviewFile(f);
     setPreviewUrl(null);
     setPreviewText(null);
@@ -334,6 +388,18 @@ export default function Knowledge() {
       return;
     }
     setPreviewUrl(data.signedUrl);
+    // For PDFs, fetch as blob so the browser renders it inline (avoids Chrome
+    // blocking iframes when storage returns Content-Disposition: attachment).
+    if (kind === 'pdf') {
+      try {
+        const res = await fetch(data.signedUrl);
+        const blob = await res.blob();
+        const typedBlob = blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
+        setPreviewBlobUrl(URL.createObjectURL(typedBlob));
+      } catch {
+        toast.error('Could not load PDF for preview');
+      }
+    }
     if (kind === 'text') {
       try {
         const res = await fetch(data.signedUrl);
@@ -359,15 +425,48 @@ export default function Knowledge() {
     const children = getChildren(folder.id);
     const isActive = currentFolderId === folder.id;
     const fileCount = getFilesInFolder(folder.id).length;
+    const isExpanded = expandedFolders.has(folder.id);
+    const hasChildren = children.length > 0;
+    const isDropTarget = dragOverFolderId === folder.id;
+    const isBeingDragged = draggedFolderId === folder.id;
+
     return (
       <div>
         <div
-          className={`group flex items-center gap-1 w-full text-sm rounded-md hover:bg-muted/50 ${isActive ? 'bg-primary/10 text-primary font-medium' : ''}`}
+          className={`group flex items-center gap-1 w-full text-sm rounded-md hover:bg-muted/50 ${isActive ? 'bg-primary/10 text-primary font-medium' : ''} ${isDropTarget ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''} ${isBeingDragged ? 'opacity-40' : ''}`}
           style={{ paddingLeft: `${4 + depth * 12}px` }}
+          draggable
+          onDragStart={(e) => { e.stopPropagation(); setDraggedFolderId(folder.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', folder.id); }}
+          onDragEnd={() => { setDraggedFolderId(null); setDragOverFolderId(null); }}
+          onDragOver={(e) => {
+            if (!draggedFolderId || draggedFolderId === folder.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            setDragOverFolderId(folder.id);
+          }}
+          onDragLeave={(e) => { e.stopPropagation(); if (dragOverFolderId === folder.id) setDragOverFolderId(null); }}
+          onDrop={(e) => {
+            if (!draggedFolderId || draggedFolderId === folder.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const id = draggedFolderId;
+            setDraggedFolderId(null); setDragOverFolderId(null);
+            moveFolder(id, folder.id);
+          }}
+          title="Drag to move into another folder"
         >
           <button
+            className="p-0.5 rounded hover:bg-muted flex-shrink-0"
+            onClick={(e) => { e.stopPropagation(); if (hasChildren) toggleExpanded(folder.id); }}
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+            style={{ visibility: hasChildren ? 'visible' : 'hidden' }}
+          >
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          </button>
+          <button
             className="flex items-center gap-2 flex-1 min-w-0 text-left py-1.5 pr-1"
-            onClick={() => { setCurrentFolderId(folder.id); setActiveTab('files'); }}
+            onClick={() => { setCurrentFolderId(folder.id); setActiveTab('files'); if (hasChildren && !isExpanded) toggleExpanded(folder.id); }}
           >
             {isActive ? <FolderOpen className="h-4 w-4 flex-shrink-0" /> : <Folder className="h-4 w-4 flex-shrink-0" />}
             <span className="truncate flex-1">{folder.name}</span>
@@ -378,7 +477,7 @@ export default function Knowledge() {
               <TooltipTrigger asChild>
                 <button
                   className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-opacity"
-                  onClick={(e) => { e.stopPropagation(); openNewFolder(folder.id); }}
+                  onClick={(e) => { e.stopPropagation(); openNewFolder(folder.id); if (!isExpanded) toggleExpanded(folder.id); }}
                   aria-label={`New subfolder inside ${folder.name}`}
                 >
                   <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />
@@ -388,7 +487,7 @@ export default function Knowledge() {
             </Tooltip>
           </TooltipProvider>
         </div>
-        {children.map(c => <FolderTreeItem key={c.id} folder={c} depth={depth + 1} />)}
+        {isExpanded && children.map(c => <FolderTreeItem key={c.id} folder={c} depth={depth + 1} />)}
       </div>
     );
   }
@@ -430,10 +529,21 @@ export default function Knowledge() {
               </TooltipProvider>
             </div>
             <button
-              className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted/50 ${currentFolderId === null ? 'bg-primary/10 text-primary font-medium' : ''}`}
+              className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted/50 ${currentFolderId === null ? 'bg-primary/10 text-primary font-medium' : ''} ${dragOverFolderId === 'root' ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}`}
               onClick={() => setCurrentFolderId(null)}
+              onDragOver={(e) => { if (!draggedFolderId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId('root'); }}
+              onDragLeave={() => { if (dragOverFolderId === 'root') setDragOverFolderId(null); }}
+              onDrop={(e) => {
+                if (!draggedFolderId) return;
+                e.preventDefault();
+                const id = draggedFolderId;
+                setDraggedFolderId(null); setDragOverFolderId(null);
+                moveFolder(id, null);
+              }}
+              title={draggedFolderId ? 'Drop here to move folder to root' : undefined}
             >
               <BookOpen className="h-4 w-4" /> All Files
+              {draggedFolderId && <span className="ml-auto text-xs text-muted-foreground">drop to root</span>}
             </button>
             {getChildren(null).map(f => <FolderTreeItem key={f.id} folder={f} />)}
           </>
@@ -701,9 +811,15 @@ export default function Knowledge() {
       </Dialog>
 
       {/* In-app file preview dialog */}
-      <Dialog open={!!previewFile} onOpenChange={(o) => { if (!o) { setPreviewFile(null); setPreviewUrl(null); setPreviewText(null); } }}>
+      <Dialog open={!!previewFile} onOpenChange={(o) => {
+        if (!o) {
+          if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+          setPreviewBlobUrl(null);
+          setPreviewFile(null); setPreviewUrl(null); setPreviewText(null);
+        }
+      }}>
         <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="p-4 border-b flex-row items-center justify-between space-y-0">
+          <div className="p-4 border-b flex flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {previewFile && fileIcon(previewFile.mime_type, previewFile.name)}
               <div className="min-w-0">
@@ -713,14 +829,19 @@ export default function Knowledge() {
                 </DialogDescription>
               </div>
             </div>
-            <div className="flex gap-2 mr-6">
+            <div className="flex gap-2 mr-6 flex-shrink-0">
+              {previewFile && previewUrl && (
+                <Button size="sm" variant="outline" onClick={() => window.open(previewBlobUrl ?? previewUrl, '_blank')}>
+                  Open in new tab
+                </Button>
+              )}
               {previewFile && (
                 <Button size="sm" variant="outline" onClick={() => downloadFile(previewFile)}>
                   <Download className="h-3.5 w-3.5 mr-1" /> Download
                 </Button>
               )}
             </div>
-          </DialogHeader>
+          </div>
           <div className="flex-1 min-h-0 overflow-auto bg-muted/30">
             {previewLoading && (
               <div className="h-full flex items-center justify-center">
@@ -735,7 +856,11 @@ export default function Knowledge() {
                   </div>
                 )}
                 {previewKind === 'pdf' && (
-                  <iframe src={previewUrl} title={previewFile.name} className="w-full h-full border-0" />
+                  previewBlobUrl ? (
+                    <iframe src={previewBlobUrl} title={previewFile.name} className="w-full h-full border-0" />
+                  ) : (
+                    <div className="h-full flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                  )
                 )}
                 {previewKind === 'video' && (
                   <div className="h-full flex items-center justify-center p-4">
