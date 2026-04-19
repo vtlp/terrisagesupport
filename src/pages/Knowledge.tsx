@@ -124,6 +124,51 @@ export default function Knowledge() {
     return trail;
   })();
 
+  // Auto-expand ancestors of the currently selected folder
+  useEffect(() => {
+    if (!currentFolderId) return;
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      let cur = folders.find(f => f.id === currentFolderId) ?? null;
+      while (cur && cur.parent_id) { next.add(cur.parent_id); cur = folders.find(f => f.id === cur!.parent_id) ?? null; }
+      next.add(currentFolderId);
+      return next;
+    });
+  }, [currentFolderId, folders]);
+
+  const toggleExpanded = (id: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Move a folder under a new parent (null = root). Prevents cycles.
+  const moveFolder = async (folderId: string, newParentId: string | null) => {
+    if (folderId === newParentId) return;
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+    if (folder.parent_id === newParentId) return;
+    // Prevent moving into own descendant
+    if (newParentId) {
+      let cur = folders.find(f => f.id === newParentId) ?? null;
+      while (cur) {
+        if (cur.id === folderId) { toast.error('Cannot move a folder into one of its subfolders.'); return; }
+        cur = folders.find(f => f.id === cur!.parent_id) ?? null;
+      }
+    }
+    // Prevent name clash at destination
+    if (folders.some(f => f.parent_id === newParentId && f.name === folder.name && f.id !== folderId)) {
+      toast.error(`A folder named “${folder.name}” already exists here.`);
+      return;
+    }
+    const { error } = await supabase.from('kb_folders').update({ parent_id: newParentId }).eq('id', folderId);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Moved “${folder.name}”`);
+    load();
+  };
+
   const filteredArticles = articles.filter(a => {
     const q = searchQuery.toLowerCase();
     const matchSearch = !q || a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q) || (a.tags ?? []).some(t => t.toLowerCase().includes(q));
