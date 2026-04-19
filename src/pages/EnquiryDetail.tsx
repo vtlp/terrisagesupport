@@ -725,35 +725,38 @@ export default function EnquiryDetail() {
                   : null;
                 return (
                   <>
-                    <Button
-                      className="w-full"
-                      size="sm"
-                      onClick={handleSendOnboarding}
-                      disabled={busy || !onboardEnabled}
-                      variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
-                      title={blockedReason ?? undefined}
-                    >
-                      <Send className="h-4 w-4 mr-2" />
-                      {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        className="flex-1"
+                        size="sm"
+                        onClick={handleSendOnboarding}
+                        disabled={busy || !onboardEnabled}
+                        variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
+                        title={blockedReason ?? undefined}
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
+                      </Button>
+                      {enquiry.onboarding_pack_sent && !enquiry.converted_account_id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={regenerateOnboardingLink}
+                          disabled={busy}
+                          title="Generate a fresh onboarding link. The previous submission is unlocked so the customer can resubmit updated details."
+                          aria-label="Generate new onboarding link"
+                          className="px-2"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                     {blockedReason && (
                       <p className="text-[11px] text-muted-foreground -mt-1 text-center">{blockedReason}</p>
                     )}
                   </>
                 );
               })()}
-              {enquiry.onboarding_pack_sent && (
-                <Button
-                  className="w-full"
-                  size="sm"
-                  variant="outline"
-                  onClick={regenerateOnboardingLink}
-                  disabled={busy}
-                  title="Reset the previous submission and share a fresh onboarding link with the customer."
-                >
-                  <Send className="h-4 w-4 mr-2" /> Generate new onboarding link
-                </Button>
-              )}
               <Button className="w-full" size="sm" variant="outline" onClick={() => setScheduleOpen(true)} disabled={busy}>
                 <CalendarPlus className="h-4 w-4 mr-2" /> Schedule event
               </Button>
