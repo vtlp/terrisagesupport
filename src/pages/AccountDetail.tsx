@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { defaultMarkets, BUSINESS_AREA_OPTIONS, PROPERTY_TYPE_FOCUS_OPTIONS } from '@/data/lookupData';
+import { defaultMarkets, BUSINESS_AREA_OPTIONS, PROPERTY_TYPE_FOCUS_OPTIONS, defaultPortals } from '@/data/lookupData';
+import { MultiSelect } from '@/components/shared/MultiSelect';
 import { PhoneInput, splitPhone, joinPhone } from '@/components/shared/PhoneInput';
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { VerificationTab } from '@/components/account/VerificationTab';
