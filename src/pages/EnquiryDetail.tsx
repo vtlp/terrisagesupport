@@ -1010,36 +1010,65 @@ export default function EnquiryDetail() {
       {submission ? (
         <Card className="border-2 border-border shadow-sm">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Onboarding submission</CardTitle>
-              {submission.status === 'PENDING_REVIEW' && <Badge className="bg-warning/15 text-warning"><Clock className="h-3 w-3 mr-1" />Pending review</Badge>}
-              {submission.status === 'APPROVED' && <Badge className="bg-success/15 text-success"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>}
-              {submission.status === 'REJECTED' && <Badge className="bg-destructive/15 text-destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base">
+                Onboarding submission
+                {submissions.length > 1 && (
+                  <span className="text-xs font-normal text-muted-foreground ml-2">
+                    (latest of {submissions.length})
+                  </span>
+                )}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                {previousSubmission && (
+                  <Badge variant="outline" className="text-[11px]">Resubmission</Badge>
+                )}
+                {submission.status === 'PENDING_REVIEW' && <Badge className="bg-warning/15 text-warning"><Clock className="h-3 w-3 mr-1" />Pending review</Badge>}
+                {submission.status === 'APPROVED' && <Badge className="bg-success/15 text-success"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>}
+                {submission.status === 'REJECTED' && <Badge className="bg-destructive/15 text-destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>}
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">Submitted {format(new Date(submission.submitted_at), 'dd MMM yyyy, HH:mm')}</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-              <div><div className="text-xs text-muted-foreground">Company</div><div>{String(subPayload.company_name ?? '—')}</div></div>
-              <div><div className="text-xs text-muted-foreground">City</div><div>{String(subPayload.city ?? '—')}</div></div>
-              <div><div className="text-xs text-muted-foreground">Owner</div><div>{String(subPayload.owner_name ?? '—')}</div></div>
-              <div><div className="text-xs text-muted-foreground">Phone</div><div>{String(subPayload.owner_phone ?? '—')}</div></div>
-              {subPayload.gst_number ? <div><div className="text-xs text-muted-foreground">GST</div><div>{String(subPayload.gst_number)}</div></div> : null}
-              {subPayload.rera_number ? <div><div className="text-xs text-muted-foreground">RERA</div><div>{String(subPayload.rera_number)}</div></div> : null}
+              <DiffField label="Company" value={subPayload.company_name} previous={previousSubmission?.payload?.company_name} />
+              <DiffField label="City" value={subPayload.city} previous={previousSubmission?.payload?.city} />
+              <DiffField label="Owner" value={subPayload.owner_name} previous={previousSubmission?.payload?.owner_name} />
+              <DiffField label="Phone" value={subPayload.owner_phone} previous={previousSubmission?.payload?.owner_phone} />
+              {(subPayload.gst_number || previousSubmission?.payload?.gst_number) && (
+                <DiffField label="GST" value={subPayload.gst_number} previous={previousSubmission?.payload?.gst_number} />
+              )}
+              {(subPayload.rera_number || previousSubmission?.payload?.rera_number) && (
+                <DiffField label="RERA" value={subPayload.rera_number} previous={previousSubmission?.payload?.rera_number} />
+              )}
             </div>
-            {teamMembers.length > 0 && (
-              <div>
-                <div className="text-xs text-muted-foreground mb-2">Team members ({teamMembers.length})</div>
-                <div className="space-y-1.5">
-                  {teamMembers.map((m, i) => (
-                    <div key={i} className="text-sm border rounded p-2 flex justify-between">
-                      <span>{m.full_name || m.name}</span>
-                      <span className="text-xs text-muted-foreground">{m.role}</span>
-                    </div>
-                  ))}
+            {teamMembers.length > 0 && (() => {
+              const prevTeam = Array.isArray(previousSubmission?.payload?.team_members)
+                ? previousSubmission!.payload!.team_members as Array<Record<string, string>>
+                : [];
+              const teamChanged = previousSubmission && JSON.stringify(prevTeam) !== JSON.stringify(teamMembers);
+              return (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
+                    <span>Team members ({teamMembers.length})</span>
+                    {teamChanged && (
+                      <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/30">
+                        Changed (was {prevTeam.length})
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {teamMembers.map((m, i) => (
+                      <div key={i} className="text-sm border rounded p-2 flex justify-between">
+                        <span>{m.full_name || m.name}</span>
+                        <span className="text-xs text-muted-foreground">{m.role}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {submission.status === 'PENDING_REVIEW' && (
               <div className="flex gap-2 pt-2">
                 <Button onClick={() => reviewSubmission('APPROVED')} disabled={busy} className="flex-1">
@@ -1048,6 +1077,50 @@ export default function EnquiryDetail() {
                 <Button onClick={() => reviewSubmission('REJECTED')} disabled={busy} variant="outline" className="flex-1">
                   <XCircle className="h-4 w-4 mr-2" /> Reject
                 </Button>
+              </div>
+            )}
+
+            {/* Submission history */}
+            {submissions.length > 1 && (
+              <div className="pt-3 mt-3 border-t border-border/60">
+                <div className="text-xs font-semibold text-muted-foreground mb-2">Previous submissions</div>
+                <div className="space-y-1.5">
+                  {submissions.slice(1).map(s => {
+                    const isOpen = expandedSubmissionIds.has(s.id);
+                    const sp = (s.payload ?? {}) as Record<string, unknown>;
+                    return (
+                      <div key={s.id} className="border rounded-md">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedSubmissionIds(prev => {
+                            const n = new Set(prev);
+                            if (n.has(s.id)) n.delete(s.id); else n.add(s.id);
+                            return n;
+                          })}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-muted/40 rounded-md"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isOpen ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                            <span className="truncate">{format(new Date(s.submitted_at), 'dd MMM yyyy, HH:mm')}</span>
+                          </div>
+                          {s.status === 'PENDING_REVIEW' && <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/30">Pending</Badge>}
+                          {s.status === 'APPROVED' && <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30">Approved</Badge>}
+                          {s.status === 'REJECTED' && <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">Rejected</Badge>}
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 pb-3 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                            <div><div className="text-xs text-muted-foreground">Company</div><div>{String(sp.company_name ?? '—')}</div></div>
+                            <div><div className="text-xs text-muted-foreground">City</div><div>{String(sp.city ?? '—')}</div></div>
+                            <div><div className="text-xs text-muted-foreground">Owner</div><div>{String(sp.owner_name ?? '—')}</div></div>
+                            <div><div className="text-xs text-muted-foreground">Phone</div><div>{String(sp.owner_phone ?? '—')}</div></div>
+                            {sp.gst_number ? <div><div className="text-xs text-muted-foreground">GST</div><div>{String(sp.gst_number)}</div></div> : null}
+                            {sp.rera_number ? <div><div className="text-xs text-muted-foreground">RERA</div><div>{String(sp.rera_number)}</div></div> : null}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </CardContent>
