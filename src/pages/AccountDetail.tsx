@@ -128,7 +128,7 @@ export default function AccountDetail() {
       account_name: draft.account_name, city: draft.city, status: draft.status, tenancy_type: draft.tenancy_type,
       owner_name: draft.owner_name, owner_phone: draft.owner_phone, owner_email: draft.owner_email,
       gst_number: draft.gst_number, pan_number: draft.pan_number, rera_number: draft.rera_number, website: draft.website,
-      payload: draft.payload,
+      payload: draft.payload as never,
     }).eq('id', acc.id);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
