@@ -300,7 +300,7 @@ export default function BuilderOnboarding() {
               { label: "Company tagline", value: companyTagline },
               { label: "RERA ID", value: reraId },
               { label: "City", value: headOfficeCity },
-              { label: "Google company address", value: googleAddress },
+              { label: "Company Address (Maps Link)", value: googleAddress },
               { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label },
             ],
           },
@@ -421,7 +421,7 @@ export default function BuilderOnboarding() {
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
                 <div data-field="propertyTypeFocus"><SelectField label="Property type focus" required value={propertyTypeFocus} onChange={setPropertyTypeFocus} options={PROPERTY_TYPE_FOCUS_OPTIONS} error={errors.propertyTypeFocus} /></div>
                 <div data-field="headOfficeCity"><SelectField label="City" required value={headOfficeCity} onChange={setHeadOfficeCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.headOfficeCity} /></div>
-                <TextField label="Google company address" value={googleAddress} onChange={setGoogleAddress} placeholder="Paste your Google Maps business address" />
+                <TextField label="Company Address (Maps Link)" value={googleAddress} onChange={setGoogleAddress} placeholder="Paste your Google Maps business link" helperText="e.g. https://maps.app.goo.gl/R7y5Vq62om2fC3b69" />
               </div>
             </section>
 
@@ -577,7 +577,7 @@ export default function BuilderOnboarding() {
             { label: "RERA ID", value: reraId },
             { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label, required: true },
             { label: "City", value: headOfficeCity, required: true },
-            { label: "Google company address", value: googleAddress },
+            { label: "Company Address (Maps Link)", value: googleAddress },
           ]} />
 
           <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(4)} fields={[
