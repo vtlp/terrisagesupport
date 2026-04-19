@@ -552,6 +552,11 @@ export default function EnquiryDetail() {
       setTimeout(() => el?.focus(), 300);
       return;
     }
+    const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
+    if (!enquiry.onboarding_pack_sent && !paymentPaid) {
+      toast.error('Mark the payment as Paid before sending the onboarding form.');
+      return;
+    }
     if (!(await requireClean('send the onboarding form'))) return;
     const link = generateLink();
     if (!enquiry.onboarding_pack_sent) {
