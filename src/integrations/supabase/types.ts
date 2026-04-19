@@ -1588,6 +1588,41 @@ export type Database = {
           },
         ]
       }
+      ticket_queue_members: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          queue_id: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          queue_id: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          queue_id?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_queue_members_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_queues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_queues: {
         Row: {
           created_at: string
@@ -1596,6 +1631,8 @@ export type Database = {
           id: string
           is_active: boolean
           key: string
+          last_assigned_at: string | null
+          last_assigned_user_id: string | null
           name: string
           sort_order: number
           updated_at: string
@@ -1607,6 +1644,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           key: string
+          last_assigned_at?: string | null
+          last_assigned_user_id?: string | null
           name: string
           sort_order?: number
           updated_at?: string
@@ -1618,6 +1657,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           key?: string
+          last_assigned_at?: string | null
+          last_assigned_user_id?: string | null
           name?: string
           sort_order?: number
           updated_at?: string
