@@ -172,6 +172,7 @@ export default function EnquiryDetail() {
   const [newNote, setNewNote] = useState('');
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [pendingEventType, setPendingEventType] = useState<CalendarEventType>(CalendarEventType.GENERAL);
   const [pendingEventTitle, setPendingEventTitle] = useState<string>('');
@@ -560,7 +561,7 @@ export default function EnquiryDetail() {
     setShareOpen(true);
   };
 
-  const regenerateOnboardingLink = async () => {
+  const requestRegenerateOnboardingLink = async () => {
     if (!enquiry || !draft) return;
     const teamSize = draft.payload.team_size_estimate;
     if (teamSize === null || teamSize === undefined || Number(teamSize) <= 0) {
@@ -568,10 +569,12 @@ export default function EnquiryDetail() {
       return;
     }
     if (!(await requireClean('generate a new onboarding link'))) return;
-    const confirmed = window.confirm(
-      'Generate a new onboarding link?\n\nThe customer can submit fresh details. The previous submission stays on file as a historical version — you can compare both and approve whichever is correct. If you approve the new one, the account will be created from it; otherwise the original approved submission is used.',
-    );
-    if (!confirmed) return;
+    setRegenConfirmOpen(true);
+  };
+
+  const regenerateOnboardingLink = async () => {
+    if (!enquiry) return;
+    setRegenConfirmOpen(false);
     setBusy(true);
     try {
       const link = generateLink();
