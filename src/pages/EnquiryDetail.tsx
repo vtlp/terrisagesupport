@@ -161,7 +161,10 @@ export default function EnquiryDetail() {
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
   const [draft, setDraft] = useState<Enquiry | null>(null);
   const [notes, setNotes] = useState<NoteRow[]>([]);
-  const [submission, setSubmission] = useState<Submission | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const submission = submissions[0] ?? null;
+  const previousSubmission = submissions[1] ?? null;
+  const [expandedSubmissionIds, setExpandedSubmissionIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
