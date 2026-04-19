@@ -35,7 +35,7 @@ const fileIcon = (mime?: string | null, name?: string) => {
   if (mime?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) return <ImageIcon className="h-4 w-4 text-info" />;
   if (mime?.includes('sheet') || ['xlsx', 'xls', 'csv'].includes(ext)) return <Table2 className="h-4 w-4 text-success" />;
   if (mime === 'application/pdf' || ['pdf', 'doc', 'docx'].includes(ext)) return <FileText className="h-4 w-4 text-destructive" />;
-  return <File className="h-4 w-4 text-muted-foreground" />;
+  return <FileIcon className="h-4 w-4 text-muted-foreground" />;
 };
 const fmtSize = (b?: number | null) => {
   if (!b) return '—';
