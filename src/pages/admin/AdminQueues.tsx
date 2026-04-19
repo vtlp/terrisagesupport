@@ -20,7 +20,13 @@ interface QueueMember {
 }
 
 export default function AdminQueues() {
-  const [autoAssign, setAutoAssign] = useState(true);
+  const [autoAssign, setAutoAssign] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem('ticket_auto_assign') !== 'false';
+  });
+  useEffect(() => {
+    window.localStorage.setItem('ticket_auto_assign', String(autoAssign));
+  }, [autoAssign]);
   const [queues, setQueues] = useState<QueueRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [members, setMembers] = useState<QueueMember[]>([]);
