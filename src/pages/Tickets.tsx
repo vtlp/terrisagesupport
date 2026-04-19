@@ -439,150 +439,137 @@ export default function Tickets() {
       {/* ── Detail Panel ── */}
       <div className={`flex-1 min-w-0 overflow-auto ${!selected ? 'hidden md:flex' : 'flex'}`}>
         {selected ? (
-          <div className="p-4 md:p-6 w-full max-w-5xl mx-auto space-y-6">
-            {/* Top bar */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
+          <div className="w-full max-w-6xl mx-auto">
+            {/* Sticky compact header */}
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 md:px-6 py-2.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 {isListCollapsed && (
-                  <Button variant="ghost" size="sm" onClick={() => setIsListCollapsed(false)} title="Show list">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsListCollapsed(false)} title="Show list">
                     <PanelLeft className="h-4 w-4" />
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" onClick={goBack}>
-                  <ArrowLeft className="h-4 w-4 mr-1" /> Back
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goBack} title="Back">
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
+                <span className="font-mono text-sm font-medium text-foreground/80">{displayCode}</span>
+                <Badge className={`${priorityColors[currentPriority]} text-[10px] px-1.5 py-0`}>{currentPriority}</Badge>
+                <Badge className={`${statusColors[currentStatus]} text-[10px] px-1.5 py-0`}>{statusLabels[currentStatus]}</Badge>
               </div>
               <div className="flex items-center gap-2">
-                {hasEdits && (
-                  <>
-                    <Button variant="outline" size="sm" onClick={handleCancel}>
-                      <X className="h-3 w-3 mr-1" /> Discard
-                    </Button>
-                    <Button size="sm" onClick={handleUpdate}>
-                      <Save className="h-3 w-3 mr-1" /> Save changes
-                    </Button>
-                  </>
-                )}
                 {currentStatus !== TicketStatus.CLOSED && (
-                  <Button variant="outline" size="sm" onClick={() => setCloseDialog(true)}>
-                    Close ticket
+                  <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-destructive" onClick={() => setCloseDialog(true)}>
+                    Close
                   </Button>
                 )}
+                {hasEdits && (
+                  <Button variant="ghost" size="sm" className="h-8" onClick={handleCancel}>
+                    Discard
+                  </Button>
+                )}
+                <Button size="sm" className="h-8" onClick={handleUpdate} disabled={!hasEdits}>
+                  <Save className="h-3.5 w-3.5 mr-1" /> Save
+                </Button>
               </div>
             </div>
 
-            {/* Header */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Ticket className="h-3.5 w-3.5" />
-                <span className="font-mono font-medium text-foreground/70">{displayCode}</span>
-                <span>·</span>
-                <span>Created {format(new Date(selected.created_at), 'dd MMM yyyy, HH:mm')}</span>
-                <span>·</span>
-                <span>Updated {format(new Date(selected.updated_at), 'dd MMM yyyy, HH:mm')}</span>
-              </div>
-              <Input
-                value={editSubject}
-                onChange={e => setEditSubject(e.target.value)}
-                className="text-2xl font-bold border-none p-0 h-auto focus-visible:ring-0 bg-transparent"
-                placeholder="Ticket subject"
-              />
-              <div className="flex gap-4 flex-wrap pt-1">
-                <SLATimer deadline={selected.sla_first_response} label="First response" />
-                <SLATimer deadline={selected.sla_resolution} label="Resolution" />
-              </div>
-            </div>
+            {/* Two-column body */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-4 md:p-6">
+              {/* ── MAIN COLUMN ── */}
+              <div className="space-y-6 min-w-0">
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">Title</label>
+                  <Input
+                    value={editSubject}
+                    onChange={e => setEditSubject(e.target.value)}
+                    className="text-lg font-semibold border border-border/40 mt-1 h-auto py-2.5 focus-visible:ring-1"
+                    placeholder="Ticket subject"
+                  />
+                  <div className="flex justify-end mt-1">
+                    <span className="text-[10px] text-muted-foreground">{editSubject.length}/2000</span>
+                  </div>
+                </div>
 
-            {/* Quick controls — minimal, no pills */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground font-medium">Status</label>
-                <Select value={currentStatus} onValueChange={(v) => setTicketStatus(v as TicketStatus)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.values(TicketStatus).map(s => (
-                      <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground font-medium">Priority</label>
-                <Select value={currentPriority} onValueChange={(v) => setTicketPriority(v as TicketPriority)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.values(TicketPriority).map(p => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground font-medium">Assigned to</label>
-                <AssignmentSelect value={currentAssigned} onChange={setAssignedTo} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground font-medium">Category</label>
-                <Select value={editCategory} onValueChange={v => setEditCategory(v as TicketCategory)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.values(TicketCategory).map(c => (
-                      <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                <div>
+                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">Description</label>
+                  <div className="mt-1 rounded-md border border-border/40 bg-card">
+                    <VoiceTextarea
+                      value={editDescription}
+                      onChange={setEditDescription}
+                      placeholder="Describe the issue or request…"
+                      rows={6}
+                    />
+                  </div>
+                  <div className="flex justify-end mt-1">
+                    <span className="text-[10px] text-muted-foreground">{editDescription.length}/20000</span>
+                  </div>
+                </div>
 
-            {/* Description with voice-to-text */}
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Description</CardTitle></CardHeader>
-              <CardContent>
-                <VoiceTextarea
-                  value={editDescription}
-                  onChange={setEditDescription}
-                  placeholder="Describe the issue or request…"
-                  rows={4}
-                />
-              </CardContent>
-            </Card>
+                <div>
+                  <TicketAttachments ticketId={selected.ticket_id} />
+                </div>
 
-            {/* Account / Requester */}
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Requester &amp; account</CardTitle></CardHeader>
-              <CardContent className="text-sm space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                <div>
+                  <TicketEvents
+                    ticketId={selected.ticket_id}
+                    ticketSubject={selected.subject}
+                    accountId={selected.account_id}
+                  />
+                </div>
+
+                <div>
+                  <NotesPanel notes={notes} onAddNote={handleAddNote} />
+                </div>
+              </div>
+
+              {/* ── RIGHT RAIL ── */}
+              <aside className="space-y-4 lg:sticky lg:top-16 lg:self-start">
+                <div className="rounded-md border border-border/50 bg-card p-3 space-y-3">
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Building2 className="h-3 w-3" /> Account
-                    </label>
-                    {selected.account_id ? (
-                      <Link to={`/accounts/${selected.account_id}`} className="text-primary hover:underline inline-flex items-center gap-1 text-sm">
-                        {linkedAccountName(selected.account_id)} <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    ) : <span className="text-sm text-muted-foreground">—</span>}
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Assign to</label>
+                    <AssignmentSelect value={currentAssigned} onChange={setAssignedTo} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <User className="h-3 w-3" /> Requester
-                    </label>
-                    <Input value={editRequesterName} onChange={e => setEditRequesterName(e.target.value)} className="h-8 text-sm" />
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Status</label>
+                    <Select value={currentStatus} onValueChange={(v) => setTicketStatus(v as TicketStatus)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.values(TicketStatus).map(s => (
+                          <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <MessageSquare className="h-3 w-3" /> Email
-                    </label>
-                    <Input value={editRequesterEmail} onChange={e => setEditRequesterEmail(e.target.value)} className="h-8 text-sm" placeholder="email@example.com" />
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Priority</label>
+                    <Select value={currentPriority} onValueChange={(v) => setTicketPriority(v as TicketPriority)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.values(TicketPriority).map(p => (
+                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Type</label>
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Type</label>
                     <Select value={editType} onValueChange={v => setEditType(v as TicketType)}>
                       <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>{Object.values(TicketType).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">City</label>
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Category</label>
+                    <Select value={editCategory} onValueChange={v => setEditCategory(v as TicketCategory)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.values(TicketCategory).map(c => (
+                          <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">City</label>
                     <Select value={editCity || '__none__'} onValueChange={v => setEditCity(v === '__none__' ? '' : v)}>
                       <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select city" /></SelectTrigger>
                       <SelectContent className="max-h-48">
@@ -592,14 +579,48 @@ export default function Tickets() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Queue</label>
-                    <Input value={selected.queue} readOnly className="h-8 text-sm bg-muted/40" />
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Queue</label>
+                    <Input value={selected.queue} readOnly className="h-8 text-sm bg-muted/30" />
                   </div>
                 </div>
 
-                {/* Tags */}
-                <div className="space-y-2 pt-2 border-t border-border/50">
-                  <label className="text-xs text-muted-foreground flex items-center gap-1">
+                <div className="rounded-md border border-border/50 bg-card p-3 space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1">
+                      <Building2 className="h-3 w-3" /> Account
+                    </label>
+                    {selected.account_id ? (
+                      <Link to={`/accounts/${selected.account_id}`} className="text-primary hover:underline inline-flex items-center gap-1 text-sm">
+                        {linkedAccountName(selected.account_id)} <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    ) : <span className="text-sm text-muted-foreground">—</span>}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1">
+                      <User className="h-3 w-3" /> Requester
+                    </label>
+                    <Input value={editRequesterName} onChange={e => setEditRequesterName(e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Email</label>
+                    <Input value={editRequesterEmail} onChange={e => setEditRequesterEmail(e.target.value)} className="h-8 text-sm" placeholder="email@example.com" />
+                  </div>
+                  {phoneNumber && (
+                    <div className="flex gap-1.5 pt-1">
+                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" asChild>
+                        <a href={`tel:${phoneNumber}`}><Phone className="h-3 w-3 mr-1" /> Call</a>
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" asChild>
+                        <a href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">
+                          <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-md border border-border/50 bg-card p-3 space-y-2">
+                  <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1">
                     <Tag className="h-3 w-3" /> Tags
                   </label>
                   <div className="flex flex-wrap gap-1.5">
@@ -618,9 +639,8 @@ export default function Tickets() {
                     />
                   </div>
                   {getTagOptions().filter(t => !editTags.includes(t)).length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      <span className="text-[10px] text-muted-foreground self-center">Suggestions:</span>
-                      {getTagOptions().filter(t => !editTags.includes(t)).slice(0, 8).map(tag => (
+                    <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
+                      {getTagOptions().filter(t => !editTags.includes(t)).slice(0, 6).map(tag => (
                         <button
                           key={tag}
                           type="button"
@@ -634,58 +654,30 @@ export default function Tickets() {
                   )}
                 </div>
 
-                {/* Contact CTAs */}
-                {(phoneNumber || editRequesterEmail) && (
-                  <div className="flex gap-2 pt-2 border-t border-border/50">
-                    {phoneNumber && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={`tel:${phoneNumber}`}><Phone className="h-3 w-3 mr-1" /> Call</a>
-                      </Button>
-                    )}
-                    {phoneNumber && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">
-                          <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp
-                        </a>
-                      </Button>
-                    )}
+                <div className="rounded-md border border-border/50 bg-card p-3 space-y-1.5 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> Created {format(new Date(selected.created_at), 'dd MMM yyyy, HH:mm')}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> Updated {format(new Date(selected.updated_at), 'dd MMM yyyy, HH:mm')}
+                  </div>
+                  <div className="pt-1.5 border-t border-border/40 space-y-1">
+                    <SLATimer deadline={selected.sla_first_response} label="First response" />
+                    <div />
+                    <SLATimer deadline={selected.sla_resolution} label="Resolution" />
+                  </div>
+                </div>
+              </aside>
+            </div>
 
-            {/* Events */}
-            <Card>
-              <CardContent className="pt-4">
-                <TicketEvents
-                  ticketId={selected.ticket_id}
-                  ticketSubject={selected.subject}
-                  accountId={selected.account_id}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Notes — separate from timeline */}
-            <Card>
-              <CardContent className="pt-4">
-                <NotesPanel notes={notes} onAddNote={handleAddNote} />
-              </CardContent>
-            </Card>
-
-            {/* Attachments */}
-            <Card>
-              <CardContent className="pt-4">
-                <TicketAttachments ticketId={selected.ticket_id} />
-              </CardContent>
-            </Card>
-
-            {/* Timeline (at the end) — full activity history */}
-            <ActivityTimeline
-              entityType="TICKET"
-              entityId={selected.ticket_id}
-              title="Ticket history"
-              includeAll
-            />
+            <div className="px-4 md:px-6 pb-6">
+              <ActivityTimeline
+                entityType="TICKET"
+                entityId={selected.ticket_id}
+                title="Ticket history"
+                includeAll
+              />
+            </div>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center bg-muted/20">
