@@ -301,6 +301,17 @@ export default function BuilderOnboarding() {
             ],
           },
           {
+            title: "Online Presence",
+            rows: [
+              { label: "Website", value: website },
+              { label: "WhatsApp channel link", value: whatsappChannel },
+              { label: "YouTube", value: youtube },
+              { label: "Instagram", value: instagram },
+              { label: "Facebook", value: facebook },
+              { label: "Property portals in use", value: portals.join(", ") },
+            ],
+          },
+          {
             title: "Team Access & Permissions",
             rows: [
               { label: "Seats required", value: seatsRequired },
@@ -529,6 +540,15 @@ export default function BuilderOnboarding() {
             { label: "RERA ID", value: reraId },
             { label: "City", value: headOfficeCity, required: true },
             { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label, required: true },
+          ]} />
+
+          <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(1)} fields={[
+            { label: "Website", value: website },
+            { label: "WhatsApp channel link", value: whatsappChannel },
+            { label: "YouTube", value: youtube },
+            { label: "Instagram", value: instagram },
+            { label: "Facebook", value: facebook },
+            { label: "Property portals in use", value: portals.length ? portals.join(", ") : undefined },
           ]} />
 
           <ReviewSummaryCard title="Team Access & Permissions" onEdit={() => setCurrentStep(2)} fields={[
