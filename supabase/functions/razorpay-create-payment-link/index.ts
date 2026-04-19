@@ -62,50 +62,57 @@ Deno.serve(async (req) => {
 
     const keyId = Deno.env.get('RAZORPAY_KEY_ID');
     const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
-    if (!keyId || !keySecret) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Razorpay is not configured yet. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to enable payment links.',
+    const useDummy = !keyId || !keySecret;
+
+    let rzpJson: { id: string; short_url: string };
+    if (useDummy) {
+      // Test-mode fallback: generates a dummy payment link so staff can rehearse
+      // the flow before Razorpay credentials are wired up. Replace by setting
+      // RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET secrets.
+      const id = `plink_dummy_${Date.now().toString(36)}`;
+      rzpJson = {
+        id,
+        short_url: `https://rzp.io/test/${id}`,
+      };
+      console.log('Razorpay credentials missing — issuing dummy payment link', { id });
+    } else {
+
+      const amountPaise = Math.round(body.total * 100);
+      const auth = btoa(`${keyId}:${keySecret}`);
+
+      const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amountPaise,
+          currency: 'INR',
+          accept_partial: false,
+          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}`,
+          customer: {
+            name: body.customer.name,
+            email: body.customer.email,
+            contact: body.customer.phone,
+          },
+          notify: { sms: !!body.customer.phone, email: !!body.customer.email },
+          reminder_enable: true,
+          reference_id: `enq_${body.enquiry_id}_${Date.now()}`,
+          notes: {
+            enquiry_id: body.enquiry_id,
+            plan: body.plan_name,
+            cycle: body.billing_cycle,
+            seats: String(body.seats),
+          },
         }),
-        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
-    const amountPaise = Math.round(body.total * 100);
-    const auth = btoa(`${keyId}:${keySecret}`);
-
-    const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: amountPaise,
-        currency: 'INR',
-        accept_partial: false,
-        description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}`,
-        customer: {
-          name: body.customer.name,
-          email: body.customer.email,
-          contact: body.customer.phone,
-        },
-        notify: { sms: !!body.customer.phone, email: !!body.customer.email },
-        reminder_enable: true,
-        reference_id: `enq_${body.enquiry_id}_${Date.now()}`,
-        notes: {
-          enquiry_id: body.enquiry_id,
-          plan: body.plan_name,
-          cycle: body.billing_cycle,
-          seats: String(body.seats),
-        },
-      }),
-    });
-    const rzpJson = await rzpRes.json();
-    if (!rzpRes.ok) {
-      console.error('Razorpay request failed', { status: rzpRes.status, body: rzpJson });
-      return new Response(
-        JSON.stringify({ success: false, error: rzpJson?.error?.description || 'Razorpay request failed' }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      });
+      const parsed = await rzpRes.json();
+      if (!rzpRes.ok) {
+        console.error('Razorpay request failed', { status: rzpRes.status, body: parsed });
+        return new Response(
+          JSON.stringify({ success: false, error: parsed?.error?.description || 'Razorpay request failed' }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      rzpJson = { id: parsed.id, short_url: parsed.short_url };
     }
 
     const payment = {
