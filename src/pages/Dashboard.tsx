@@ -145,7 +145,7 @@ export default function Dashboard() {
     .filter(e => isToday(new Date(e.scheduled_at)))
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
   const thisWeekEvents = filteredEvents
-    .filter(e => isThisWeek(new Date(e.scheduled_at), { weekStartsOn: 1 }) && !isToday(new Date(e.scheduled_at)))
+    .filter(e => isThisWeek(new Date(e.scheduled_at), { weekStartsOn: 1 }))
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
 
   const entityLink = (t: string | null, id: string | null) => {
