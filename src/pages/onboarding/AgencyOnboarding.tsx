@@ -573,6 +573,15 @@ export default function AgencyOnboarding() {
             { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label, required: true },
           ]} />
 
+          <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(1)} fields={[
+            { label: "Website", value: website },
+            { label: "WhatsApp channel link", value: whatsappChannel },
+            { label: "YouTube", value: youtube },
+            { label: "Instagram", value: instagram },
+            { label: "Facebook", value: facebook },
+            { label: "Property portals in use", value: portals.length ? portals.join(", ") : undefined },
+          ]} />
+
           <ReviewSummaryCard title="Team Access & Permissions" onEdit={() => setCurrentStep(2)} fields={[
             { label: "Seats required", value: seatsRequired, required: true },
             ...teamMembers.flatMap((tm, i) => [
