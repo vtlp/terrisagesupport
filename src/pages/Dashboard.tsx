@@ -287,9 +287,14 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" /> Today's actions
             </CardTitle>
-            <div className="flex gap-1">
-              <Button variant={calendarScope === 'my' ? 'default' : 'outline'} size="sm" className="text-xs h-7" onClick={() => setCalendarScope('my')}>Mine</Button>
-              <Button variant={calendarScope === 'all' ? 'default' : 'outline'} size="sm" className="text-xs h-7" onClick={() => setCalendarScope('all')}>Team</Button>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                <Button variant={calendarScope === 'my' ? 'default' : 'outline'} size="sm" className="text-xs h-7" onClick={() => setCalendarScope('my')}>Mine</Button>
+                <Button variant={calendarScope === 'all' ? 'default' : 'outline'} size="sm" className="text-xs h-7" onClick={() => setCalendarScope('all')}>Team</Button>
+              </div>
+              <Link to="/calendar" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                Open calendar <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
           </div>
         </CardHeader>
