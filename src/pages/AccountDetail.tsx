@@ -122,6 +122,16 @@ export default function AccountDetail() {
     });
   };
 
+  const setOnlinePresenceField = (key: 'website' | 'whatsapp_channel' | 'youtube' | 'instagram' | 'facebook' | 'portals', value: string | string[]) => {
+    setDraft(d => {
+      if (!d) return d;
+      const op = { ...((d.payload?.online_presence as Record<string, unknown> | undefined) ?? {}), [key]: value };
+      const next: Account = { ...d, payload: { ...d.payload, online_presence: op } };
+      if (key === 'website') next.website = (value as string) || null;
+      return next;
+    });
+  };
+
   const save = async () => {
     if (!draft || !acc) return;
     setSaving(true);
