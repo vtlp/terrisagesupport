@@ -124,13 +124,18 @@ export function CalendarEventForm({
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={date} onSelect={setDate} initialFocus className="p-3 pointer-events-auto" />
+              <Calendar mode="single" selected={date} onSelect={setDate} initialFocus
+                disabled={(d) => d < todayMidnight}
+                className="p-3 pointer-events-auto" />
             </PopoverContent>
           </Popover>
         </div>
         <div className="space-y-2">
           <Label>Time</Label>
-          <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <Input type="time" value={time} min={minTime} onChange={(e) => setTime(e.target.value)} />
+          {isToday && time < nowHHMM && (
+            <p className="text-[11px] text-destructive">Time must be in the future</p>
+          )}
         </div>
       </div>
       <div className="space-y-2">
@@ -157,7 +162,7 @@ export function CalendarEventForm({
       </div>
       <div className="flex gap-2 justify-end">
         <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-        <Button onClick={handleSubmit} disabled={!title || !date}>Create Event</Button>
+        <Button onClick={handleSubmit} disabled={!title || !date || (isToday && time < nowHHMM)}>Create Event</Button>
       </div>
     </div>
   );
