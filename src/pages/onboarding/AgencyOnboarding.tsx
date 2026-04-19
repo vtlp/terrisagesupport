@@ -277,7 +277,7 @@ export default function AgencyOnboarding() {
               { label: "Company name", value: companyName },
               { label: "Company tagline", value: companyTagline },
               { label: "RERA ID", value: reraId },
-              { label: "City / primary market", value: city },
+              { label: "City", value: city },
               { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label },
             ],
           },
@@ -384,7 +384,7 @@ export default function AgencyOnboarding() {
                   <FileUploadField label="Company logo" acceptedFormats={LOGO_EXTENSIONS} acceptedMimeTypes={LOGO_FORMATS} files={companyLogo} onChange={setCompanyLogo} helperText="Upload your company logo for workspace branding." />
                 </div>
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
-                <div data-field="city"><TextField label="City / primary market served" required value={city} onChange={setCity} error={errors.city} /></div>
+                <div data-field="city"><SelectField label="City" required value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.city} /></div>
                 <div data-field="businessArea"><SelectField label="Business area" required value={businessArea} onChange={setBusinessArea} options={BUSINESS_AREA_OPTIONS} error={errors.businessArea} /></div>
               </div>
             </section>
@@ -518,7 +518,7 @@ export default function AgencyOnboarding() {
             { label: "Company name", value: companyName, required: true },
             { label: "Company tagline", value: companyTagline },
             { label: "RERA ID", value: reraId },
-            { label: "City / primary market", value: city, required: true },
+            { label: "City", value: city, required: true },
             { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label, required: true },
           ]} />
 
