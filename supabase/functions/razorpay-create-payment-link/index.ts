@@ -107,6 +107,11 @@ Deno.serve(async (req) => {
       const parsed = await rzpRes.json();
       if (!rzpRes.ok) {
         console.error('Razorpay request failed', { status: rzpRes.status, body: parsed });
+        await admin.from('enquiry_notes').insert({
+          enquiry_id: body.enquiry_id,
+          author_id: user.id,
+          note_text: `[Payment] Link generation failed – ${parsed?.error?.description || 'Razorpay request failed'}`,
+        });
         return new Response(
           JSON.stringify({ success: false, error: parsed?.error?.description || 'Razorpay request failed' }),
           { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -148,7 +153,7 @@ Deno.serve(async (req) => {
     await admin.from('enquiry_notes').insert({
       enquiry_id: body.enquiry_id,
       author_id: user.id,
-      note_text: `[Payment] Link sent ${fmtINR(body.total)} – ${payment.short_url}`,
+      note_text: `[Payment] ${useDummy ? 'Dummy test link sent' : 'Link sent'} ${fmtINR(body.total)} – ${payment.short_url}`,
     });
 
     return new Response(JSON.stringify({ success: true, payment }), {

@@ -103,6 +103,10 @@ export function PaymentLinkDialog({ open, onOpenChange, enquiryId, defaults, onS
     setBusy(false);
     if (error || !data?.success) {
       const msg = data?.error || error?.message || 'Failed to generate payment link';
+      await supabase.from('enquiry_notes').insert({
+        enquiry_id: enquiryId,
+        note_text: `[Payment] Link generation failed – ${msg}`,
+      });
       toast.error(msg);
       return;
     }

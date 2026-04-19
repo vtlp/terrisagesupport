@@ -732,14 +732,11 @@ export default function EnquiryDetail() {
               <div className="text-sm font-semibold text-foreground mb-1">Actions</div>
               {(() => {
                 const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
-                const baseEnabled = enquiry.onboarding_pack_sent
-                  || draft.payload.demo_outcome === 'LIKED_WANT_ONBOARD_SOON';
-                const onboardEnabled = baseEnabled && (enquiry.onboarding_pack_sent || paymentPaid);
-                const blockedReason = !baseEnabled
-                  ? 'Available after demo outcome is "Liked, wants to onboard soon".'
-                  : !paymentPaid
-                  ? 'Mark payment as Paid to unlock onboarding.'
-                  : null;
+                const onboardingSent = enquiry.onboarding_pack_sent || draft.onboarding_pack_sent;
+                const onboardEnabled = onboardingSent || paymentPaid;
+                const blockedReason = onboardEnabled
+                  ? null
+                  : 'Mark payment as Paid to unlock onboarding.';
                 return (
                   <>
                     <div className="flex items-center gap-1.5">
@@ -748,13 +745,13 @@ export default function EnquiryDetail() {
                         size="sm"
                         onClick={handleSendOnboarding}
                         disabled={busy || !onboardEnabled}
-                        variant={enquiry.onboarding_pack_sent ? 'outline' : 'default'}
+                        variant={onboardingSent ? 'outline' : 'default'}
                         title={blockedReason ?? undefined}
                       >
                         <Send className="h-4 w-4 mr-2" />
-                        {enquiry.onboarding_pack_sent ? 'Share onboarding link' : 'Send onboarding form'}
+                        {onboardingSent ? 'Share onboarding link' : 'Send onboarding form'}
                       </Button>
-                      {enquiry.onboarding_pack_sent && !enquiry.converted_account_id && (
+                      {onboardingSent && !enquiry.converted_account_id && (
                         <Button
                           size="sm"
                           variant="outline"
