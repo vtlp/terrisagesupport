@@ -77,40 +77,42 @@ Deno.serve(async (req) => {
       console.log('Razorpay credentials missing — issuing dummy payment link', { id });
     } else {
 
-    const amountPaise = Math.round(body.total * 100);
-    const auth = btoa(`${keyId}:${keySecret}`);
+      const amountPaise = Math.round(body.total * 100);
+      const auth = btoa(`${keyId}:${keySecret}`);
 
-    const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: amountPaise,
-        currency: 'INR',
-        accept_partial: false,
-        description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}`,
-        customer: {
-          name: body.customer.name,
-          email: body.customer.email,
-          contact: body.customer.phone,
-        },
-        notify: { sms: !!body.customer.phone, email: !!body.customer.email },
-        reminder_enable: true,
-        reference_id: `enq_${body.enquiry_id}_${Date.now()}`,
-        notes: {
-          enquiry_id: body.enquiry_id,
-          plan: body.plan_name,
-          cycle: body.billing_cycle,
-          seats: String(body.seats),
-        },
-      }),
-    });
-    const rzpJson = await rzpRes.json();
-    if (!rzpRes.ok) {
-      console.error('Razorpay request failed', { status: rzpRes.status, body: rzpJson });
-      return new Response(
-        JSON.stringify({ success: false, error: rzpJson?.error?.description || 'Razorpay request failed' }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amountPaise,
+          currency: 'INR',
+          accept_partial: false,
+          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}`,
+          customer: {
+            name: body.customer.name,
+            email: body.customer.email,
+            contact: body.customer.phone,
+          },
+          notify: { sms: !!body.customer.phone, email: !!body.customer.email },
+          reminder_enable: true,
+          reference_id: `enq_${body.enquiry_id}_${Date.now()}`,
+          notes: {
+            enquiry_id: body.enquiry_id,
+            plan: body.plan_name,
+            cycle: body.billing_cycle,
+            seats: String(body.seats),
+          },
+        }),
+      });
+      const parsed = await rzpRes.json();
+      if (!rzpRes.ok) {
+        console.error('Razorpay request failed', { status: rzpRes.status, body: parsed });
+        return new Response(
+          JSON.stringify({ success: false, error: parsed?.error?.description || 'Razorpay request failed' }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      rzpJson = { id: parsed.id, short_url: parsed.short_url };
     }
 
     const payment = {
