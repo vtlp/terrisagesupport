@@ -514,10 +514,21 @@ export default function Knowledge() {
               </TooltipProvider>
             </div>
             <button
-              className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted/50 ${currentFolderId === null ? 'bg-primary/10 text-primary font-medium' : ''}`}
+              className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted/50 ${currentFolderId === null ? 'bg-primary/10 text-primary font-medium' : ''} ${dragOverFolderId === 'root' ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}`}
               onClick={() => setCurrentFolderId(null)}
+              onDragOver={(e) => { if (!draggedFolderId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId('root'); }}
+              onDragLeave={() => { if (dragOverFolderId === 'root') setDragOverFolderId(null); }}
+              onDrop={(e) => {
+                if (!draggedFolderId) return;
+                e.preventDefault();
+                const id = draggedFolderId;
+                setDraggedFolderId(null); setDragOverFolderId(null);
+                moveFolder(id, null);
+              }}
+              title={draggedFolderId ? 'Drop here to move folder to root' : undefined}
             >
               <BookOpen className="h-4 w-4" /> All Files
+              {draggedFolderId && <span className="ml-auto text-xs text-muted-foreground">drop to root</span>}
             </button>
             {getChildren(null).map(f => <FolderTreeItem key={f.id} folder={f} />)}
           </>
