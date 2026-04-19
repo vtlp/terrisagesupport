@@ -416,9 +416,9 @@ export default function AgencyOnboarding() {
                   <FileUploadField label="Company logo" acceptedFormats={LOGO_EXTENSIONS} acceptedMimeTypes={LOGO_FORMATS} files={companyLogo} onChange={setCompanyLogo} helperText="Upload your company logo for workspace branding." />
                 </div>
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
-                <div data-field="businessArea"><SelectField label="Business area" required value={businessArea} onChange={setBusinessArea} options={BUSINESS_AREA_OPTIONS} error={errors.businessArea} /></div>
+                <div data-field="businessArea"><SelectField label="Business area" required value={businessArea} onChange={setBusinessArea} options={BUSINESS_AREA_OPTIONS.map(o => ({ value: o.value, label: o.label }))} error={errors.businessArea} /></div>
                 <div data-field="city"><SelectField label="City" required value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.city} /></div>
-                <TextField label="Company Address (Maps Link)" value={googleAddress} onChange={setGoogleAddress} placeholder="Paste your Google Maps business link" helperText="e.g. https://maps.app.goo.gl/R7y5Vq62om2fC3b69" />
+                <TextField label="Company Address (Maps Link)" value={googleAddress} onChange={setGoogleAddress} helperText="e.g. https://maps.app.goo.gl/R7y5Vq62om2fC3b69" />
               </div>
             </section>
 

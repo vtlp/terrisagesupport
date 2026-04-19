@@ -41,7 +41,7 @@ interface CalEvent {
   created_by: string | null; assigned_to: string | null;
 }
 interface Profile { id: string; full_name: string; }
-type ViewMode = 'day' | 'week' | 'month';
+type ViewMode = 'week' | 'month';
 
 export default function CalendarPage() {
   const { currentUser, isAdmin } = useUser();
@@ -59,11 +59,6 @@ export default function CalendarPage() {
 
   // Compute the visible range based on view mode
   const { rangeStart, rangeEnd, days, headerLabel } = useMemo(() => {
-    if (viewMode === 'day') {
-      const d = new Date(cursor); d.setHours(0, 0, 0, 0);
-      const end = new Date(d); end.setHours(23, 59, 59, 999);
-      return { rangeStart: d, rangeEnd: end, days: [d], headerLabel: format(d, 'EEEE, dd MMM yyyy') };
-    }
     if (viewMode === 'week') {
       const s = startOfWeek(cursor, { weekStartsOn: 1 });
       const e = endOfWeek(cursor, { weekStartsOn: 1 });
@@ -109,8 +104,8 @@ export default function CalendarPage() {
 
   const userName = (id: string | null) => id ? (profiles.find(p => p.id === id)?.full_name ?? '—') : '—';
 
-  const goPrev = () => setCursor(c => viewMode === 'day' ? subDays(c, 1) : viewMode === 'week' ? subWeeks(c, 1) : subMonths(c, 1));
-  const goNext = () => setCursor(c => viewMode === 'day' ? addDays(c, 1) : viewMode === 'week' ? addWeeks(c, 1) : addMonths(c, 1));
+  const goPrev = () => setCursor(c => viewMode === 'week' ? subWeeks(c, 1) : subMonths(c, 1));
+  const goNext = () => setCursor(c => viewMode === 'week' ? addWeeks(c, 1) : addMonths(c, 1));
 
   const handleCreateEvent = async (data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType; related_entity_type: 'ENQUIRY' | 'ACCOUNT' | ''; related_entity_id: string | null; assigned_to: string | null }) => {
     const scheduled = new Date(data.date);
@@ -190,12 +185,12 @@ export default function CalendarPage() {
             <div className="flex items-center gap-2 flex-wrap">
               {/* View mode toggle */}
               <div className="inline-flex rounded-md border border-border p-0.5">
-                {(['day', 'week', 'month'] as const).map(m => (
+                {(['week', 'month'] as const).map(m => (
                   <Button key={m} size="sm" variant={viewMode === m ? 'default' : 'ghost'}
                     className="h-7 px-2 text-xs capitalize" onClick={() => setViewMode(m)}>{m}</Button>
                 ))}
               </div>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCursor(new Date())}>Today</Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCursor(new Date())}>Jump to today</Button>
 
               <Select value={entityFilter} onValueChange={setEntityFilter}>
                 <SelectTrigger className="w-[140px] h-8"><SelectValue /></SelectTrigger>
