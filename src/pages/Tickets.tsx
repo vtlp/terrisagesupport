@@ -523,6 +523,43 @@ export default function Tickets() {
 
               {/* ── RIGHT RAIL ── */}
               <aside className="space-y-4 lg:sticky lg:top-16 lg:self-start">
+                {/* Account / Requester */}
+                <div className="rounded-md border border-border/50 bg-card p-3 space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1">
+                      <Building2 className="h-3 w-3" /> Account
+                    </label>
+                    {selected.account_id ? (
+                      <Link to={`/accounts/${selected.account_id}`} className="text-primary hover:underline inline-flex items-center gap-1 text-sm">
+                        {linkedAccountName(selected.account_id)} <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    ) : <span className="text-sm text-muted-foreground">—</span>}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1">
+                      <User className="h-3 w-3" /> Requester
+                    </label>
+                    <Input value={editRequesterName} onChange={e => setEditRequesterName(e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Email</label>
+                    <Input value={editRequesterEmail} onChange={e => setEditRequesterEmail(e.target.value)} className="h-8 text-sm" placeholder="email@example.com" />
+                  </div>
+                  {phoneNumber && (
+                    <div className="flex gap-1.5 pt-1">
+                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" asChild>
+                        <a href={`tel:${phoneNumber}`}><Phone className="h-3 w-3 mr-1" /> Call</a>
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" asChild>
+                        <a href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">
+                          <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Assignment & Status */}
                 <div className="rounded-md border border-border/50 bg-card p-3 space-y-3">
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Assign to</label>
@@ -582,41 +619,6 @@ export default function Tickets() {
                     <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Queue</label>
                     <Input value={selected.queue} readOnly className="h-8 text-sm bg-muted/30" />
                   </div>
-                </div>
-
-                <div className="rounded-md border border-border/50 bg-card p-3 space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1">
-                      <Building2 className="h-3 w-3" /> Account
-                    </label>
-                    {selected.account_id ? (
-                      <Link to={`/accounts/${selected.account_id}`} className="text-primary hover:underline inline-flex items-center gap-1 text-sm">
-                        {linkedAccountName(selected.account_id)} <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    ) : <span className="text-sm text-muted-foreground">—</span>}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1">
-                      <User className="h-3 w-3" /> Requester
-                    </label>
-                    <Input value={editRequesterName} onChange={e => setEditRequesterName(e.target.value)} className="h-8 text-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Email</label>
-                    <Input value={editRequesterEmail} onChange={e => setEditRequesterEmail(e.target.value)} className="h-8 text-sm" placeholder="email@example.com" />
-                  </div>
-                  {phoneNumber && (
-                    <div className="flex gap-1.5 pt-1">
-                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" asChild>
-                        <a href={`tel:${phoneNumber}`}><Phone className="h-3 w-3 mr-1" /> Call</a>
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-7 text-xs flex-1" asChild>
-                        <a href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">
-                          <MessageSquare className="h-3 w-3 mr-1" /> WhatsApp
-                        </a>
-                      </Button>
-                    </div>
-                  )}
                 </div>
 
                 <div className="rounded-md border border-border/50 bg-card p-3 space-y-2">
