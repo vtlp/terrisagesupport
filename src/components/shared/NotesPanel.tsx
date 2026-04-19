@@ -134,10 +134,8 @@ export function NotesPanel({ notes, onAddNote, compact = false, open, onOpenChan
           <Card key={n.note_id}>
             <CardContent className="p-3">
               <p className="text-sm whitespace-pre-wrap">{n.note_text}</p>
-              <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-                <span>{getUserName(n.created_by_user_id)}</span>
-                <span>•</span>
-                <span>{format(new Date(n.created_at), 'dd MMM yyyy, HH:mm')}</span>
+              <div className="mt-1.5 text-xs text-muted-foreground">
+                {format(new Date(n.created_at), 'dd MMM yyyy, HH:mm')}
               </div>
             </CardContent>
           </Card>
