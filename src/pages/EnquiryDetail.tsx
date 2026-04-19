@@ -568,20 +568,15 @@ export default function EnquiryDetail() {
     }
     if (!(await requireClean('generate a new onboarding link'))) return;
     const confirmed = window.confirm(
-      'Generate a new onboarding link?\n\nAny previous submission for this enquiry will be marked as rejected so the customer can submit fresh information.',
+      'Generate a new onboarding link?\n\nThe customer can submit fresh details. The previous submission stays on file as a historical version — you can compare both and approve whichever is correct. If you approve the new one, the account will be created from it; otherwise the original approved submission is used.',
     );
     if (!confirmed) return;
     setBusy(true);
     try {
-      // Reject prior non-rejected submissions so the per-link lock is released.
-      const { error: rejErr } = await supabase
-        .from('onboarding_submissions')
-        .update({ status: 'REJECTED', reviewed_at: new Date().toISOString() })
-        .eq('enquiry_id', enquiry.id)
-        .neq('status', 'REJECTED');
-      if (rejErr) throw rejErr;
-
       const link = generateLink();
+      // IMPORTANT: bumping onboarding_pack_sent_at unlocks the form for a new
+      // submission (see check_submission_lock). Older submissions are preserved
+      // untouched so staff can compare versions and approve whichever is correct.
       const { error: updErr } = await supabase.from('enquiries').update({
         onboarding_pack_sent: true,
         onboarding_pack_sent_at: new Date().toISOString(),
@@ -593,7 +588,7 @@ export default function EnquiryDetail() {
         entity_type: 'ENQUIRY',
         entity_id: enquiry.id,
         event_type: 'SUBMISSION',
-        summary: 'New onboarding form link generated (previous submission reset)',
+        summary: 'New onboarding form link generated (previous submissions preserved)',
         details: { link },
       });
 
