@@ -79,7 +79,7 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
     setCompanyName(''); setContactName('');
     setPhoneCode(DEFAULT_COUNTRY_CODE); setPhoneNumber('');
     setPhoneAltCode(DEFAULT_COUNTRY_CODE); setPhoneAltNumber('');
-    setEmail(''); setCity(''); setSource('CALL_DIRECT');
+    setEmail(''); setCity(''); setSource('');
     setTenancyType('AGENCY_BROKERAGE_CONSULTANCY');
     setWhatsappEnabled(true); setNotes(''); setErrors({}); setDuplicate(null);
   };
@@ -253,10 +253,10 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
             </div>
             <div className="space-y-1.5">
               <Label>Source</Label>
-              <Select value={source} onValueChange={setSource}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {SOURCES.map(s => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
+              <Select value={source || undefined} onValueChange={setSource}>
+                <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {sources.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
