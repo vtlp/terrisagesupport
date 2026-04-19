@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckCircle2, Mail, Phone, Link2 } from "lucide-react";
+import { CheckCircle2, Mail, Phone, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -9,7 +9,8 @@ interface Props {
 }
 
 const SUPPORT_EMAIL = "contact@terrisage.com";
-const SUPPORT_PHONE = "+919000720111";
+const SUPPORT_PHONE_TEL = "+919000720111";
+const SUPPORT_PHONE_DISPLAY = "+91 9000 720 111";
 
 export function AlreadySubmittedScreen({ submittedAt, tenancy }: Props) {
   const [showContact, setShowContact] = useState(false);
@@ -19,6 +20,8 @@ export function AlreadySubmittedScreen({ submittedAt, tenancy }: Props) {
         timeStyle: "short",
       })
     : null;
+
+  const subject = encodeURIComponent(`Request new onboarding link (${tenancy})`);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -37,8 +40,8 @@ export function AlreadySubmittedScreen({ submittedAt, tenancy }: Props) {
             This onboarding form has already been submitted
           </h1>
           <p className="text-base text-muted-foreground">
-            If you need to correct or add information, request an updated link
-            or contact Terrisage support.
+            Need to add or correct information? Contact Terrisage support and
+            we will share a fresh onboarding link with you.
           </p>
           {formatted && (
             <p className="text-sm text-muted-foreground">
@@ -47,23 +50,13 @@ export function AlreadySubmittedScreen({ submittedAt, tenancy }: Props) {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+        <div className="flex justify-center pt-2">
           <Button
             variant="default"
             className="gap-2"
-            onClick={() =>
-              (window.location.href = `mailto:${SUPPORT_EMAIL}?subject=Request new onboarding link (${tenancy})`)
-            }
-          >
-            <Link2 className="w-4 h-4" />
-            Request new link
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
             onClick={() => setShowContact((v) => !v)}
           >
-            <Mail className="w-4 h-4" />
+            <LifeBuoy className="w-4 h-4" />
             Contact support
           </Button>
         </div>
@@ -75,18 +68,18 @@ export function AlreadySubmittedScreen({ submittedAt, tenancy }: Props) {
             className="bg-card border border-border rounded-lg p-5 max-w-sm mx-auto text-left space-y-3"
           >
             <a
-              href={`mailto:${SUPPORT_EMAIL}`}
+              href={`mailto:${SUPPORT_EMAIL}?subject=${subject}`}
               className="flex items-center gap-2 text-sm text-primary hover:underline"
             >
               <Mail className="w-4 h-4" />
               {SUPPORT_EMAIL}
             </a>
             <a
-              href={`tel:${SUPPORT_PHONE}`}
+              href={`tel:${SUPPORT_PHONE_TEL}`}
               className="flex items-center gap-2 text-sm text-primary hover:underline"
             >
               <Phone className="w-4 h-4" />
-              +91 9000 720 111
+              {SUPPORT_PHONE_DISPLAY}
             </a>
           </motion.div>
         )}
