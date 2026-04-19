@@ -281,7 +281,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 <div key={i.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{i.invoice_no ?? '(draft)'}</span>
+                      <span className="font-medium text-sm">{i.invoice_no ?? '—'}</span>
                       <Badge className={`text-[10px] ${STATUS_COLORS[i.status]}`}>{i.status}</Badge>
                       {i.period_from && i.period_to && (
                         <span className="text-xs text-muted-foreground">{format(new Date(i.period_from), 'dd MMM')} – {format(new Date(i.period_to), 'dd MMM yyyy')}</span>
