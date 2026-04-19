@@ -104,6 +104,7 @@ export default function BuilderOnboarding() {
   const [companyLogo, setCompanyLogo] = useState<File[]>([]);
   const [reraId, setReraId] = useState("");
   const [headOfficeCity, setHeadOfficeCity] = useState("");
+  const [googleAddress, setGoogleAddress] = useState("");
   const [propertyTypeFocus, setPropertyTypeFocus] = useState("");
   const [website, setWebsite] = useState("");
   const [whatsappChannel, setWhatsappChannel] = useState("");
@@ -144,6 +145,7 @@ export default function BuilderOnboarding() {
         if (d.companyTagline) setCompanyTagline(d.companyTagline);
         if (d.reraId) setReraId(d.reraId);
         if (d.headOfficeCity) setHeadOfficeCity(d.headOfficeCity);
+        if (d.googleAddress) setGoogleAddress(d.googleAddress);
         if (d.propertyTypeFocus) setPropertyTypeFocus(d.propertyTypeFocus);
         if (d.website) setWebsite(d.website);
         if (d.whatsappChannel) setWhatsappChannel(d.whatsappChannel);
@@ -167,7 +169,7 @@ export default function BuilderOnboarding() {
   const handleSaveDraft = async () => {
     const companyLogoSerialized = await filesToSerializable(companyLogo);
     const data = {
-      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, propertyTypeFocus,
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, headOfficeCity, googleAddress, propertyTypeFocus,
       website, whatsappChannel, youtube, instagram, facebook, portals,
       notes,
       seatsRequired, teamMembers,
@@ -267,7 +269,7 @@ export default function BuilderOnboarding() {
 
       const payload = {
         primary_contact: { full_name: fullName, mobile, mobile_code: mobileCode, email },
-        company: { name: companyName, tagline: companyTagline, rera_id: reraId, head_office_city: headOfficeCity, property_type_focus: propertyTypeFocus, logo_paths: logoPaths },
+        company: { name: companyName, tagline: companyTagline, rera_id: reraId, head_office_city: headOfficeCity, google_address: googleAddress, property_type_focus: propertyTypeFocus, logo_paths: logoPaths },
         online_presence: { website, whatsapp_channel: whatsappChannel, youtube, instagram, facebook, portals },
         company_name: companyName,
         owner_name: fullName,
@@ -298,6 +300,7 @@ export default function BuilderOnboarding() {
               { label: "Company tagline", value: companyTagline },
               { label: "RERA ID", value: reraId },
               { label: "City", value: headOfficeCity },
+              { label: "Google company address", value: googleAddress },
               { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label },
             ],
           },
@@ -416,8 +419,9 @@ export default function BuilderOnboarding() {
                   <FileUploadField label="Company logo" acceptedFormats={LOGO_EXTENSIONS} acceptedMimeTypes={LOGO_FORMATS} files={companyLogo} onChange={setCompanyLogo} helperText="Upload your company logo for workspace branding." />
                 </div>
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
-                <div data-field="headOfficeCity"><SelectField label="City" required value={headOfficeCity} onChange={setHeadOfficeCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.headOfficeCity} /></div>
                 <div data-field="propertyTypeFocus"><SelectField label="Property type focus" required value={propertyTypeFocus} onChange={setPropertyTypeFocus} options={PROPERTY_TYPE_FOCUS_OPTIONS} error={errors.propertyTypeFocus} /></div>
+                <div data-field="headOfficeCity"><SelectField label="City" required value={headOfficeCity} onChange={setHeadOfficeCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.headOfficeCity} /></div>
+                <TextField label="Google company address" value={googleAddress} onChange={setGoogleAddress} placeholder="Paste your Google Maps business address" />
               </div>
             </section>
 

@@ -98,6 +98,7 @@ export default function AgencyOnboarding() {
   const [companyLogo, setCompanyLogo] = useState<File[]>([]);
   const [reraId, setReraId] = useState("");
   const [city, setCity] = useState("");
+  const [googleAddress, setGoogleAddress] = useState("");
   const [businessArea, setBusinessArea] = useState("");
   const [website, setWebsite] = useState("");
   const [whatsappChannel, setWhatsappChannel] = useState("");
@@ -138,6 +139,7 @@ export default function AgencyOnboarding() {
         if (d.companyTagline) setCompanyTagline(d.companyTagline);
         if (d.reraId) setReraId(d.reraId);
         if (d.city) setCity(d.city);
+        if (d.googleAddress) setGoogleAddress(d.googleAddress);
         if (d.businessArea) setBusinessArea(d.businessArea);
         if (d.website) setWebsite(d.website);
         if (d.whatsappChannel) setWhatsappChannel(d.whatsappChannel);
@@ -164,7 +166,7 @@ export default function AgencyOnboarding() {
     // serialise them — users re-attach those before final submission.
     const companyLogoSerialized = await filesToSerializable(companyLogo);
     const data = {
-      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, businessArea,
+      fullName, mobile, mobileCode, email, companyName, companyTagline, reraId, city, googleAddress, businessArea,
       website, whatsappChannel, youtube, instagram, facebook, portals,
       notes,
       seatsRequired, teamMembers,
@@ -265,7 +267,7 @@ export default function AgencyOnboarding() {
 
       const payload = {
         primary_contact: { full_name: fullName, mobile, mobile_code: mobileCode, email },
-        company: { name: companyName, tagline: companyTagline, rera_id: reraId, city, business_area: businessArea, logo_paths: logoPaths },
+        company: { name: companyName, tagline: companyTagline, rera_id: reraId, city, google_address: googleAddress, business_area: businessArea, logo_paths: logoPaths },
         online_presence: { website, whatsapp_channel: whatsappChannel, youtube, instagram, facebook, portals },
         company_name: companyName,
         owner_name: fullName,
@@ -296,6 +298,7 @@ export default function AgencyOnboarding() {
               { label: "Company tagline", value: companyTagline },
               { label: "RERA ID", value: reraId },
               { label: "City", value: city },
+              { label: "Google company address", value: googleAddress },
               { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label },
             ],
           },
@@ -413,8 +416,9 @@ export default function AgencyOnboarding() {
                   <FileUploadField label="Company logo" acceptedFormats={LOGO_EXTENSIONS} acceptedMimeTypes={LOGO_FORMATS} files={companyLogo} onChange={setCompanyLogo} helperText="Upload your company logo for workspace branding." />
                 </div>
                 <TextField label="RERA ID" value={reraId} onChange={setReraId} />
-                <div data-field="city"><SelectField label="City" required value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.city} /></div>
                 <div data-field="businessArea"><SelectField label="Business area" required value={businessArea} onChange={setBusinessArea} options={BUSINESS_AREA_OPTIONS} error={errors.businessArea} /></div>
+                <div data-field="city"><SelectField label="City" required value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Select city" error={errors.city} /></div>
+                <TextField label="Google company address" value={googleAddress} onChange={setGoogleAddress} placeholder="Paste your Google Maps business address" />
               </div>
             </section>
 
@@ -572,8 +576,9 @@ export default function AgencyOnboarding() {
             { label: "Company name", value: companyName, required: true },
             { label: "Company tagline", value: companyTagline },
             { label: "RERA ID", value: reraId },
-            { label: "City", value: city, required: true },
             { label: "Business area", value: BUSINESS_AREA_OPTIONS.find(a => a.value === businessArea)?.label, required: true },
+            { label: "City", value: city, required: true },
+            { label: "Google company address", value: googleAddress },
           ]} />
 
           <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(4)} fields={[
