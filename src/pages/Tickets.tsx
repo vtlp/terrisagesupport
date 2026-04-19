@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,17 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, CalendarEventStatus, CalendarEventType, TimelineEventType, type SupportTicket } from '@/types/core';
+import { TicketPriority, TicketStatus, TicketType, TicketCategory, EntityType, TimelineEventType, type SupportTicket } from '@/types/core';
 import { NotesPanel } from '@/components/shared/NotesPanel';
-import { AttachmentUploader } from '@/components/shared/AttachmentUploader';
 import { AssignmentSelect } from '@/components/shared/AssignmentSelect';
-import { CalendarEventForm } from '@/components/shared/CalendarEventForm';
-import { format, formatDistanceToNow } from 'date-fns';
+import { TicketAttachments } from '@/components/shared/TicketAttachments';
+import { TicketEvents } from '@/components/shared/TicketEvents';
+import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
+import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
+import { format } from 'date-fns';
 import {
-  Plus, Search, ArrowLeft, ExternalLink, CalendarIcon, Tag,
-  Clock, User, Building2, Ticket, MessageSquare,
-  ArrowRightLeft, Shield, PanelLeftClose, PanelLeft,
-  Phone, X, Save,
+  Plus, Search, ArrowLeft, ExternalLink, Tag, Clock, User, Building2, Ticket,
+  MessageSquare, PanelLeftClose, PanelLeft, Phone, X, Save,
 } from 'lucide-react';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
 import { getCityOptions, getTagOptions } from '@/data/lookupData';
@@ -54,16 +54,21 @@ const statusLabels: Record<TicketStatus, string> = {
 
 function SLATimer({ deadline, label }: { deadline: string | null; label: string }) {
   if (!deadline) return null;
-  const now = new Date();
   const dl = new Date(deadline);
-  const diff = dl.getTime() - now.getTime();
+  const diff = dl.getTime() - Date.now();
   const isBreached = diff < 0;
   const isWarning = diff > 0 && diff < 3600000;
+  const tone = isBreached
+    ? 'text-destructive'
+    : isWarning ? 'text-warning' : 'text-muted-foreground';
+  const text = isBreached
+    ? 'Breached'
+    : `${Math.max(1, Math.round(diff / 60000))} min left`;
   return (
-    <div className={`sla-timer ${isBreached ? 'sla-timer-breach' : isWarning ? 'sla-timer-warning' : 'sla-timer-ok'}`}>
+    <span className={`inline-flex items-center gap-1 text-xs ${tone}`}>
       <Clock className="h-3 w-3" />
-      <span>{label}: {isBreached ? 'Breached' : `${formatDistanceToNow(dl, { addSuffix: false })} left`}</span>
-    </div>
+      {label}: {text}
+    </span>
   );
 }
 
@@ -80,8 +85,8 @@ export default function Tickets() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
 
-  const profileMap = new Map(profiles.map(p => [p.id, p.full_name]));
-  const accountMap = new Map(accounts.map(a => [a.id, a]));
+  const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p.full_name])), [profiles]);
+  const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
   const getUserName = (id: string | null) => id ? (profileMap.get(id) ?? 'User') : 'Unassigned';
 
   // Editable state
@@ -99,7 +104,6 @@ export default function Tickets() {
   const [tagInput, setTagInput] = useState('');
   const [hasEdits, setHasEdits] = useState(false);
 
-  const [showEventForm, setShowEventForm] = useState(false);
   const [noteRefresh, setNoteRefresh] = useState(0);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
   const [closeDialog, setCloseDialog] = useState(false);
@@ -132,6 +136,17 @@ export default function Tickets() {
   useEffect(() => {
     if (!ticketId) { setSelected(null); return; }
     fetchTicketDetail(ticketId).then(t => setSelected(t)).catch(() => setSelected(null));
+  }, [ticketId]);
+
+  // Fetch ticket_code (DB has it; SupportTicket maps queue→ticket_code fallback already, but we want a clear ST- code)
+  const [ticketCode, setTicketCode] = useState<string | null>(null);
+  useEffect(() => {
+    if (!ticketId) { setTicketCode(null); return; }
+    // Lazy import to avoid circular: use supabase via ticketsApi already loads it; quick direct fetch:
+    import('@/integrations/supabase/client').then(({ supabase }) => {
+      supabase.from('tickets').select('ticket_code').eq('id', ticketId).maybeSingle()
+        .then(({ data }) => setTicketCode((data?.ticket_code as string | null) ?? null));
+    });
   }, [ticketId]);
 
   // Initialize editable fields when ticket changes
@@ -179,17 +194,55 @@ export default function Tickets() {
     setHasEdits(detectEdits());
   }, [editSubject, editDescription, editType, editCategory, editCity, editRequesterName, editRequesterEmail, editTags, ticketStatus, ticketPriority, assignedTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = tickets.filter(t => {
-    const matchSearch = t.subject.toLowerCase().includes(search.toLowerCase()) ||
-      t.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()));
-    const matchStatus = statusFilter === 'all' || t.status === statusFilter;
-    const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
-    return matchSearch && matchStatus && matchPriority;
-  });
+  // Warn on browser tab close / refresh
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasEdits) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasEdits]);
 
-  const notes = selected
+  // Search across subject, ticket code, tags, requester name/email
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return tickets.filter(t => {
+      const code = (t.queue || '').toString().toLowerCase(); // fallback shows code in queue field
+      const matchSearch = !q ||
+        t.subject.toLowerCase().includes(q) ||
+        code.includes(q) ||
+        t.requester_name.toLowerCase().includes(q) ||
+        (t.requester_email ?? '').toLowerCase().includes(q) ||
+        t.tags.some(tag => tag.toLowerCase().includes(q));
+      const matchStatus = statusFilter === 'all' || t.status === statusFilter;
+      const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
+      return matchSearch && matchStatus && matchPriority;
+    });
+  }, [tickets, search, statusFilter, priorityFilter]);
+
+  // Notes pulled from timeline (INTERNAL_NOTE only) so they live separately from timeline UI
+  const notesFromTimeline = useMemo(() => {
+    if (!selected) return [];
+    return selected.timeline
+      .filter(t => t.type === TimelineEventType.INTERNAL_NOTE)
+      .map(t => ({
+        note_id: t.id,
+        entity_type: EntityType.TICKET,
+        entity_id: selected.ticket_id,
+        note_text: t.content,
+        created_by_user_id: t.user_id ?? '',
+        created_at: t.created_at,
+      }));
+  }, [selected]);
+
+  // Legacy seed notes (if any) for backward compat
+  const seedNoteList = selected
     ? seedNotes.filter(n => n.entity_type === EntityType.TICKET && n.entity_id === selected.ticket_id)
     : [];
+  const notes = [...notesFromTimeline, ...seedNoteList];
   void noteRefresh;
 
   const handleAddNote = async (text: string) => {
@@ -203,11 +256,6 @@ export default function Tickets() {
       console.error(e);
       toast.error('Failed to add note');
     }
-  };
-
-  const handleCreateEvent = (_data: { title: string; date: Date; time: string; notes: string; event_type: CalendarEventType }) => {
-    void _data; void CalendarEventStatus;
-    setShowEventForm(false);
   };
 
   const handleUpdate = async () => {
@@ -266,13 +314,16 @@ export default function Tickets() {
     }
   };
 
-  const selectTicket = (id: string) => {
+  // Centralized "leave with unsaved changes" guard
+  const guardLeave = (action: () => void) => {
     if (hasEdits) {
-      if (!window.confirm('You have unsaved changes. Discard them?')) return;
+      if (!window.confirm('You have unsaved changes. Discard them and continue?')) return;
     }
-    setShowEventForm(false);
-    navigate(`/tickets/${id}`);
+    action();
   };
+
+  const selectTicket = (id: string) => guardLeave(() => navigate(`/tickets/${id}`));
+  const goBack = () => guardLeave(() => navigate('/tickets'));
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -280,10 +331,12 @@ export default function Tickets() {
     setTagInput('');
   };
 
-  // Get linked account for call/whatsapp
   const linkedAccount = selected?.account_id ? accountMap.get(selected.account_id) : null;
   const phoneNumber = linkedAccount?.owner_phone || '';
   const linkedAccountName = (id: string | null) => id ? (accountMap.get(id)?.account_name ?? '—') : '—';
+
+  // Display code: prefer real DB ticket_code (ST-xxxxxx), fallback to short UUID
+  const displayCode = ticketCode ?? (selected ? `#${selected.ticket_id.slice(0, 8)}` : '');
 
   return (
     <div className="flex h-full">
@@ -300,18 +353,18 @@ export default function Tickets() {
       <Dialog open={closeDialog} onOpenChange={setCloseDialog}>
         <DialogContent className="bg-card">
           <DialogHeader>
-            <DialogTitle>Close Ticket</DialogTitle>
+            <DialogTitle>Close ticket</DialogTitle>
             <DialogDescription>Add closing comments before closing this ticket.</DialogDescription>
           </DialogHeader>
           <Textarea
-            placeholder="Closing comments (required)..."
+            placeholder="Closing comments (required)…"
             value={closingComment}
             onChange={e => setClosingComment(e.target.value)}
             rows={4}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCloseDialog(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleCloseTicket}>Close Ticket</Button>
+            <Button variant="destructive" onClick={handleCloseTicket}>Close ticket</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -321,7 +374,7 @@ export default function Tickets() {
         <div className={`w-full md:w-96 flex-shrink-0 border-r border-border overflow-auto ${selected ? 'hidden md:block' : ''}`}>
           <div className="p-4 border-b border-border space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-foreground">Support Tickets</h2>
+              <h2 className="font-semibold text-foreground">Support tickets</h2>
               <div className="flex gap-1">
                 <Button size="sm" variant="ghost" onClick={() => setIsListCollapsed(true)} title="Collapse panel">
                   <PanelLeftClose className="h-4 w-4" />
@@ -331,20 +384,25 @@ export default function Tickets() {
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search subject or tags..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+              <Input
+                placeholder="Search by code, subject, requester, or tag…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9"
+              />
             </div>
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="flex-1"><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="all">All status</SelectItem>
                   {Object.values(TicketStatus).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                 <SelectTrigger className="flex-1"><SelectValue placeholder="Priority" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
+                  <SelectItem value="all">All priority</SelectItem>
                   {Object.values(TicketPriority).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -358,21 +416,17 @@ export default function Tickets() {
                 onClick={() => selectTicket(t.ticket_id)}
               >
                 <div className="flex items-start justify-between mb-1 gap-2">
-                  <span className="font-medium text-sm truncate">{t.subject}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] text-muted-foreground font-mono">{t.queue || '—'}</div>
+                    <div className="font-medium text-sm truncate">{t.subject}</div>
+                  </div>
                   <Badge className={`flex-shrink-0 ${priorityColors[t.priority]}`}>{t.priority}</Badge>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Badge className={statusColors[t.status]}>{statusLabels[t.status]}</Badge>
-                  <span>{getUserName(t.assigned_to_user_id)}</span>
-                  <span className="ml-auto">{format(new Date(t.updated_at), 'dd MMM')}</span>
+                  <span className="truncate">{getUserName(t.assigned_to_user_id)}</span>
+                  <span className="ml-auto whitespace-nowrap">{format(new Date(t.updated_at), 'dd MMM')}</span>
                 </div>
-                {t.tags.length > 0 && (
-                  <div className="flex gap-1 mt-1.5 flex-wrap">
-                    {t.tags.slice(0, 3).map(tag => (
-                      <span key={tag} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{tag}</span>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
             {filtered.length === 0 && (
@@ -385,8 +439,8 @@ export default function Tickets() {
       {/* ── Detail Panel ── */}
       <div className={`flex-1 min-w-0 overflow-auto ${!selected ? 'hidden md:flex' : 'flex'}`}>
         {selected ? (
-          <div className="p-4 md:p-6 w-full space-y-6">
-            {/* Top bar: Back + collapse + Update/Cancel/Close */}
+          <div className="p-4 md:p-6 w-full max-w-5xl mx-auto space-y-6">
+            {/* Top bar */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 {isListCollapsed && (
@@ -394,59 +448,53 @@ export default function Tickets() {
                     <PanelLeft className="h-4 w-4" />
                   </Button>
                 )}
-                <div className="md:hidden">
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/tickets')}>
-                    <ArrowLeft className="h-4 w-4 mr-1" /> Back
-                  </Button>
-                </div>
+                <Button variant="ghost" size="sm" onClick={goBack}>
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Back
+                </Button>
               </div>
               <div className="flex items-center gap-2">
                 {hasEdits && (
                   <>
                     <Button variant="outline" size="sm" onClick={handleCancel}>
-                      <X className="h-3 w-3 mr-1" /> Cancel
+                      <X className="h-3 w-3 mr-1" /> Discard
                     </Button>
                     <Button size="sm" onClick={handleUpdate}>
-                      <Save className="h-3 w-3 mr-1" /> Update
+                      <Save className="h-3 w-3 mr-1" /> Save changes
                     </Button>
                   </>
                 )}
                 {currentStatus !== TicketStatus.CLOSED && (
-                  <Button variant="destructive" size="sm" onClick={() => setCloseDialog(true)}>
-                    Close Ticket
+                  <Button variant="outline" size="sm" onClick={() => setCloseDialog(true)}>
+                    Close ticket
                   </Button>
                 )}
               </div>
             </div>
 
-            {/* Header — editable subject + description */}
-            <div className="space-y-3">
+            {/* Header */}
+            <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Ticket className="h-3 w-3" />
-                <span>{selected.ticket_id}</span>
-                <span>•</span>
+                <Ticket className="h-3.5 w-3.5" />
+                <span className="font-mono font-medium text-foreground/70">{displayCode}</span>
+                <span>·</span>
                 <span>Created {format(new Date(selected.created_at), 'dd MMM yyyy, HH:mm')}</span>
+                <span>·</span>
+                <span>Updated {format(new Date(selected.updated_at), 'dd MMM yyyy, HH:mm')}</span>
               </div>
               <Input
                 value={editSubject}
                 onChange={e => setEditSubject(e.target.value)}
-                className="text-xl font-bold border-none p-0 h-auto focus-visible:ring-0 bg-transparent"
+                className="text-2xl font-bold border-none p-0 h-auto focus-visible:ring-0 bg-transparent"
+                placeholder="Ticket subject"
               />
-              <Textarea
-                value={editDescription}
-                onChange={e => setEditDescription(e.target.value)}
-                className="text-sm text-muted-foreground border-none p-0 min-h-[40px] focus-visible:ring-0 bg-transparent resize-none"
-                rows={2}
-              />
-              {/* SLA Timers */}
-              <div className="flex gap-4 flex-wrap">
-                <SLATimer deadline={selected.sla_first_response} label="First Response" />
+              <div className="flex gap-4 flex-wrap pt-1">
+                <SLATimer deadline={selected.sla_first_response} label="First response" />
                 <SLATimer deadline={selected.sla_resolution} label="Resolution" />
               </div>
             </div>
 
-            {/* Controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            {/* Quick controls — minimal, no pills */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground font-medium">Status</label>
                 <Select value={currentStatus} onValueChange={(v) => setTicketStatus(v as TicketStatus)}>
@@ -470,97 +518,125 @@ export default function Tickets() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground font-medium">Queue</label>
-                <Input value={selected.queue} readOnly className="bg-muted/50" />
+                <label className="text-xs text-muted-foreground font-medium">Assigned to</label>
+                <AssignmentSelect value={currentAssigned} onChange={setAssignedTo} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground font-medium">Assigned To</label>
-                <AssignmentSelect value={currentAssigned} onChange={setAssignedTo} />
+                <label className="text-xs text-muted-foreground font-medium">Category</label>
+                <Select value={editCategory} onValueChange={v => setEditCategory(v as TicketCategory)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.values(TicketCategory).map(c => (
+                      <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {/* Merged "Account Details" card */}
+            {/* Description with voice-to-text */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Account Details</CardTitle></CardHeader>
-              <CardContent className="text-sm space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Account:</span>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Description</CardTitle></CardHeader>
+              <CardContent>
+                <VoiceTextarea
+                  value={editDescription}
+                  onChange={setEditDescription}
+                  placeholder="Describe the issue or request…"
+                  rows={4}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Account / Requester */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Requester &amp; account</CardTitle></CardHeader>
+              <CardContent className="text-sm space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Building2 className="h-3 w-3" /> Account
+                    </label>
                     {selected.account_id ? (
-                      <Link to={`/accounts/${selected.account_id}`} className="text-primary hover:underline inline-flex items-center gap-1">
+                      <Link to={`/accounts/${selected.account_id}`} className="text-primary hover:underline inline-flex items-center gap-1 text-sm">
                         {linkedAccountName(selected.account_id)} <ExternalLink className="h-3 w-3" />
                       </Link>
-                    ) : <span>—</span>}
+                    ) : <span className="text-sm text-muted-foreground">—</span>}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <User className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Requester:</span>
-                    <Input value={editRequesterName} onChange={e => setEditRequesterName(e.target.value)} className="h-7 text-sm border-none p-0 bg-transparent w-auto flex-1" />
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <User className="h-3 w-3" /> Requester
+                    </label>
+                    <Input value={editRequesterName} onChange={e => setEditRequesterName(e.target.value)} className="h-8 text-sm" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Email:</span>
-                    <Input value={editRequesterEmail} onChange={e => setEditRequesterEmail(e.target.value)} className="h-7 text-sm border-none p-0 bg-transparent w-auto flex-1" />
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" /> Email
+                    </label>
+                    <Input value={editRequesterEmail} onChange={e => setEditRequesterEmail(e.target.value)} className="h-8 text-sm" placeholder="email@example.com" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Type:</span>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Type</label>
                     <Select value={editType} onValueChange={v => setEditType(v as TicketType)}>
-                      <SelectTrigger className="h-7 text-xs border-none bg-transparent w-auto"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>{Object.values(TicketType).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Category:</span>
-                    <Select value={editCategory} onValueChange={v => setEditCategory(v as TicketCategory)}>
-                      <SelectTrigger className="h-7 text-xs border-none bg-transparent w-auto"><SelectValue /></SelectTrigger>
-                      <SelectContent>{Object.values(TicketCategory).map(c => <SelectItem key={c} value={c}>{c.replace(/_/g, ' ')}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">City:</span>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">City</label>
                     <Select value={editCity || '__none__'} onValueChange={v => setEditCity(v === '__none__' ? '' : v)}>
-                      <SelectTrigger className="h-7 text-xs border-none bg-transparent w-auto"><SelectValue placeholder="City" /></SelectTrigger>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select city" /></SelectTrigger>
                       <SelectContent className="max-h-48">
                         <SelectItem value="__none__">None</SelectItem>
                         {getCityOptions().map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                {/* Tags — editable with lookup suggestions */}
-                <div className="flex items-center gap-2 flex-wrap pt-1">
-                  <Tag className="h-3 w-3 text-muted-foreground" />
-                  {editTags.map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs gap-1">
-                      {tag}
-                      <X className="h-3 w-3 cursor-pointer" onClick={() => setEditTags(editTags.filter(x => x !== tag))} />
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {getTagOptions().filter(t => !editTags.includes(t)).map(tag => (
-                    <Badge key={tag} variant="secondary" className="text-[10px] cursor-pointer hover:bg-primary/15" onClick={() => setEditTags([...editTags, tag])}>
-                      + {tag}
-                    </Badge>
-                  ))}
-                  <div className="flex gap-1 ml-1">
-                    <Input
-                      value={tagInput}
-                      onChange={e => setTagInput(e.target.value)}
-                      placeholder="Custom…"
-                      className="h-6 text-xs w-20 border-dashed"
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
-                    />
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Queue</label>
+                    <Input value={selected.queue} readOnly className="h-8 text-sm bg-muted/40" />
                   </div>
                 </div>
 
-                {/* Call / WhatsApp CTAs */}
+                {/* Tags */}
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Tag className="h-3 w-3" /> Tags
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {editTags.map(tag => (
+                      <Badge key={tag} variant="secondary" className="text-xs gap-1">
+                        {tag}
+                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => setEditTags(editTags.filter(x => x !== tag))} />
+                      </Badge>
+                    ))}
+                    <Input
+                      value={tagInput}
+                      onChange={e => setTagInput(e.target.value)}
+                      placeholder="Add tag…"
+                      className="h-6 text-xs w-24 border-dashed"
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                    />
+                  </div>
+                  {getTagOptions().filter(t => !editTags.includes(t)).length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-[10px] text-muted-foreground self-center">Suggestions:</span>
+                      {getTagOptions().filter(t => !editTags.includes(t)).slice(0, 8).map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className="text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted px-1.5 py-0.5 rounded transition-colors"
+                          onClick={() => setEditTags([...editTags, tag])}
+                        >
+                          + {tag}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Contact CTAs */}
                 {(phoneNumber || editRequesterEmail) && (
-                  <div className="flex gap-2 pt-2 border-t border-border/50 mt-2">
+                  <div className="flex gap-2 pt-2 border-t border-border/50">
                     {phoneNumber && (
                       <Button variant="outline" size="sm" asChild>
                         <a href={`tel:${phoneNumber}`}><Phone className="h-3 w-3 mr-1" /> Call</a>
@@ -578,53 +654,37 @@ export default function Tickets() {
               </CardContent>
             </Card>
 
-            {/* Timeline */}
+            {/* Events */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Timeline</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-0">
-                  {selected.timeline.map(entry => (
-                    <div key={entry.id} className="timeline-item">
-                      <div className={`timeline-dot ${
-                        entry.type === TimelineEventType.CUSTOMER_MESSAGE ? 'timeline-customer' :
-                        entry.type === TimelineEventType.AGENT_REPLY ? 'timeline-agent' :
-                        entry.type === TimelineEventType.INTERNAL_NOTE ? 'timeline-internal' :
-                        'timeline-system'
-                      }`} />
-                      <div className="text-sm">{entry.content}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {entry.user_id ? getUserName(entry.user_id) : 'System'} • {format(new Date(entry.created_at), 'dd MMM, HH:mm')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <CardContent className="pt-4">
+                <TicketEvents
+                  ticketId={selected.ticket_id}
+                  ticketSubject={selected.subject}
+                  accountId={selected.account_id}
+                />
               </CardContent>
             </Card>
 
-            {/* Schedule follow-up */}
-            <div>
-              {!showEventForm ? (
-                <Button variant="outline" size="sm" onClick={() => setShowEventForm(true)}>
-                  <CalendarIcon className="h-4 w-4 mr-1" /> Schedule Follow-up
-                </Button>
-              ) : (
-                <Card>
-                  <CardContent className="p-4">
-                    <CalendarEventForm
-                      onSubmit={handleCreateEvent}
-                      onCancel={() => setShowEventForm(false)}
-                      defaultTitle={`Follow-up — ${selected.subject.slice(0, 40)}`}
-                      defaultEventType={CalendarEventType.FOLLOW_UP}
-                    />
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            {/* Notes — separate from timeline */}
+            <Card>
+              <CardContent className="pt-4">
+                <NotesPanel notes={notes} onAddNote={handleAddNote} />
+              </CardContent>
+            </Card>
 
-            <NotesPanel notes={notes} onAddNote={handleAddNote} />
-            <AttachmentUploader
-              attachments={selected.attachments.map(id => ({ file_name: id, file_url: '#' }))}
-              onUpload={() => {}}
+            {/* Attachments */}
+            <Card>
+              <CardContent className="pt-4">
+                <TicketAttachments ticketId={selected.ticket_id} />
+              </CardContent>
+            </Card>
+
+            {/* Timeline (at the end) — full activity history */}
+            <ActivityTimeline
+              entityType="TICKET"
+              entityId={selected.ticket_id}
+              title="Ticket history"
+              includeAll
             />
           </div>
         ) : (
@@ -632,7 +692,7 @@ export default function Tickets() {
             <div className="text-center space-y-2">
               {isListCollapsed && (
                 <Button variant="ghost" size="sm" onClick={() => setIsListCollapsed(false)} className="mb-2">
-                  <PanelLeft className="h-4 w-4 mr-1" /> Show List
+                  <PanelLeft className="h-4 w-4 mr-1" /> Show list
                 </Button>
               )}
               <Ticket className="h-10 w-10 text-muted-foreground mx-auto" />
