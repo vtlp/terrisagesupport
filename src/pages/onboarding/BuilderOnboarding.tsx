@@ -575,8 +575,9 @@ export default function BuilderOnboarding() {
             { label: "Company name", value: companyName, required: true },
             { label: "Company tagline", value: companyTagline },
             { label: "RERA ID", value: reraId },
-            { label: "City", value: headOfficeCity, required: true },
             { label: "Property type focus", value: PROPERTY_TYPE_FOCUS_OPTIONS.find(b => b.value === propertyTypeFocus)?.label, required: true },
+            { label: "City", value: headOfficeCity, required: true },
+            { label: "Google company address", value: googleAddress },
           ]} />
 
           <ReviewSummaryCard title="Online Presence" onEdit={() => setCurrentStep(4)} fields={[
