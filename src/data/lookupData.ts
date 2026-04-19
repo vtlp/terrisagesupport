@@ -131,3 +131,19 @@ export const defaultPortals: LookupItem[] = [
 // Helper to get city names as a simple string array
 export const getCityOptions = (): string[] => defaultMarkets.map(m => m.value);
 export const getTagOptions = (): string[] => defaultTags.map(t => t.value);
+
+// Shared business area options (Agency onboarding + Account overview)
+export const BUSINESS_AREA_OPTIONS = [
+  { label: "Primary Market Sales Only", value: "primary-sales", description: "Focused exclusively on selling new launch or under-construction projects directly from builders and developers." },
+  { label: "Primary and Secondary Market Sales", value: "primary-secondary-sales", description: "Handles both new project sales and resale of existing properties across markets." },
+  { label: "Sales and Rentals in All Markets", value: "sales-rentals-all", description: "Full-service operations covering sales and rentals across primary, secondary, and all property markets." },
+  { label: "Rental Only", value: "rental-only", description: "Specialised in rental and leasing services for residential or commercial properties." },
+];
+
+// Shared property type focus options (Builder onboarding + Account overview)
+export const PROPERTY_TYPE_FOCUS_OPTIONS = [
+  { label: "Apartments", value: "apartments" },
+  { label: "Villas", value: "villas" },
+  { label: "Plots", value: "plots" },
+  { label: "Mix", value: "mix" },
+];
