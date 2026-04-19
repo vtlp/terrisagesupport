@@ -556,6 +556,55 @@ export default function EnquiryDetail() {
     setShareOpen(true);
   };
 
+  const regenerateOnboardingLink = async () => {
+    if (!enquiry || !draft) return;
+    const teamSize = draft.payload.team_size_estimate;
+    if (teamSize === null || teamSize === undefined || Number(teamSize) <= 0) {
+      toast.error('Please enter the team / seat size before generating a new onboarding link.');
+      return;
+    }
+    if (!(await requireClean('generate a new onboarding link'))) return;
+    const confirmed = window.confirm(
+      'Generate a new onboarding link?\n\nAny previous submission for this enquiry will be marked as rejected so the customer can submit fresh information.',
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    try {
+      // Reject prior non-rejected submissions so the per-link lock is released.
+      const { error: rejErr } = await supabase
+        .from('onboarding_submissions')
+        .update({ status: 'REJECTED', reviewed_at: new Date().toISOString() })
+        .eq('enquiry_id', enquiry.id)
+        .neq('status', 'REJECTED');
+      if (rejErr) throw rejErr;
+
+      const link = generateLink();
+      const { error: updErr } = await supabase.from('enquiries').update({
+        onboarding_pack_sent: true,
+        onboarding_pack_sent_at: new Date().toISOString(),
+        onboarding_form_link: link,
+      }).eq('id', enquiry.id);
+      if (updErr) throw updErr;
+
+      await supabase.from('activity_log').insert({
+        entity_type: 'ENQUIRY',
+        entity_id: enquiry.id,
+        event_type: 'SUBMISSION',
+        summary: 'New onboarding form link generated (previous submission reset)',
+        details: { link },
+      });
+
+      await refreshEnquiryMeta(enquiry.id);
+      await refreshSubmission(enquiry.id);
+      toast.success('New onboarding link ready');
+      setShareOpen(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not regenerate link');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const reviewSubmission = async (status: 'APPROVED' | 'REJECTED') => {
     if (!submission || !enquiry) return;
     setBusy(true);
