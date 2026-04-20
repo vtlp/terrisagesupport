@@ -757,100 +757,16 @@ export default function Knowledge() {
         </DialogContent>
       </Dialog>
 
-      {/* In-app file preview dialog */}
-      <Dialog open={!!previewFile} onOpenChange={(o) => {
-        if (!o) {
-          if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
-          setPreviewBlobUrl(null);
-          setPreviewFile(null); setPreviewUrl(null); setPreviewText(null);
-        }
-      }}>
-        <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
-          <div className="p-4 border-b flex flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              {previewFile && fileIcon(previewFile.mime_type, previewFile.name)}
-              <div className="min-w-0">
-                <DialogTitle className="text-base truncate">{previewFile?.name}</DialogTitle>
-                <DialogDescription className="text-xs">
-                  {previewFile && `${fmtSize(previewFile.size_bytes)} • ${folderPath(previewFile.folder_id)}`}
-                </DialogDescription>
-              </div>
-            </div>
-            <div className="flex gap-2 mr-6 flex-shrink-0">
-              {previewFile && previewUrl && (
-                <Button size="sm" variant="outline" onClick={() => window.open(previewBlobUrl ?? previewUrl, '_blank')}>
-                  Open in new tab
-                </Button>
-              )}
-              {previewFile && (
-                <Button size="sm" variant="outline" onClick={() => downloadFile(previewFile)}>
-                  <Download className="h-3.5 w-3.5 mr-1" /> Download
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="flex-1 min-h-0 overflow-auto bg-muted/30">
-            {previewLoading && (
-              <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            {!previewLoading && previewFile && previewUrl && (
-              <>
-                {previewKind === 'image' && (
-                  <div className="h-full flex items-center justify-center p-4">
-                    <img src={previewUrl} alt={previewFile.name} className="max-h-full max-w-full object-contain" />
-                  </div>
-                )}
-                {previewKind === 'pdf' && (
-                  previewBlobUrl ? (
-                    <iframe src={previewBlobUrl} title={previewFile.name} className="w-full h-full border-0" />
-                  ) : (
-                    <div className="h-full flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-                  )
-                )}
-                {previewKind === 'video' && (
-                  <div className="h-full flex items-center justify-center p-4">
-                    <video src={previewUrl} controls className="max-h-full max-w-full" />
-                  </div>
-                )}
-                {previewKind === 'audio' && (
-                  <div className="h-full flex items-center justify-center p-4">
-                    <audio src={previewUrl} controls />
-                  </div>
-                )}
-                {previewKind === 'office' && (
-                  <iframe
-                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`}
-                    title={previewFile.name}
-                    className="w-full h-full border-0"
-                  />
-                )}
-                {previewKind === 'text' && (
-                  <pre className="p-4 text-xs whitespace-pre-wrap break-words font-mono">{previewText ?? ''}</pre>
-                )}
-                {previewKind === null && (
-                  <div className="h-full flex items-center justify-center p-6 text-center">
-                    <div>
-                      <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-sm font-medium mb-1">In-app preview not supported for this file type.</p>
-                      <p className="text-xs text-muted-foreground mb-4">You can open it in a new tab or download it.</p>
-                      <div className="flex gap-2 justify-center">
-                        <Button size="sm" variant="outline" onClick={() => window.open(previewUrl, '_blank')}>
-                          Open in new tab
-                        </Button>
-                        <Button size="sm" onClick={() => previewFile && downloadFile(previewFile)}>
-                          <Download className="h-3.5 w-3.5 mr-1" /> Download
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FilePreviewDialog
+        open={!!previewFile}
+        onOpenChange={(open) => {
+          if (!open) setPreviewFile(null);
+        }}
+        bucket="kb-files"
+        path={previewFile?.storage_path ?? null}
+        name={previewFile?.name ?? null}
+        mime={previewFile?.mime_type ?? null}
+      />
     </div>
   );
 }
