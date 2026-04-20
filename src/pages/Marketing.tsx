@@ -58,6 +58,7 @@ export default function Marketing() {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [spendDialogOpen, setSpendDialogOpen] = useState(false);
+  const [editingSpend, setEditingSpend] = useState<MarketingCostItem | null>(null);
 
   const reloadAll = async () => {
     const [t, s, ci, geo, enq, acc, tic] = await Promise.all([
