@@ -1667,6 +1667,54 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          dedupe_key: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          is_read: boolean
+          link_path: string | null
+          read_at: string | null
+          severity: Database["public"]["Enums"]["notification_severity"]
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean
+          link_path?: string | null
+          read_at?: string | null
+          severity?: Database["public"]["Enums"]["notification_severity"]
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean
+          link_path?: string | null
+          read_at?: string | null
+          severity?: Database["public"]["Enums"]["notification_severity"]
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       onboarding_submissions: {
         Row: {
           created_at: string
@@ -2237,6 +2285,20 @@ export type Database = {
         Args: { _enquiry_id: string }
         Returns: string
       }
+      create_notification: {
+        Args: {
+          _body?: string
+          _dedupe_key?: string
+          _entity_id?: string
+          _entity_type?: string
+          _link_path?: string
+          _severity?: Database["public"]["Enums"]["notification_severity"]
+          _title: string
+          _type: Database["public"]["Enums"]["notification_type"]
+          _user_id?: string
+        }
+        Returns: string
+      }
       fulfil_seat_request: { Args: { _request_id: string }; Returns: undefined }
       has_role: {
         Args: {
@@ -2256,7 +2318,9 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_notifications_read: { Args: { _ids?: string[] }; Returns: number }
       mark_stalled_accounts: { Args: never; Returns: number }
+      scan_overdue_events: { Args: never; Returns: number }
       validate_account_api_key: { Args: { _key_hash: string }; Returns: string }
     }
     Enums: {
@@ -2332,6 +2396,20 @@ export type Database = {
         | "OTHER"
       marketing_cost_item_type: "ONLINE" | "OFFLINE"
       marketing_cost_type: "CPM" | "CPC" | "CPL" | "FIXED" | "RETAINER"
+      notification_severity: "INFO" | "WARNING" | "CRITICAL"
+      notification_type:
+        | "EVENT_DUE"
+        | "EVENT_OVERDUE"
+        | "REMINDER"
+        | "ENQUIRY_SUBMISSION"
+        | "SLA_BREACH"
+        | "ACCOUNT_STALLED"
+        | "DEMO_NOT_COMPLETED"
+        | "SEAT_REQUEST"
+        | "TICKET_ASSIGNED"
+        | "TICKET_UPDATED"
+        | "EXTERNAL"
+        | "GENERAL"
       referral_status:
         | "Closed"
         | "In Process"
@@ -2570,6 +2648,21 @@ export const Constants = {
       ],
       marketing_cost_item_type: ["ONLINE", "OFFLINE"],
       marketing_cost_type: ["CPM", "CPC", "CPL", "FIXED", "RETAINER"],
+      notification_severity: ["INFO", "WARNING", "CRITICAL"],
+      notification_type: [
+        "EVENT_DUE",
+        "EVENT_OVERDUE",
+        "REMINDER",
+        "ENQUIRY_SUBMISSION",
+        "SLA_BREACH",
+        "ACCOUNT_STALLED",
+        "DEMO_NOT_COMPLETED",
+        "SEAT_REQUEST",
+        "TICKET_ASSIGNED",
+        "TICKET_UPDATED",
+        "EXTERNAL",
+        "GENERAL",
+      ],
       referral_status: [
         "Closed",
         "In Process",
