@@ -50,6 +50,7 @@ const isPreviewable = (mime?: string | null, name?: string) => {
   if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
   if (mime?.startsWith('video/') || ['mp4', 'webm', 'mov'].includes(ext)) return 'video';
   if (mime?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'audio';
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'office';
   if (mime?.startsWith('text/') || ['txt', 'md', 'csv', 'json', 'log'].includes(ext)) return 'text';
   return null;
 };
