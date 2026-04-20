@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
-  listContacts, listReferralRecords, createReferralRecord,
+  listContacts, listReferralRecords, createReferralRecord, updateReferralRecord,
   REFERRAL_STATUSES, REFERRER_ELIGIBLE_TYPES,
   type MarketingContact, type MarketingReferralRecord, type ReferralStatus,
 } from '@/lib/marketingApi';
@@ -25,6 +25,7 @@ export function ReferralManagementTab({ isAdmin }: Props) {
   const [records, setRecords] = useState<MarketingReferralRecord[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<MarketingReferralRecord | null>(null);
   const [drawerContact, setDrawerContact] = useState<MarketingContact | null>(null);
   const [contactDrawerOpen, setContactDrawerOpen] = useState(false);
   const [detailRecord, setDetailRecord] = useState<MarketingReferralRecord | null>(null);
@@ -55,6 +56,8 @@ export function ReferralManagementTab({ isAdmin }: Props) {
     setDrawerContact(c); setContactDrawerOpen(true);
   };
   const openDetail = (r: MarketingReferralRecord) => { setDetailRecord(r); setDetailOpen(true); };
+  const openNew = () => { setEditing(null); setOpen(true); };
+  const openEdit = (r: MarketingReferralRecord) => { setEditing(r); setOpen(true); setDetailOpen(false); };
 
   return (
     <div className="space-y-4">
@@ -63,7 +66,7 @@ export function ReferralManagementTab({ isAdmin }: Props) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search referrals…" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        {isAdmin && <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Add referral</Button>}
+        {isAdmin && <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" />Add referral</Button>}
       </div>
 
       <Card><CardContent className="p-0 overflow-x-auto">
@@ -104,16 +107,17 @@ export function ReferralManagementTab({ isAdmin }: Props) {
         {filtered.length === 0 && <p className="text-center text-muted-foreground py-8 text-sm">No referrals yet.</p>}
       </CardContent></Card>
 
-      <AddReferralDialog
+      <ReferralDialog
         open={open} onOpenChange={setOpen}
         contacts={eligibleContacts}
-        onCreated={reload}
+        existing={editing}
+        onSaved={reload}
       />
 
       <ReferralDetailDrawer
         record={detailRecord} contact={detailRecord ? contactById[detailRecord.contact_id] : null}
         open={detailOpen} onOpenChange={setDetailOpen}
-        onChanged={reload} onOpenContact={openContact} isAdmin={isAdmin}
+        onChanged={reload} onEdit={openEdit} onOpenContact={openContact} isAdmin={isAdmin}
       />
 
       <ContactDetailDrawer
@@ -125,10 +129,14 @@ export function ReferralManagementTab({ isAdmin }: Props) {
   );
 }
 
-function AddReferralDialog({ open, onOpenChange, contacts, onCreated }: {
-  open: boolean; onOpenChange: (v: boolean) => void; contacts: MarketingContact[]; onCreated: () => void;
+function ReferralDialog({ open, onOpenChange, contacts, existing, onSaved }: {
+  open: boolean; onOpenChange: (v: boolean) => void;
+  contacts: MarketingContact[];
+  existing: MarketingReferralRecord | null;
+  onSaved: () => void;
 }) {
   const { toast } = useToast();
+  const isEdit = !!existing;
   const [contactId, setContactId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState<ReferralStatus>('New');
@@ -139,11 +147,20 @@ function AddReferralDialog({ open, onOpenChange, contacts, onCreated }: {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (existing) {
+      setContactId(existing.contact_id);
+      setDate(existing.referral_date);
+      setStatus(existing.status);
+      setSeats(existing.seats_referred);
+      setPricePerSeat(Number(existing.price_per_seat));
+      setPct(Number(existing.commission_pct));
+      setNotes(existing.notes ?? '');
+    } else {
       setContactId(''); setDate(new Date().toISOString().slice(0, 10)); setStatus('New');
       setSeats(0); setPricePerSeat(0); setPct(0); setNotes('');
     }
-  }, [open]);
+  }, [open, existing]);
 
   const total = seats * pricePerSeat * (pct / 100);
   const selected = contacts.find(c => c.id === contactId);
@@ -152,13 +169,19 @@ function AddReferralDialog({ open, onOpenChange, contacts, onCreated }: {
     if (!contactId) { toast({ title: 'Select a referrer', variant: 'destructive' }); return; }
     setBusy(true);
     try {
-      await createReferralRecord({
+      const payload = {
         contact_id: contactId, referral_date: date, status,
         seats_referred: seats, commission_pct: pct, price_per_seat: pricePerSeat,
         notes: notes || null,
-      });
-      toast({ title: 'Referral added' });
-      onCreated(); onOpenChange(false);
+      };
+      if (isEdit && existing) {
+        await updateReferralRecord(existing.id, payload);
+        toast({ title: 'Referral updated' });
+      } else {
+        await createReferralRecord(payload);
+        toast({ title: 'Referral added' });
+      }
+      onSaved(); onOpenChange(false);
     } catch (e) {
       toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' });
     } finally { setBusy(false); }
@@ -167,7 +190,7 @@ function AddReferralDialog({ open, onOpenChange, contacts, onCreated }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Add referral</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEdit ? 'Edit referral' : 'Add referral'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div>
             <Label>Referrer (contact) *</Label>
@@ -205,11 +228,11 @@ function AddReferralDialog({ open, onOpenChange, contacts, onCreated }: {
               <span className="font-semibold">₹{total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
             </div>
           </div>
-          <div><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} /></div>
+          <div><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Add notes for this referral…" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>Save</Button>
+          <Button onClick={submit} disabled={busy}>{isEdit ? 'Save changes' : 'Save'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
