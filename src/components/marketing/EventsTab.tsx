@@ -3,10 +3,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Trash2 } from 'lucide-react';
-import { listRecords, deleteRecord, type MarketingEvent } from '@/lib/marketingApi';
+import { Plus, Search } from 'lucide-react';
+import { listRecords, type MarketingEvent } from '@/lib/marketingApi';
 import { AddEventDialog } from './AddEventDialog';
-import { useToast } from '@/hooks/use-toast';
+import { EventDetailDrawer } from './EventDetailDrawer';
 
 interface Props { isAdmin: boolean }
 
@@ -14,20 +14,17 @@ export function EventsTab({ isAdmin }: Props) {
   const [events, setEvents] = useState<MarketingEvent[]>([]);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { toast } = useToast();
+  const [detail, setDetail] = useState<MarketingEvent | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const reload = async () => setEvents(await listRecords<MarketingEvent>('marketing_events'));
   useEffect(() => { reload(); }, []);
 
-  const remove = async (id: string) => {
-    if (!confirm('Delete this event?')) return;
-    try { await deleteRecord('marketing_events', id); toast({ title: 'Deleted' }); reload(); }
-    catch (e) { toast({ title: 'Delete failed', description: (e as Error).message, variant: 'destructive' }); }
-  };
-
   const filtered = useMemo(() => events.filter(e =>
     !search || [e.event_name, e.location, e.city].some(v => (v ?? '').toLowerCase().includes(search.toLowerCase()))),
   [events, search]);
+
+  const openRow = (e: MarketingEvent) => { setDetail(e); setDrawerOpen(true); };
 
   return (
     <div className="space-y-4">
@@ -43,17 +40,16 @@ export function EventsTab({ isAdmin }: Props) {
         <Table>
           <TableHeader><TableRow>
             <TableHead>Event</TableHead><TableHead>City</TableHead><TableHead>Location</TableHead>
-            <TableHead>Date</TableHead><TableHead>Attendees</TableHead><TableHead className="w-12" />
+            <TableHead>Date</TableHead><TableHead className="text-right">Attendees</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {filtered.map(e => (
-              <TableRow key={e.id}>
+              <TableRow key={e.id} className="cursor-pointer hover:bg-muted/40" onClick={() => openRow(e)}>
                 <TableCell className="font-medium">{e.event_name}</TableCell>
                 <TableCell>{e.city ?? '—'}</TableCell>
                 <TableCell className="max-w-xs truncate" title={e.location ?? ''}>{e.location ?? '—'}</TableCell>
                 <TableCell>{e.event_date ? new Date(e.event_date).toLocaleDateString() : '—'}</TableCell>
-                <TableCell>{e.attendees.toLocaleString()}</TableCell>
-                <TableCell>{isAdmin && <button onClick={() => remove(e.id)} className="text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></button>}</TableCell>
+                <TableCell className="text-right">{e.attendees.toLocaleString()}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -62,6 +58,10 @@ export function EventsTab({ isAdmin }: Props) {
       </CardContent></Card>
 
       <AddEventDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={reload} />
+      <EventDetailDrawer
+        event={detail} open={drawerOpen} onOpenChange={setDrawerOpen}
+        onChanged={reload} isAdmin={isAdmin}
+      />
     </div>
   );
 }
