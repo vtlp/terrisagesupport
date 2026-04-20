@@ -50,6 +50,7 @@ const isPreviewable = (mime?: string | null, name?: string) => {
   if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
   if (mime?.startsWith('video/') || ['mp4', 'webm', 'mov'].includes(ext)) return 'video';
   if (mime?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'audio';
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'office';
   if (mime?.startsWith('text/') || ['txt', 'md', 'csv', 'json', 'log'].includes(ext)) return 'text';
   return null;
 };
@@ -871,6 +872,13 @@ export default function Knowledge() {
                   <div className="h-full flex items-center justify-center p-4">
                     <audio src={previewUrl} controls />
                   </div>
+                )}
+                {previewKind === 'office' && (
+                  <iframe
+                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`}
+                    title={previewFile.name}
+                    className="w-full h-full border-0"
+                  />
                 )}
                 {previewKind === 'text' && (
                   <pre className="p-4 text-xs whitespace-pre-wrap break-words font-mono">{previewText ?? ''}</pre>
