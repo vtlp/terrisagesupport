@@ -1,40 +1,35 @@
 // Google Calendar one-way sync (CRM -> Google Calendar)
-// Pushes a calendar_event to the connected Google account's primary calendar
-// using the Lovable connector gateway.
+// Uses OAuth credentials configured in Admin → Integrations.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.95.0';
 import { corsHeaders } from 'https://esm.sh/@supabase/supabase-js@2.95.0/cors';
 
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/google_calendar';
-
 interface SyncRequest {
   event_id: string;
-  calendar_id?: string; // defaults to 'primary'
+  calendar_id?: string;
+}
+
+async function getAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.access_token) {
+    throw new Error(`Failed to refresh access token: ${JSON.stringify(data)}`);
+  }
+  return data.access_token as string;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const GOOGLE_CALENDAR_API_KEY = Deno.env.get('GOOGLE_CALENDAR_API_KEY');
-
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY is not configured' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (!GOOGLE_CALENDAR_API_KEY) {
-      // Optional integration — silently skip if not connected
-      return new Response(JSON.stringify({
-        success: true,
-        skipped: true,
-        reason: 'Google Calendar not connected',
-        code: 'NOT_CONNECTED',
-      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
@@ -61,7 +56,28 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const calendarId = body.calendar_id ?? 'primary';
+
+    // Read settings via service role
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const { data: settings } = await admin
+      .from('integration_settings')
+      .select('*')
+      .eq('provider', 'google_calendar')
+      .maybeSingle();
+
+    if (!settings?.google_client_id || !settings?.google_client_secret || !settings?.google_refresh_token) {
+      return new Response(JSON.stringify({
+        success: true,
+        skipped: true,
+        reason: 'Google Calendar not connected',
+        code: 'NOT_CONNECTED',
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const calendarId = body.calendar_id ?? settings.google_calendar_id ?? 'primary';
 
     const { data: event, error: evErr } = await supabase
       .from('calendar_events')
@@ -91,16 +107,21 @@ Deno.serve(async (req) => {
       end: { dateTime: endTime.toISOString() },
     };
 
+    const accessToken = await getAccessToken(
+      settings.google_client_id,
+      settings.google_client_secret,
+      settings.google_refresh_token,
+    );
+
     const isUpdate = !!existing?.google_event_id;
     const url = isUpdate
-      ? `${GATEWAY_URL}/calendars/${encodeURIComponent(calendarId)}/events/${existing!.google_event_id}`
-      : `${GATEWAY_URL}/calendars/${encodeURIComponent(calendarId)}/events`;
+      ? `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${existing!.google_event_id}`
+      : `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
 
     const gResp = await fetch(url, {
       method: isUpdate ? 'PUT' : 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': GOOGLE_CALENDAR_API_KEY,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(gcalEvent),
@@ -109,21 +130,20 @@ Deno.serve(async (req) => {
     const gData = await gResp.json();
 
     if (!gResp.ok) {
-      await supabase.from('calendar_event_sync').upsert({
+      await admin.from('calendar_event_sync').upsert({
         calendar_event_id: body.event_id,
         google_calendar_id: calendarId,
         sync_status: 'FAILED',
         sync_error: `Google API ${gResp.status}: ${JSON.stringify(gData)}`,
         synced_at: new Date().toISOString(),
       }, { onConflict: 'calendar_event_id' });
-
       console.error('Google Calendar sync failed', { status: gResp.status, body: gData });
-      return new Response(JSON.stringify({
-        error: 'Google Calendar sync failed',
-      }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Google Calendar sync failed' }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    await supabase.from('calendar_event_sync').upsert({
+    await admin.from('calendar_event_sync').upsert({
       calendar_event_id: body.event_id,
       google_event_id: gData.id,
       google_calendar_id: calendarId,
@@ -139,7 +159,8 @@ Deno.serve(async (req) => {
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: unknown) {
     console.error('sync-calendar-event error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    const msg = error instanceof Error ? error.message : 'Internal server error';
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

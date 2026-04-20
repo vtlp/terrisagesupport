@@ -2,7 +2,7 @@ import { useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Ticket, BookOpen, BarChart3, Megaphone,
   Settings, ChevronDown, ChevronRight, Users, GitBranch, ListChecks,
-  PhoneCall, CalendarDays,
+  PhoneCall, CalendarDays, Plug,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -28,6 +28,7 @@ const adminSubItems = [
   { title: 'Teams & Users', url: '/admin/users', icon: Users },
   { title: 'Lookup Management', url: '/admin/lookups', icon: ListChecks },
   { title: 'Assignment Rules', url: '/admin/queues', icon: GitBranch },
+  { title: 'Integrations', url: '/admin/integrations', icon: Plug },
 ];
 
 function useNotificationCounts() {

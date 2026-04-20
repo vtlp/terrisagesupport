@@ -904,6 +904,48 @@ export type Database = {
           },
         ]
       }
+      integration_settings: {
+        Row: {
+          connected_at: string | null
+          created_at: string
+          google_account_email: string | null
+          google_calendar_id: string | null
+          google_client_id: string | null
+          google_client_secret: string | null
+          google_refresh_token: string | null
+          id: string
+          provider: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          connected_at?: string | null
+          created_at?: string
+          google_account_email?: string | null
+          google_calendar_id?: string | null
+          google_client_id?: string | null
+          google_client_secret?: string | null
+          google_refresh_token?: string | null
+          id?: string
+          provider: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          connected_at?: string | null
+          created_at?: string
+          google_account_email?: string | null
+          google_calendar_id?: string | null
+          google_client_id?: string | null
+          google_client_secret?: string | null
+          google_refresh_token?: string | null
+          id?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       kb_articles: {
         Row: {
           body: string
