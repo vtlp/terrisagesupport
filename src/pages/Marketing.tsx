@@ -366,24 +366,33 @@ export default function Marketing() {
                   <CardTitle className="text-base">{card.label}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {card.items.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">No spends yet.</p>}
+                  {card.items.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">No spends yet.</p>}
                   {card.items.map(item => (
-                    <div key={item.id} className="flex items-start justify-between py-1.5 border-b border-border last:border-0 group">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{item.title}</p>
-                        {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}
-                        {item.spend_date && (
-                          <p className="text-xs text-muted-foreground">{new Date(item.spend_date).toLocaleDateString()}</p>
-                        )}
+                    <div key={item.id} className="rounded-md border border-border bg-card p-3 group hover:border-primary/40 transition-colors">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
+                          {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`font-semibold text-sm ${card.accent}`}>₹{Number(item.amount).toLocaleString()}</span>
+                          {isAdmin && (
+                            <button onClick={() => removeCostItem(item.id)} className="opacity-0 group-hover:opacity-100 text-destructive transition-opacity">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 ml-2">
-                        <span className={`font-semibold text-sm ${card.accent}`}>₹{Number(item.amount).toLocaleString()}</span>
-                        {isAdmin && (
-                          <button onClick={() => removeCostItem(item.id)} className="opacity-0 group-hover:opacity-100 text-destructive transition-opacity">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] text-muted-foreground">
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">{item.cost_type === 'ONLINE' ? 'Online' : 'Offline'}</Badge>
+                        {item.spend_date && <span>📅 {new Date(item.spend_date).toLocaleDateString()}</span>}
+                        <span className="ml-auto">Logged {new Date(item.created_at).toLocaleDateString()}</span>
                       </div>
+                      {item.notes && (
+                        <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border whitespace-pre-wrap">
+                          {item.notes}
+                        </p>
+                      )}
                     </div>
                   ))}
                   <div className="pt-2 flex justify-between font-semibold text-sm border-t border-border">
