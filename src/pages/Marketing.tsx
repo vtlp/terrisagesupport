@@ -166,16 +166,18 @@ export default function Marketing() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex flex-wrap">
-          <TabsTrigger value="overview"><Target className="h-4 w-4 mr-1" />Overview</TabsTrigger>
-          <TabsTrigger value="pipeline"><BarChart3 className="h-4 w-4 mr-1" />Pipeline KPIs</TabsTrigger>
-          <TabsTrigger value="contacts"><Users className="h-4 w-4 mr-1" />Contacts</TabsTrigger>
-          <TabsTrigger value="referrals"><Handshake className="h-4 w-4 mr-1" />Referral Management</TabsTrigger>
-          <TabsTrigger value="events"><Calendar className="h-4 w-4 mr-1" />Events</TabsTrigger>
-          <TabsTrigger value="costs"><DollarSign className="h-4 w-4 mr-1" />Costs</TabsTrigger>
-          <TabsTrigger value="assets"><FolderOpen className="h-4 w-4 mr-1" />Assets</TabsTrigger>
-          <TabsTrigger value="activity"><Megaphone className="h-4 w-4 mr-1" />Activity Log</TabsTrigger>
-        </TabsList>
+        <div className="-mx-4 md:mx-0 overflow-x-auto scrollbar-thin">
+          <TabsList className="inline-flex w-max min-w-full justify-start gap-1 px-4 md:px-1 h-auto flex-nowrap">
+            <TabsTrigger value="overview" className="whitespace-nowrap"><Target className="h-4 w-4 mr-1" />Overview</TabsTrigger>
+            <TabsTrigger value="pipeline" className="whitespace-nowrap"><BarChart3 className="h-4 w-4 mr-1" />Pipeline KPIs</TabsTrigger>
+            <TabsTrigger value="contacts" className="whitespace-nowrap"><Users className="h-4 w-4 mr-1" />Contacts</TabsTrigger>
+            <TabsTrigger value="referrals" className="whitespace-nowrap"><Handshake className="h-4 w-4 mr-1" />Referrals</TabsTrigger>
+            <TabsTrigger value="events" className="whitespace-nowrap"><Calendar className="h-4 w-4 mr-1" />Events</TabsTrigger>
+            <TabsTrigger value="costs" className="whitespace-nowrap"><DollarSign className="h-4 w-4 mr-1" />Costs</TabsTrigger>
+            <TabsTrigger value="assets" className="whitespace-nowrap"><FolderOpen className="h-4 w-4 mr-1" />Assets</TabsTrigger>
+            <TabsTrigger value="activity" className="whitespace-nowrap"><Megaphone className="h-4 w-4 mr-1" />Activity</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ─── Overview ─── */}
         <TabsContent value="overview" className="space-y-6">
@@ -426,8 +428,8 @@ export default function Marketing() {
                           <span className="text-foreground text-right max-w-[60%] truncate">{item.description || '—'}</span>
                         </div>
                         <div className="flex justify-between px-2 py-1">
-                          <span className="text-muted-foreground">Logged</span>
-                          <span className="text-foreground">{new Date(item.created_at).toLocaleDateString()}</span>
+                          <span className="text-muted-foreground">Updated</span>
+                          <span className="text-foreground">{new Date(item.updated_at ?? item.created_at).toLocaleString()}</span>
                         </div>
                       </div>
 
