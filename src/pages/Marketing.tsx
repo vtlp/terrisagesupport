@@ -58,8 +58,6 @@ export default function Marketing() {
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [spendDialog, setSpendDialog] = useState<null | 'ONLINE' | 'OFFLINE'>(null);
 
-  if (!isAdmin) return <Navigate to="/" replace />;
-
   const reloadAll = async () => {
     const [t, s, ci, geo, enq, acc, tic] = await Promise.all([
       fetchTargets(year),
@@ -144,6 +142,8 @@ export default function Marketing() {
   enquiries.forEach(e => { const k = e.source ?? 'UNKNOWN'; sourceCounts[k] = (sourceCounts[k] ?? 0) + 1; });
   const sourceData = Object.entries(sourceCounts).map(([name, value]) => ({ name: name.replace(/_/g, ' '), value }));
 
+  if (!isAdmin) return <Navigate to="/" replace />;
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -185,13 +185,7 @@ export default function Marketing() {
 
           {/* Activity summary tiles */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('records')}>
-              <CardContent className="p-3 text-center">
-                <UserPlus className="h-5 w-5 mx-auto mb-1 text-primary" />
-                <p className="text-2xl font-bold text-foreground">{geoCountSafe(0)}</p>
-                <p className="text-xs text-muted-foreground">Referrals</p>
-              </CardContent>
-            </Card>
+            <TileCount label="Referrals" Icon={UserPlus} onClick={() => setActiveTab('records')} fetcher="marketing_referrals" />
             <TileCount label="Contacts" Icon={Users} onClick={() => setActiveTab('records')} fetcher="marketing_contacts" />
             <TileCount label="Champions" Icon={Award} onClick={() => setActiveTab('records')} fetcher="marketing_champions" />
             <TileCount label="Events" Icon={Calendar} onClick={() => setActiveTab('events')} fetcher="marketing_events" />
@@ -203,7 +197,6 @@ export default function Marketing() {
               </CardContent>
             </Card>
           </div>
-          {/* Use referrals count via geoCounts placeholder fix: render proper tile */}
 
           {/* Cost Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -406,8 +399,6 @@ export default function Marketing() {
       </Tabs>
     </div>
   );
-
-  function geoCountSafe(_: number) { return 0; } // placeholder removed below
 }
 
 // Tile that fetches its own count for a given marketing table
