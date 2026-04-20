@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import {
   Target, Users, Megaphone, DollarSign, MapPin,
-  Calendar, BarChart3, Plus, Trash2, Handshake,
+  Calendar, BarChart3, Plus, Trash2, Handshake, FolderOpen, Wifi, WifiOff,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLookup } from '@/hooks/useLookups';
@@ -169,11 +169,12 @@ export default function Marketing() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview"><Target className="h-4 w-4 mr-1" />Overview</TabsTrigger>
           <TabsTrigger value="pipeline"><BarChart3 className="h-4 w-4 mr-1" />Pipeline KPIs</TabsTrigger>
-          <TabsTrigger value="activity"><Megaphone className="h-4 w-4 mr-1" />Activity Log</TabsTrigger>
           <TabsTrigger value="contacts"><Users className="h-4 w-4 mr-1" />Contacts</TabsTrigger>
           <TabsTrigger value="referrals"><Handshake className="h-4 w-4 mr-1" />Referral Management</TabsTrigger>
           <TabsTrigger value="events"><Calendar className="h-4 w-4 mr-1" />Events</TabsTrigger>
           <TabsTrigger value="costs"><DollarSign className="h-4 w-4 mr-1" />Costs</TabsTrigger>
+          <TabsTrigger value="assets"><FolderOpen className="h-4 w-4 mr-1" />Assets</TabsTrigger>
+          <TabsTrigger value="activity"><Megaphone className="h-4 w-4 mr-1" />Activity Log</TabsTrigger>
         </TabsList>
 
         {/* ─── Overview ─── */}
@@ -351,63 +352,95 @@ export default function Marketing() {
 
         {/* ─── Costs ─── */}
         <TabsContent value="costs" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Marketing Spend</h2>
+              <p className="text-xs text-muted-foreground">Track spend by channel — online vs offline</p>
+            </div>
             {isAdmin && (
               <Button onClick={() => { setEditingSpend(null); setSpendDialogOpen(true); }}>
                 <Plus className="h-4 w-4 mr-1" />Add spend
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { type: 'ONLINE' as const, items: onlineItems, total: onlineTotal, label: 'Online Spend', accent: 'text-info' },
-              { type: 'OFFLINE' as const, items: offlineItems, total: offlineTotal, label: 'Offline Spend', accent: 'text-warning' },
+              { type: 'ONLINE' as const, items: onlineItems, total: onlineTotal, label: 'Online Spend', Icon: Wifi, accent: 'text-info', bar: 'bg-info' },
+              { type: 'OFFLINE' as const, items: offlineItems, total: offlineTotal, label: 'Offline Spend', Icon: WifiOff, accent: 'text-warning', bar: 'bg-warning' },
             ].map(card => (
-              <Card key={card.type}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{card.label}</CardTitle>
+              <Card key={card.type} className="overflow-hidden">
+                <CardHeader className="pb-3 border-b border-border bg-muted/30">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <span className={`inline-flex h-7 w-7 items-center justify-center rounded-md bg-card border border-border ${card.accent}`}>
+                        <card.Icon className="h-4 w-4" />
+                      </span>
+                      {card.label}
+                      <Badge variant="secondary" className="ml-1 text-[10px] py-0 px-1.5 h-4">{card.items.length}</Badge>
+                    </CardTitle>
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</p>
+                      <p className={`text-base font-bold ${card.accent}`}>₹{card.total.toLocaleString()}</p>
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  {card.items.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">No spends yet.</p>}
+                <CardContent className="p-3 space-y-2">
+                  {card.items.length === 0 && (
+                    <div className="py-10 text-center text-sm text-muted-foreground">
+                      <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                      No {card.label.toLowerCase()} logged yet.
+                    </div>
+                  )}
                   {card.items.map(item => (
                     <div
                       key={item.id}
-                      className="rounded-md border border-border bg-card p-3 group hover:border-primary/40 transition-colors cursor-pointer"
+                      className="rounded-md border border-border bg-card hover:border-primary/40 transition-colors cursor-pointer group overflow-hidden"
                       onClick={() => { if (isAdmin) { setEditingSpend(item); setSpendDialogOpen(true); } }}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
-                          {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
-                        </div>
+                      {/* Top: title + amount */}
+                      <div className="flex items-start justify-between gap-3 px-3 pt-2.5">
+                        <p className="font-medium text-sm text-foreground leading-tight flex-1 min-w-0 truncate">{item.title}</p>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={`font-semibold text-sm ${card.accent}`}>₹{Number(item.amount).toLocaleString()}</span>
                           {isAdmin && (
                             <button
                               onClick={(e) => { e.stopPropagation(); removeCostItem(item.id); }}
                               className="opacity-0 group-hover:opacity-100 text-destructive transition-opacity"
+                              title="Delete"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] text-muted-foreground">
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">{item.cost_type === 'ONLINE' ? 'Online' : 'Offline'}</Badge>
-                        {item.spend_date && <span>📅 {new Date(item.spend_date).toLocaleDateString()}</span>}
-                        <span className="ml-auto">Logged {new Date(item.created_at).toLocaleDateString()}</span>
+
+                      {/* Structured info rows — always present for visual alignment */}
+                      <div className="mt-2 mx-3 mb-3 rounded-md bg-muted/30 border border-border/60 divide-y divide-border/60 text-[11px]">
+                        <div className="flex justify-between px-2 py-1">
+                          <span className="text-muted-foreground">Spend date</span>
+                          <span className="text-foreground">{item.spend_date ? new Date(item.spend_date).toLocaleDateString() : '—'}</span>
+                        </div>
+                        <div className="flex justify-between px-2 py-1">
+                          <span className="text-muted-foreground">Description</span>
+                          <span className="text-foreground text-right max-w-[60%] truncate">{item.description || '—'}</span>
+                        </div>
+                        <div className="flex justify-between px-2 py-1">
+                          <span className="text-muted-foreground">Logged</span>
+                          <span className="text-foreground">{new Date(item.created_at).toLocaleDateString()}</span>
+                        </div>
                       </div>
+
                       {item.notes && (
-                        <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border whitespace-pre-wrap">
-                          {item.notes}
-                        </p>
+                        <div className="px-3 pb-3 -mt-1">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Notes</p>
+                          <p className="text-xs text-foreground whitespace-pre-wrap rounded-md bg-muted/30 border border-border/60 p-2">
+                            {item.notes}
+                          </p>
+                        </div>
                       )}
                     </div>
                   ))}
-                  <div className="pt-2 flex justify-between font-semibold text-sm border-t border-border">
-                    <span>Total {card.type === 'ONLINE' ? 'Online' : 'Offline'}</span>
-                    <span className={card.accent}>₹{card.total.toLocaleString()}</span>
-                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -419,6 +452,17 @@ export default function Marketing() {
             existing={editingSpend}
             onSaved={reloadAll}
           />
+        </TabsContent>
+
+        {/* ─── Assets ─── */}
+        <TabsContent value="assets">
+          <Card>
+            <CardContent className="p-12 text-center">
+              <FolderOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
+              <p className="text-foreground font-medium">Marketing Assets</p>
+              <p className="text-muted-foreground text-sm mt-1">This space is reserved for marketing assets — coming soon.</p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ─── Activity Log (kept at the end) ─── */}
