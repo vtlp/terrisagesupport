@@ -40,7 +40,6 @@ export function ContactDetailDrawer({ contact, open, onOpenChange, onEdit, onCha
           {
             title: 'Contact details',
             rows: [
-              { label: 'Contact type', value: contact.contact_type },
               { label: 'Title', value: contact.title },
               { label: 'Company', value: contact.company },
               { label: 'Email', value: contact.email },

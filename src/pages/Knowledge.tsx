@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
+import { FilePreviewDialog } from '@/components/shared/FilePreviewDialog';
 
 const buckets = [
   { v: 'SALES_CONTENT', l: 'Sales Content' },
@@ -44,17 +45,6 @@ const fmtSize = (b?: number | null) => {
   return `${(b / 1048576).toFixed(1)} MB`;
 };
 
-const isPreviewable = (mime?: string | null, name?: string) => {
-  const ext = name?.split('.').pop()?.toLowerCase() ?? '';
-  if (mime?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)) return 'image';
-  if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
-  if (mime?.startsWith('video/') || ['mp4', 'webm', 'mov'].includes(ext)) return 'video';
-  if (mime?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'audio';
-  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'office';
-  if (mime?.startsWith('text/') || ['txt', 'md', 'csv', 'json', 'log'].includes(ext)) return 'text';
-  return null;
-};
-
 export default function Knowledge() {
   const { currentUser } = useUser();
   const [activeTab, setActiveTab] = useState<'articles' | 'files'>('files');
@@ -83,10 +73,6 @@ export default function Knowledge() {
 
   // Preview state
   const [previewFile, setPreviewFile] = useState<KFile | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
-  const [previewText, setPreviewText] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
 
   const folderInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -373,45 +359,7 @@ export default function Knowledge() {
     window.open(data.signedUrl, '_blank');
   };
 
-  const openPreview = async (f: KFile) => {
-    // revoke previous blob if any
-    if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); }
-    setPreviewBlobUrl(null);
-    setPreviewFile(f);
-    setPreviewUrl(null);
-    setPreviewText(null);
-    setPreviewLoading(true);
-    const kind = isPreviewable(f.mime_type, f.name);
-    const { data, error } = await supabase.storage.from('kb-files').createSignedUrl(f.storage_path, 600);
-    if (error || !data) {
-      toast.error('Could not load preview');
-      setPreviewLoading(false);
-      return;
-    }
-    setPreviewUrl(data.signedUrl);
-    // For PDFs, fetch as blob so the browser renders it inline (avoids Chrome
-    // blocking iframes when storage returns Content-Disposition: attachment).
-    if (kind === 'pdf') {
-      try {
-        const res = await fetch(data.signedUrl);
-        const blob = await res.blob();
-        const typedBlob = blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
-        setPreviewBlobUrl(URL.createObjectURL(typedBlob));
-      } catch {
-        toast.error('Could not load PDF for preview');
-      }
-    }
-    if (kind === 'text') {
-      try {
-        const res = await fetch(data.signedUrl);
-        const text = await res.text();
-        setPreviewText(text.slice(0, 200_000));
-      } catch {
-        setPreviewText('Could not load text content.');
-      }
-    }
-    setPreviewLoading(false);
-  };
+  const openPreview = (f: KFile) => setPreviewFile(f);
 
   const deleteFile = async (f: KFile) => {
     if (!confirm(`Delete ${f.name}?`)) return;
@@ -494,8 +442,6 @@ export default function Knowledge() {
   }
 
   if (loading) return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-
-  const previewKind = previewFile ? isPreviewable(previewFile.mime_type, previewFile.name) : null;
 
   return (
     <div className="flex h-full">
