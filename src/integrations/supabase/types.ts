@@ -1278,45 +1278,6 @@ export type Database = {
           },
         ]
       }
-      marketing_champions: {
-        Row: {
-          city: string | null
-          company: string | null
-          created_at: string
-          created_by: string | null
-          id: string
-          name: string
-          notes: string | null
-          reach: number
-          role: string | null
-          updated_at: string
-        }
-        Insert: {
-          city?: string | null
-          company?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          name: string
-          notes?: string | null
-          reach?: number
-          role?: string | null
-          updated_at?: string
-        }
-        Update: {
-          city?: string | null
-          company?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          name?: string
-          notes?: string | null
-          reach?: number
-          role?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       marketing_channels: {
         Row: {
           channel_type: Database["public"]["Enums"]["marketing_channel_type"]
@@ -1361,8 +1322,10 @@ export type Database = {
       }
       marketing_contacts: {
         Row: {
+          attachments: Json
           city: string | null
           company: string | null
+          contact_type: Database["public"]["Enums"]["contact_type"]
           created_at: string
           created_by: string | null
           email: string | null
@@ -1374,8 +1337,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attachments?: Json
           city?: string | null
           company?: string | null
+          contact_type?: Database["public"]["Enums"]["contact_type"]
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -1387,8 +1352,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachments?: Json
           city?: string | null
           company?: string | null
+          contact_type?: Database["public"]["Enums"]["contact_type"]
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -1584,47 +1551,55 @@ export type Database = {
         }
         Relationships: []
       }
-      marketing_referrals: {
+      marketing_referral_records: {
         Row: {
-          city: string | null
+          commission_pct: number
+          contact_id: string
           created_at: string
           created_by: string | null
           id: string
           notes: string | null
-          referred_company: string | null
-          referrer_email: string | null
-          referrer_name: string
-          referrer_phone: string | null
-          status: string
+          price_per_seat: number
+          referral_date: string
+          seats_referred: number
+          status: Database["public"]["Enums"]["referral_status"]
           updated_at: string
         }
         Insert: {
-          city?: string | null
+          commission_pct?: number
+          contact_id: string
           created_at?: string
           created_by?: string | null
           id?: string
           notes?: string | null
-          referred_company?: string | null
-          referrer_email?: string | null
-          referrer_name: string
-          referrer_phone?: string | null
-          status?: string
+          price_per_seat?: number
+          referral_date?: string
+          seats_referred?: number
+          status?: Database["public"]["Enums"]["referral_status"]
           updated_at?: string
         }
         Update: {
-          city?: string | null
+          commission_pct?: number
+          contact_id?: string
           created_at?: string
           created_by?: string | null
           id?: string
           notes?: string | null
-          referred_company?: string | null
-          referrer_email?: string | null
-          referrer_name?: string
-          referrer_phone?: string | null
-          status?: string
+          price_per_seat?: number
+          referral_date?: string
+          seats_referred?: number
+          status?: Database["public"]["Enums"]["referral_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "marketing_referral_records_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketing_settings: {
         Row: {
@@ -2314,6 +2289,17 @@ export type Database = {
         | "ONBOARDING"
         | "OTHER"
       campaign_status: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED"
+      contact_type:
+        | "Adviser/Mentor"
+        | "Champion (non user)"
+        | "CRM CP"
+        | "Investor"
+        | "Media/PR"
+        | "Potential Hire"
+        | "Prospect Customer"
+        | "Strategic Partner"
+        | "Vendor/Service Provider"
+        | "VIP"
       content_status: "IDEA" | "DRAFT" | "SCHEDULED" | "PUBLISHED" | "ARCHIVED"
       enquiry_stage:
         | "NEW_ENQUIRY"
@@ -2346,6 +2332,14 @@ export type Database = {
         | "OTHER"
       marketing_cost_item_type: "ONLINE" | "OFFLINE"
       marketing_cost_type: "CPM" | "CPC" | "CPL" | "FIXED" | "RETAINER"
+      referral_status:
+        | "Closed"
+        | "In Process"
+        | "New"
+        | "Paid"
+        | "Pending"
+        | "Referred"
+        | "Rejected"
       seat_request_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
       subscription_status: "ACTIVE" | "PAUSED" | "CANCELLED" | "OVERDUE"
@@ -2528,6 +2522,18 @@ export const Constants = {
         "OTHER",
       ],
       campaign_status: ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"],
+      contact_type: [
+        "Adviser/Mentor",
+        "Champion (non user)",
+        "CRM CP",
+        "Investor",
+        "Media/PR",
+        "Potential Hire",
+        "Prospect Customer",
+        "Strategic Partner",
+        "Vendor/Service Provider",
+        "VIP",
+      ],
       content_status: ["IDEA", "DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"],
       enquiry_stage: [
         "NEW_ENQUIRY",
@@ -2564,6 +2570,15 @@ export const Constants = {
       ],
       marketing_cost_item_type: ["ONLINE", "OFFLINE"],
       marketing_cost_type: ["CPM", "CPC", "CPL", "FIXED", "RETAINER"],
+      referral_status: [
+        "Closed",
+        "In Process",
+        "New",
+        "Paid",
+        "Pending",
+        "Referred",
+        "Rejected",
+      ],
       seat_request_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
       subscription_status: ["ACTIVE", "PAUSED", "CANCELLED", "OVERDUE"],

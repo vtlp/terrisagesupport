@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import {
   Target, Users, Megaphone, DollarSign, MapPin,
-  TrendingUp, Award, UserPlus, Calendar, BarChart3, Plus, Trash2,
+  Calendar, BarChart3, Plus, Trash2, Handshake,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLookup } from '@/hooks/useLookups';
@@ -23,7 +23,8 @@ import {
 import { MarketingTargetCard } from '@/components/marketing/MarketingTargetCard';
 import { EditableNumber } from '@/components/marketing/EditableNumber';
 import { AddSpendDialog } from '@/components/marketing/AddSpendDialog';
-import { RecordsTab } from '@/components/marketing/RecordsTab';
+import { ContactsTab } from '@/components/marketing/ContactsTab';
+import { ReferralManagementTab } from '@/components/marketing/ReferralManagementTab';
 import { EventsTab } from '@/components/marketing/EventsTab';
 
 const PIE_COLORS = ['hsl(var(--primary))', 'hsl(var(--info))', 'hsl(var(--warning))', 'hsl(var(--accent))', 'hsl(var(--success))', 'hsl(var(--destructive))'];
@@ -159,7 +160,8 @@ export default function Marketing() {
           <TabsTrigger value="overview"><Target className="h-4 w-4 mr-1" />Overview</TabsTrigger>
           <TabsTrigger value="pipeline"><BarChart3 className="h-4 w-4 mr-1" />Pipeline KPIs</TabsTrigger>
           <TabsTrigger value="activity"><Megaphone className="h-4 w-4 mr-1" />Activity Log</TabsTrigger>
-          <TabsTrigger value="records"><UserPlus className="h-4 w-4 mr-1" />Leads</TabsTrigger>
+          <TabsTrigger value="contacts"><Users className="h-4 w-4 mr-1" />Contacts</TabsTrigger>
+          <TabsTrigger value="referrals"><Handshake className="h-4 w-4 mr-1" />Referral Management</TabsTrigger>
           <TabsTrigger value="events"><Calendar className="h-4 w-4 mr-1" />Events</TabsTrigger>
           <TabsTrigger value="costs"><DollarSign className="h-4 w-4 mr-1" />Costs</TabsTrigger>
         </TabsList>
@@ -184,10 +186,9 @@ export default function Marketing() {
           </div>
 
           {/* Activity summary tiles */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <TileCount label="Referrals" Icon={UserPlus} onClick={() => setActiveTab('records')} fetcher="marketing_referrals" />
-            <TileCount label="Contacts" Icon={Users} onClick={() => setActiveTab('records')} fetcher="marketing_contacts" />
-            <TileCount label="Champions" Icon={Award} onClick={() => setActiveTab('records')} fetcher="marketing_champions" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <TileCount label="Contacts" Icon={Users} onClick={() => setActiveTab('contacts')} fetcher="marketing_contacts" />
+            <TileCount label="Referrals" Icon={Handshake} onClick={() => setActiveTab('referrals')} fetcher="marketing_referral_records" />
             <TileCount label="Events" Icon={Calendar} onClick={() => setActiveTab('events')} fetcher="marketing_events" />
             <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('costs')}>
               <CardContent className="p-3 text-center">
@@ -331,9 +332,14 @@ export default function Marketing() {
           </Card>
         </TabsContent>
 
-        {/* ─── Records (Referrals · Contacts · Champions) ─── */}
-        <TabsContent value="records">
-          <RecordsTab isAdmin={isAdmin} />
+        {/* ─── Contacts ─── */}
+        <TabsContent value="contacts">
+          <ContactsTab isAdmin={isAdmin} />
+        </TabsContent>
+
+        {/* ─── Referral Management ─── */}
+        <TabsContent value="referrals">
+          <ReferralManagementTab isAdmin={isAdmin} />
         </TabsContent>
 
         {/* ─── Events ─── */}
@@ -405,11 +411,11 @@ function TileCount({ label, Icon, onClick, fetcher }: {
   label: string;
   Icon: React.ElementType;
   onClick: () => void;
-  fetcher: 'marketing_referrals' | 'marketing_contacts' | 'marketing_champions' | 'marketing_events';
+  fetcher: 'marketing_contacts' | 'marketing_events' | 'marketing_referral_records';
 }) {
   const [count, setCount] = useState<number>(0);
   useEffect(() => {
-    supabase.from(fetcher as 'marketing_referrals').select('id', { count: 'exact', head: true })
+    supabase.from(fetcher).select('id', { count: 'exact', head: true })
       .then(({ count: c }) => setCount(c ?? 0));
   }, [fetcher]);
   return (
