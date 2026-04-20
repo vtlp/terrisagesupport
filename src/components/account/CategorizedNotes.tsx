@@ -89,7 +89,7 @@ export function CategorizedNotes({ accountId, notes, onChanged }: Props) {
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <StickyNote className="h-4 w-4 text-primary" />
-          Notes &amp; activity
+          Notes
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
