@@ -873,6 +873,13 @@ export default function Knowledge() {
                     <audio src={previewUrl} controls />
                   </div>
                 )}
+                {previewKind === 'office' && (
+                  <iframe
+                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`}
+                    title={previewFile.name}
+                    className="w-full h-full border-0"
+                  />
+                )}
                 {previewKind === 'text' && (
                   <pre className="p-4 text-xs whitespace-pre-wrap break-words font-mono">{previewText ?? ''}</pre>
                 )}
