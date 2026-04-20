@@ -5,31 +5,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useLookup } from '@/hooks/useLookups';
 import { createRecord, type CostItemType } from '@/lib/marketingApi';
 import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  defaultCostType: CostItemType;
   onCreated: () => void;
 }
 
-export function AddSpendDialog({ open, onOpenChange, defaultCostType, onCreated }: Props) {
+export function AddSpendDialog({ open, onOpenChange, onCreated }: Props) {
   const { toast } = useToast();
-  const cities = useLookup('cities');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [costType, setCostType] = useState<CostItemType>(defaultCostType);
-  const [city, setCity] = useState<string>('');
+  const [costType, setCostType] = useState<CostItemType>('ONLINE');
   const [spendDate, setSpendDate] = useState('');
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
-    setTitle(''); setDescription(''); setAmount(''); setCity(''); setSpendDate('');
-    setCostType(defaultCostType);
+    setTitle(''); setDescription(''); setAmount(''); setSpendDate('');
+    setCostType('ONLINE');
   };
 
   const submit = async () => {
@@ -44,7 +40,6 @@ export function AddSpendDialog({ open, onOpenChange, defaultCostType, onCreated 
         description: description.trim() || null,
         amount: Number(amount),
         cost_type: costType,
-        city: city || null,
         spend_date: spendDate || null,
       });
       toast({ title: 'Spend added' });
@@ -87,21 +82,9 @@ export function AddSpendDialog({ open, onOpenChange, defaultCostType, onCreated 
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>City</Label>
-              <Select value={city || 'none'} onValueChange={(v) => setCity(v === 'none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent className="bg-card">
-                  <SelectItem value="none">—</SelectItem>
-                  {cities.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Spend date</Label>
-              <Input type="date" value={spendDate} onChange={e => setSpendDate(e.target.value)} />
-            </div>
+          <div>
+            <Label>Spend date</Label>
+            <Input type="date" value={spendDate} onChange={e => setSpendDate(e.target.value)} />
           </div>
         </div>
         <DialogFooter>
