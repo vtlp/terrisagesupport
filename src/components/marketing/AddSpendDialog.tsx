@@ -21,11 +21,12 @@ export function AddSpendDialog({ open, onOpenChange, onCreated }: Props) {
   const [amount, setAmount] = useState('');
   const [costType, setCostType] = useState<CostItemType>('ONLINE');
   const [spendDate, setSpendDate] = useState('');
+  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setTitle(''); setDescription(''); setAmount(''); setSpendDate('');
-    setCostType('ONLINE');
+    setCostType('ONLINE'); setNotes('');
   };
 
   const submit = async () => {
@@ -41,6 +42,7 @@ export function AddSpendDialog({ open, onOpenChange, onCreated }: Props) {
         amount: Number(amount),
         cost_type: costType,
         spend_date: spendDate || null,
+        notes: notes.trim() || null,
       });
       toast({ title: 'Spend added' });
       reset();
@@ -85,6 +87,10 @@ export function AddSpendDialog({ open, onOpenChange, onCreated }: Props) {
           <div>
             <Label>Spend date</Label>
             <Input type="date" value={spendDate} onChange={e => setSpendDate(e.target.value)} />
+          </div>
+          <div>
+            <Label>Notes</Label>
+            <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Optional context, vendor, campaign reference…" />
           </div>
         </div>
         <DialogFooter>

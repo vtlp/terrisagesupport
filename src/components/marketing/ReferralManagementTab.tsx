@@ -4,28 +4,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Trash2 } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
-  listContacts, listReferralRecords, createReferralRecord, updateReferralRecord, deleteReferralRecord,
+  listContacts, listReferralRecords, createReferralRecord,
   REFERRAL_STATUSES, REFERRER_ELIGIBLE_TYPES,
   type MarketingContact, type MarketingReferralRecord, type ReferralStatus,
 } from '@/lib/marketingApi';
 import { ContactDetailDrawer } from './ContactDetailDrawer';
+import { ReferralDetailDrawer } from './ReferralDetailDrawer';
 
 interface Props { isAdmin: boolean }
 
 export function ReferralManagementTab({ isAdmin }: Props) {
-  const { toast } = useToast();
   const [contacts, setContacts] = useState<MarketingContact[]>([]);
   const [records, setRecords] = useState<MarketingReferralRecord[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [drawerContact, setDrawerContact] = useState<MarketingContact | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [contactDrawerOpen, setContactDrawerOpen] = useState(false);
+  const [detailRecord, setDetailRecord] = useState<MarketingReferralRecord | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const reload = async () => {
     const [c, r] = await Promise.all([listContacts(), listReferralRecords()]);
@@ -47,18 +50,11 @@ export function ReferralManagementTab({ isAdmin }: Props) {
     });
   }, [records, contactById, search]);
 
-  const openContact = (c: MarketingContact) => { setDrawerContact(c); setDrawerOpen(true); };
-
-  const handleStatusChange = async (id: string, status: ReferralStatus) => {
-    try { await updateReferralRecord(id, { status }); reload(); }
-    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  const openContact = (c: MarketingContact) => {
+    setDetailOpen(false);
+    setDrawerContact(c); setContactDrawerOpen(true);
   };
-
-  const remove = async (id: string) => {
-    if (!confirm('Delete this referral?')) return;
-    try { await deleteReferralRecord(id); reload(); toast({ title: 'Deleted' }); }
-    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
-  };
+  const openDetail = (r: MarketingReferralRecord) => { setDetailRecord(r); setDetailOpen(true); };
 
   return (
     <div className="space-y-4">
@@ -75,36 +71,31 @@ export function ReferralManagementTab({ isAdmin }: Props) {
           <TableHeader><TableRow>
             <TableHead>Referrer</TableHead><TableHead>Contact</TableHead><TableHead>Date</TableHead>
             <TableHead>Status</TableHead><TableHead className="text-right">Seats</TableHead>
-            <TableHead className="text-right">% / Seat</TableHead><TableHead className="text-right">Total</TableHead>
-            <TableHead className="w-12" />
+            <TableHead className="text-right">Price / seat</TableHead>
+            <TableHead className="text-right">Commission %</TableHead>
+            <TableHead className="text-right">Total</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {filtered.map(r => {
               const c = contactById[r.contact_id];
-              const total = r.seats_referred * r.price_per_seat * (r.commission_pct / 100);
+              const total = r.seats_referred * Number(r.price_per_seat) * (Number(r.commission_pct) / 100);
               return (
-                <TableRow key={r.id}>
+                <TableRow key={r.id} className="cursor-pointer hover:bg-muted/40" onClick={() => openDetail(r)}>
                   <TableCell>
-                    <button className="font-medium text-primary hover:underline text-left" onClick={() => c && openContact(c)}>
+                    <button
+                      className="font-medium text-primary hover:underline text-left"
+                      onClick={(e) => { e.stopPropagation(); c && openContact(c); }}
+                    >
                       {c?.name ?? '—'}
                     </button>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{c?.email ?? c?.phone ?? '—'}</TableCell>
                   <TableCell>{new Date(r.referral_date).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    {isAdmin ? (
-                      <Select value={r.status} onValueChange={(v) => handleStatusChange(r.id, v as ReferralStatus)}>
-                        <SelectTrigger className="h-7 text-xs w-[120px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {REFERRAL_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : <Badge variant="outline">{r.status}</Badge>}
-                  </TableCell>
+                  <TableCell><Badge variant="outline">{r.status}</Badge></TableCell>
                   <TableCell className="text-right">{r.seats_referred}</TableCell>
-                  <TableCell className="text-right text-xs">{r.commission_pct}% / ₹{Number(r.price_per_seat).toLocaleString()}</TableCell>
+                  <TableCell className="text-right">₹{Number(r.price_per_seat).toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{r.commission_pct}%</TableCell>
                   <TableCell className="text-right font-semibold">₹{total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
-                  <TableCell>{isAdmin && <button onClick={() => remove(r.id)} className="text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></button>}</TableCell>
                 </TableRow>
               );
             })}
@@ -119,9 +110,15 @@ export function ReferralManagementTab({ isAdmin }: Props) {
         onCreated={reload}
       />
 
+      <ReferralDetailDrawer
+        record={detailRecord} contact={detailRecord ? contactById[detailRecord.contact_id] : null}
+        open={detailOpen} onOpenChange={setDetailOpen}
+        onChanged={reload} onOpenContact={openContact} isAdmin={isAdmin}
+      />
+
       <ContactDetailDrawer
-        contact={drawerContact} open={drawerOpen} onOpenChange={setDrawerOpen}
-        onEdit={() => { /* open contact dialog from contacts tab */ }}
+        contact={drawerContact} open={contactDrawerOpen} onOpenChange={setContactDrawerOpen}
+        onEdit={() => { /* edit contact from contacts tab */ }}
         onChanged={reload} isAdmin={isAdmin}
       />
     </div>
@@ -136,15 +133,15 @@ function AddReferralDialog({ open, onOpenChange, contacts, onCreated }: {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState<ReferralStatus>('New');
   const [seats, setSeats] = useState(0);
-  const [pct, setPct] = useState(0);
   const [pricePerSeat, setPricePerSeat] = useState(0);
+  const [pct, setPct] = useState(0);
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
       setContactId(''); setDate(new Date().toISOString().slice(0, 10)); setStatus('New');
-      setSeats(0); setPct(0); setPricePerSeat(0); setNotes('');
+      setSeats(0); setPricePerSeat(0); setPct(0); setNotes('');
     }
   }, [open]);
 
@@ -200,15 +197,15 @@ function AddReferralDialog({ open, onOpenChange, contacts, onCreated }: {
             <p className="text-sm font-medium">Commission</p>
             <div className="grid grid-cols-3 gap-3">
               <div><Label>Seats referred</Label><Input type="number" min={0} value={seats} onChange={e => setSeats(Number(e.target.value))} /></div>
-              <div><Label>Commission %</Label><Input type="number" min={0} step="0.01" value={pct} onChange={e => setPct(Number(e.target.value))} /></div>
               <div><Label>Price / seat</Label><Input type="number" min={0} value={pricePerSeat} onChange={e => setPricePerSeat(Number(e.target.value))} /></div>
+              <div><Label>Commission %</Label><Input type="number" min={0} step="0.01" value={pct} onChange={e => setPct(Number(e.target.value))} /></div>
             </div>
             <div className="flex justify-between text-sm pt-2 border-t">
               <span className="text-muted-foreground">Total commission</span>
               <span className="font-semibold">₹{total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
             </div>
           </div>
-          <div><Label>Notes</Label><Input value={notes} onChange={e => setNotes(e.target.value)} /></div>
+          <div><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
