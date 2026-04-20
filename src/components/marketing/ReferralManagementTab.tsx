@@ -137,6 +137,7 @@ function ReferralDialog({ open, onOpenChange, contacts, existing, onSaved }: {
 }) {
   const { toast } = useToast();
   const isEdit = !!existing;
+  const [contactType, setContactType] = useState<MarketingContact['contact_type'] | ''>('');
   const [contactId, setContactId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState<ReferralStatus>('New');
@@ -149,6 +150,8 @@ function ReferralDialog({ open, onOpenChange, contacts, existing, onSaved }: {
   useEffect(() => {
     if (!open) return;
     if (existing) {
+      const existingContact = contacts.find(c => c.id === existing.contact_id);
+      setContactType(existingContact?.contact_type ?? '');
       setContactId(existing.contact_id);
       setDate(existing.referral_date);
       setStatus(existing.status);
@@ -157,11 +160,19 @@ function ReferralDialog({ open, onOpenChange, contacts, existing, onSaved }: {
       setPct(Number(existing.commission_pct));
       setNotes(existing.notes ?? '');
     } else {
-      setContactId(''); setDate(new Date().toISOString().slice(0, 10)); setStatus('New');
+      setContactType(''); setContactId(''); setDate(new Date().toISOString().slice(0, 10)); setStatus('New');
       setSeats(0); setPricePerSeat(0); setPct(0); setNotes('');
     }
-  }, [open, existing]);
+  }, [open, existing, contacts]);
 
+  const eligibleTypes = useMemo(
+    () => Array.from(new Set(contacts.map(c => c.contact_type))).sort(),
+    [contacts],
+  );
+  const filteredContacts = useMemo(
+    () => contactType ? contacts.filter(c => c.contact_type === contactType) : [],
+    [contacts, contactType],
+  );
   const total = seats * pricePerSeat * (pct / 100);
   const selected = contacts.find(c => c.id === contactId);
 
@@ -192,20 +203,34 @@ function ReferralDialog({ open, onOpenChange, contacts, existing, onSaved }: {
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{isEdit ? 'Edit referral' : 'Add referral'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div>
-            <Label>Referrer (contact) *</Label>
-            <Select value={contactId} onValueChange={setContactId}>
-              <SelectTrigger><SelectValue placeholder="Select referrer" /></SelectTrigger>
-              <SelectContent>
-                {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name} · {c.contact_type}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {selected && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {selected.email ?? '—'} · {selected.phone ?? '—'}
-              </p>
-            )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Contact type *</Label>
+              <Select
+                value={contactType}
+                onValueChange={(v) => { setContactType(v as MarketingContact['contact_type']); setContactId(''); }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectContent>
+                  {eligibleTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Referrer *</Label>
+              <Select value={contactId} onValueChange={setContactId} disabled={!contactType}>
+                <SelectTrigger><SelectValue placeholder={contactType ? 'Select referrer' : 'Select type first'} /></SelectTrigger>
+                <SelectContent>
+                  {filteredContacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          {selected && (
+            <p className="text-xs text-muted-foreground">
+              {selected.email ?? '—'} · {selected.phone ?? '—'}
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Date of referral</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
             <div>
