@@ -334,7 +334,7 @@ export interface Account {
 
 export interface SupportTicket {
   ticket_id: string;
-  ticket_code: string | null;
+  ticket_code?: string | null;
   subject: string;
   description: string;
   status: TicketStatus;
