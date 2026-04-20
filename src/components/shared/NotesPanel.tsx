@@ -5,7 +5,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { MessageSquare, Plus, Mic, MicOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Note } from '@/types/core';
-import { getUserName } from '@/data/seedData';
 import { toast } from 'sonner';
 
 interface NotesPanelProps {

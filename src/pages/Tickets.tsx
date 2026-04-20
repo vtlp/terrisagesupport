@@ -27,7 +27,7 @@ import {
   updateTicket, addTicketMessage, subscribeTicketChanges,
   type ProfileRow, type AccountRow,
 } from '@/lib/ticketsApi';
-import { seedNotes } from '@/data/seedData';
+
 
 const priorityColors: Record<TicketPriority, string> = {
   [TicketPriority.P1]: 'bg-destructive/15 text-destructive font-semibold',
@@ -238,11 +238,7 @@ export default function Tickets() {
       }));
   }, [selected]);
 
-  // Legacy seed notes (if any) for backward compat
-  const seedNoteList = selected
-    ? seedNotes.filter(n => n.entity_type === EntityType.TICKET && n.entity_id === selected.ticket_id)
-    : [];
-  const notes = [...notesFromTimeline, ...seedNoteList];
+  const notes = notesFromTimeline;
   void noteRefresh;
 
   const handleAddNote = async (text: string) => {
