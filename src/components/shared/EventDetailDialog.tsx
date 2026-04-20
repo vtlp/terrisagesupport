@@ -44,6 +44,8 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
 
   if (!event) return null;
 
+  const overdue = event.status === 'SCHEDULED' && new Date(event.scheduled_at).getTime() < Date.now();
+
   const linkHref = (() => {
     if (!event.related_entity_type || !event.related_entity_id) return null;
     if (event.related_entity_type === 'ENQUIRY') return `/enquiries/${event.related_entity_id}`;
