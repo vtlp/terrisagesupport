@@ -2320,7 +2320,9 @@ export type Database = {
       }
       mark_notifications_read: { Args: { _ids?: string[] }; Returns: number }
       mark_stalled_accounts: { Args: never; Returns: number }
+      scan_demo_not_completed: { Args: never; Returns: number }
       scan_overdue_events: { Args: never; Returns: number }
+      scan_upcoming_events: { Args: never; Returns: number }
       validate_account_api_key: { Args: { _key_hash: string }; Returns: string }
     }
     Enums: {
