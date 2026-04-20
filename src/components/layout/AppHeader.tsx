@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket, LogOut, AlertTriangle, Users, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket, LogOut, AlertTriangle, Users, ExternalLink, Calendar as CalendarIcon, Inbox, FileCheck, CheckCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -17,33 +17,51 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useUser } from '@/context/UserContext';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
 
-interface SeatReqItem {
+type NotifType =
+  | 'EVENT_DUE' | 'EVENT_OVERDUE' | 'REMINDER'
+  | 'ENQUIRY_SUBMISSION' | 'SLA_BREACH' | 'ACCOUNT_STALLED'
+  | 'DEMO_NOT_COMPLETED' | 'SEAT_REQUEST' | 'TICKET_ASSIGNED'
+  | 'TICKET_UPDATED' | 'EXTERNAL' | 'GENERAL';
+
+type Severity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+interface NotificationRow {
   id: string;
-  account_id: string;
-  requested_seats: number;
-  requested_by_email: string | null;
+  type: NotifType;
+  severity: Severity;
+  title: string;
+  body: string | null;
+  link_path: string | null;
+  is_read: boolean;
   created_at: string;
-  account_name?: string;
 }
 
-interface UrgentTicketItem {
-  id: string;
-  ticket_code: string | null;
-  subject: string;
-  priority: string;
-  status: string;
-}
+const ICONS: Record<NotifType, React.ComponentType<{ className?: string }>> = {
+  EVENT_DUE: CalendarIcon,
+  EVENT_OVERDUE: AlertTriangle,
+  REMINDER: CalendarIcon,
+  ENQUIRY_SUBMISSION: Inbox,
+  SLA_BREACH: AlertTriangle,
+  ACCOUNT_STALLED: AlertTriangle,
+  DEMO_NOT_COMPLETED: AlertTriangle,
+  SEAT_REQUEST: Users,
+  TICKET_ASSIGNED: Ticket,
+  TICKET_UPDATED: Ticket,
+  EXTERNAL: ExternalLink,
+  GENERAL: Bell,
+};
 
-interface StalledAccountItem {
-  id: string;
-  account_name: string;
-}
+const SEVERITY_COLOR: Record<Severity, string> = {
+  INFO: 'text-muted-foreground',
+  WARNING: 'text-warning',
+  CRITICAL: 'text-destructive',
+};
 
 export function AppHeader() {
   const navigate = useNavigate();
@@ -51,61 +69,43 @@ export function AppHeader() {
   const { toggleSidebar } = useSidebar();
   const [createEnquiryOpen, setCreateEnquiryOpen] = useState(false);
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
-  const [pendingSeatReqs, setPendingSeatReqs] = useState<SeatReqItem[]>([]);
-  const [urgentTickets, setUrgentTickets] = useState<UrgentTicketItem[]>([]);
-  const [stalledAccounts, setStalledAccounts] = useState<StalledAccountItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
 
-  const attentionCount = urgentTickets.length + stalledAccounts.length + pendingSeatReqs.length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const load = useCallback(async () => {
+    // Trigger overdue scan (best-effort) so the bell stays current
+    supabase.rpc('scan_overdue_events').then(() => {});
+    const { data } = await supabase
+      .from('notifications')
+      .select('id, type, severity, title, body, link_path, is_read, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    setNotifications((data ?? []) as NotificationRow[]);
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const [{ data: seatData }, { data: ticketData }, { data: stalledData }] = await Promise.all([
-        supabase
-          .from('seat_requests')
-          .select('id, account_id, requested_seats, requested_by_email, created_at')
-          .eq('status', 'PENDING')
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase
-          .from('tickets')
-          .select('id, ticket_code, subject, priority, status')
-          .in('priority', ['P1', 'P2'])
-          .in('status', ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL'])
-          .order('updated_at', { ascending: false })
-          .limit(20),
-        supabase
-          .from('accounts')
-          .select('id, account_name')
-          .eq('status', 'STALLED_ONBOARDING')
-          .order('updated_at', { ascending: false })
-          .limit(20),
-      ]);
-      if (cancelled) return;
-      const rows = (seatData ?? []) as Omit<SeatReqItem, 'account_name'>[];
-      const ids = Array.from(new Set(rows.map(r => r.account_id)));
-      let nameMap = new Map<string, string>();
-      if (ids.length > 0) {
-        const { data: accts } = await supabase
-          .from('accounts')
-          .select('id, account_name')
-          .in('id', ids);
-        nameMap = new Map((accts ?? []).map(a => [a.id, a.account_name]));
-      }
-      if (cancelled) return;
-      setPendingSeatReqs(rows.map(r => ({ ...r, account_name: nameMap.get(r.account_id) })));
-      setUrgentTickets((ticketData ?? []) as UrgentTicketItem[]);
-      setStalledAccounts((stalledData ?? []) as StalledAccountItem[]);
-    };
     load();
     const channel = supabase
-      .channel('header-attention')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'seat_requests' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, load)
+      .channel('header-notifications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, load)
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
-  }, []);
+    // Refresh overdue scan periodically while the app is open
+    const t = setInterval(load, 5 * 60 * 1000);
+    return () => { supabase.removeChannel(channel); clearInterval(t); };
+  }, [load]);
+
+  const handleClickNotification = async (n: NotificationRow) => {
+    if (!n.is_read) {
+      await supabase.rpc('mark_notifications_read', { _ids: [n.id] });
+    }
+    if (n.link_path) navigate(n.link_path);
+  };
+
+  const markAllRead = async () => {
+    await supabase.rpc('mark_notifications_read', { _ids: null });
+    toast.success('All notifications marked read');
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -149,7 +149,6 @@ export function AppHeader() {
 
       {/* Right */}
       <div className="flex items-center gap-2">
-        {/* Quick Create */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" className="bg-primary hover:bg-primary/90 hidden sm:flex">
@@ -178,101 +177,69 @@ export function AppHeader() {
               variant="ghost"
               size="icon"
               className="text-secondary-foreground hover:bg-sidebar-muted relative"
-              aria-label={`${attentionCount} notifications`}
+              aria-label={`${unreadCount} unread notifications`}
             >
               <Bell className="h-5 w-5" />
-              {attentionCount > 0 && (
+              {unreadCount > 0 && (
                 <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 bg-accent text-accent-foreground text-xs">
-                  {attentionCount}
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </Badge>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80 bg-card">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifications</span>
-              <span className="text-xs text-muted-foreground font-normal">{attentionCount} item{attentionCount === 1 ? '' : 's'}</span>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+          <DropdownMenuContent align="end" className="w-96 bg-card p-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-sm">Notifications</span>
+                {unreadCount > 0 && (
+                  <Badge variant="secondary" className="text-[10px]">{unreadCount} new</Badge>
+                )}
+              </div>
+              {unreadCount > 0 && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={markAllRead}>
+                  <CheckCheck className="h-3.5 w-3.5 mr-1" /> Mark all read
+                </Button>
+              )}
+            </div>
 
-            {attentionCount === 0 && (
-              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            {notifications.length === 0 ? (
+              <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+                <FileCheck className="h-6 w-6 mx-auto mb-2 opacity-50" />
                 You're all caught up.
               </div>
+            ) : (
+              <ScrollArea className="h-[420px]">
+                {notifications.map(n => {
+                  const Icon = ICONS[n.type] ?? Bell;
+                  return (
+                    <DropdownMenuItem
+                      key={n.id}
+                      className={`flex-col items-start gap-0.5 px-3 py-2.5 rounded-none border-b border-border/50 last:border-b-0 ${!n.is_read ? 'bg-accent/30' : ''}`}
+                      onClick={() => handleClickNotification(n)}
+                    >
+                      <div className="flex items-start gap-2 w-full">
+                        <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${SEVERITY_COLOR[n.severity]}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm truncate flex-1 ${!n.is_read ? 'font-semibold' : 'font-medium'}`}>
+                              {n.title}
+                            </span>
+                            {!n.is_read && <span className="h-2 w-2 rounded-full bg-primary shrink-0" />}
+                          </div>
+                          {n.body && (
+                            <div className="text-[11px] text-muted-foreground truncate mt-0.5">{n.body}</div>
+                          )}
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                          </div>
+                        </div>
+                        {n.link_path && <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 mt-1" />}
+                      </div>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </ScrollArea>
             )}
-
-            <ScrollArea className="max-h-96">
-              {pendingSeatReqs.length > 0 && (
-                <>
-                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground py-1">
-                    Pending seat requests
-                  </DropdownMenuLabel>
-                  {pendingSeatReqs.map(r => (
-                    <DropdownMenuItem
-                      key={r.id}
-                      className="flex-col items-start gap-0.5 py-2"
-                      onClick={() => navigate(`/accounts/${r.account_id}?tab=seats`)}
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <Users className="h-3.5 w-3.5 text-warning shrink-0" />
-                        <span className="text-sm font-medium truncate flex-1">
-                          +{r.requested_seats} seats · {r.account_name ?? 'Account'}
-                        </span>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
-                      </div>
-                      <div className="text-[11px] text-muted-foreground pl-5 truncate w-full">
-                        {r.requested_by_email ? `${r.requested_by_email} · ` : ''}{format(new Date(r.created_at), 'dd MMM, HH:mm')}
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {urgentTickets.length > 0 && (
-                <>
-                  {pendingSeatReqs.length > 0 && <DropdownMenuSeparator />}
-                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground py-1">
-                    Urgent tickets ({urgentTickets.length})
-                  </DropdownMenuLabel>
-                  {urgentTickets.slice(0, 6).map(t => (
-                    <DropdownMenuItem
-                      key={t.id}
-                      className="flex-col items-start gap-0.5 py-2"
-                      onClick={() => navigate(`/tickets/${t.id}`)}
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
-                        <span className="text-sm font-medium truncate flex-1">{t.subject}</span>
-                        <Badge variant="outline" className="text-[10px]">{t.priority}</Badge>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground pl-5 truncate w-full">{t.ticket_code ?? t.id.slice(0, 8)} · {t.status}</div>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {stalledAccounts.length > 0 && (
-                <>
-                  {(pendingSeatReqs.length > 0 || urgentTickets.length > 0) && <DropdownMenuSeparator />}
-                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground py-1">
-                    Stalled onboarding ({stalledAccounts.length})
-                  </DropdownMenuLabel>
-                  {stalledAccounts.slice(0, 5).map(a => (
-                    <DropdownMenuItem
-                      key={a.id}
-                      className="flex-col items-start gap-0.5 py-2"
-                      onClick={() => navigate(`/accounts/${a.id}`)}
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
-                        <span className="text-sm font-medium truncate flex-1">{a.account_name}</span>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-            </ScrollArea>
           </DropdownMenuContent>
         </DropdownMenu>
 

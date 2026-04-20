@@ -75,16 +75,25 @@ export default function CalendarPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Include the full visible range; past events stay visible and are computed as Overdue in the UI.
+    const startDay = new Date(rangeStart); startDay.setHours(0, 0, 0, 0);
+    const endDay = new Date(rangeEnd); endDay.setHours(23, 59, 59, 999);
     const [{ data: e }, { data: p }] = await Promise.all([
       supabase.from('calendar_events').select('*')
-        .gte('scheduled_at', rangeStart.toISOString())
-        .lte('scheduled_at', rangeEnd.toISOString()),
+        .gte('scheduled_at', startDay.toISOString())
+        .lte('scheduled_at', endDay.toISOString()),
       supabase.from('profiles').select('id, full_name').eq('is_active', true),
     ]);
     setEvents((e ?? []) as CalEvent[]);
     setProfiles((p ?? []) as Profile[]);
     setLoading(false);
+    // Best-effort: refresh overdue notifications when calendar loads
+    supabase.rpc('scan_overdue_events').then(() => {});
   }, [rangeStart, rangeEnd]);
+
+  // Helper: a SCHEDULED event in the past is computed as Overdue
+  const isOverdue = (ev: { status: string; scheduled_at: string }) =>
+    ev.status === 'SCHEDULED' && new Date(ev.scheduled_at).getTime() < Date.now();
 
   useEffect(() => { load(); }, [load]);
 
@@ -255,11 +264,16 @@ export default function CalendarPage() {
                             {format(day, 'd')}
                           </div>
                           <div className="space-y-0.5 overflow-hidden">
-                            {dayEvents.slice(0, 2).map(e => (
-                              <span key={e.id}
-                                className={`block w-full text-left rounded px-1 py-0.5 truncate ${eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary'}`}
-                                title={e.title}>{e.title.length > 15 ? `${e.title.substring(0, 15)}…` : e.title}</span>
-                            ))}
+                            {dayEvents.slice(0, 2).map(e => {
+                              const overdue = isOverdue(e);
+                              return (
+                                <span key={e.id}
+                                  className={`block w-full text-left rounded px-1 py-0.5 truncate ${overdue ? 'bg-destructive/15 text-destructive line-through' : (eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary')}`}
+                                  title={overdue ? `Overdue · ${e.title}` : e.title}>
+                                  {e.title.length > 15 ? `${e.title.substring(0, 15)}…` : e.title}
+                                </span>
+                              );
+                            })}
                             {dayEvents.length > 2 && (
                               <span className="text-[11px] text-primary block">
                                 +{dayEvents.length - 2} more
@@ -288,13 +302,19 @@ export default function CalendarPage() {
                         </button>
                         <div className="mt-2 space-y-1">
                           {dayEvents.length === 0 && <p className="text-[11px] text-muted-foreground">—</p>}
-                          {dayEvents.map(e => (
-                            <button key={e.id} onClick={() => setOpenEvent(e as EventRow)}
-                              className={`block w-full text-left rounded px-1.5 py-1 text-[11px] hover:opacity-80 ${eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary'}`}
-                              title={e.title}>
-                              <div className="font-medium truncate">{format(new Date(e.scheduled_at), 'HH:mm')} {e.title}</div>
-                            </button>
-                          ))}
+                          {dayEvents.map(e => {
+                            const overdue = isOverdue(e);
+                            return (
+                              <button key={e.id} onClick={() => setOpenEvent(e as EventRow)}
+                                className={`block w-full text-left rounded px-1.5 py-1 text-[11px] hover:opacity-80 ${overdue ? 'bg-destructive/15 text-destructive' : (eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary')}`}
+                                title={overdue ? `Overdue · ${e.title}` : e.title}>
+                                <div className="font-medium truncate">
+                                  {format(new Date(e.scheduled_at), 'HH:mm')} {e.title}
+                                  {overdue && <span className="ml-1 font-semibold">· Overdue</span>}
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -324,6 +344,7 @@ export default function CalendarPage() {
                     </div>
                   </button>
                   <div className="flex items-center gap-2">
+                    {isOverdue(e) && <Badge className="text-[10px] bg-destructive text-destructive-foreground">Overdue</Badge>}
                     <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? ''}`}>{eventTypeLabels[e.event_type] ?? e.event_type}</Badge>
                     {e.related_entity_type && <Badge className={`text-[10px] ${entityColors[e.related_entity_type] ?? ''}`}>{e.related_entity_type}</Badge>}
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="Sync to Google Calendar" onClick={(ev) => { ev.preventDefault(); syncToGoogle(e.id, e.title); }}>
