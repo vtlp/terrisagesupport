@@ -100,9 +100,37 @@ Deno.serve(async (req) => {
     const startTime = new Date(event.scheduled_at);
     const endTime = new Date(startTime.getTime() + (event.duration_min ?? 30) * 60 * 1000);
 
+    // Look up assigned agent name (best-effort) for filterable titles
+    let agentName: string | null = null;
+    if (event.assigned_to) {
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', event.assigned_to)
+        .maybeSingle();
+      agentName = profile?.full_name?.trim() || profile?.email?.split('@')[0] || null;
+    }
+
+    // Build filter-friendly title: [TYPE] Original title · Agent
+    const typePrefix = event.event_type ? `[${event.event_type}] ` : '';
+    const agentSuffix = agentName ? ` · ${agentName}` : '';
+    const summary = `${typePrefix}${event.title}${agentSuffix}`;
+
+    // Enrich description with structured metadata for in-Google searches
+    const descriptionLines = [
+      event.notes ?? '',
+      '',
+      '— Terrisage CRM —',
+      `Type: ${event.event_type ?? 'OTHER'}`,
+      agentName ? `Assigned: ${agentName}` : null,
+      event.related_entity_type && event.related_entity_id
+        ? `Linked: ${event.related_entity_type} ${event.related_entity_id}`
+        : null,
+    ].filter(Boolean).join('\n');
+
     const gcalEvent = {
-      summary: event.title,
-      description: event.notes ?? '',
+      summary,
+      description: descriptionLines,
       start: { dateTime: startTime.toISOString() },
       end: { dateTime: endTime.toISOString() },
     };
