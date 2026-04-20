@@ -98,6 +98,7 @@ export function AddEventDialog({ open, onOpenChange, onSaved, existing }: Props)
 
   const submit = async () => {
     if (!eventName.trim()) { toast({ title: 'Event name is required', variant: 'destructive' }); return; }
+    if (!eventDate) { toast({ title: 'Event date is required', variant: 'destructive' }); return; }
     setSaving(true);
     try {
       const selectedUsers = users.filter(u => selectedUserIds.includes(u.id));
@@ -148,8 +149,8 @@ export function AddEventDialog({ open, onOpenChange, onSaved, existing }: Props)
               </Select>
             </div>
             <div>
-              <Label>Event date</Label>
-              <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} />
+              <Label>Event date *</Label>
+              <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required />
             </div>
           </div>
 
@@ -248,7 +249,7 @@ export function AddEventDialog({ open, onOpenChange, onSaved, existing }: Props)
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={saving}>{saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Add event')}</Button>
+          <Button onClick={submit} disabled={saving || !eventName.trim() || !eventDate}>{saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Add event')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
