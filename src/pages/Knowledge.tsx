@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
+import { FilePreviewDialog } from '@/components/shared/FilePreviewDialog';
 
 const buckets = [
   { v: 'SALES_CONTENT', l: 'Sales Content' },
@@ -44,17 +45,6 @@ const fmtSize = (b?: number | null) => {
   return `${(b / 1048576).toFixed(1)} MB`;
 };
 
-const isPreviewable = (mime?: string | null, name?: string) => {
-  const ext = name?.split('.').pop()?.toLowerCase() ?? '';
-  if (mime?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)) return 'image';
-  if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
-  if (mime?.startsWith('video/') || ['mp4', 'webm', 'mov'].includes(ext)) return 'video';
-  if (mime?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'audio';
-  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'office';
-  if (mime?.startsWith('text/') || ['txt', 'md', 'csv', 'json', 'log'].includes(ext)) return 'text';
-  return null;
-};
-
 export default function Knowledge() {
   const { currentUser } = useUser();
   const [activeTab, setActiveTab] = useState<'articles' | 'files'>('files');
@@ -83,10 +73,6 @@ export default function Knowledge() {
 
   // Preview state
   const [previewFile, setPreviewFile] = useState<KFile | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
-  const [previewText, setPreviewText] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
 
   const folderInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -373,45 +359,7 @@ export default function Knowledge() {
     window.open(data.signedUrl, '_blank');
   };
 
-  const openPreview = async (f: KFile) => {
-    // revoke previous blob if any
-    if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); }
-    setPreviewBlobUrl(null);
-    setPreviewFile(f);
-    setPreviewUrl(null);
-    setPreviewText(null);
-    setPreviewLoading(true);
-    const kind = isPreviewable(f.mime_type, f.name);
-    const { data, error } = await supabase.storage.from('kb-files').createSignedUrl(f.storage_path, 600);
-    if (error || !data) {
-      toast.error('Could not load preview');
-      setPreviewLoading(false);
-      return;
-    }
-    setPreviewUrl(data.signedUrl);
-    // For PDFs, fetch as blob so the browser renders it inline (avoids Chrome
-    // blocking iframes when storage returns Content-Disposition: attachment).
-    if (kind === 'pdf') {
-      try {
-        const res = await fetch(data.signedUrl);
-        const blob = await res.blob();
-        const typedBlob = blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
-        setPreviewBlobUrl(URL.createObjectURL(typedBlob));
-      } catch {
-        toast.error('Could not load PDF for preview');
-      }
-    }
-    if (kind === 'text') {
-      try {
-        const res = await fetch(data.signedUrl);
-        const text = await res.text();
-        setPreviewText(text.slice(0, 200_000));
-      } catch {
-        setPreviewText('Could not load text content.');
-      }
-    }
-    setPreviewLoading(false);
-  };
+  const openPreview = (f: KFile) => setPreviewFile(f);
 
   const deleteFile = async (f: KFile) => {
     if (!confirm(`Delete ${f.name}?`)) return;
@@ -494,8 +442,6 @@ export default function Knowledge() {
   }
 
   if (loading) return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-
-  const previewKind = previewFile ? isPreviewable(previewFile.mime_type, previewFile.name) : null;
 
   return (
     <div className="flex h-full">
@@ -811,100 +757,16 @@ export default function Knowledge() {
         </DialogContent>
       </Dialog>
 
-      {/* In-app file preview dialog */}
-      <Dialog open={!!previewFile} onOpenChange={(o) => {
-        if (!o) {
-          if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
-          setPreviewBlobUrl(null);
-          setPreviewFile(null); setPreviewUrl(null); setPreviewText(null);
-        }
-      }}>
-        <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
-          <div className="p-4 border-b flex flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              {previewFile && fileIcon(previewFile.mime_type, previewFile.name)}
-              <div className="min-w-0">
-                <DialogTitle className="text-base truncate">{previewFile?.name}</DialogTitle>
-                <DialogDescription className="text-xs">
-                  {previewFile && `${fmtSize(previewFile.size_bytes)} • ${folderPath(previewFile.folder_id)}`}
-                </DialogDescription>
-              </div>
-            </div>
-            <div className="flex gap-2 mr-6 flex-shrink-0">
-              {previewFile && previewUrl && (
-                <Button size="sm" variant="outline" onClick={() => window.open(previewBlobUrl ?? previewUrl, '_blank')}>
-                  Open in new tab
-                </Button>
-              )}
-              {previewFile && (
-                <Button size="sm" variant="outline" onClick={() => downloadFile(previewFile)}>
-                  <Download className="h-3.5 w-3.5 mr-1" /> Download
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="flex-1 min-h-0 overflow-auto bg-muted/30">
-            {previewLoading && (
-              <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            {!previewLoading && previewFile && previewUrl && (
-              <>
-                {previewKind === 'image' && (
-                  <div className="h-full flex items-center justify-center p-4">
-                    <img src={previewUrl} alt={previewFile.name} className="max-h-full max-w-full object-contain" />
-                  </div>
-                )}
-                {previewKind === 'pdf' && (
-                  previewBlobUrl ? (
-                    <iframe src={previewBlobUrl} title={previewFile.name} className="w-full h-full border-0" />
-                  ) : (
-                    <div className="h-full flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-                  )
-                )}
-                {previewKind === 'video' && (
-                  <div className="h-full flex items-center justify-center p-4">
-                    <video src={previewUrl} controls className="max-h-full max-w-full" />
-                  </div>
-                )}
-                {previewKind === 'audio' && (
-                  <div className="h-full flex items-center justify-center p-4">
-                    <audio src={previewUrl} controls />
-                  </div>
-                )}
-                {previewKind === 'office' && (
-                  <iframe
-                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`}
-                    title={previewFile.name}
-                    className="w-full h-full border-0"
-                  />
-                )}
-                {previewKind === 'text' && (
-                  <pre className="p-4 text-xs whitespace-pre-wrap break-words font-mono">{previewText ?? ''}</pre>
-                )}
-                {previewKind === null && (
-                  <div className="h-full flex items-center justify-center p-6 text-center">
-                    <div>
-                      <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-sm font-medium mb-1">In-app preview not supported for this file type.</p>
-                      <p className="text-xs text-muted-foreground mb-4">You can open it in a new tab or download it.</p>
-                      <div className="flex gap-2 justify-center">
-                        <Button size="sm" variant="outline" onClick={() => window.open(previewUrl, '_blank')}>
-                          Open in new tab
-                        </Button>
-                        <Button size="sm" onClick={() => previewFile && downloadFile(previewFile)}>
-                          <Download className="h-3.5 w-3.5 mr-1" /> Download
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FilePreviewDialog
+        open={!!previewFile}
+        onOpenChange={(open) => {
+          if (!open) setPreviewFile(null);
+        }}
+        bucket="kb-files"
+        path={previewFile?.storage_path ?? null}
+        name={previewFile?.name ?? null}
+        mime={previewFile?.mime_type ?? null}
+      />
     </div>
   );
 }

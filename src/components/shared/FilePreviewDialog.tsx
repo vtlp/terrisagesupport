@@ -46,6 +46,7 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const kind = detectPreviewKind(mime, name);
@@ -60,27 +61,43 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
       setSignedUrl(null);
       setBlobUrl(null);
       setTextContent(null);
+      setLoadError(null);
 
       const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
-      if (error || !data) { toast.error('Could not load preview'); setLoading(false); return; }
+      if (error || !data) {
+        toast.error('Could not load preview');
+        setLoadError('Could not load this file preview.');
+        setLoading(false);
+        return;
+      }
       if (cancelled) return;
       setSignedUrl(data.signedUrl);
 
       if (kind === 'pdf') {
         try {
           const res = await fetch(data.signedUrl);
+          if (!res.ok) throw new Error('PDF fetch failed');
           const blob = await res.blob();
           const typed = blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
           const url = URL.createObjectURL(typed);
           revokedUrl = url;
           if (!cancelled) setBlobUrl(url);
-        } catch { toast.error('Could not load PDF'); }
+        } catch {
+          toast.error('Could not load PDF');
+          if (!cancelled) setLoadError('PDF preview is unavailable in-app for this file.');
+        }
       } else if (kind === 'text') {
         try {
           const res = await fetch(data.signedUrl);
+          if (!res.ok) throw new Error('Text fetch failed');
           const t = await res.text();
           if (!cancelled) setTextContent(t.slice(0, 200_000));
-        } catch { setTextContent('Could not load text content.'); }
+        } catch {
+          if (!cancelled) {
+            setTextContent('Could not load text content.');
+            setLoadError('Text preview is unavailable in-app for this file.');
+          }
+        }
       }
       if (!cancelled) setLoading(false);
     })();
@@ -130,7 +147,20 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           )}
-          {!loading && signedUrl && (
+          {!loading && signedUrl && loadError && (
+            <div className="h-full flex items-center justify-center p-6 text-center">
+              <div>
+                <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium mb-1">{loadError}</p>
+                <p className="text-xs text-muted-foreground mb-4">Try opening it in a new tab or downloading it.</p>
+                <div className="flex gap-2 justify-center">
+                  <Button size="sm" variant="outline" onClick={() => window.open(blobUrl ?? signedUrl, '_blank')}>Open in new tab</Button>
+                  <Button size="sm" onClick={download}><Download className="h-3.5 w-3.5 mr-1" /> Download</Button>
+                </div>
+              </div>
+            </div>
+          )}
+          {!loading && signedUrl && !loadError && (
             <>
               {kind === 'image' && (
                 <div className="h-full flex items-center justify-center p-4">
@@ -139,7 +169,20 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
               )}
               {kind === 'pdf' && (
                 blobUrl
-                  ? <iframe src={blobUrl} title={name ?? 'PDF'} className="w-full h-full border-0" />
+                  ? (
+                    <object data={blobUrl} type="application/pdf" className="w-full h-full">
+                      <div className="h-full flex items-center justify-center p-6 text-center">
+                        <div>
+                          <p className="text-sm font-medium mb-1">PDF preview is unavailable in-app for this file.</p>
+                          <p className="text-xs text-muted-foreground mb-4">Try opening it in a new tab or downloading it.</p>
+                          <div className="flex gap-2 justify-center">
+                            <Button size="sm" variant="outline" onClick={() => window.open(blobUrl, '_blank')}>Open in new tab</Button>
+                            <Button size="sm" onClick={download}><Download className="h-3.5 w-3.5 mr-1" /> Download</Button>
+                          </div>
+                        </div>
+                      </div>
+                    </object>
+                  )
                   : <div className="h-full flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
               )}
               {kind === 'video' && (
