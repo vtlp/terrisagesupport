@@ -143,12 +143,19 @@ export default function CalendarPage() {
   const syncAll = async () => {
     if (filtered.length === 0) { toast.info('No events to sync'); return; }
     toast.loading(`Syncing ${filtered.length} events…`, { id: 'sync-all' });
-    let ok = 0, fail = 0;
+    let ok = 0, fail = 0, skipped = 0;
     for (const ev of filtered) {
       const { data, error } = await supabase.functions.invoke('sync-calendar-event', { body: { event_id: ev.id } });
-      if (error || (data as { error?: string })?.error) fail++; else ok++;
+      const resp = data as { error?: string; code?: string; skipped?: boolean } | null;
+      if (resp?.skipped || resp?.code === 'NOT_CONNECTED') skipped++;
+      else if (error || resp?.error) fail++;
+      else ok++;
     }
-    toast.success(`Synced ${ok} • Failed ${fail}`, { id: 'sync-all' });
+    if (skipped === filtered.length) {
+      toast.message('Google Calendar is not connected yet. Connect it from Connectors to enable sync.', { id: 'sync-all' });
+      return;
+    }
+    toast.success(`Synced ${ok}${fail ? ` • Failed ${fail}` : ''}${skipped ? ` • Skipped ${skipped}` : ''}`, { id: 'sync-all' });
   };
 
   const syncToGoogle = async (eventId: string, title: string) => {
