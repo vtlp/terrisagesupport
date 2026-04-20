@@ -85,14 +85,23 @@ export default function Marketing() {
   const agencyTarget = useMemo(() => targets.find(t => t.tenancy_type === 'AGENCY_BROKERAGE_CONSULTANCY') ?? null, [targets]);
   const builderTarget = useMemo(() => targets.find(t => t.tenancy_type === 'BUILDER_DEVELOPER') ?? null, [targets]);
 
-  const liveCountFor = (tenancy: TenancyTypeDb) => {
-    const monthRanges = { q1: [0, 2], q2: [3, 5], q3: [6, 8], q4: [9, 11] }[qKey] as [number, number];
+  const quarterRanges: Record<'q1' | 'q2' | 'q3' | 'q4', [number, number]> = {
+    q1: [0, 2], q2: [3, 5], q3: [6, 8], q4: [9, 11],
+  };
+  const liveCountFor = (tenancy: TenancyTypeDb, qk: 'q1' | 'q2' | 'q3' | 'q4' = qKey) => {
+    const [from, to] = quarterRanges[qk];
     return accounts.filter(a => {
       if (a.status !== 'LIVE' || a.tenancy_type !== tenancy) return false;
       const d = new Date(a.created_at);
-      return d.getFullYear() === year && d.getMonth() >= monthRanges[0] && d.getMonth() <= monthRanges[1];
+      return d.getFullYear() === year && d.getMonth() >= from && d.getMonth() <= to;
     }).length;
   };
+  const quarterlyAchievedFor = (tenancy: TenancyTypeDb) => ({
+    q1: liveCountFor(tenancy, 'q1'),
+    q2: liveCountFor(tenancy, 'q2'),
+    q3: liveCountFor(tenancy, 'q3'),
+    q4: liveCountFor(tenancy, 'q4'),
+  });
 
   const handleSaveTarget = async (
     tenancy: TenancyTypeDb,
@@ -175,6 +184,7 @@ export default function Marketing() {
               tenancy="AGENCY_BROKERAGE_CONSULTANCY"
               target={agencyTarget}
               liveCount={liveCountFor('AGENCY_BROKERAGE_CONSULTANCY')}
+              quarterlyAchieved={quarterlyAchievedFor('AGENCY_BROKERAGE_CONSULTANCY')}
               currentQuarterKey={qKey} isAdmin={isAdmin} onSave={handleSaveTarget}
             />
             <MarketingTargetCard
@@ -182,6 +192,7 @@ export default function Marketing() {
               tenancy="BUILDER_DEVELOPER"
               target={builderTarget}
               liveCount={liveCountFor('BUILDER_DEVELOPER')}
+              quarterlyAchieved={quarterlyAchievedFor('BUILDER_DEVELOPER')}
               currentQuarterKey={qKey} isAdmin={isAdmin} onSave={handleSaveTarget}
             />
           </div>
