@@ -75,16 +75,25 @@ export default function CalendarPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Include the full visible range; past events stay visible and are computed as Overdue in the UI.
+    const startDay = new Date(rangeStart); startDay.setHours(0, 0, 0, 0);
+    const endDay = new Date(rangeEnd); endDay.setHours(23, 59, 59, 999);
     const [{ data: e }, { data: p }] = await Promise.all([
       supabase.from('calendar_events').select('*')
-        .gte('scheduled_at', rangeStart.toISOString())
-        .lte('scheduled_at', rangeEnd.toISOString()),
+        .gte('scheduled_at', startDay.toISOString())
+        .lte('scheduled_at', endDay.toISOString()),
       supabase.from('profiles').select('id, full_name').eq('is_active', true),
     ]);
     setEvents((e ?? []) as CalEvent[]);
     setProfiles((p ?? []) as Profile[]);
     setLoading(false);
+    // Best-effort: refresh overdue notifications when calendar loads
+    supabase.rpc('scan_overdue_events').then(() => {});
   }, [rangeStart, rangeEnd]);
+
+  // Helper: a SCHEDULED event in the past is computed as Overdue
+  const isOverdue = (ev: { status: string; scheduled_at: string }) =>
+    ev.status === 'SCHEDULED' && new Date(ev.scheduled_at).getTime() < Date.now();
 
   useEffect(() => { load(); }, [load]);
 
