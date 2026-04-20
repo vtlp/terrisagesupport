@@ -128,15 +128,6 @@ export default function CalendarPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(`Event "${data.title}" created`);
     setShowCreateDialog(false);
-    if (created?.id) {
-      supabase.functions.invoke('sync-calendar-event', { body: { event_id: created.id } })
-        .then(({ data: r, error: e }) => {
-          const code = (r as { code?: string })?.code;
-          if (e || (r as { error?: string })?.error) {
-            if (code !== 'NOT_CONNECTED') console.warn('Auto-sync failed', e ?? r);
-          }
-        });
-    }
     load();
   };
 
