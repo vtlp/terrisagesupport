@@ -109,7 +109,7 @@ export function ReferralManagementTab({ isAdmin }: Props) {
 
       <ReferralDialog
         open={open} onOpenChange={setOpen}
-        contacts={eligibleContacts}
+        contacts={contacts}
         existing={editing}
         onSaved={reload}
       />
