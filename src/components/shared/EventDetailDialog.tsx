@@ -106,9 +106,10 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             {event.title}
             <Badge variant="outline" className="text-[10px]">{eventTypeLabels[event.event_type] ?? event.event_type}</Badge>
+            {overdue && <Badge className="text-[10px] bg-destructive text-destructive-foreground">Overdue</Badge>}
           </DialogTitle>
         </DialogHeader>
 
