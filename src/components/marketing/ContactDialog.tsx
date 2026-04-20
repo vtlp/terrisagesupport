@@ -24,6 +24,8 @@ export function ContactDialog({ open, onOpenChange, contact, onSaved }: Props) {
   const { toast } = useToast();
   const cities = useLookup('cities');
   const [name, setName] = useState('');
+  const [title, setTitle] = useState('');
+  const [company, setCompany] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [type, setType] = useState<ContactType>('Prospect Customer');
@@ -35,6 +37,8 @@ export function ContactDialog({ open, onOpenChange, contact, onSaved }: Props) {
   useEffect(() => {
     if (open) {
       setName(contact?.name ?? '');
+      setTitle(contact?.title ?? '');
+      setCompany(contact?.company ?? '');
       setEmail(contact?.email ?? '');
       setPhone(contact?.phone ?? '');
       setType(contact?.contact_type ?? 'Prospect Customer');
@@ -88,11 +92,21 @@ export function ContactDialog({ open, onOpenChange, contact, onSaved }: Props) {
     if (!name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
     setBusy(true);
     try {
+      const payload = {
+        name,
+        title: title || null,
+        company: company || null,
+        email: email || null,
+        phone: phone || null,
+        contact_type: type,
+        city: city || null,
+        notes: notes || null,
+      };
       if (contact) {
-        await updateContact(contact.id, { name, email: email || null, phone: phone || null, contact_type: type, city: city || null, notes: notes || null });
+        await updateContact(contact.id, payload);
         toast({ title: 'Contact updated' });
       } else {
-        await createContact({ name, email: email || null, phone: phone || null, contact_type: type, city: city || null, notes: notes || null });
+        await createContact(payload);
         toast({ title: 'Contact created' });
       }
       onSaved();
@@ -108,6 +122,10 @@ export function ContactDialog({ open, onOpenChange, contact, onSaved }: Props) {
         <DialogHeader><DialogTitle>{contact ? 'Edit contact' : 'Add contact'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div><Label>Contact name *</Label><Input value={name} onChange={e => setName(e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Title / Designation</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Director, Founder" /></div>
+            <div><Label>Company</Label><Input value={company} onChange={e => setCompany(e.target.value)} /></div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Email</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} /></div>
             <div><Label>Phone</Label><Input value={phone} onChange={e => setPhone(e.target.value)} /></div>
