@@ -224,13 +224,13 @@ function ReferralDialog({ open, onOpenChange, contacts, existing, onSaved }: {
                   {filteredContacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {selected && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {selected.email ?? '—'} · {selected.phone ?? '—'}
+                </p>
+              )}
             </div>
           </div>
-          {selected && (
-            <p className="text-xs text-muted-foreground">
-              {selected.email ?? '—'} · {selected.phone ?? '—'}
-            </p>
-          )}
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Date of referral</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
             <div>
