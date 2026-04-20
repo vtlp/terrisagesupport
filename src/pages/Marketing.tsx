@@ -58,6 +58,7 @@ export default function Marketing() {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [spendDialogOpen, setSpendDialogOpen] = useState(false);
+  const [editingSpend, setEditingSpend] = useState<MarketingCostItem | null>(null);
 
   const reloadAll = async () => {
     const [t, s, ci, geo, enq, acc, tic] = await Promise.all([
@@ -322,16 +323,6 @@ export default function Marketing() {
           </div>
         </TabsContent>
 
-        {/* ─── Activity Log (empty state) ─── */}
-        <TabsContent value="activity">
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Megaphone className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-              <p className="text-muted-foreground">Activity log mapping coming soon.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* ─── Contacts ─── */}
         <TabsContent value="contacts">
           <ContactsTab isAdmin={isAdmin} />
@@ -351,7 +342,7 @@ export default function Marketing() {
         <TabsContent value="costs" className="space-y-4">
           <div className="flex justify-end">
             {isAdmin && (
-              <Button onClick={() => setSpendDialogOpen(true)}>
+              <Button onClick={() => { setEditingSpend(null); setSpendDialogOpen(true); }}>
                 <Plus className="h-4 w-4 mr-1" />Add spend
               </Button>
             )}
@@ -368,7 +359,11 @@ export default function Marketing() {
                 <CardContent className="space-y-2">
                   {card.items.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">No spends yet.</p>}
                   {card.items.map(item => (
-                    <div key={item.id} className="rounded-md border border-border bg-card p-3 group hover:border-primary/40 transition-colors">
+                    <div
+                      key={item.id}
+                      className="rounded-md border border-border bg-card p-3 group hover:border-primary/40 transition-colors cursor-pointer"
+                      onClick={() => { if (isAdmin) { setEditingSpend(item); setSpendDialogOpen(true); } }}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm text-foreground truncate">{item.title}</p>
@@ -377,7 +372,10 @@ export default function Marketing() {
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={`font-semibold text-sm ${card.accent}`}>₹{Number(item.amount).toLocaleString()}</span>
                           {isAdmin && (
-                            <button onClick={() => removeCostItem(item.id)} className="opacity-0 group-hover:opacity-100 text-destructive transition-opacity">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); removeCostItem(item.id); }}
+                              className="opacity-0 group-hover:opacity-100 text-destructive transition-opacity"
+                            >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -407,8 +405,19 @@ export default function Marketing() {
           <AddSpendDialog
             open={spendDialogOpen}
             onOpenChange={setSpendDialogOpen}
-            onCreated={reloadAll}
+            existing={editingSpend}
+            onSaved={reloadAll}
           />
+        </TabsContent>
+
+        {/* ─── Activity Log (kept at the end) ─── */}
+        <TabsContent value="activity">
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Megaphone className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
+              <p className="text-muted-foreground">Activity log mapping coming soon.</p>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

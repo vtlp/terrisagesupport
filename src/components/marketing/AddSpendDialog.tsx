@@ -1,21 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createRecord, type CostItemType } from '@/lib/marketingApi';
+import { createRecord, updateRecord, type CostItemType, type MarketingCostItem } from '@/lib/marketingApi';
 import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreated: () => void;
+  onSaved: () => void;
+  existing?: MarketingCostItem | null;
 }
 
-export function AddSpendDialog({ open, onOpenChange, onCreated }: Props) {
+export function AddSpendDialog({ open, onOpenChange, onSaved, existing }: Props) {
   const { toast } = useToast();
+  const isEdit = !!existing;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -24,10 +26,20 @@ export function AddSpendDialog({ open, onOpenChange, onCreated }: Props) {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const reset = () => {
-    setTitle(''); setDescription(''); setAmount(''); setSpendDate('');
-    setCostType('ONLINE'); setNotes('');
-  };
+  useEffect(() => {
+    if (!open) return;
+    if (existing) {
+      setTitle(existing.title);
+      setDescription(existing.description ?? '');
+      setAmount(String(existing.amount ?? ''));
+      setCostType(existing.cost_type);
+      setSpendDate(existing.spend_date ?? '');
+      setNotes(existing.notes ?? '');
+    } else {
+      setTitle(''); setDescription(''); setAmount(''); setSpendDate('');
+      setCostType('ONLINE'); setNotes('');
+    }
+  }, [open, existing]);
 
   const submit = async () => {
     if (!title.trim() || !amount) {
@@ -36,29 +48,34 @@ export function AddSpendDialog({ open, onOpenChange, onCreated }: Props) {
     }
     setSaving(true);
     try {
-      await createRecord('marketing_cost_items', {
+      const payload = {
         title: title.trim(),
         description: description.trim() || null,
         amount: Number(amount),
         cost_type: costType,
         spend_date: spendDate || null,
         notes: notes.trim() || null,
-      });
-      toast({ title: 'Spend added' });
-      reset();
+      };
+      if (isEdit && existing) {
+        await updateRecord('marketing_cost_items', existing.id, payload);
+        toast({ title: 'Spend updated' });
+      } else {
+        await createRecord('marketing_cost_items', payload);
+        toast({ title: 'Spend added' });
+      }
       onOpenChange(false);
-      onCreated();
+      onSaved();
     } catch (e) {
-      toast({ title: 'Failed to add spend', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Failed to save', description: (e as Error).message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Add spend</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEdit ? 'Edit spend' : 'Add spend'}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div>
             <Label>Title *</Label>
@@ -95,7 +112,7 @@ export function AddSpendDialog({ open, onOpenChange, onCreated }: Props) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={saving}>{saving ? 'Saving…' : 'Add spend'}</Button>
+          <Button onClick={submit} disabled={saving}>{saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Add spend')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

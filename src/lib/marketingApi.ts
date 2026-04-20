@@ -225,6 +225,11 @@ export async function createRecord(table: RecordTable, payload: Record<string, u
   if (error) throw error;
 }
 
+export async function updateRecord(table: RecordTable, id: string, patch: Record<string, unknown>): Promise<void> {
+  const { error } = await supabase.from(table).update(patch as never).eq('id', id);
+  if (error) throw error;
+}
+
 export async function deleteRecord(table: RecordTable, id: string): Promise<void> {
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) throw error;

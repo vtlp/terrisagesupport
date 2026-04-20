@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Trash2, ExternalLink } from 'lucide-react';
+import { Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { deleteReferralRecord, type MarketingContact, type MarketingReferralRecord } from '@/lib/marketingApi';
 import { DetailDrawer } from './DetailDrawer';
@@ -10,11 +10,12 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onChanged: () => void;
+  onEdit?: (r: MarketingReferralRecord) => void;
   onOpenContact?: (c: MarketingContact) => void;
   isAdmin: boolean;
 }
 
-export function ReferralDetailDrawer({ record, contact, open, onOpenChange, onChanged, onOpenContact, isAdmin }: Props) {
+export function ReferralDetailDrawer({ record, contact, open, onOpenChange, onChanged, onEdit, onOpenContact, isAdmin }: Props) {
   const { toast } = useToast();
   if (!record) return null;
 
@@ -64,9 +65,16 @@ export function ReferralDetailDrawer({ record, contact, open, onOpenChange, onCh
       ]}
       notes={record.notes}
       footer={isAdmin && (
-        <Button variant="outline" size="sm" className="text-destructive" onClick={remove}>
-          <Trash2 className="h-3.5 w-3.5 mr-1" />Delete referral
-        </Button>
+        <div className="flex gap-2">
+          {onEdit && (
+            <Button variant="outline" size="sm" onClick={() => onEdit(record)}>
+              <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="text-destructive" onClick={remove}>
+            <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
+          </Button>
+        </div>
       )}
     />
   );
