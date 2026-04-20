@@ -56,7 +56,7 @@ export default function Marketing() {
   const [enquiries, setEnquiries] = useState<EnquiryRow[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
-  const [spendDialog, setSpendDialog] = useState<null | 'ONLINE' | 'OFFLINE'>(null);
+  const [spendDialogOpen, setSpendDialogOpen] = useState(false);
 
   const reloadAll = async () => {
     const [t, s, ci, geo, enq, acc, tic] = await Promise.all([
@@ -159,7 +159,7 @@ export default function Marketing() {
           <TabsTrigger value="overview"><Target className="h-4 w-4 mr-1" />Overview</TabsTrigger>
           <TabsTrigger value="pipeline"><BarChart3 className="h-4 w-4 mr-1" />Pipeline KPIs</TabsTrigger>
           <TabsTrigger value="activity"><Megaphone className="h-4 w-4 mr-1" />Activity Log</TabsTrigger>
-          <TabsTrigger value="records"><UserPlus className="h-4 w-4 mr-1" />Referrals · Contacts · Champions</TabsTrigger>
+          <TabsTrigger value="records"><UserPlus className="h-4 w-4 mr-1" />Leads</TabsTrigger>
           <TabsTrigger value="events"><Calendar className="h-4 w-4 mr-1" />Events</TabsTrigger>
           <TabsTrigger value="costs"><DollarSign className="h-4 w-4 mr-1" />Costs</TabsTrigger>
         </TabsList>
@@ -239,15 +239,17 @@ export default function Marketing() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {cities.length === 0 && <p className="text-sm text-muted-foreground">No cities configured. Add some in Lookup Management.</p>}
-                {cities.map(city => {
-                  const count = geoCounts[city.name.toLowerCase()] ?? 0;
-                  return (
-                    <Badge key={city.id} variant="secondary">
-                      {city.name} ({count})
-                    </Badge>
-                  );
-                })}
+                {(() => {
+                  const visible = cities
+                    .map(c => ({ c, count: geoCounts[c.name.toLowerCase()] ?? 0 }))
+                    .filter(x => x.count >= 1);
+                  if (visible.length === 0) {
+                    return <p className="text-sm text-muted-foreground">No marketing records tagged with a city yet.</p>;
+                  }
+                  return visible.map(({ c, count }) => (
+                    <Badge key={c.id} variant="secondary">{c.name} ({count})</Badge>
+                  ));
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -341,19 +343,21 @@ export default function Marketing() {
 
         {/* ─── Costs ─── */}
         <TabsContent value="costs" className="space-y-4">
+          <div className="flex justify-end">
+            {isAdmin && (
+              <Button onClick={() => setSpendDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />Add spend
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
               { type: 'ONLINE' as const, items: onlineItems, total: onlineTotal, label: 'Online Spend', accent: 'text-info' },
               { type: 'OFFLINE' as const, items: offlineItems, total: offlineTotal, label: 'Offline Spend', accent: 'text-warning' },
             ].map(card => (
               <Card key={card.type}>
-                <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
+                <CardHeader className="pb-2">
                   <CardTitle className="text-base">{card.label}</CardTitle>
-                  {isAdmin && (
-                    <Button size="sm" variant="outline" onClick={() => setSpendDialog(card.type)}>
-                      <Plus className="h-3.5 w-3.5 mr-1" />Add spend
-                    </Button>
-                  )}
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {card.items.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">No spends yet.</p>}
@@ -362,12 +366,8 @@ export default function Marketing() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{item.title}</p>
                         {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}
-                        {(item.city || item.spend_date) && (
-                          <p className="text-xs text-muted-foreground">
-                            {item.city && <span>{item.city}</span>}
-                            {item.city && item.spend_date && <span> · </span>}
-                            {item.spend_date && <span>{new Date(item.spend_date).toLocaleDateString()}</span>}
-                          </p>
+                        {item.spend_date && (
+                          <p className="text-xs text-muted-foreground">{new Date(item.spend_date).toLocaleDateString()}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-2 ml-2">
@@ -390,9 +390,8 @@ export default function Marketing() {
           </div>
 
           <AddSpendDialog
-            open={spendDialog !== null}
-            onOpenChange={(v) => { if (!v) setSpendDialog(null); }}
-            defaultCostType={spendDialog ?? 'ONLINE'}
+            open={spendDialogOpen}
+            onOpenChange={setSpendDialogOpen}
             onCreated={reloadAll}
           />
         </TabsContent>
