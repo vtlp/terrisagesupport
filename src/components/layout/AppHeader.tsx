@@ -22,8 +22,6 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useUser } from '@/context/UserContext';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
-import { seedAccounts } from '@/data/seedData';
-import { AccountStatus } from '@/types/core';
 
 interface SeatReqItem {
   id: string;
@@ -42,6 +40,11 @@ interface UrgentTicketItem {
   status: string;
 }
 
+interface StalledAccountItem {
+  id: string;
+  account_name: string;
+}
+
 export function AppHeader() {
   const navigate = useNavigate();
   const { currentUser, signOut } = useUser();
@@ -50,14 +53,14 @@ export function AppHeader() {
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
   const [pendingSeatReqs, setPendingSeatReqs] = useState<SeatReqItem[]>([]);
   const [urgentTickets, setUrgentTickets] = useState<UrgentTicketItem[]>([]);
+  const [stalledAccounts, setStalledAccounts] = useState<StalledAccountItem[]>([]);
 
-  const stalledAccounts = seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING);
   const attentionCount = urgentTickets.length + stalledAccounts.length + pendingSeatReqs.length;
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const [{ data: seatData }, { data: ticketData }] = await Promise.all([
+      const [{ data: seatData }, { data: ticketData }, { data: stalledData }] = await Promise.all([
         supabase
           .from('seat_requests')
           .select('id, account_id, requested_seats, requested_by_email, created_at')
@@ -69,6 +72,12 @@ export function AppHeader() {
           .select('id, ticket_code, subject, priority, status')
           .in('priority', ['P1', 'P2'])
           .in('status', ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL'])
+          .order('updated_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('accounts')
+          .select('id, account_name')
+          .eq('status', 'STALLED_ONBOARDING')
           .order('updated_at', { ascending: false })
           .limit(20),
       ]);
@@ -86,12 +95,14 @@ export function AppHeader() {
       if (cancelled) return;
       setPendingSeatReqs(rows.map(r => ({ ...r, account_name: nameMap.get(r.account_id) })));
       setUrgentTickets((ticketData ?? []) as UrgentTicketItem[]);
+      setStalledAccounts((stalledData ?? []) as StalledAccountItem[]);
     };
     load();
     const channel = supabase
       .channel('header-attention')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'seat_requests' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, load)
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, []);
@@ -248,9 +259,9 @@ export function AppHeader() {
                   </DropdownMenuLabel>
                   {stalledAccounts.slice(0, 5).map(a => (
                     <DropdownMenuItem
-                      key={a.account_id}
+                      key={a.id}
                       className="flex-col items-start gap-0.5 py-2"
-                      onClick={() => navigate(`/accounts/${a.account_id}`)}
+                      onClick={() => navigate(`/accounts/${a.id}`)}
                     >
                       <div className="flex items-center gap-2 w-full">
                         <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />

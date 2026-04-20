@@ -15,8 +15,6 @@ import {
 } from '@/components/ui/collapsible';
 import { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
-import { seedEnquiries, seedAccounts } from '@/data/seedData';
-import { EnquiryStage, AccountStatus } from '@/types/core';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AppSidebarProps {
@@ -32,25 +30,34 @@ const adminSubItems = [
 ];
 
 function useNotificationCounts() {
-  const newEnquiries = seedEnquiries.filter(e => e.stage === EnquiryStage.NEW_ENQUIRY).length;
-  const stalledAccounts = seedAccounts.filter(a => a.status === AccountStatus.STALLED_ONBOARDING).length;
+  const [newEnquiries, setNewEnquiries] = useState(0);
   const [urgentTickets, setUrgentTickets] = useState(0);
+  const [stalledAccounts, setStalledAccounts] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const { count } = await supabase
-        .from('tickets')
-        .select('id', { count: 'exact', head: true })
-        .in('priority', ['P1', 'P2'])
-        .in('status', ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL']);
-      if (!cancelled) setUrgentTickets(count ?? 0);
+      const [enqRes, ticketRes, acctRes] = await Promise.all([
+        supabase.from('enquiries').select('id', { count: 'exact', head: true }).eq('stage', 'NEW_ENQUIRY'),
+        supabase.from('tickets').select('id', { count: 'exact', head: true })
+          .in('priority', ['P1', 'P2'])
+          .in('status', ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL']),
+        supabase.from('accounts').select('id', { count: 'exact', head: true }).eq('status', 'STALLED_ONBOARDING'),
+      ]);
+      if (cancelled) return;
+      setNewEnquiries(enqRes.count ?? 0);
+      setUrgentTickets(ticketRes.count ?? 0);
+      setStalledAccounts(acctRes.count ?? 0);
     };
     load();
-    const ch = supabase.channel('sidebar-tickets')
+    const ch = supabase.channel('sidebar-counts')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiries' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, load)
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(ch); };
   }, []);
+
   return { newEnquiries, urgentTickets, stalledAccounts };
 }
 

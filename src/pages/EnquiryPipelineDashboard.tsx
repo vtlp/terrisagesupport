@@ -1,68 +1,128 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { seedEnquiries, seedCalendarEvents, seedAccounts, getUserName } from '@/data/seedData';
-import { EntityType, CalendarEventStatus, EnquiryStage } from '@/types/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, CalendarIcon, TrendingUp, Users, Phone, Target } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarIcon, TrendingUp, Phone, Target, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-const stageLabels: Record<EnquiryStage, string> = {
-  [EnquiryStage.NEW_ENQUIRY]: 'New',
-  [EnquiryStage.CONTACTED]: 'Contacted',
-  [EnquiryStage.DEMO_SCHEDULED]: 'Demo Sched.',
-  [EnquiryStage.DEMO_COMPLETED]: 'Demo Done',
-  [EnquiryStage.PAYMENT_LINK_SENT]: 'Payment Sent',
-  [EnquiryStage.ONBOARDING_PACK_SENT]: 'Onboarding Sent',
-  [EnquiryStage.ACCOUNT_CREATED]: 'Converted',
+type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'PAYMENT_LINK_SENT' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
+type EventStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+
+interface EnquiryRow { id: string; stage: Stage; created_at: string; }
+interface EventRow {
+  id: string;
+  title: string;
+  scheduled_at: string;
+  event_type: string;
+  status: EventStatus;
+  related_entity_type: string | null;
+  related_entity_id: string | null;
+  created_by: string | null;
+  assigned_to: string | null;
+}
+
+const stageOrder: Stage[] = ['NEW_ENQUIRY', 'CONTACTED', 'DEMO_SCHEDULED', 'DEMO_COMPLETED', 'PAYMENT_LINK_SENT', 'ONBOARDING_PACK_SENT', 'ACCOUNT_CREATED'];
+
+const stageLabels: Record<Stage, string> = {
+  NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Sched.',
+  DEMO_COMPLETED: 'Demo Done', PAYMENT_LINK_SENT: 'Payment Sent',
+  ONBOARDING_PACK_SENT: 'Onboarding Sent', ACCOUNT_CREATED: 'Converted',
+  LOST: 'Lost',
 };
 
-const stageColors: Record<EnquiryStage, string> = {
-  [EnquiryStage.NEW_ENQUIRY]: 'bg-muted text-muted-foreground',
-  [EnquiryStage.CONTACTED]: 'bg-info/15 text-info',
-  [EnquiryStage.DEMO_SCHEDULED]: 'bg-primary/15 text-primary',
-  [EnquiryStage.DEMO_COMPLETED]: 'bg-accent/20 text-accent-foreground',
-  [EnquiryStage.PAYMENT_LINK_SENT]: 'bg-warning/15 text-warning',
-  [EnquiryStage.ONBOARDING_PACK_SENT]: 'bg-warning/15 text-warning',
-  [EnquiryStage.ACCOUNT_CREATED]: 'bg-success/15 text-success',
+const stageColors: Record<Stage, string> = {
+  NEW_ENQUIRY: 'bg-muted text-muted-foreground',
+  CONTACTED: 'bg-info/15 text-info',
+  DEMO_SCHEDULED: 'bg-primary/15 text-primary',
+  DEMO_COMPLETED: 'bg-accent/20 text-accent-foreground',
+  PAYMENT_LINK_SENT: 'bg-warning/15 text-warning',
+  ONBOARDING_PACK_SENT: 'bg-warning/15 text-warning',
+  ACCOUNT_CREATED: 'bg-success/15 text-success',
+  LOST: 'bg-destructive/15 text-destructive',
 };
 
 export default function EnquiryPipelineDashboard() {
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [entityFilter, setEntityFilter] = useState<string>('all');
+  const [enquiries, setEnquiries] = useState<EnquiryRow[]>([]);
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [profileMap, setProfileMap] = useState<Map<string, string>>(new Map());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      const [{ data: enq, error: e1 }, { data: ev, error: e2 }, { data: profs }] = await Promise.all([
+        supabase.from('enquiries').select('id, stage, created_at'),
+        supabase.from('calendar_events').select('id, title, scheduled_at, event_type, status, related_entity_type, related_entity_id, created_by, assigned_to'),
+        supabase.from('profiles').select('id, full_name'),
+      ]);
+      if (cancelled) return;
+      if (e1) toast.error(e1.message);
+      if (e2) toast.error(e2.message);
+      setEnquiries((enq ?? []) as EnquiryRow[]);
+      setEvents((ev ?? []) as EventRow[]);
+      setProfileMap(new Map((profs ?? []).map(p => [p.id, p.full_name])));
+      setLoading(false);
+    };
+    load();
+    const ch = supabase.channel('pipeline-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiries' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, load)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(ch); };
+  }, []);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  // All calendar events for this month
   const monthEvents = useMemo(() => {
-    return seedCalendarEvents.filter(e => {
+    return events.filter(e => {
       const d = new Date(e.scheduled_at);
       const matchMonth = d >= monthStart && d <= monthEnd;
-      const matchEntity = entityFilter === 'all' || e.entity_type === entityFilter;
+      const matchEntity = entityFilter === 'all' || (e.related_entity_type ?? '').toUpperCase() === entityFilter;
       return matchMonth && matchEntity;
     });
-  }, [currentMonth, entityFilter]);
+  }, [events, monthStart, monthEnd, entityFilter]);
 
   const getEventsForDay = (day: Date) =>
     monthEvents.filter(e => isSameDay(new Date(e.scheduled_at), day));
 
-  // Pipeline funnel
   const funnel = useMemo(() => {
-    return Object.values(EnquiryStage).map(stage => ({
+    return stageOrder.map(stage => ({
       stage,
-      count: seedEnquiries.filter(e => e.stage === stage).length,
+      count: enquiries.filter(e => e.stage === stage).length,
     }));
-  }, []);
+  }, [enquiries]);
 
-  const totalEnquiries = seedEnquiries.length;
-  const totalUpcoming = seedCalendarEvents.filter(e => e.status === CalendarEventStatus.UPCOMING).length;
-  const totalCompleted = seedCalendarEvents.filter(e => e.status === CalendarEventStatus.COMPLETED).length;
-  const conversionRate = Math.round((funnel.find(f => f.stage === EnquiryStage.ACCOUNT_CREATED)?.count ?? 0) / totalEnquiries * 100);
+  const totalEnquiries = enquiries.length;
+  const totalUpcoming = events.filter(e => e.status === 'SCHEDULED' && new Date(e.scheduled_at) >= new Date()).length;
+  const totalCompleted = events.filter(e => e.status === 'COMPLETED').length;
+  const converted = funnel.find(f => f.stage === 'ACCOUNT_CREATED')?.count ?? 0;
+  const conversionRate = totalEnquiries > 0 ? Math.round((converted / totalEnquiries) * 100) : 0;
+
+  const navigateForEvent = (e: EventRow) => {
+    const t = (e.related_entity_type ?? '').toUpperCase();
+    if (!e.related_entity_id) return;
+    if (t === 'ENQUIRY') navigate(`/enquiries/${e.related_entity_id}`);
+    else if (t === 'ACCOUNT') navigate(`/accounts/${e.related_entity_id}`);
+    else if (t === 'TICKET') navigate(`/tickets/${e.related_entity_id}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -139,8 +199,9 @@ export default function EnquiryPipelineDashboard() {
                 <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Events</SelectItem>
-                  <SelectItem value={EntityType.ENQUIRY}>Enquiries</SelectItem>
-                  <SelectItem value={EntityType.ACCOUNT}>Accounts</SelectItem>
+                  <SelectItem value="ENQUIRY">Enquiries</SelectItem>
+                  <SelectItem value="ACCOUNT">Accounts</SelectItem>
+                  <SelectItem value="TICKET">Tickets</SelectItem>
                 </SelectContent>
               </Select>
               <div className="flex items-center gap-1">
@@ -158,15 +219,12 @@ export default function EnquiryPipelineDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Day headers */}
           <div className="grid grid-cols-7 gap-1 mb-1">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
               <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">{d}</div>
             ))}
           </div>
-          {/* Calendar grid */}
           <div className="grid grid-cols-7 gap-1">
-            {/* Leading blanks */}
             {Array.from({ length: monthStart.getDay() }).map((_, i) => (
               <div key={`blank-${i}`} className="h-20 md:h-24" />
             ))}
@@ -185,19 +243,16 @@ export default function EnquiryPipelineDashboard() {
                   <div className="space-y-0.5 overflow-hidden">
                     {dayEvents.slice(0, 2).map(e => (
                       <div
-                        key={e.event_id}
+                        key={e.id}
                         className={`rounded px-1 py-0.5 truncate cursor-pointer hover:opacity-80 ${
-                          e.status === CalendarEventStatus.COMPLETED ? 'bg-success/15 text-success' :
-                          e.status === CalendarEventStatus.CANCELLED ? 'bg-destructive/15 text-destructive' :
+                          e.status === 'COMPLETED' ? 'bg-success/15 text-success' :
+                          e.status === 'CANCELLED' || e.status === 'NO_SHOW' ? 'bg-destructive/15 text-destructive' :
                           'bg-primary/15 text-primary'
                         }`}
                         title={e.title}
-                        onClick={() => {
-                          if (e.entity_type === EntityType.ENQUIRY) navigate(`/enquiries/${e.entity_id}`);
-                          else if (e.entity_type === EntityType.ACCOUNT) navigate(`/accounts/${e.entity_id}`);
-                        }}
+                        onClick={() => navigateForEvent(e)}
                       >
-                        {e.title.substring(0, 15)}...
+                        {e.title.length > 15 ? `${e.title.substring(0, 15)}...` : e.title}
                       </div>
                     ))}
                     {dayEvents.length > 2 && (
@@ -218,30 +273,32 @@ export default function EnquiryPipelineDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {seedCalendarEvents
-              .filter(e => e.status === CalendarEventStatus.UPCOMING)
+            {events
+              .filter(e => e.status === 'SCHEDULED' && new Date(e.scheduled_at) >= new Date())
               .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
               .slice(0, 10)
               .map(e => (
                 <div
-                  key={e.event_id}
+                  key={e.id}
                   className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70"
-                  onClick={() => {
-                    if (e.entity_type === EntityType.ENQUIRY) navigate(`/enquiries/${e.entity_id}`);
-                    else if (e.entity_type === EntityType.ACCOUNT) navigate(`/accounts/${e.entity_id}`);
-                  }}
+                  onClick={() => navigateForEvent(e)}
                 >
                   <div>
                     <p className="text-sm font-medium">{e.title}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{format(new Date(e.scheduled_at), 'dd MMM yyyy, HH:mm')}</span>
-                      <Badge variant="outline" className="text-xs">{e.entity_type}</Badge>
-                      <span>{getUserName(e.created_by_user_id)}</span>
+                      {e.related_entity_type && (
+                        <Badge variant="outline" className="text-xs">{e.related_entity_type}</Badge>
+                      )}
+                      <span>{e.created_by ? (profileMap.get(e.created_by) ?? 'User') : 'Unassigned'}</span>
                     </div>
                   </div>
                   <Badge className="bg-primary/15 text-primary text-xs">{e.status}</Badge>
                 </div>
               ))}
+            {events.filter(e => e.status === 'SCHEDULED' && new Date(e.scheduled_at) >= new Date()).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No upcoming events.</p>
+            )}
           </div>
         </CardContent>
       </Card>
