@@ -71,8 +71,6 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Assignee updated');
-    // resync to Google so owner change reflects there
-    supabase.functions.invoke('sync-calendar-event', { body: { event_id: event.id } });
     onChanged?.();
   };
 
