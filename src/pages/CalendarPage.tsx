@@ -344,6 +344,7 @@ export default function CalendarPage() {
                     </div>
                   </button>
                   <div className="flex items-center gap-2">
+                    {isOverdue(e) && <Badge className="text-[10px] bg-destructive text-destructive-foreground">Overdue</Badge>}
                     <Badge className={`text-[10px] ${eventTypeColors[e.event_type] ?? ''}`}>{eventTypeLabels[e.event_type] ?? e.event_type}</Badge>
                     {e.related_entity_type && <Badge className={`text-[10px] ${entityColors[e.related_entity_type] ?? ''}`}>{e.related_entity_type}</Badge>}
                     <Button variant="ghost" size="icon" className="h-7 w-7" title="Sync to Google Calendar" onClick={(ev) => { ev.preventDefault(); syncToGoogle(e.id, e.title); }}>
