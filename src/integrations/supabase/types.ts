@@ -1278,6 +1278,45 @@ export type Database = {
           },
         ]
       }
+      marketing_champions: {
+        Row: {
+          city: string | null
+          company: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          reach: number
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          reach?: number
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          reach?: number
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       marketing_channels: {
         Row: {
           channel_type: Database["public"]["Enums"]["marketing_channel_type"]
@@ -1316,6 +1355,90 @@ export type Database = {
           key?: string
           name?: string
           sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_contacts: {
+        Row: {
+          city: string | null
+          company: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_cost_items: {
+        Row: {
+          amount: number
+          city: string | null
+          cost_type: Database["public"]["Enums"]["marketing_cost_item_type"]
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          notes: string | null
+          spend_date: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          city?: string | null
+          cost_type: Database["public"]["Enums"]["marketing_cost_item_type"]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          spend_date?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          city?: string | null
+          cost_type?: Database["public"]["Enums"]["marketing_cost_item_type"]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          spend_date?: string | null
+          title?: string
           updated_at?: string
         }
         Relationships: []
@@ -1383,6 +1506,45 @@ export type Database = {
           },
         ]
       }
+      marketing_events: {
+        Row: {
+          attendees: number
+          city: string | null
+          created_at: string
+          created_by: string | null
+          event_date: string | null
+          event_name: string
+          id: string
+          location: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          attendees?: number
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_date?: string | null
+          event_name: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attendees?: number
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_date?: string | null
+          event_name?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       marketing_governance: {
         Row: {
           approver_id: string | null
@@ -1419,6 +1581,114 @@ export type Database = {
           id?: string
           submitted_by?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_referrals: {
+        Row: {
+          city: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          referred_company: string | null
+          referrer_email: string | null
+          referrer_name: string
+          referrer_phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          referred_company?: string | null
+          referrer_email?: string | null
+          referrer_name: string
+          referrer_phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          referred_company?: string | null
+          referrer_email?: string | null
+          referrer_name?: string
+          referrer_phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_settings: {
+        Row: {
+          created_at: string
+          id: string
+          total_spend_override: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          total_spend_override?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          total_spend_override?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      marketing_targets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          q1: number
+          q2: number
+          q3: number
+          q4: number
+          tenancy_type: Database["public"]["Enums"]["tenancy_type"]
+          total_target: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          q1?: number
+          q2?: number
+          q3?: number
+          q4?: number
+          tenancy_type: Database["public"]["Enums"]["tenancy_type"]
+          total_target?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          q1?: number
+          q2?: number
+          q3?: number
+          q4?: number
+          tenancy_type?: Database["public"]["Enums"]["tenancy_type"]
+          total_target?: number
+          updated_at?: string
+          year?: number
         }
         Relationships: []
       }
@@ -2074,6 +2344,7 @@ export type Database = {
         | "DIRECT"
         | "EVENT"
         | "OTHER"
+      marketing_cost_item_type: "ONLINE" | "OFFLINE"
       marketing_cost_type: "CPM" | "CPC" | "CPL" | "FIXED" | "RETAINER"
       seat_request_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
@@ -2291,6 +2562,7 @@ export const Constants = {
         "EVENT",
         "OTHER",
       ],
+      marketing_cost_item_type: ["ONLINE", "OFFLINE"],
       marketing_cost_type: ["CPM", "CPC", "CPL", "FIXED", "RETAINER"],
       seat_request_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
