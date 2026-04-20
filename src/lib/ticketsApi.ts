@@ -101,6 +101,7 @@ export function mapDbTicketToUi(
 
   return {
     ticket_id: row.id,
+    ticket_code: row.ticket_code,
     subject: row.subject,
     description: row.description ?? '',
     status: row.status,
@@ -111,7 +112,7 @@ export function mapDbTicketToUi(
     requester_name: row.requester_name,
     requester_email: row.requester_email ?? '',
     assigned_to_user_id: row.assigned_to,
-    queue: queueName ?? row.ticket_code ?? '',
+    queue: queueName ?? '',
     tags: row.tags ?? [],
     sla_first_response: row.sla_first_response_at,
     sla_resolution: row.sla_resolution_at,
