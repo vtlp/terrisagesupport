@@ -302,13 +302,19 @@ export default function CalendarPage() {
                         </button>
                         <div className="mt-2 space-y-1">
                           {dayEvents.length === 0 && <p className="text-[11px] text-muted-foreground">—</p>}
-                          {dayEvents.map(e => (
-                            <button key={e.id} onClick={() => setOpenEvent(e as EventRow)}
-                              className={`block w-full text-left rounded px-1.5 py-1 text-[11px] hover:opacity-80 ${eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary'}`}
-                              title={e.title}>
-                              <div className="font-medium truncate">{format(new Date(e.scheduled_at), 'HH:mm')} {e.title}</div>
-                            </button>
-                          ))}
+                          {dayEvents.map(e => {
+                            const overdue = isOverdue(e);
+                            return (
+                              <button key={e.id} onClick={() => setOpenEvent(e as EventRow)}
+                                className={`block w-full text-left rounded px-1.5 py-1 text-[11px] hover:opacity-80 ${overdue ? 'bg-destructive/15 text-destructive' : (eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary')}`}
+                                title={overdue ? `Overdue · ${e.title}` : e.title}>
+                                <div className="font-medium truncate">
+                                  {format(new Date(e.scheduled_at), 'HH:mm')} {e.title}
+                                  {overdue && <span className="ml-1 font-semibold">· Overdue</span>}
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     );
