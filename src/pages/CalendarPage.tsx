@@ -264,11 +264,16 @@ export default function CalendarPage() {
                             {format(day, 'd')}
                           </div>
                           <div className="space-y-0.5 overflow-hidden">
-                            {dayEvents.slice(0, 2).map(e => (
-                              <span key={e.id}
-                                className={`block w-full text-left rounded px-1 py-0.5 truncate ${eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary'}`}
-                                title={e.title}>{e.title.length > 15 ? `${e.title.substring(0, 15)}…` : e.title}</span>
-                            ))}
+                            {dayEvents.slice(0, 2).map(e => {
+                              const overdue = isOverdue(e);
+                              return (
+                                <span key={e.id}
+                                  className={`block w-full text-left rounded px-1 py-0.5 truncate ${overdue ? 'bg-destructive/15 text-destructive line-through' : (eventTypeColors[e.event_type] ?? 'bg-primary/15 text-primary')}`}
+                                  title={overdue ? `Overdue · ${e.title}` : e.title}>
+                                  {e.title.length > 15 ? `${e.title.substring(0, 15)}…` : e.title}
+                                </span>
+                              );
+                            })}
                             {dayEvents.length > 2 && (
                               <span className="text-[11px] text-primary block">
                                 +{dayEvents.length - 2} more
