@@ -137,32 +137,44 @@ export function AddEventDialog({ open, onOpenChange, onCreated }: Props) {
 
           <div>
             <Label>Location {city && <span className="text-muted-foreground text-xs">(in {city})</span>}</Label>
-            <Popover open={locResults.length > 0 || locLoading}>
-              <PopoverTrigger asChild>
-                <Input
-                  value={locationQuery || location}
-                  onChange={(e) => { setLocationQuery(e.target.value); setLocation(''); }}
-                  placeholder={city ? `Search venues in ${city}…` : 'Type at least 3 characters…'}
-                />
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-card" align="start" onOpenAutoFocus={e => e.preventDefault()}>
-                {locLoading && (
-                  <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Searching…
-                  </div>
-                )}
-                {!locLoading && locResults.map(r => (
-                  <button
-                    key={r.place_id}
-                    type="button"
-                    onClick={() => { setLocation(r.display_name); setLocationQuery(r.display_name); setLocResults([]); }}
-                    className="block w-full text-left px-3 py-2 text-sm hover:bg-muted border-b border-border last:border-0"
-                  >
-                    {r.display_name}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
+            <div className="relative">
+              <Input
+                value={locationQuery}
+                onChange={(e) => { setLocationQuery(e.target.value); setLocation(''); }}
+                placeholder={city ? `Search venues in ${city}…` : 'Type at least 3 characters…'}
+                autoComplete="off"
+              />
+              {(locLoading || locResults.length > 0) && locationQuery.length >= 3 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-60 overflow-auto">
+                  {locLoading && (
+                    <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Searching…
+                    </div>
+                  )}
+                  {!locLoading && locResults.length === 0 && (
+                    <div className="p-3 text-sm text-muted-foreground">No matches. Try a different query.</div>
+                  )}
+                  {!locLoading && locResults.map(r => (
+                    <button
+                      key={r.place_id}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setLocation(r.display_name);
+                        setLocationQuery(r.display_name);
+                        setLocResults([]);
+                      }}
+                      className="block w-full text-left px-3 py-2 text-sm hover:bg-muted border-b border-border last:border-0"
+                    >
+                      {r.display_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {location && (
+                <p className="text-xs text-muted-foreground mt-1">✓ Selected: {location}</p>
+              )}
+            </div>
           </div>
 
           <div>
