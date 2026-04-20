@@ -206,14 +206,16 @@ export default function Tickets() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [hasEdits]);
 
-  // Search across subject, ticket code, tags, requester name/email
+  // Search across subject, ticket code, queue, tags, requester name/email
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return tickets.filter(t => {
-      const code = (t.queue || '').toString().toLowerCase(); // fallback shows code in queue field
+      const code = (t.ticket_code ?? '').toLowerCase();
+      const queue = (t.queue ?? '').toLowerCase();
       const matchSearch = !q ||
         t.subject.toLowerCase().includes(q) ||
         code.includes(q) ||
+        queue.includes(q) ||
         t.requester_name.toLowerCase().includes(q) ||
         (t.requester_email ?? '').toLowerCase().includes(q) ||
         t.tags.some(tag => tag.toLowerCase().includes(q));
@@ -413,7 +415,10 @@ export default function Tickets() {
               >
                 <div className="flex items-start justify-between mb-1 gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="text-[11px] text-muted-foreground font-mono">{t.queue || '—'}</div>
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="font-mono">{t.ticket_code ?? '—'}</span>
+                      {t.queue && <span className="truncate">· {t.queue}</span>}
+                    </div>
                     <div className="font-medium text-sm truncate">{t.subject}</div>
                   </div>
                   <Badge className={`flex-shrink-0 ${priorityColors[t.priority]}`}>{t.priority}</Badge>
@@ -613,7 +618,7 @@ export default function Tickets() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Queue</label>
-                    <Input value={selected.queue} readOnly className="h-8 text-sm bg-muted/30" />
+                    <Input value={selected.queue || 'Unassigned'} readOnly className="h-8 text-sm bg-muted/30" />
                   </div>
                 </div>
 

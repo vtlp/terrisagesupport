@@ -101,6 +101,7 @@ export function mapDbTicketToUi(
 
   return {
     ticket_id: row.id,
+    ticket_code: row.ticket_code,
     subject: row.subject,
     description: row.description ?? '',
     status: row.status,
