@@ -1554,7 +1554,8 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
 }
 
 function ActiveStagePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  onOpenPaymentDialog, onOpenOfflineDialog, onOpenDeferDialog, onSetPaymentStatus,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1563,7 +1564,9 @@ function ActiveStagePanel({
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
   onOpenPaymentDialog: () => void;
-  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
+  onOpenOfflineDialog: () => void;
+  onOpenDeferDialog: () => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => void;
 }) {
   const outcome = (draft.payload.outcome as string) || '';
 
