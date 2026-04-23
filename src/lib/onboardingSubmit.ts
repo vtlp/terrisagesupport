@@ -68,11 +68,10 @@ export async function submitOnboarding(
     }
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("onboarding_submissions")
-    .insert({ tenancy_type: tenancy, payload: payload as never, enquiry_id: enquiryId })
-    .select("id")
-    .single();
+    .insert({ tenancy_type: tenancy, payload: payload as never, enquiry_id: enquiryId });
+
   if (error) {
     console.error("Onboarding submission insert failed", error);
     // Postgres unique-violation code = 23505. Surfaces when two submissions race.
@@ -83,7 +82,6 @@ export async function submitOnboarding(
     }
     throw new Error(`Submission failed: ${error.message}`);
   }
-  return data.id as string;
 }
 
 export function getEnquiryIdFromUrl(): string | null {
