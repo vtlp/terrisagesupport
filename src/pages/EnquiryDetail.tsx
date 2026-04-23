@@ -787,12 +787,13 @@ export default function EnquiryDetail() {
             <div className="p-4 space-y-2.5">
               <div className="text-sm font-semibold text-foreground mb-1">Actions</div>
               {(() => {
-                const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
+                const payStatus = draft.payload.payment?.status ?? null;
+                const paymentResolved = payStatus === 'PAID' || payStatus === 'DEFERRED';
                 const onboardingSent = enquiry.onboarding_pack_sent || draft.onboarding_pack_sent;
-                const onboardEnabled = onboardingSent || paymentPaid;
+                const onboardEnabled = onboardingSent || paymentResolved;
                 const blockedReason = onboardEnabled
                   ? null
-                  : 'Mark payment as Paid to unlock onboarding.';
+                  : 'Resolve payment (link / offline / defer) to unlock onboarding.';
                 return (
                   <>
                     <div className="flex items-center gap-1.5">
