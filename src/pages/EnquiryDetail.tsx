@@ -1314,6 +1314,31 @@ export default function EnquiryDetail() {
         onSuccess={applyPaymentResult}
       />
 
+      {(() => {
+        const p = draft.payload.payment;
+        const tmpl = buildInitialPaymentEmail({
+          ownerName: enquiry.full_name,
+          planName: (p?.breakdown as { plan_name?: string } | undefined)?.plan_name ?? 'Standard',
+          seats: (p?.breakdown as { seats?: number } | undefined)?.seats ?? (draft.payload.team_size_estimate as number) ?? 0,
+          amount: p?.amount ?? 0,
+          currency: p?.currency ?? 'INR',
+          paymentLinkUrl: p?.short_url ?? '',
+          expiresAt: p?.expires_at ?? null,
+        });
+        return (
+          <PaymentEmailComposer
+            open={paymentEmailOpen}
+            onOpenChange={setPaymentEmailOpen}
+            purpose="INITIAL"
+            to={enquiry.email ?? ''}
+            defaultSubject={p?.email?.subject ?? tmpl.subject}
+            defaultBody={p?.email?.body ?? tmpl.body}
+            onDrafted={(s, b) => recordEmailAction('drafted', s, b)}
+            onMarkedSent={(s, b) => recordEmailAction('sent', s, b)}
+          />
+        );
+      })()}
+
       <SendOnboardingDialog
         open={shareOpen}
         onOpenChange={setShareOpen}
