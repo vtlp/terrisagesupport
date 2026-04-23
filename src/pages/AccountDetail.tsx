@@ -21,6 +21,7 @@ import { PhoneInput, splitPhone, joinPhone } from '@/components/shared/PhoneInpu
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline';
 import { VerificationTab } from '@/components/account/VerificationTab';
 import { BillingTab } from '@/components/account/BillingTab';
+import { RenewalsCard } from '@/components/account/RenewalsCard';
 import { ImportsTab } from '@/components/account/ImportsTab';
 import { SeatsAndRequestsTab } from '@/components/account/SeatsAndRequestsTab';
 import { ApiKeysCard } from '@/components/account/ApiKeysCard';
@@ -523,6 +524,7 @@ export default function AccountDetail() {
 
         <TabsContent value="billing" className="space-y-4">
           <BillingTab accountId={acc.id} />
+          <RenewalsCard accountId={acc.id} />
           <ApiKeysCard accountId={acc.id} />
         </TabsContent>
 
