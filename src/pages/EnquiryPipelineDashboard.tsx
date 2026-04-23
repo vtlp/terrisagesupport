@@ -29,7 +29,7 @@ const stageOrder: Stage[] = ['NEW_ENQUIRY', 'CONTACTED', 'DEMO_SCHEDULED', 'DEMO
 
 const stageLabels: Record<Stage, string> = {
   NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Sched.',
-  DEMO_COMPLETED: 'Demo Done', PAYMENT_LINK_SENT: 'Payment Sent',
+  DEMO_COMPLETED: 'Demo Done', PAYMENT_LINK_SENT: 'Payment',
   ONBOARDING_PACK_SENT: 'Onboarding Sent', ACCOUNT_CREATED: 'Converted',
   LOST: 'Lost',
 };

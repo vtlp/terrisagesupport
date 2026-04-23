@@ -30,7 +30,7 @@ interface EnquiryRow {
 
 const stageLabels: Record<Stage, string> = {
   NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Scheduled',
-  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment Sent',
+  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment',
   ONBOARDING_PACK_SENT: 'Pack Sent',
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
