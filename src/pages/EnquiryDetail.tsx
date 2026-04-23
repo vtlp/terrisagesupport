@@ -29,6 +29,9 @@ import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
 import { PaymentLinkDialog, PaymentLinkResult } from '@/components/shared/PaymentLinkDialog';
+import { PaymentOfflineDialog, OfflinePaymentResult } from '@/components/shared/PaymentOfflineDialog';
+import { PaymentDeferDialog, DeferredPaymentResult } from '@/components/shared/PaymentDeferDialog';
+import { calcBilling } from '@/lib/billing';
 import { fmtINR } from '@/lib/billing';
 import { useUser } from '@/context/UserContext';
 
@@ -60,8 +63,15 @@ interface PaymentInfo {
   short_url?: string;
   amount?: number;
   currency?: string;
-  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING';
+  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING' | 'DEFERRED';
+  // method tells us how this stage was resolved:
+  //  RAZORPAY = link generated, OFFLINE = manually marked paid, DEFER = collect later.
+  method?: 'RAZORPAY' | 'OFFLINE' | 'DEFER';
+  reference?: string;       // offline txn id / cheque no.
+  channel?: string;         // UPI / NEFT / CASH / CHEQUE / OTHER
+  reason?: string;          // defer reason
   paid_at?: string;
+  deferred_at?: string;
   created_at?: string;
   breakdown?: Record<string, unknown>;
 }
@@ -92,7 +102,7 @@ interface Submission {
 
 const stageLabels: Record<Stage, string> = {
   NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Scheduled',
-  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment Link Sent',
+  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment',
   ONBOARDING_PACK_SENT: 'Onboarding Sent',
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
