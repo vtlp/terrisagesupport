@@ -152,6 +152,11 @@ export function RenewalsCard({ accountId }: Props) {
     if (kind === 'sent') toast.success('Renewal email marked as sent');
   };
 
+  // Hide entirely while the account is on trial — the TrialConversionCard
+  // owns the first payment. RenewalsCard only makes sense once the account
+  // is ACTIVE (or post-active states like PAUSED / OVERDUE / CANCELLED).
+  if (state && state.status === 'TRIAL') return null;
+
   if (loading || !state || !breakdown) {
     return (
       <Card>
