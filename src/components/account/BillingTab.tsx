@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { format, differenceInCalendarDays } from 'date-fns';
 
 type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
-type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE';
+type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE' | 'TRIAL';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 type InvoiceKind = 'CYCLE' | 'PRORATION' | 'RENEWAL';
 type RenewalDecision = 'RENEW' | 'RENEW_INCREASE' | 'RENEW_DECREASE' | 'CANCEL';
@@ -283,6 +283,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
               <Select value={settings.status} onValueChange={v => setSettings(s => ({ ...s, status: v as SubStatus }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="TRIAL">Trial</SelectItem>
                   <SelectItem value="ACTIVE">Active</SelectItem>
                   <SelectItem value="PAUSED">Paused</SelectItem>
                   <SelectItem value="OVERDUE">Overdue</SelectItem>

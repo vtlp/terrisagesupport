@@ -90,6 +90,23 @@ export type Database = {
           seats_purchased: number
           status: Database["public"]["Enums"]["subscription_status"]
           subscription_started_at: string | null
+          trial_email_draft_body: string | null
+          trial_email_draft_subject: string | null
+          trial_email_last_drafted_at: string | null
+          trial_email_last_sent_at: string | null
+          trial_ends_at: string | null
+          trial_link_amount: number
+          trial_link_created_at: string | null
+          trial_link_currency: string
+          trial_link_expires_at: string | null
+          trial_link_id: string | null
+          trial_link_outdated: boolean
+          trial_link_seats: number
+          trial_link_short_url: string | null
+          trial_link_status: string | null
+          trial_paid_at: string | null
+          trial_payment_reference: string | null
+          trial_starts_at: string | null
           updated_at: string
         }
         Insert: {
@@ -128,6 +145,23 @@ export type Database = {
           seats_purchased?: number
           status?: Database["public"]["Enums"]["subscription_status"]
           subscription_started_at?: string | null
+          trial_email_draft_body?: string | null
+          trial_email_draft_subject?: string | null
+          trial_email_last_drafted_at?: string | null
+          trial_email_last_sent_at?: string | null
+          trial_ends_at?: string | null
+          trial_link_amount?: number
+          trial_link_created_at?: string | null
+          trial_link_currency?: string
+          trial_link_expires_at?: string | null
+          trial_link_id?: string | null
+          trial_link_outdated?: boolean
+          trial_link_seats?: number
+          trial_link_short_url?: string | null
+          trial_link_status?: string | null
+          trial_paid_at?: string | null
+          trial_payment_reference?: string | null
+          trial_starts_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -166,6 +200,23 @@ export type Database = {
           seats_purchased?: number
           status?: Database["public"]["Enums"]["subscription_status"]
           subscription_started_at?: string | null
+          trial_email_draft_body?: string | null
+          trial_email_draft_subject?: string | null
+          trial_email_last_drafted_at?: string | null
+          trial_email_last_sent_at?: string | null
+          trial_ends_at?: string | null
+          trial_link_amount?: number
+          trial_link_created_at?: string | null
+          trial_link_currency?: string
+          trial_link_expires_at?: string | null
+          trial_link_id?: string | null
+          trial_link_outdated?: boolean
+          trial_link_seats?: number
+          trial_link_short_url?: string | null
+          trial_link_status?: string | null
+          trial_paid_at?: string | null
+          trial_payment_reference?: string | null
+          trial_starts_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2569,6 +2620,8 @@ export type Database = {
         }
         Returns: string
       }
+      cron_run_scanners: { Args: never; Returns: Json }
+      cron_scan_renewals: { Args: never; Returns: number }
       fulfil_seat_request: { Args: { _request_id: string }; Returns: undefined }
       has_role: {
         Args: {
@@ -2727,7 +2780,12 @@ export type Database = {
         | "SUPERUSER_TRANSFER"
       seat_request_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
-      subscription_status: "ACTIVE" | "PAUSED" | "CANCELLED" | "OVERDUE"
+      subscription_status:
+        | "ACTIVE"
+        | "PAUSED"
+        | "CANCELLED"
+        | "OVERDUE"
+        | "TRIAL"
       superuser_transfer_status: "INITIATED" | "COMPLETED" | "CANCELLED"
       tenancy_type: "AGENCY_BROKERAGE_CONSULTANCY" | "BUILDER_DEVELOPER"
       ticket_category:
@@ -2999,7 +3057,13 @@ export const Constants = {
       ],
       seat_request_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
-      subscription_status: ["ACTIVE", "PAUSED", "CANCELLED", "OVERDUE"],
+      subscription_status: [
+        "ACTIVE",
+        "PAUSED",
+        "CANCELLED",
+        "OVERDUE",
+        "TRIAL",
+      ],
       superuser_transfer_status: ["INITIATED", "COMPLETED", "CANCELLED"],
       tenancy_type: ["AGENCY_BROKERAGE_CONSULTANCY", "BUILDER_DEVELOPER"],
       ticket_category: [

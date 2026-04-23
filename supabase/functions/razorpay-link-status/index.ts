@@ -12,7 +12,7 @@ const corsHeaders = {
 
 interface Body {
   link_id: string;
-  purpose: 'INITIAL' | 'RENEWAL';
+  purpose: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION';
   enquiry_id?: string;
   account_id?: string;
 }
@@ -114,6 +114,20 @@ Deno.serve(async (req) => {
         entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
         summary: `[Renewal] Link status refreshed → ${status}`,
         details: { module: 'renewal', link_id: body.link_id, status },
+      });
+      return new Response(JSON.stringify({ success: true, status, paid_at: paidAt }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (body.purpose === 'TRIAL_CONVERSION' && body.account_id) {
+      const update: Record<string, unknown> = { trial_link_status: status };
+      if (paidAt) update.trial_paid_at = paidAt;
+      await admin.from('account_billing_settings').update(update).eq('account_id', body.account_id);
+      await admin.from('activity_log').insert({
+        entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
+        summary: `[Trial] Link status refreshed → ${status}`,
+        details: { module: 'trial', link_id: body.link_id, status },
       });
       return new Response(JSON.stringify({ success: true, status, paid_at: paidAt }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
