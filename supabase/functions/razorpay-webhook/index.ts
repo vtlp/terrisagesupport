@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const linkObj = (event.payload as { payment_link?: { entity?: Record<string, unknown> } } | undefined)?.payment_link?.entity ?? {};
     const linkId = linkObj.id as string | undefined;
     const notes = (linkObj.notes ?? {}) as Record<string, string>;
-    const purpose = (notes.purpose as 'INITIAL' | 'RENEWAL' | undefined) ?? 'INITIAL';
+    const purpose = (notes.purpose as 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | undefined) ?? 'INITIAL';
     const enquiryId = notes.enquiry_id;
     const accountIdNote = notes.account_id;
 
@@ -72,6 +72,13 @@ Deno.serve(async (req) => {
           entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
           summary: `[Renewal] Link ${newStatus.toLowerCase()} (Razorpay)`,
           details: { module: 'renewal', link_id: linkId },
+        });
+      } else if (purpose === 'TRIAL_CONVERSION' && accountIdNote) {
+        await admin.from('account_billing_settings').update({ trial_link_status: newStatus }).eq('account_id', accountIdNote);
+        await admin.from('activity_log').insert({
+          entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
+          summary: `[Trial] Link ${newStatus.toLowerCase()} (Razorpay)`,
+          details: { module: 'trial', link_id: linkId },
         });
       }
 
