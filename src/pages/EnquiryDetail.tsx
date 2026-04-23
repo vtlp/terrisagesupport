@@ -774,6 +774,8 @@ export default function EnquiryDetail() {
             onOutcomeChange={handleOutcomeChange}
             onDemoOutcomeChange={handleDemoOutcomeChange}
             onOpenPaymentDialog={() => setPaymentDialogOpen(true)}
+            onOpenOfflineDialog={() => setOfflineDialogOpen(true)}
+            onOpenDeferDialog={() => setDeferDialogOpen(true)}
             onSetPaymentStatus={setPaymentStatus}
           />
         }
