@@ -10,7 +10,7 @@ const corsHeaders = {
 
 interface Body {
   link_id: string;
-  purpose: 'INITIAL' | 'RENEWAL';
+  purpose: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION';
   enquiry_id?: string;
   account_id?: string;
 }
@@ -89,6 +89,15 @@ Deno.serve(async (req) => {
         entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
         summary: '[Renewal] Payment link cancelled',
         details: { module: 'renewal', link_id: body.link_id },
+      });
+    } else if (body.purpose === 'TRIAL_CONVERSION' && body.account_id) {
+      await admin.from('account_billing_settings').update({
+        trial_link_status: 'CANCELLED',
+      }).eq('account_id', body.account_id);
+      await admin.from('activity_log').insert({
+        entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
+        summary: '[Trial] Conversion link cancelled',
+        details: { module: 'trial', link_id: body.link_id },
       });
     }
 
