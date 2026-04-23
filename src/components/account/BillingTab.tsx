@@ -79,6 +79,11 @@ export function BillingTab({ accountId }: { accountId: string }) {
   const [savingSettings, setSavingSettings] = useState(false);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [renewOpen, setRenewOpen] = useState(false);
+  const [renewDecision, setRenewDecision] = useState<RenewalDecision>('RENEW');
+  const [renewSeats, setRenewSeats] = useState<number>(0);
+  const [renewNotes, setRenewNotes] = useState('');
+  const [renewBusy, setRenewBusy] = useState(false);
   const [draft, setDraft] = useState<Partial<Invoice> & { id?: string }>({
     invoice_no: '', period_from: null, period_to: null, plan_name: 'Standard',
     seat_count: 0, seat_rate: 0, base_fee: 0, gst_pct: 18, status: 'DRAFT', notes: '',
