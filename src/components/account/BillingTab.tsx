@@ -8,13 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Receipt, Plus, Pencil, Trash2, Loader2, Save } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Receipt, Plus, Pencil, Trash2, Loader2, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, differenceInCalendarDays } from 'date-fns';
 
 type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
 type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+type InvoiceKind = 'CYCLE' | 'PRORATION' | 'RENEWAL';
+type RenewalDecision = 'RENEW' | 'RENEW_INCREASE' | 'RENEW_DECREASE' | 'CANCEL';
 
 interface Settings {
   id?: string;
@@ -26,13 +29,21 @@ interface Settings {
   gst_pct: number;
   next_renewal_at: string | null;
   status: SubStatus;
+  country: string;
+  auto_renew: boolean;
+  subscription_started_at: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancellation_requested_at: string | null;
+  cancellation_effective_at: string | null;
 }
 
 interface Invoice {
   id: string; invoice_no: string | null; period_from: string | null; period_to: string | null;
   plan_name: string | null; seat_count: number; seat_rate: number; base_fee: number;
   subtotal: number; gst_pct: number; gst_amount: number; total: number;
-  status: InvoiceStatus; issued_at: string | null; due_at: string | null; paid_at: string | null; notes: string | null;
+  status: InvoiceStatus; kind: InvoiceKind;
+  issued_at: string | null; due_at: string | null; paid_at: string | null; notes: string | null;
 }
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -43,11 +54,20 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
   CANCELLED: 'bg-muted text-muted-foreground',
 };
 
+const KIND_COLORS: Record<InvoiceKind, string> = {
+  CYCLE: 'bg-primary/10 text-primary',
+  PRORATION: 'bg-warning/15 text-warning',
+  RENEWAL: 'bg-success/15 text-success',
+};
+
 const fmtINR = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 const DEFAULT_SETTINGS: Settings = {
   plan_name: 'Standard', billing_cycle: 'MONTHLY', base_fee: 33000, seat_rate: 7000, seats_purchased: 0,
   gst_pct: 18, next_renewal_at: null, status: 'ACTIVE',
+  country: 'IN', auto_renew: true,
+  subscription_started_at: null, current_period_start: null, current_period_end: null,
+  cancellation_requested_at: null, cancellation_effective_at: null,
 };
 
 export function BillingTab({ accountId }: { accountId: string }) {
@@ -59,6 +79,11 @@ export function BillingTab({ accountId }: { accountId: string }) {
   const [savingSettings, setSavingSettings] = useState(false);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [renewOpen, setRenewOpen] = useState(false);
+  const [renewDecision, setRenewDecision] = useState<RenewalDecision>('RENEW');
+  const [renewSeats, setRenewSeats] = useState<number>(0);
+  const [renewNotes, setRenewNotes] = useState('');
+  const [renewBusy, setRenewBusy] = useState(false);
   const [draft, setDraft] = useState<Partial<Invoice> & { id?: string }>({
     invoice_no: '', period_from: null, period_to: null, plan_name: 'Standard',
     seat_count: 0, seat_rate: 0, base_fee: 0, gst_pct: 18, status: 'DRAFT', notes: '',
@@ -72,18 +97,27 @@ export function BillingTab({ accountId }: { accountId: string }) {
       supabase.from('account_seats').select('id', { count: 'exact', head: true }).eq('account_id', accountId).eq('is_active', true),
     ]);
     if (s.data) {
+      const d = s.data as Record<string, unknown>;
       const loaded: Settings = {
         id: s.data.id, plan_name: s.data.plan_name, billing_cycle: s.data.billing_cycle,
         base_fee: Number(s.data.base_fee), seat_rate: Number(s.data.seat_rate),
         seats_purchased: Number((s.data as { seats_purchased?: number }).seats_purchased ?? 0),
         gst_pct: Number(s.data.gst_pct),
         next_renewal_at: s.data.next_renewal_at, status: s.data.status,
+        country: (d.country as string) ?? 'IN',
+        auto_renew: (d.auto_renew as boolean) ?? true,
+        subscription_started_at: (d.subscription_started_at as string | null) ?? null,
+        current_period_start: (d.current_period_start as string | null) ?? null,
+        current_period_end: (d.current_period_end as string | null) ?? null,
+        cancellation_requested_at: (d.cancellation_requested_at as string | null) ?? null,
+        cancellation_effective_at: (d.cancellation_effective_at as string | null) ?? null,
       };
       setSettings(loaded); setSavedSettings(loaded);
     }
     setInvoices((inv.data ?? []).map(i => ({
       ...i, seat_count: i.seat_count, seat_rate: Number(i.seat_rate), base_fee: Number(i.base_fee),
       subtotal: Number(i.subtotal), gst_pct: Number(i.gst_pct), gst_amount: Number(i.gst_amount), total: Number(i.total),
+      kind: ((i as { kind?: InvoiceKind }).kind ?? 'CYCLE') as InvoiceKind,
     })) as Invoice[]);
     setSeatCount(seats.count ?? 0);
     setLoading(false);
@@ -113,6 +147,11 @@ export function BillingTab({ accountId }: { accountId: string }) {
       seats_purchased: settings.seats_purchased,
       gst_pct: settings.gst_pct,
       next_renewal_at: settings.next_renewal_at, status: settings.status,
+      country: settings.country,
+      auto_renew: settings.auto_renew,
+      subscription_started_at: settings.subscription_started_at,
+      current_period_start: settings.current_period_start,
+      current_period_end: settings.current_period_end,
     };
     const { error } = settings.id
       ? await supabase.from('account_billing_settings').update(payload).eq('id', settings.id)
@@ -176,6 +215,37 @@ export function BillingTab({ accountId }: { accountId: string }) {
     if (error) toast.error(error.message); else { toast.success('Deleted'); load(); }
   };
 
+  const openRenew = () => {
+    setRenewDecision('RENEW');
+    setRenewSeats(settings.seats_purchased);
+    setRenewNotes('');
+    setRenewOpen(true);
+  };
+
+  const submitRenewal = async () => {
+    if (!settings.current_period_end) { toast.error('No active billing period set.'); return; }
+    setRenewBusy(true);
+    const seatsArg = renewDecision === 'RENEW' || renewDecision === 'CANCEL'
+      ? null
+      : Math.max(0, renewSeats);
+    const { error } = await supabase.rpc('renew_subscription', {
+      _account_id: accountId,
+      _decision: renewDecision,
+      _new_seats: seatsArg,
+      _notes: renewNotes.trim() || null,
+    });
+    setRenewBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(renewDecision === 'CANCEL' ? 'Cancellation scheduled' : 'Renewal recorded');
+    setRenewOpen(false);
+    load();
+  };
+
+  const daysToRenewal = settings.current_period_end
+    ? differenceInCalendarDays(new Date(settings.current_period_end), new Date())
+    : null;
+  const renewalWindow = daysToRenewal !== null && daysToRenewal <= 30 && daysToRenewal >= -7;
+
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;
 
   return (
@@ -238,11 +308,72 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 onChange={e => setSettings(s => ({ ...s, seats_purchased: Math.max(0, Number(e.target.value) || 0) }))} />
             </div>
             <div className="space-y-1.5">
+              <Label>Country</Label>
+              <Input value={settings.country} onChange={e => setSettings(s => ({ ...s, country: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="IN" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Subscription started</Label>
+              <Input type="date" value={settings.subscription_started_at ? settings.subscription_started_at.substring(0, 10) : ''}
+                onChange={e => setSettings(s => ({ ...s, subscription_started_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Current period start</Label>
+              <Input type="date" value={settings.current_period_start ? settings.current_period_start.substring(0, 10) : ''}
+                onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Current period end</Label>
+              <Input type="date" value={settings.current_period_end ? settings.current_period_end.substring(0, 10) : ''}
+                onChange={e => setSettings(s => ({ ...s, current_period_end: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+            </div>
+            <div className="space-y-1.5">
               <Label>Next renewal</Label>
               <Input type="date" value={settings.next_renewal_at ? settings.next_renewal_at.substring(0, 10) : ''}
                 onChange={e => setSettings(s => ({ ...s, next_renewal_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
             </div>
+            <div className="space-y-1.5 flex flex-col">
+              <Label>Auto-renew</Label>
+              <div className="flex items-center gap-2 h-10">
+                <Switch checked={settings.auto_renew} onCheckedChange={v => setSettings(s => ({ ...s, auto_renew: v }))} />
+                <span className="text-xs text-muted-foreground">{settings.auto_renew ? 'On' : 'Off'}</span>
+              </div>
+            </div>
           </div>
+
+          {settings.cancellation_requested_at && (
+            <div className="rounded border border-destructive/40 bg-destructive/5 p-3 text-xs flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium text-destructive">Cancellation scheduled</div>
+                <div className="text-muted-foreground">
+                  Requested {format(new Date(settings.cancellation_requested_at), 'dd MMM yyyy')}
+                  {settings.cancellation_effective_at && ` · effective ${format(new Date(settings.cancellation_effective_at), 'dd MMM yyyy')}`}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {renewalWindow && (
+            <div className="rounded border bg-warning/5 border-warning/40 p-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-start gap-2">
+                <RefreshCw className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <div className="text-xs">
+                  <div className="font-medium">
+                    {daysToRenewal! >= 0
+                      ? `Renewal due in ${daysToRenewal} day(s)`
+                      : `Period ended ${Math.abs(daysToRenewal!)} day(s) ago`}
+                  </div>
+                  <div className="text-muted-foreground">
+                    Period ends {settings.current_period_end ? format(new Date(settings.current_period_end), 'dd MMM yyyy') : '—'}
+                  </div>
+                </div>
+              </div>
+              <Button size="sm" onClick={openRenew}>
+                <RefreshCw className="h-4 w-4 mr-1" /> Manage renewal
+              </Button>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
             <div className="border rounded p-3">
               <div className="text-xs text-muted-foreground">Seat capacity</div>
@@ -282,6 +413,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">{i.invoice_no ?? '—'}</span>
+                      <Badge className={`text-[10px] ${KIND_COLORS[i.kind]}`}>{i.kind}</Badge>
                       <Badge className={`text-[10px] ${STATUS_COLORS[i.status]}`}>{i.status}</Badge>
                       {i.period_from && i.period_to && (
                         <span className="text-xs text-muted-foreground">{format(new Date(i.period_from), 'dd MMM')} – {format(new Date(i.period_to), 'dd MMM yyyy')}</span>
@@ -339,6 +471,68 @@ export function BillingTab({ accountId }: { accountId: string }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={saveInvoice} disabled={busy}>{busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={renewOpen} onOpenChange={setRenewOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage renewal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded border p-3 text-xs space-y-1 bg-muted/30">
+              <div><span className="text-muted-foreground">Current period:</span>{' '}
+                {settings.current_period_start ? format(new Date(settings.current_period_start), 'dd MMM') : '—'}
+                {' – '}
+                {settings.current_period_end ? format(new Date(settings.current_period_end), 'dd MMM yyyy') : '—'}
+              </div>
+              <div><span className="text-muted-foreground">Seats purchased:</span> {settings.seats_purchased}</div>
+              <div><span className="text-muted-foreground">Cycle:</span> {settings.billing_cycle}</div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Decision</Label>
+              <Select value={renewDecision} onValueChange={v => setRenewDecision(v as RenewalDecision)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="RENEW">Renew (same seats)</SelectItem>
+                  <SelectItem value="RENEW_INCREASE">Renew + increase seats</SelectItem>
+                  <SelectItem value="RENEW_DECREASE">Renew + decrease seats</SelectItem>
+                  <SelectItem value="CANCEL">Cancel subscription</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(renewDecision === 'RENEW_INCREASE' || renewDecision === 'RENEW_DECREASE') && (
+              <div className="space-y-1.5">
+                <Label>New seat total</Label>
+                <Input type="number" min={0} value={renewSeats}
+                  onChange={e => setRenewSeats(Math.max(0, Number(e.target.value) || 0))} />
+                <p className="text-[11px] text-muted-foreground">
+                  A new RENEWAL invoice will be drafted for the next period.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea rows={2} value={renewNotes} onChange={e => setRenewNotes(e.target.value)} placeholder="Optional context for the audit log" />
+            </div>
+
+            {renewDecision === 'CANCEL' && (
+              <div className="rounded border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>Cancellation takes effect at the end of the current period. Seats remain available until then.</div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenewOpen(false)}>Close</Button>
+            <Button onClick={submitRenewal} disabled={renewBusy} variant={renewDecision === 'CANCEL' ? 'destructive' : 'default'}>
+              {renewBusy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {renewDecision === 'CANCEL' ? 'Confirm cancellation' : 'Confirm renewal'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,3 @@
-// CRM → Console: upsert seat usage snapshot for the calling account.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -12,12 +11,25 @@ async function sha256Hex(input: string) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-const isInt = (v: unknown) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100000;
+interface MemberPayload {
+  external_id?: string;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  role?: string | null;
+  permissions?: string[];
+  state: 'INVITED' | 'ACTIVE' | 'TEMP_DEACTIVATED' | 'DELETION_REQUESTED' | 'DELETED';
+  invited_at?: string | null;
+  invitation_expires_at?: string | null;
+  activated_at?: string | null;
+  last_active_at?: string | null;
+  is_superuser?: boolean;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }),
+    return new Response(JSON.stringify({ error: 'POST only' }),
       { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
@@ -39,44 +51,80 @@ Deno.serve(async (req) => {
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  let body: any;
+  let body: { as_of?: string; members?: MemberPayload[] };
   try { body = await req.json(); } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
+  const members = Array.isArray(body.members) ? body.members : [];
+  const now = new Date();
 
-  const allocated = Number(body.allocated);
-  const consumed = Number(body.consumed);
-  const reserved = Number(body.reserved ?? 0);
-  const available = Number(body.available ?? Math.max(0, allocated - consumed - reserved));
+  // Compute aggregates
+  const reserved = members.filter(m =>
+    m.state === 'INVITED' &&
+    (!m.invitation_expires_at || new Date(m.invitation_expires_at) > now)
+  ).length;
+  const consumed = members.filter(m =>
+    ['ACTIVE', 'TEMP_DEACTIVATED', 'DELETION_REQUESTED', 'DELETED'].includes(m.state)
+  ).length;
 
-  if (![allocated, consumed, reserved, available].every(isInt)) {
-    return new Response(JSON.stringify({ error: 'allocated, consumed, reserved, available must be integers >= 0' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
+  // Read allocation from billing settings
+  const { data: bs } = await supabase.from('account_billing_settings')
+    .select('seats_purchased').eq('account_id', accountId).maybeSingle();
+  const allocated = bs?.seats_purchased ?? 0;
+  const available = Math.max(0, allocated - reserved - consumed);
 
-  const members = Array.isArray(body.members) ? body.members.slice(0, 5000) : [];
+  // Upsert snapshot
+  const reportedAt = body.as_of ?? now.toISOString();
+  await supabase.from('seat_usage_snapshots').upsert({
+    account_id: accountId,
+    allocated,
+    reserved,
+    consumed,
+    available,
+    members: members,
+    reported_at: reportedAt,
+    source: 'CRM',
+  }, { onConflict: 'account_id' });
 
-  // Upsert one row per account_id
-  const { error: upErr } = await supabase
-    .from('seat_usage_snapshots')
-    .upsert({
+  // Mirror member roster into account_seats (best-effort by external_id or email)
+  for (const m of members) {
+    const matchKey = m.external_id ? { external_id: m.external_id } : (m.email ? { email: m.email } : null);
+    if (!matchKey) continue;
+
+    const { data: existing } = await supabase.from('account_seats')
+      .select('id')
+      .eq('account_id', accountId)
+      .match(matchKey)
+      .maybeSingle();
+
+    const row = {
       account_id: accountId,
-      allocated,
-      consumed,
-      reserved,
-      available,
-      members,
-      reported_at: new Date().toISOString(),
-      source: 'CRM',
-    }, { onConflict: 'account_id' });
+      external_id: m.external_id ?? null,
+      full_name: m.full_name,
+      email: m.email ?? null,
+      phone: m.phone ?? null,
+      role: m.role ?? null,
+      permissions: m.permissions ?? [],
+      crm_state: m.state,
+      invitation_expires_at: m.invitation_expires_at ?? null,
+      last_active_at: m.last_active_at ?? null,
+      is_superuser: !!m.is_superuser,
+      is_active: m.state === 'ACTIVE' || m.state === 'TEMP_DEACTIVATED',
+      deleted_in_cycle: m.state === 'DELETED',
+    };
 
-  if (upErr) {
-    return new Response(JSON.stringify({ error: upErr.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (existing) {
+      await supabase.from('account_seats').update(row).eq('id', existing.id);
+    } else {
+      await supabase.from('account_seats').insert(row);
+    }
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return new Response(JSON.stringify({
+    ok: true,
+    account_id: accountId,
+    allocated, reserved, consumed, available,
+    over_capacity: consumed > allocated,
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 });

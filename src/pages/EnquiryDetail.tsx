@@ -29,10 +29,8 @@ import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
 import { PaymentLinkDialog, PaymentLinkResult } from '@/components/shared/PaymentLinkDialog';
-import { PaymentOfflineDialog, OfflinePaymentResult } from '@/components/shared/PaymentOfflineDialog';
-import { PaymentDeferDialog, DeferredPaymentResult } from '@/components/shared/PaymentDeferDialog';
-import { calcBilling } from '@/lib/billing';
-import { fmtINR } from '@/lib/billing';
+import { PaymentEmailComposer, buildInitialPaymentEmail } from '@/components/billing/PaymentEmailComposer';
+import { calcBilling, fmtINR } from '@/lib/billing';
 import { useUser } from '@/context/UserContext';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'PAYMENT_LINK_SENT' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
@@ -63,16 +61,14 @@ interface PaymentInfo {
   short_url?: string;
   amount?: number;
   currency?: string;
-  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING' | 'DEFERRED';
-  // method tells us how this stage was resolved:
-  //  RAZORPAY = link generated, OFFLINE = manually marked paid, DEFER = collect later.
-  method?: 'RAZORPAY' | 'OFFLINE' | 'DEFER';
-  reference?: string;       // offline txn id / cheque no.
-  channel?: string;         // UPI / NEFT / CASH / CHEQUE / OTHER
-  reason?: string;          // defer reason
+  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING' | 'EXPIRED' | 'EMAIL_DRAFTED' | 'EMAIL_SENT' | 'PAYMENT_PENDING';
   paid_at?: string;
-  deferred_at?: string;
   created_at?: string;
+  expires_at?: string;
+  outdated?: boolean;
+  mode?: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST';
+  trial?: { start?: string | null; end?: string | null };
+  email?: { last_drafted_at?: string; last_sent_at?: string; subject?: string; body?: string };
   breakdown?: Record<string, unknown>;
 }
 
@@ -102,7 +98,7 @@ interface Submission {
 
 const stageLabels: Record<Stage, string> = {
   NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Scheduled',
-  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment',
+  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment Link Sent',
   ONBOARDING_PACK_SENT: 'Onboarding Sent',
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
@@ -185,8 +181,8 @@ export default function EnquiryDetail() {
   const [existingEventOptions, setExistingEventOptions] = useState<ExistingEventOption[]>([]);
   const [existingPromptOpen, setExistingPromptOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [offlineDialogOpen, setOfflineDialogOpen] = useState(false);
-  const [deferDialogOpen, setDeferDialogOpen] = useState(false);
+  const [paymentEmailOpen, setPaymentEmailOpen] = useState(false);
+  const [paymentBusy, setPaymentBusy] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
@@ -397,8 +393,19 @@ export default function EnquiryDetail() {
     if (currentStage === 'DEMO_COMPLETED' && !d.payload.demo_outcome) {
       return 'Please select a demo outcome before moving on.';
     }
-    if (currentStage === 'PAYMENT_LINK_SENT' && !d.payload.payment?.status) {
-      return 'Generate a link, mark as paid offline, or defer collection before moving on.';
+    if (currentStage === 'PAYMENT_LINK_SENT') {
+      const p = d.payload.payment;
+      const mode = p?.mode ?? 'PAY_BEFORE_ACCOUNT';
+      if (mode === 'TRIAL_FIRST') {
+        if (!p?.trial?.start || !p?.trial?.end) {
+          return 'Set trial start and end dates before moving on.';
+        }
+        if (new Date(p.trial.end) < new Date(p.trial.start)) {
+          return 'Trial end date cannot be before the start date.';
+        }
+      } else if (!p?.status) {
+        return 'Please capture the payment outcome (Paid / Pending / Failed) before moving on.';
+      }
     }
     return null;
   };
@@ -462,24 +469,31 @@ export default function EnquiryDetail() {
   };
 
   // Apply the generated Razorpay link locally.
+  // The edge function already merged previously-set mode/trial; we additionally
+  // preserve the email draft on the client (server response doesn't include it).
   const applyPaymentResult = (result: PaymentLinkResult) => {
-    setEnquiry(prev => prev ? { ...prev, payload: { ...prev.payload, payment: result } } : prev);
-    setDraft(prev => prev ? { ...prev, payload: { ...prev.payload, payment: result } } : prev);
+    setEnquiry(prev => {
+      if (!prev) return prev;
+      const prior = (prev.payload.payment ?? {}) as PaymentInfo;
+      const merged = { ...prior, ...result, email: prior.email } as PaymentInfo;
+      return { ...prev, payload: { ...prev.payload, payment: merged } };
+    });
+    setDraft(prev => {
+      if (!prev) return prev;
+      const prior = (prev.payload.payment ?? {}) as PaymentInfo;
+      const merged = { ...prior, ...result, email: prior.email } as PaymentInfo;
+      return { ...prev, payload: { ...prev.payload, payment: merged } };
+    });
     refreshNotes(enquiry?.id ?? '');
   };
 
-  // Manually flip payment outcome (PAID / PENDING / FAILED / DEFERRED) — used by the
-  // Payment stage outcome panel and unlocks the onboarding action when PAID/DEFERRED.
-  const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => {
+  // Manually flip payment outcome (PAID / PENDING / FAILED) — used by the
+  // Payment stage outcome panel and unlocks the onboarding action when PAID.
+  const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED') => {
     if (!enquiry) return;
     const cur = (draft?.payload.payment ?? {}) as PaymentInfo;
     const prevStatus = cur.status ?? null;
-    const nextPayment: PaymentInfo = {
-      ...cur,
-      status,
-      paid_at: status === 'PAID' ? (cur.paid_at ?? new Date().toISOString()) : cur.paid_at,
-      deferred_at: status === 'DEFERRED' ? (cur.deferred_at ?? new Date().toISOString()) : cur.deferred_at,
-    };
+    const nextPayment: PaymentInfo = { ...cur, status, paid_at: status === 'PAID' ? new Date().toISOString() : cur.paid_at };
     const nextPayload = { ...draft!.payload, payment: nextPayment };
     const { error } = await supabase.from('enquiries')
       .update({ payload: nextPayload as unknown as never })
@@ -487,6 +501,7 @@ export default function EnquiryDetail() {
     if (error) { toast.error(error.message); return; }
     setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
     setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    // Log the outcome to the enquiry timeline for traceability.
     if (prevStatus !== status) {
       const amt = cur.amount ? ` ${fmtINR(cur.amount)}` : '';
       await supabase.from('enquiry_notes').insert({
@@ -498,48 +513,91 @@ export default function EnquiryDetail() {
     toast.success(`Payment marked ${status}`);
   };
 
-  // Apply offline / deferred payment results from their dialogs.
-  const applyOfflinePayment = (r: OfflinePaymentResult) => {
+  // Set the billing mode (Pay first vs Trial first) on the enquiry payment.
+  const setPaymentMode = async (mode: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST') => {
     if (!enquiry || !draft) return;
-    const next: PaymentInfo = {
-      ...(draft.payload.payment ?? {}),
-      status: r.status,
-      method: r.method,
-      amount: r.amount,
-      currency: r.currency,
-      reference: r.reference,
-      channel: r.channel,
-      paid_at: r.paid_at,
-      created_at: r.created_at,
-    };
+    const cur = (draft.payload.payment ?? {}) as PaymentInfo;
+    const next: PaymentInfo = { ...cur, mode };
     const nextPayload = { ...draft.payload, payment: next };
-    supabase.from('enquiries').update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id)
-      .then(({ error }) => {
-        if (error) { toast.error(error.message); return; }
-        setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
-        setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
-        refreshNotes(enquiry.id);
-      });
+    const { error } = await supabase.from('enquiries')
+      .update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id);
+    if (error) { toast.error(error.message); return; }
+    setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    toast.success(`Billing mode: ${mode === 'TRIAL_FIRST' ? 'Trial first' : 'Pay before account'}`);
   };
 
-  const applyDeferredPayment = (r: DeferredPaymentResult) => {
+  // Update trial start/end dates on the enquiry payment.
+  const setTrialDate = async (key: 'start' | 'end', value: string) => {
     if (!enquiry || !draft) return;
+    const cur = (draft.payload.payment ?? {}) as PaymentInfo;
+    const trial = { ...(cur.trial ?? {}), [key]: value || undefined };
+    const next: PaymentInfo = { ...cur, trial };
+    const nextPayload = { ...draft.payload, payment: next };
+    const { error } = await supabase.from('enquiries')
+      .update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id);
+    if (error) { toast.error(error.message); return; }
+    setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+  };
+
+  // Cancel the active Razorpay payment link via the backend edge function.
+  const cancelPaymentLink = async () => {
+    if (!enquiry || !draft?.payload.payment?.link_id) return;
+    if (!confirm('Cancel this payment link? The customer will no longer be able to pay against it.')) return;
+    setPaymentBusy(true);
+    const { data, error } = await supabase.functions.invoke('razorpay-cancel-payment-link', {
+      body: { link_id: draft.payload.payment.link_id, purpose: 'INITIAL', enquiry_id: enquiry.id },
+    });
+    setPaymentBusy(false);
+    if (error || !data?.success) { toast.error(data?.error || error?.message || 'Failed to cancel link'); return; }
+    toast.success('Payment link cancelled');
+    // Reload enquiry payload to pick up the server update.
+    const { data: e } = await supabase.from('enquiries').select('payload').eq('id', enquiry.id).maybeSingle();
+    if (e) {
+      const payload = (e.payload ?? {}) as EnquiryPayload;
+      setEnquiry(prev => prev ? { ...prev, payload } : prev);
+      setDraft(prev => prev ? { ...prev, payload } : prev);
+    }
+  };
+
+  // Refresh the link status from Razorpay (manual poll).
+  const refreshPaymentStatus = async () => {
+    if (!enquiry || !draft?.payload.payment?.link_id) return;
+    setPaymentBusy(true);
+    const { data, error } = await supabase.functions.invoke('razorpay-link-status', {
+      body: { link_id: draft.payload.payment.link_id, purpose: 'INITIAL', enquiry_id: enquiry.id },
+    });
+    setPaymentBusy(false);
+    if (error || !data?.success) { toast.error(data?.error || error?.message || 'Failed to refresh status'); return; }
+    toast.success(`Status: ${data.status ?? 'unchanged'}`);
+    const { data: e } = await supabase.from('enquiries').select('payload').eq('id', enquiry.id).maybeSingle();
+    if (e) {
+      const payload = (e.payload ?? {}) as EnquiryPayload;
+      setEnquiry(prev => prev ? { ...prev, payload } : prev);
+      setDraft(prev => prev ? { ...prev, payload } : prev);
+    }
+  };
+
+  // Persist email-draft / mark-sent timestamps to the enquiry payment payload.
+  const recordEmailAction = async (kind: 'drafted' | 'sent', subject: string, body: string) => {
+    if (!enquiry || !draft) return;
+    const cur = (draft.payload.payment ?? {}) as PaymentInfo;
+    const nowIso = new Date().toISOString();
+    const email = {
+      ...(cur.email ?? {}),
+      subject, body,
+      ...(kind === 'drafted' ? { last_drafted_at: nowIso } : { last_sent_at: nowIso }),
+    };
     const next: PaymentInfo = {
-      ...(draft.payload.payment ?? {}),
-      status: r.status,
-      method: r.method,
-      reason: r.reason,
-      deferred_at: r.deferred_at,
-      created_at: r.created_at,
+      ...cur, email,
+      ...(kind === 'sent' ? { status: 'EMAIL_SENT' as const } : cur.status ? {} : { status: 'EMAIL_DRAFTED' as const }),
     };
     const nextPayload = { ...draft.payload, payment: next };
-    supabase.from('enquiries').update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id)
-      .then(({ error }) => {
-        if (error) { toast.error(error.message); return; }
-        setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
-        setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
-        refreshNotes(enquiry.id);
-      });
+    await supabase.from('enquiries').update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id);
+    setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    if (kind === 'sent') toast.success('Email marked as sent');
   };
 
   const addNote = async () => {
@@ -607,10 +665,11 @@ export default function EnquiryDetail() {
       setTimeout(() => el?.focus(), 300);
       return;
     }
-    const paymentStatus = draft.payload.payment?.status ?? null;
-    const paymentResolved = paymentStatus === 'PAID' || paymentStatus === 'DEFERRED';
-    if (!enquiry.onboarding_pack_sent && !paymentResolved) {
-      toast.error('Generate a payment link, mark as paid offline, or defer collection before sending the onboarding form.');
+    const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
+    const trialMode = draft.payload.payment?.mode === 'TRIAL_FIRST';
+    const trialValid = trialMode && !!draft.payload.payment?.trial?.start && !!draft.payload.payment?.trial?.end;
+    if (!enquiry.onboarding_pack_sent && !paymentPaid && !trialValid) {
+      toast.error('Mark the payment as Paid, or set a trial period, before sending the onboarding form.');
       return;
     }
     if (!(await requireClean('send the onboarding form'))) return;
@@ -774,9 +833,13 @@ export default function EnquiryDetail() {
             onOutcomeChange={handleOutcomeChange}
             onDemoOutcomeChange={handleDemoOutcomeChange}
             onOpenPaymentDialog={() => setPaymentDialogOpen(true)}
-            onOpenOfflineDialog={() => setOfflineDialogOpen(true)}
-            onOpenDeferDialog={() => setDeferDialogOpen(true)}
             onSetPaymentStatus={setPaymentStatus}
+            onSetPaymentMode={setPaymentMode}
+            onSetTrialDate={setTrialDate}
+            onCancelPaymentLink={cancelPaymentLink}
+            onRefreshPaymentStatus={refreshPaymentStatus}
+            onDraftPaymentEmail={() => setPaymentEmailOpen(true)}
+            paymentBusy={paymentBusy}
           />
         }
       />
@@ -789,13 +852,12 @@ export default function EnquiryDetail() {
             <div className="p-4 space-y-2.5">
               <div className="text-sm font-semibold text-foreground mb-1">Actions</div>
               {(() => {
-                const payStatus = draft.payload.payment?.status ?? null;
-                const paymentResolved = payStatus === 'PAID' || payStatus === 'DEFERRED';
+                const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
                 const onboardingSent = enquiry.onboarding_pack_sent || draft.onboarding_pack_sent;
-                const onboardEnabled = onboardingSent || paymentResolved;
+                const onboardEnabled = onboardingSent || paymentPaid;
                 const blockedReason = onboardEnabled
                   ? null
-                  : 'Resolve payment (link / offline / defer) to unlock onboarding.';
+                  : 'Mark payment as Paid to unlock onboarding.';
                 return (
                   <>
                     <div className="flex items-center gap-1.5">
@@ -1264,6 +1326,31 @@ export default function EnquiryDetail() {
         onSuccess={applyPaymentResult}
       />
 
+      {(() => {
+        const p = draft.payload.payment;
+        const tmpl = buildInitialPaymentEmail({
+          ownerName: enquiry.full_name,
+          planName: (p?.breakdown as { plan_name?: string } | undefined)?.plan_name ?? 'Standard',
+          seats: (p?.breakdown as { seats?: number } | undefined)?.seats ?? (draft.payload.team_size_estimate as number) ?? 0,
+          amount: p?.amount ?? 0,
+          currency: p?.currency ?? 'INR',
+          paymentLinkUrl: p?.short_url ?? '',
+          expiresAt: p?.expires_at ?? null,
+        });
+        return (
+          <PaymentEmailComposer
+            open={paymentEmailOpen}
+            onOpenChange={setPaymentEmailOpen}
+            purpose="INITIAL"
+            to={enquiry.email ?? ''}
+            defaultSubject={p?.email?.subject ?? tmpl.subject}
+            defaultBody={p?.email?.body ?? tmpl.body}
+            onDrafted={(s, b) => recordEmailAction('drafted', s, b)}
+            onMarkedSent={(s, b) => recordEmailAction('sent', s, b)}
+          />
+        );
+      })()}
+
       <SendOnboardingDialog
         open={shareOpen}
         onOpenChange={setShareOpen}
@@ -1454,7 +1541,8 @@ function StageFlow({
 
 function StageOutcomePanel({
   stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
-  onOpenPaymentDialog, onOpenOfflineDialog, onOpenDeferDialog, onSetPaymentStatus,
+  onOpenPaymentDialog, onSetPaymentStatus, onSetPaymentMode, onSetTrialDate,
+  onCancelPaymentLink, onRefreshPaymentStatus, onDraftPaymentEmail, paymentBusy,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1463,9 +1551,13 @@ function StageOutcomePanel({
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
   onOpenPaymentDialog: () => void;
-  onOpenOfflineDialog: () => void;
-  onOpenDeferDialog: () => void;
-  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
+  onSetPaymentMode: (m: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST') => void;
+  onSetTrialDate: (k: 'start' | 'end', v: string) => void;
+  onCancelPaymentLink: () => void;
+  onRefreshPaymentStatus: () => void;
+  onDraftPaymentEmail: () => void;
+  paymentBusy: boolean;
 }) {
   const isLost = stage === 'LOST';
   const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
@@ -1488,10 +1580,10 @@ function StageOutcomePanel({
         <ActiveStagePanel
           stage={stage} draft={draft} setField={setField} setPayload={setPayload}
           onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange}
-          onOpenPaymentDialog={onOpenPaymentDialog}
-          onOpenOfflineDialog={onOpenOfflineDialog}
-          onOpenDeferDialog={onOpenDeferDialog}
-          onSetPaymentStatus={onSetPaymentStatus}
+          onOpenPaymentDialog={onOpenPaymentDialog} onSetPaymentStatus={onSetPaymentStatus}
+          onSetPaymentMode={onSetPaymentMode} onSetTrialDate={onSetTrialDate}
+          onCancelPaymentLink={onCancelPaymentLink} onRefreshPaymentStatus={onRefreshPaymentStatus}
+          onDraftPaymentEmail={onDraftPaymentEmail} paymentBusy={paymentBusy}
         />
       </div>
     </div>
@@ -1530,15 +1622,9 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
     );
   } else if (stage === 'PAYMENT_LINK_SENT') {
     const p = draft.payload.payment;
-    if (p?.status === 'DEFERRED') {
-      body = <span><span className="font-medium">Deferred</span>{p.reason ? ` · ${p.reason}` : ''}</span>;
-    } else if (p?.method === 'OFFLINE') {
-      body = <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">PAID offline</span>{p.reference ? ` · ref ${p.reference}` : ''}</span>;
-    } else if (p?.short_url) {
-      body = <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>;
-    } else {
-      body = <span className="text-muted-foreground">Not resolved yet</span>;
-    }
+    body = p?.short_url
+      ? <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>
+      : <span className="text-muted-foreground">No link generated</span>;
   } else if (stage === 'ONBOARDING_PACK_SENT') {
     body = <span>Onboarding form sent</span>;
   } else if (stage === 'ACCOUNT_CREATED') {
@@ -1555,7 +1641,8 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
 
 function ActiveStagePanel({
   stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
-  onOpenPaymentDialog, onOpenOfflineDialog, onOpenDeferDialog, onSetPaymentStatus,
+  onOpenPaymentDialog, onSetPaymentStatus, onSetPaymentMode, onSetTrialDate,
+  onCancelPaymentLink, onRefreshPaymentStatus, onDraftPaymentEmail, paymentBusy,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1564,9 +1651,13 @@ function ActiveStagePanel({
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
   onOpenPaymentDialog: () => void;
-  onOpenOfflineDialog: () => void;
-  onOpenDeferDialog: () => void;
-  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
+  onSetPaymentMode: (m: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST') => void;
+  onSetTrialDate: (k: 'start' | 'end', v: string) => void;
+  onCancelPaymentLink: () => void;
+  onRefreshPaymentStatus: () => void;
+  onDraftPaymentEmail: () => void;
+  paymentBusy: boolean;
 }) {
   const outcome = (draft.payload.outcome as string) || '';
 
@@ -1669,37 +1760,124 @@ function ActiveStagePanel({
   if (stage === 'PAYMENT_LINK_SENT') {
     const payment = draft.payload.payment;
     const status = payment?.status ?? null;
+    const mode = payment?.mode ?? 'PAY_BEFORE_ACCOUNT';
+    const teamSize = (draft.payload.team_size_estimate as number | null | undefined) ?? null;
+    const breakdownSeats = (payment?.breakdown as { seats?: number } | undefined)?.seats ?? null;
+    const seatsDrifted = payment?.short_url && breakdownSeats !== null && teamSize !== null && breakdownSeats !== teamSize;
+    const isOutdated = !!(payment?.outdated || seatsDrifted);
+    const linkExpired = payment?.expires_at ? new Date(payment.expires_at) < new Date() : false;
+    const linkActive = !!payment?.short_url && status !== 'PAID' && status !== 'CANCELLED' && !linkExpired;
+
     const statusBadge = (s: string) => {
       const cls = s === 'PAID' ? 'bg-success/15 text-success border-success/30'
-        : s === 'FAILED' ? 'bg-destructive/15 text-destructive border-destructive/30'
+        : s === 'FAILED' || s === 'EXPIRED' ? 'bg-destructive/15 text-destructive border-destructive/30'
         : s === 'CANCELLED' ? 'bg-muted text-muted-foreground'
+        : s === 'EMAIL_SENT' ? 'bg-success/10 text-success border-success/30'
+        : s === 'EMAIL_DRAFTED' ? 'bg-warning/15 text-warning border-warning/30'
         : 'bg-primary/15 text-primary border-primary/30';
-      return <Badge variant="outline" className={cn('text-[10px]', cls)}>{s}</Badge>;
+      return <Badge variant="outline" className={cn('text-[10px]', cls)}>{s.replace('_', ' ')}</Badge>;
     };
+
     return (
       <div className="space-y-3">
+        {/* Mode toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Label className="text-xs text-muted-foreground">Billing mode</Label>
+          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            <button
+              type="button"
+              onClick={() => mode !== 'PAY_BEFORE_ACCOUNT' && onSetPaymentMode('PAY_BEFORE_ACCOUNT')}
+              className={cn('px-3 py-1 text-xs rounded transition-colors',
+                mode === 'PAY_BEFORE_ACCOUNT' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground')}
+            >Pay first</button>
+            <button
+              type="button"
+              onClick={() => mode !== 'TRIAL_FIRST' && onSetPaymentMode('TRIAL_FIRST')}
+              className={cn('px-3 py-1 text-xs rounded transition-colors',
+                mode === 'TRIAL_FIRST' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground')}
+            >Trial first</button>
+          </div>
+          {teamSize !== null && (
+            <span className="text-[11px] text-muted-foreground ml-auto">Seats: <span className="font-medium text-foreground">{teamSize}</span></span>
+          )}
+        </div>
+
+        {/* Trial date inputs */}
+        {mode === 'TRIAL_FIRST' && (
+          <div className="grid grid-cols-2 gap-2 rounded-md border border-dashed bg-muted/20 p-3">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Trial start</Label>
+              <Input
+                type="date"
+                className="h-8"
+                value={payment?.trial?.start ?? ''}
+                onChange={e => onSetTrialDate('start', e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Trial end</Label>
+              <Input
+                type="date"
+                className="h-8"
+                value={payment?.trial?.end ?? ''}
+                onChange={e => onSetTrialDate('end', e.target.value)}
+              />
+            </div>
+            <p className="col-span-2 text-[11px] text-muted-foreground">
+              Trial mode allows account creation without immediate payment. Capture both dates before progressing.
+            </p>
+          </div>
+        )}
+
+        {/* Link card */}
         {payment?.short_url ? (
-          <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+          <div className={cn('rounded-md border p-3 space-y-2',
+            isOutdated ? 'border-warning/40 bg-warning/5' : 'bg-muted/20')}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold">{fmtINR(payment.amount ?? 0)}</span>
                 {status && statusBadge(status)}
+                {isOutdated && (
+                  <Badge variant="outline" className="text-[10px] bg-warning/15 text-warning border-warning/40">Outdated</Badge>
+                )}
+                {linkExpired && (
+                  <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/40">Expired</Badge>
+                )}
                 {payment.created_at && (
                   <span className="text-[11px] text-muted-foreground">
                     Sent {format(new Date(payment.created_at), 'dd MMM, HH:mm')}
                   </span>
                 )}
+                {payment.expires_at && (
+                  <span className="text-[11px] text-muted-foreground">
+                    · Expires {format(new Date(payment.expires_at), 'dd MMM yyyy')}
+                  </span>
+                )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(payment.short_url!); toast.success('Link copied'); }}>
                   <CopyIcon className="h-3.5 w-3.5 mr-1" /> Copy
                 </Button>
                 <a href={payment.short_url} target="_blank" rel="noreferrer">
                   <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Open</Button>
                 </a>
+                <Button size="sm" variant="outline" onClick={onRefreshPaymentStatus} disabled={paymentBusy}>
+                  <RefreshCw className={cn('h-3.5 w-3.5 mr-1', paymentBusy && 'animate-spin')} /> Refresh
+                </Button>
               </div>
             </div>
             <div className="text-[11px] text-muted-foreground break-all">{payment.short_url}</div>
+            {(payment.email?.last_drafted_at || payment.email?.last_sent_at) && (
+              <div className="text-[11px] text-muted-foreground border-t pt-1.5 flex gap-4 flex-wrap">
+                {payment.email?.last_sent_at && <span>Email sent {format(new Date(payment.email.last_sent_at), 'dd MMM, HH:mm')}</span>}
+                {payment.email?.last_drafted_at && !payment.email?.last_sent_at && (
+                  <span>Email drafted {format(new Date(payment.email.last_drafted_at), 'dd MMM, HH:mm')}</span>
+                )}
+              </div>
+            )}
+            {isOutdated && (
+              <p className="text-[11px] text-warning">Seats or amount have changed since this link was created. Regenerate before sending.</p>
+            )}
           </div>
         ) : (
           <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
@@ -1707,19 +1885,25 @@ function ActiveStagePanel({
           </div>
         )}
 
+        {/* Action row */}
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={onOpenPaymentDialog}>
-            {payment?.short_url ? 'Generate new link' : 'Generate payment link'}
+          <Button size="sm" onClick={onOpenPaymentDialog} disabled={paymentBusy}>
+            {payment?.short_url ? 'Regenerate link' : 'Generate payment link'}
           </Button>
-          <Button size="sm" variant="outline" onClick={onOpenOfflineDialog}>
-            Mark as paid (offline)
-          </Button>
-          <Button size="sm" variant="outline" onClick={onOpenDeferDialog}>
-            Defer · collect later
-          </Button>
+          {payment?.short_url && (
+            <Button size="sm" variant="outline" onClick={onDraftPaymentEmail} disabled={paymentBusy || isOutdated}>
+              Draft email
+            </Button>
+          )}
+          {linkActive && (
+            <Button size="sm" variant="outline" onClick={onCancelPaymentLink} disabled={paymentBusy}>
+              Cancel link
+            </Button>
+          )}
           <div className="flex items-center gap-2 ml-auto">
             <Label className="text-xs text-muted-foreground">Mark as</Label>
-            <Select value={status ?? NONE} onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
+            <Select value={status === 'PAID' || status === 'PENDING' || status === 'FAILED' ? status : NONE}
+              onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
               <SelectTrigger className="h-9 w-36"><SelectValue placeholder="Set status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="PAID">Paid</SelectItem>
@@ -1729,7 +1913,6 @@ function ActiveStagePanel({
             </Select>
           </div>
         </div>
-
       </div>
     );
   }

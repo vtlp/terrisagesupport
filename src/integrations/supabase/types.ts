@@ -2569,8 +2569,6 @@ export type Database = {
         }
         Returns: string
       }
-      cron_run_scanners: { Args: never; Returns: Json }
-      cron_scan_renewals: { Args: never; Returns: number }
       fulfil_seat_request: { Args: { _request_id: string }; Returns: undefined }
       has_role: {
         Args: {

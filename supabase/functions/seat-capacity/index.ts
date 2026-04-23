@@ -27,56 +27,42 @@ Deno.serve(async (req) => {
 
   const keyHash = await sha256Hex(apiKey);
   const { data: accountId, error: keyErr } = await supabase.rpc('validate_account_api_key', { _key_hash: keyHash });
-
   if (keyErr || !accountId) {
     return new Response(JSON.stringify({ error: 'Invalid API key' }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  // Capacity from view (purchased, used, reserved, available, last_crm_sync_at)
-  const { data: cap, error: capErr } = await supabase
-    .from('account_seat_capacity')
-    .select('seats_purchased, seats_used, seats_reserved, seats_available, plan_name, subscription_status, account_name, last_crm_sync_at')
-    .eq('account_id', accountId)
-    .maybeSingle();
+  const [capRes, bsRes, acctRes, snapRes, reqRes] = await Promise.all([
+    supabase.from('account_seat_capacity').select('*').eq('account_id', accountId).maybeSingle(),
+    supabase.from('account_billing_settings').select('*').eq('account_id', accountId).maybeSingle(),
+    supabase.from('accounts').select('account_name, owner_name, city').eq('id', accountId).maybeSingle(),
+    supabase.from('seat_usage_snapshots').select('reserved, consumed, reported_at').eq('account_id', accountId).maybeSingle(),
+    supabase.from('seat_requests').select('requested_seats').eq('account_id', accountId).in('status', ['PENDING', 'APPROVED']),
+  ]);
 
-  if (capErr || !cap) {
+  if (!capRes.data) {
     return new Response(JSON.stringify({ error: 'Account not found' }),
       { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  // Subscription metadata
-  const { data: bs } = await supabase
-    .from('account_billing_settings')
-    .select('billing_cycle, current_period_start, current_period_end, next_renewal_at, country, auto_renew, subscription_started_at, cancellation_effective_at')
-    .eq('account_id', accountId)
-    .maybeSingle();
-
-  // Owner name
-  const { data: acct } = await supabase
-    .from('accounts')
-    .select('owner_name')
-    .eq('id', accountId)
-    .maybeSingle();
+  const requested = (reqRes.data ?? []).reduce((s, r: { requested_seats: number }) => s + (r.requested_seats || 0), 0);
 
   return new Response(JSON.stringify({
     account_id: accountId,
-    account_name: cap.account_name,
-    owner_name: acct?.owner_name ?? null,
-    plan: cap.plan_name,
-    cycle: bs?.billing_cycle ?? null,
-    status: cap.subscription_status,
-    country: bs?.country ?? 'IN',
-    auto_renew: bs?.auto_renew ?? true,
-    subscription_started_at: bs?.subscription_started_at ?? null,
-    period_start: bs?.current_period_start ?? null,
-    period_end: bs?.current_period_end ?? null,
-    next_renewal_at: bs?.next_renewal_at ?? null,
-    cancellation_effective_at: bs?.cancellation_effective_at ?? null,
-    purchased: cap.seats_purchased,
-    in_use: cap.seats_used,
-    reserved: cap.seats_reserved,
-    available: cap.seats_available,
-    last_crm_sync_at: cap.last_crm_sync_at,
+    account_name: capRes.data.account_name,
+    owner_name: acctRes.data?.owner_name ?? null,
+    country: bsRes.data?.country ?? 'IN',
+    plan: capRes.data.plan_name,
+    status: capRes.data.subscription_status,
+    cycle: bsRes.data?.billing_cycle ?? null,
+    auto_renew: bsRes.data?.auto_renew ?? true,
+    current_period_start: bsRes.data?.current_period_start ?? null,
+    current_period_end: bsRes.data?.current_period_end ?? null,
+    allocated: capRes.data.seats_purchased ?? 0,
+    reserved: snapRes.data?.reserved ?? 0,
+    consumed: snapRes.data?.consumed ?? capRes.data.seats_used ?? 0,
+    available: capRes.data.seats_available ?? 0,
+    requested,
+    last_crm_sync_at: snapRes.data?.reported_at ?? null,
   }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 });

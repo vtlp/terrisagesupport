@@ -1,4 +1,4 @@
-// Console → CRM: recent seat change events so CRM can react to admin adjustments.
+// Console → CRM read: poll seat allocation deltas since a timestamp so the CRM can unlock invite slots.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -7,18 +7,24 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 };
 
-async function sha256Hex(input: string) {
+async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  if (req.method !== 'GET') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   const apiKey = req.headers.get('x-account-api-key');
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Missing x-account-api-key header' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'Missing x-account-api-key' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   const supabase = createClient(
@@ -27,37 +33,41 @@ Deno.serve(async (req) => {
   );
 
   const keyHash = await sha256Hex(apiKey);
-  const { data: accountId, error: keyErr } = await supabase.rpc('validate_account_api_key', { _key_hash: keyHash });
-  if (keyErr || !accountId) {
-    return new Response(JSON.stringify({ error: 'Invalid API key' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const { data: accountId, error: vErr } = await supabase.rpc('validate_account_api_key', { _key_hash: keyHash });
+  if (vErr || !accountId) {
+    return new Response(JSON.stringify({ error: 'Invalid API key' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   const url = new URL(req.url);
   const sinceParam = url.searchParams.get('since');
-  const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') ?? '100')));
-
-  let query = supabase
-    .from('seat_change_events')
-    .select('id, delta, new_total, reason, prorated_amount, effective_at, created_at, notes')
-    .eq('account_id', accountId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (sinceParam) {
-    const sinceDate = new Date(sinceParam);
-    if (!isNaN(sinceDate.getTime())) query = query.gt('created_at', sinceDate.toISOString());
+  const since = sinceParam ? new Date(sinceParam) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  if (Number.isNaN(since.getTime())) {
+    return new Response(JSON.stringify({ error: 'Invalid since timestamp' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
-  const { data, error } = await query;
+  const { data: events, error } = await supabase
+    .from('seat_change_events')
+    .select('id, delta, new_total, reason, effective_at, prorated_amount, invoice_id, notes, created_at')
+    .eq('account_id', accountId)
+    .gte('effective_at', since.toISOString())
+    .order('effective_at', { ascending: true })
+    .limit(500);
+
   if (error) {
-    return new Response(JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   return new Response(JSON.stringify({
-    account_id: accountId,
-    events: data ?? [],
+    since: since.toISOString(),
     server_time: new Date().toISOString(),
-  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    events: events ?? [],
+  }), {
+    status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 });
