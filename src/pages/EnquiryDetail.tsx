@@ -469,9 +469,21 @@ export default function EnquiryDetail() {
   };
 
   // Apply the generated Razorpay link locally.
+  // The edge function already merged previously-set mode/trial; we additionally
+  // preserve the email draft on the client (server response doesn't include it).
   const applyPaymentResult = (result: PaymentLinkResult) => {
-    setEnquiry(prev => prev ? { ...prev, payload: { ...prev.payload, payment: result } } : prev);
-    setDraft(prev => prev ? { ...prev, payload: { ...prev.payload, payment: result } } : prev);
+    setEnquiry(prev => {
+      if (!prev) return prev;
+      const prior = (prev.payload.payment ?? {}) as PaymentInfo;
+      const merged = { ...prior, ...result, email: prior.email } as PaymentInfo;
+      return { ...prev, payload: { ...prev.payload, payment: merged } };
+    });
+    setDraft(prev => {
+      if (!prev) return prev;
+      const prior = (prev.payload.payment ?? {}) as PaymentInfo;
+      const merged = { ...prior, ...result, email: prior.email } as PaymentInfo;
+      return { ...prev, payload: { ...prev.payload, payment: merged } };
+    });
     refreshNotes(enquiry?.id ?? '');
   };
 
