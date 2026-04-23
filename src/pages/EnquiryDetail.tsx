@@ -398,7 +398,7 @@ export default function EnquiryDetail() {
       return 'Please select a demo outcome before moving on.';
     }
     if (currentStage === 'PAYMENT_LINK_SENT' && !d.payload.payment?.status) {
-      return 'Please capture the payment outcome (Paid / Pending / Failed) before moving on.';
+      return 'Generate a link, mark as paid offline, or defer collection before moving on.';
     }
     return null;
   };
@@ -468,13 +468,18 @@ export default function EnquiryDetail() {
     refreshNotes(enquiry?.id ?? '');
   };
 
-  // Manually flip payment outcome (PAID / PENDING / FAILED) — used by the
-  // Payment stage outcome panel and unlocks the onboarding action when PAID.
-  const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED') => {
+  // Manually flip payment outcome (PAID / PENDING / FAILED / DEFERRED) — used by the
+  // Payment stage outcome panel and unlocks the onboarding action when PAID/DEFERRED.
+  const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => {
     if (!enquiry) return;
     const cur = (draft?.payload.payment ?? {}) as PaymentInfo;
     const prevStatus = cur.status ?? null;
-    const nextPayment: PaymentInfo = { ...cur, status, paid_at: status === 'PAID' ? new Date().toISOString() : cur.paid_at };
+    const nextPayment: PaymentInfo = {
+      ...cur,
+      status,
+      paid_at: status === 'PAID' ? (cur.paid_at ?? new Date().toISOString()) : cur.paid_at,
+      deferred_at: status === 'DEFERRED' ? (cur.deferred_at ?? new Date().toISOString()) : cur.deferred_at,
+    };
     const nextPayload = { ...draft!.payload, payment: nextPayment };
     const { error } = await supabase.from('enquiries')
       .update({ payload: nextPayload as unknown as never })
@@ -482,7 +487,6 @@ export default function EnquiryDetail() {
     if (error) { toast.error(error.message); return; }
     setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
     setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
-    // Log the outcome to the enquiry timeline for traceability.
     if (prevStatus !== status) {
       const amt = cur.amount ? ` ${fmtINR(cur.amount)}` : '';
       await supabase.from('enquiry_notes').insert({
@@ -492,6 +496,50 @@ export default function EnquiryDetail() {
       await refreshNotes(enquiry.id);
     }
     toast.success(`Payment marked ${status}`);
+  };
+
+  // Apply offline / deferred payment results from their dialogs.
+  const applyOfflinePayment = (r: OfflinePaymentResult) => {
+    if (!enquiry || !draft) return;
+    const next: PaymentInfo = {
+      ...(draft.payload.payment ?? {}),
+      status: r.status,
+      method: r.method,
+      amount: r.amount,
+      currency: r.currency,
+      reference: r.reference,
+      channel: r.channel,
+      paid_at: r.paid_at,
+      created_at: r.created_at,
+    };
+    const nextPayload = { ...draft.payload, payment: next };
+    supabase.from('enquiries').update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id)
+      .then(({ error }) => {
+        if (error) { toast.error(error.message); return; }
+        setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+        setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+        refreshNotes(enquiry.id);
+      });
+  };
+
+  const applyDeferredPayment = (r: DeferredPaymentResult) => {
+    if (!enquiry || !draft) return;
+    const next: PaymentInfo = {
+      ...(draft.payload.payment ?? {}),
+      status: r.status,
+      method: r.method,
+      reason: r.reason,
+      deferred_at: r.deferred_at,
+      created_at: r.created_at,
+    };
+    const nextPayload = { ...draft.payload, payment: next };
+    supabase.from('enquiries').update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id)
+      .then(({ error }) => {
+        if (error) { toast.error(error.message); return; }
+        setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+        setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+        refreshNotes(enquiry.id);
+      });
   };
 
   const addNote = async () => {
