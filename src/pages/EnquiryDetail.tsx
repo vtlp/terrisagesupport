@@ -564,8 +564,10 @@ export default function EnquiryDetail() {
       return;
     }
     const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
-    if (!enquiry.onboarding_pack_sent && !paymentPaid) {
-      toast.error('Mark the payment as Paid before sending the onboarding form.');
+    const trialMode = draft.payload.payment?.mode === 'TRIAL_FIRST';
+    const trialValid = trialMode && !!draft.payload.payment?.trial?.start && !!draft.payload.payment?.trial?.end;
+    if (!enquiry.onboarding_pack_sent && !paymentPaid && !trialValid) {
+      toast.error('Mark the payment as Paid, or set a trial period, before sending the onboarding form.');
       return;
     }
     if (!(await requireClean('send the onboarding form'))) return;
