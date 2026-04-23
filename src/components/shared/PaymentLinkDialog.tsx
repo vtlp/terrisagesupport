@@ -42,8 +42,8 @@ export interface PaymentLinkResult {
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  /** 'INITIAL' uses enquiry_id; 'RENEWAL' uses account_id. */
-  purpose?: 'INITIAL' | 'RENEWAL';
+  /** 'INITIAL' uses enquiry_id; 'RENEWAL' / 'TRIAL_CONVERSION' use account_id. */
+  purpose?: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION';
   enquiryId?: string;
   accountId?: string;
   defaults: {
@@ -106,7 +106,7 @@ export function PaymentLinkDialog({
       toast.error('Missing enquiry reference.');
       return;
     }
-    if (purpose === 'RENEWAL' && !accountId) {
+    if ((purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION') && !accountId) {
       toast.error('Missing account reference.');
       return;
     }
@@ -134,7 +134,7 @@ export function PaymentLinkDialog({
       toast.error(msg);
       return;
     }
-    toast.success(purpose === 'RENEWAL' ? 'Renewal link created' : 'Payment link created');
+    toast.success(purpose === 'RENEWAL' ? 'Renewal link created' : purpose === 'TRIAL_CONVERSION' ? 'Trial conversion link created' : 'Payment link created');
     onSuccess(data.payment as PaymentLinkResult);
     onOpenChange(false);
   };
@@ -145,7 +145,7 @@ export function PaymentLinkDialog({
         <DialogHeader className="space-y-1">
           <DialogTitle className="flex items-center gap-2 text-base">
             <LinkIcon className="h-4 w-4" />
-            {purpose === 'RENEWAL' ? 'Generate renewal link' : 'Generate payment link'}
+            {purpose === 'RENEWAL' ? 'Generate renewal link' : purpose === 'TRIAL_CONVERSION' ? 'Generate trial conversion link' : 'Generate payment link'}
           </DialogTitle>
         </DialogHeader>
 
