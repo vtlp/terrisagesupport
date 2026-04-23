@@ -142,6 +142,11 @@ export function BillingTab({ accountId }: { accountId: string }) {
       seats_purchased: settings.seats_purchased,
       gst_pct: settings.gst_pct,
       next_renewal_at: settings.next_renewal_at, status: settings.status,
+      country: settings.country,
+      auto_renew: settings.auto_renew,
+      subscription_started_at: settings.subscription_started_at,
+      current_period_start: settings.current_period_start,
+      current_period_end: settings.current_period_end,
     };
     const { error } = settings.id
       ? await supabase.from('account_billing_settings').update(payload).eq('id', settings.id)
