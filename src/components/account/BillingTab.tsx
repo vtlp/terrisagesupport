@@ -215,6 +215,37 @@ export function BillingTab({ accountId }: { accountId: string }) {
     if (error) toast.error(error.message); else { toast.success('Deleted'); load(); }
   };
 
+  const openRenew = () => {
+    setRenewDecision('RENEW');
+    setRenewSeats(settings.seats_purchased);
+    setRenewNotes('');
+    setRenewOpen(true);
+  };
+
+  const submitRenewal = async () => {
+    if (!settings.current_period_end) { toast.error('No active billing period set.'); return; }
+    setRenewBusy(true);
+    const seatsArg = renewDecision === 'RENEW' || renewDecision === 'CANCEL'
+      ? null
+      : Math.max(0, renewSeats);
+    const { error } = await supabase.rpc('renew_subscription', {
+      _account_id: accountId,
+      _decision: renewDecision,
+      _new_seats: seatsArg,
+      _notes: renewNotes.trim() || null,
+    });
+    setRenewBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(renewDecision === 'CANCEL' ? 'Cancellation scheduled' : 'Renewal recorded');
+    setRenewOpen(false);
+    load();
+  };
+
+  const daysToRenewal = settings.current_period_end
+    ? differenceInCalendarDays(new Date(settings.current_period_end), new Date())
+    : null;
+  const renewalWindow = daysToRenewal !== null && daysToRenewal <= 30 && daysToRenewal >= -7;
+
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;
 
   return (
