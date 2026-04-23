@@ -169,6 +169,7 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <CrmSyncChip />
         <ThemeToggle />
 
         {/* Notifications */}
