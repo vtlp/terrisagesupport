@@ -3,13 +3,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone } from 'lucide-react';
+import {
+  Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone,
+  Settings2, RefreshCw, Activity, AlertTriangle,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { AdjustSeatsDialog } from './AdjustSeatsDialog';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FULFILLED';
 
@@ -31,6 +35,15 @@ interface Capacity {
   seats_available: number | null;
 }
 
+interface Snapshot {
+  allocated: number;
+  consumed: number;
+  reserved: number;
+  available: number;
+  reported_at: string;
+  source: string;
+}
+
 const STATUS_COLORS: Record<Status, string> = {
   PENDING: 'bg-warning/15 text-warning',
   APPROVED: 'bg-primary/15 text-primary',
@@ -47,6 +60,7 @@ interface Props {
 export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   const [rows, setRows] = useState<SeatRequest[]>([]);
   const [capacity, setCapacity] = useState<Capacity | null>(null);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [mockOpen, setMockOpen] = useState(false);
@@ -54,10 +68,11 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   const [mockEmail, setMockEmail] = useState<string>('');
   const [mockReason, setMockReason] = useState<string>('');
   const [submittingMock, setSubmittingMock] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [reqRes, capRes] = await Promise.all([
+    const [reqRes, capRes, snapRes] = await Promise.all([
       supabase
         .from('seat_requests')
         .select('*')
@@ -68,14 +83,31 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
         .select('seats_purchased, seats_used, seats_available')
         .eq('account_id', accountId)
         .maybeSingle(),
+      supabase
+        .from('seat_usage_snapshots')
+        .select('allocated, consumed, reserved, available, reported_at, source')
+        .eq('account_id', accountId)
+        .maybeSingle(),
     ]);
     if (reqRes.error) toast.error(reqRes.error.message);
     setRows((reqRes.data ?? []) as SeatRequest[]);
     setCapacity((capRes.data ?? null) as Capacity | null);
+    setSnapshot((snapRes.data ?? null) as Snapshot | null);
     setLoading(false);
   }, [accountId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Realtime: refresh when CRM pushes a new snapshot or seats change
+  useEffect(() => {
+    const channel = supabase
+      .channel(`seats-${accountId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'seat_usage_snapshots', filter: `account_id=eq.${accountId}` }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'seat_change_events', filter: `account_id=eq.${accountId}` }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'seat_requests', filter: `account_id=eq.${accountId}` }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [accountId, load]);
 
   const setStatus = async (id: string, status: Status) => {
     setBusyId(id);
@@ -119,11 +151,27 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   };
 
   const purchased = capacity?.seats_purchased ?? 0;
-  const used = capacity?.seats_used ?? activeSeatsUsed;
-  const available = Math.max(0, purchased - used);
+  // Prefer CRM-reported "consumed" as in-use; fall back to console's computed used
+  const inUse = snapshot?.consumed ?? capacity?.seats_used ?? activeSeatsUsed;
+  const available = Math.max(0, purchased - inUse);
   const pendingRequested = rows
     .filter(r => r.status === 'PENDING' || r.status === 'APPROVED')
     .reduce((acc, r) => acc + r.requested_seats, 0);
+
+  const reportedAt = snapshot?.reported_at ? new Date(snapshot.reported_at) : null;
+  const ageMs = reportedAt ? Date.now() - reportedAt.getTime() : null;
+  let syncTone: 'success' | 'warning' | 'destructive' | 'muted' = 'muted';
+  if (ageMs !== null) {
+    if (ageMs < 60 * 60 * 1000) syncTone = 'success';
+    else if (ageMs < 24 * 60 * 60 * 1000) syncTone = 'warning';
+    else syncTone = 'destructive';
+  }
+  const syncToneClass: Record<typeof syncTone, string> = {
+    success: 'bg-success/15 text-success',
+    warning: 'bg-warning/15 text-warning',
+    destructive: 'bg-destructive/15 text-destructive',
+    muted: 'bg-muted text-muted-foreground',
+  };
 
   if (loading) {
     return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;
@@ -133,19 +181,40 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
     <div className="space-y-4">
       {/* Capacity summary */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Seat capacity</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <div>
+            <CardTitle className="text-base">Seat capacity</CardTitle>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge className={`text-[10px] gap-1 ${syncToneClass[syncTone]}`}>
+                <Activity className="h-3 w-3" />
+                {reportedAt
+                  ? `CRM sync · ${formatDistanceToNow(reportedAt, { addSuffix: true })}`
+                  : 'CRM has not reported yet'}
+              </Badge>
+              {snapshot?.source && reportedAt && (
+                <span className="text-[11px] text-muted-foreground">source: {snapshot.source}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh</Button>
+            <Button size="sm" onClick={() => setAdjustOpen(true)}><Settings2 className="h-3.5 w-3.5 mr-1" />Adjust seats</Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <CapacityStat icon={<Users className="h-4 w-4 text-primary" />} label="Allocated" value={purchased} hint="Seats purchased on plan" />
-            <CapacityStat icon={<Check className="h-4 w-4 text-success" />} label="In use" value={used} hint="Active team members" />
+            <CapacityStat icon={<Check className="h-4 w-4 text-success" />} label="In use (CRM)" value={inUse} hint={snapshot ? 'Reported by CRM' : 'Console-computed (no CRM data yet)'} />
             <CapacityStat icon={<UserPlus className="h-4 w-4 text-accent" />} label="Available" value={available} hint="Free seats remaining" />
             <CapacityStat icon={<Clock className="h-4 w-4 text-warning" />} label="Requested" value={pendingRequested} hint="Pending / approved requests" />
           </div>
-          {used > purchased && purchased > 0 && (
-            <p className="mt-3 text-xs text-destructive">
-              Over capacity: {used - purchased} seat{used - purchased === 1 ? '' : 's'} in use beyond what is allocated.
+          {snapshot && snapshot.reserved > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground">CRM also reports {snapshot.reserved} reserved seat(s).</p>
+          )}
+          {inUse > purchased && purchased > 0 && (
+            <p className="mt-3 text-xs text-destructive flex items-center gap-1">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Over capacity: {inUse - purchased} seat{inUse - purchased === 1 ? '' : 's'} in use beyond what is allocated.
             </p>
           )}
         </CardContent>
@@ -201,6 +270,16 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Adjust seats dialog */}
+      <AdjustSeatsDialog
+        open={adjustOpen}
+        onOpenChange={setAdjustOpen}
+        accountId={accountId}
+        currentSeats={purchased}
+        inUseSeats={inUse}
+        onApplied={load}
+      />
 
       {/* Mock Terrisage app request dialog */}
       <Dialog open={mockOpen} onOpenChange={setMockOpen}>
