@@ -1503,7 +1503,9 @@ function StageFlow({
 }
 
 function StageOutcomePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  onOpenPaymentDialog, onSetPaymentStatus, onSetPaymentMode, onSetTrialDate,
+  onCancelPaymentLink, onRefreshPaymentStatus, onDraftPaymentEmail, paymentBusy,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1513,6 +1515,12 @@ function StageOutcomePanel({
   onDemoOutcomeChange: (v: string) => void;
   onOpenPaymentDialog: () => void;
   onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
+  onSetPaymentMode: (m: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST') => void;
+  onSetTrialDate: (k: 'start' | 'end', v: string) => void;
+  onCancelPaymentLink: () => void;
+  onRefreshPaymentStatus: () => void;
+  onDraftPaymentEmail: () => void;
+  paymentBusy: boolean;
 }) {
   const isLost = stage === 'LOST';
   const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
@@ -1536,6 +1544,9 @@ function StageOutcomePanel({
           stage={stage} draft={draft} setField={setField} setPayload={setPayload}
           onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange}
           onOpenPaymentDialog={onOpenPaymentDialog} onSetPaymentStatus={onSetPaymentStatus}
+          onSetPaymentMode={onSetPaymentMode} onSetTrialDate={onSetTrialDate}
+          onCancelPaymentLink={onCancelPaymentLink} onRefreshPaymentStatus={onRefreshPaymentStatus}
+          onDraftPaymentEmail={onDraftPaymentEmail} paymentBusy={paymentBusy}
         />
       </div>
     </div>
