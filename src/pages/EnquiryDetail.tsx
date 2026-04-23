@@ -501,6 +501,93 @@ export default function EnquiryDetail() {
     toast.success(`Payment marked ${status}`);
   };
 
+  // Set the billing mode (Pay first vs Trial first) on the enquiry payment.
+  const setPaymentMode = async (mode: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST') => {
+    if (!enquiry || !draft) return;
+    const cur = (draft.payload.payment ?? {}) as PaymentInfo;
+    const next: PaymentInfo = { ...cur, mode };
+    const nextPayload = { ...draft.payload, payment: next };
+    const { error } = await supabase.from('enquiries')
+      .update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id);
+    if (error) { toast.error(error.message); return; }
+    setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    toast.success(`Billing mode: ${mode === 'TRIAL_FIRST' ? 'Trial first' : 'Pay before account'}`);
+  };
+
+  // Update trial start/end dates on the enquiry payment.
+  const setTrialDate = async (key: 'start' | 'end', value: string) => {
+    if (!enquiry || !draft) return;
+    const cur = (draft.payload.payment ?? {}) as PaymentInfo;
+    const trial = { ...(cur.trial ?? {}), [key]: value || undefined };
+    const next: PaymentInfo = { ...cur, trial };
+    const nextPayload = { ...draft.payload, payment: next };
+    const { error } = await supabase.from('enquiries')
+      .update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id);
+    if (error) { toast.error(error.message); return; }
+    setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+  };
+
+  // Cancel the active Razorpay payment link via the backend edge function.
+  const cancelPaymentLink = async () => {
+    if (!enquiry || !draft?.payload.payment?.link_id) return;
+    if (!confirm('Cancel this payment link? The customer will no longer be able to pay against it.')) return;
+    setPaymentBusy(true);
+    const { data, error } = await supabase.functions.invoke('razorpay-cancel-payment-link', {
+      body: { link_id: draft.payload.payment.link_id, purpose: 'INITIAL', enquiry_id: enquiry.id },
+    });
+    setPaymentBusy(false);
+    if (error || !data?.success) { toast.error(data?.error || error?.message || 'Failed to cancel link'); return; }
+    toast.success('Payment link cancelled');
+    // Reload enquiry payload to pick up the server update.
+    const { data: e } = await supabase.from('enquiries').select('payload').eq('id', enquiry.id).maybeSingle();
+    if (e) {
+      const payload = (e.payload ?? {}) as EnquiryPayload;
+      setEnquiry(prev => prev ? { ...prev, payload } : prev);
+      setDraft(prev => prev ? { ...prev, payload } : prev);
+    }
+  };
+
+  // Refresh the link status from Razorpay (manual poll).
+  const refreshPaymentStatus = async () => {
+    if (!enquiry || !draft?.payload.payment?.link_id) return;
+    setPaymentBusy(true);
+    const { data, error } = await supabase.functions.invoke('razorpay-link-status', {
+      body: { link_id: draft.payload.payment.link_id, purpose: 'INITIAL', enquiry_id: enquiry.id },
+    });
+    setPaymentBusy(false);
+    if (error || !data?.success) { toast.error(data?.error || error?.message || 'Failed to refresh status'); return; }
+    toast.success(`Status: ${data.status ?? 'unchanged'}`);
+    const { data: e } = await supabase.from('enquiries').select('payload').eq('id', enquiry.id).maybeSingle();
+    if (e) {
+      const payload = (e.payload ?? {}) as EnquiryPayload;
+      setEnquiry(prev => prev ? { ...prev, payload } : prev);
+      setDraft(prev => prev ? { ...prev, payload } : prev);
+    }
+  };
+
+  // Persist email-draft / mark-sent timestamps to the enquiry payment payload.
+  const recordEmailAction = async (kind: 'drafted' | 'sent', subject: string, body: string) => {
+    if (!enquiry || !draft) return;
+    const cur = (draft.payload.payment ?? {}) as PaymentInfo;
+    const nowIso = new Date().toISOString();
+    const email = {
+      ...(cur.email ?? {}),
+      subject, body,
+      ...(kind === 'drafted' ? { last_drafted_at: nowIso } : { last_sent_at: nowIso }),
+    };
+    const next: PaymentInfo = {
+      ...cur, email,
+      ...(kind === 'sent' ? { status: 'EMAIL_SENT' as const } : cur.status ? {} : { status: 'EMAIL_DRAFTED' as const }),
+    };
+    const nextPayload = { ...draft.payload, payment: next };
+    await supabase.from('enquiries').update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id);
+    setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+    if (kind === 'sent') toast.success('Email marked as sent');
+  };
+
   const addNote = async () => {
     if (!enquiry || !newNote.trim()) return;
     if (!(await requireClean('add a note'))) return;
