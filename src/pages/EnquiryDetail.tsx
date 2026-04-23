@@ -60,9 +60,14 @@ interface PaymentInfo {
   short_url?: string;
   amount?: number;
   currency?: string;
-  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING';
+  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING' | 'EXPIRED' | 'EMAIL_DRAFTED' | 'EMAIL_SENT' | 'PAYMENT_PENDING';
   paid_at?: string;
   created_at?: string;
+  expires_at?: string;
+  outdated?: boolean;
+  mode?: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST';
+  trial?: { start?: string | null; end?: string | null };
+  email?: { last_drafted_at?: string; last_sent_at?: string; subject?: string; body?: string };
   breakdown?: Record<string, unknown>;
 }
 
