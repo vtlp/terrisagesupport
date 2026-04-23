@@ -98,7 +98,7 @@ interface Submission {
 
 const stageLabels: Record<Stage, string> = {
   NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Scheduled',
-  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment Link Sent',
+  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment',
   ONBOARDING_PACK_SENT: 'Onboarding Sent',
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
@@ -852,12 +852,18 @@ export default function EnquiryDetail() {
             <div className="p-4 space-y-2.5">
               <div className="text-sm font-semibold text-foreground mb-1">Actions</div>
               {(() => {
-                const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
+                const p = draft.payload.payment;
+                const paymentPaid = (p?.status ?? null) === 'PAID';
+                const trialMode = p?.mode === 'TRIAL_FIRST';
+                const trialValid = trialMode && !!p?.trial?.start && !!p?.trial?.end
+                  && new Date(p.trial.end) >= new Date(p.trial.start);
                 const onboardingSent = enquiry.onboarding_pack_sent || draft.onboarding_pack_sent;
-                const onboardEnabled = onboardingSent || paymentPaid;
+                const onboardEnabled = onboardingSent || paymentPaid || trialValid;
                 const blockedReason = onboardEnabled
                   ? null
-                  : 'Mark payment as Paid to unlock onboarding.';
+                  : trialMode
+                    ? 'Set valid trial start and end dates to unlock onboarding.'
+                    : 'Mark payment as Paid, or switch to Trial-First with valid dates, to unlock onboarding.';
                 return (
                   <>
                     <div className="flex items-center gap-1.5">
@@ -1834,9 +1840,10 @@ function ActiveStagePanel({
           <div className="rounded-md border border-dashed bg-muted/10 p-3 text-xs text-muted-foreground space-y-1">
             <p className="font-medium text-foreground">No payment link needed at this stage</p>
             <p>
-              The customer will be onboarded on a trial. Once the account is created, generate the
-              trial conversion link from <span className="font-medium text-foreground">Account &rsaquo; Billing</span>
-              when they decide to convert.
+              The customer will be onboarded on a trial. You can send the onboarding form straight away
+              once trial dates are set. Once the account is created, generate the trial conversion link
+              from <span className="font-medium text-foreground">Account &rsaquo; Billing</span> when they
+              decide to convert.
             </p>
           </div>
         ) : (
