@@ -1554,7 +1554,8 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
 }
 
 function ActiveStagePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  onOpenPaymentDialog, onOpenOfflineDialog, onOpenDeferDialog, onSetPaymentStatus,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1563,7 +1564,9 @@ function ActiveStagePanel({
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
   onOpenPaymentDialog: () => void;
-  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
+  onOpenOfflineDialog: () => void;
+  onOpenDeferDialog: () => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => void;
 }) {
   const outcome = (draft.payload.outcome as string) || '';
 
@@ -1708,6 +1711,12 @@ function ActiveStagePanel({
           <Button size="sm" onClick={onOpenPaymentDialog}>
             {payment?.short_url ? 'Generate new link' : 'Generate payment link'}
           </Button>
+          <Button size="sm" variant="outline" onClick={onOpenOfflineDialog}>
+            Mark as paid (offline)
+          </Button>
+          <Button size="sm" variant="outline" onClick={onOpenDeferDialog}>
+            Defer · collect later
+          </Button>
           <div className="flex items-center gap-2 ml-auto">
             <Label className="text-xs text-muted-foreground">Mark as</Label>
             <Select value={status ?? NONE} onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
@@ -1720,6 +1729,7 @@ function ActiveStagePanel({
             </Select>
           </div>
         </div>
+
       </div>
     );
   }
