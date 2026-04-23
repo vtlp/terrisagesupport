@@ -15,7 +15,7 @@ const corsHeaders = {
 interface Body {
   enquiry_id?: string;
   account_id?: string;
-  purpose?: 'INITIAL' | 'RENEWAL';
+  purpose?: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION';
   plan_name: string;
   billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   seats: number;
@@ -67,8 +67,8 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    if (purpose === 'RENEWAL' && !body.account_id) {
-      return new Response(JSON.stringify({ success: false, error: 'account_id required for RENEWAL purpose' }), {
+    if ((purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION') && !body.account_id) {
+      return new Response(JSON.stringify({ success: false, error: `account_id required for ${purpose} purpose` }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -95,8 +95,8 @@ Deno.serve(async (req) => {
       const amountPaise = Math.round(body.total * 100);
       const auth = btoa(`${keyId}:${keySecret}`);
 
-      const refId = purpose === 'RENEWAL'
-        ? `acc_${body.account_id}_${Date.now()}`
+      const refId = (purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION')
+        ? `acc_${body.account_id}_${purpose.toLowerCase()}_${Date.now()}`
         : `enq_${body.enquiry_id}_${Date.now()}`;
 
       const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
           currency: 'INR',
           accept_partial: false,
           expire_by: Math.floor(expiresAt.getTime() / 1000),
-          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}${purpose === 'RENEWAL' ? ' · Renewal' : ''}`,
+          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}${purpose === 'RENEWAL' ? ' · Renewal' : purpose === 'TRIAL_CONVERSION' ? ' · Trial conversion' : ''}`,
           customer: {
             name: body.customer.name,
             email: body.customer.email,
@@ -223,6 +223,36 @@ Deno.serve(async (req) => {
         entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
         summary: `[Renewal] Payment link generated ${fmtINR(body.total)}`,
         details: { module: 'renewal', link_id: payment.link_id, seats: body.seats, total: body.total },
+      });
+
+      return new Response(JSON.stringify({ success: true, payment }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (purpose === 'TRIAL_CONVERSION' && body.account_id) {
+      await admin.from('account_billing_settings').update({
+        trial_link_id: payment.link_id,
+        trial_link_short_url: payment.short_url,
+        trial_link_amount: payment.amount,
+        trial_link_seats: body.seats,
+        trial_link_currency: 'INR',
+        trial_link_status: 'CREATED',
+        trial_link_created_at: createdAtIso,
+        trial_link_expires_at: expiresAtIso,
+        trial_link_outdated: false,
+        trial_paid_at: null,
+        trial_payment_reference: null,
+      }).eq('account_id', body.account_id);
+
+      await admin.from('account_notes').insert({
+        account_id: body.account_id,
+        note_text: `[Trial] Conversion link generated ${fmtINR(body.total)} · ${payment.short_url}`,
+      });
+      await admin.from('activity_log').insert({
+        entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
+        summary: `[Trial] Conversion link generated ${fmtINR(body.total)}`,
+        details: { module: 'trial', link_id: payment.link_id, seats: body.seats, total: body.total },
       });
 
       return new Response(JSON.stringify({ success: true, payment }), {
