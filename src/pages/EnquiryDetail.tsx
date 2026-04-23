@@ -1451,7 +1451,8 @@ function StageFlow({
 }
 
 function StageOutcomePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  onOpenPaymentDialog, onOpenOfflineDialog, onOpenDeferDialog, onSetPaymentStatus,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1460,7 +1461,9 @@ function StageOutcomePanel({
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
   onOpenPaymentDialog: () => void;
-  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
+  onOpenOfflineDialog: () => void;
+  onOpenDeferDialog: () => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => void;
 }) {
   const isLost = stage === 'LOST';
   const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
@@ -1483,7 +1486,10 @@ function StageOutcomePanel({
         <ActiveStagePanel
           stage={stage} draft={draft} setField={setField} setPayload={setPayload}
           onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange}
-          onOpenPaymentDialog={onOpenPaymentDialog} onSetPaymentStatus={onSetPaymentStatus}
+          onOpenPaymentDialog={onOpenPaymentDialog}
+          onOpenOfflineDialog={onOpenOfflineDialog}
+          onOpenDeferDialog={onOpenDeferDialog}
+          onSetPaymentStatus={onSetPaymentStatus}
         />
       </div>
     </div>
@@ -1522,9 +1528,15 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
     );
   } else if (stage === 'PAYMENT_LINK_SENT') {
     const p = draft.payload.payment;
-    body = p?.short_url
-      ? <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>
-      : <span className="text-muted-foreground">No link generated</span>;
+    if (p?.status === 'DEFERRED') {
+      body = <span><span className="font-medium">Deferred</span>{p.reason ? ` · ${p.reason}` : ''}</span>;
+    } else if (p?.method === 'OFFLINE') {
+      body = <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">PAID offline</span>{p.reference ? ` · ref ${p.reference}` : ''}</span>;
+    } else if (p?.short_url) {
+      body = <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>;
+    } else {
+      body = <span className="text-muted-foreground">Not resolved yet</span>;
+    }
   } else if (stage === 'ONBOARDING_PACK_SENT') {
     body = <span>Onboarding form sent</span>;
   } else if (stage === 'ACCOUNT_CREATED') {
