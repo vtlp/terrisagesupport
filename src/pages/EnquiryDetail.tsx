@@ -1711,6 +1711,12 @@ function ActiveStagePanel({
           <Button size="sm" onClick={onOpenPaymentDialog}>
             {payment?.short_url ? 'Generate new link' : 'Generate payment link'}
           </Button>
+          <Button size="sm" variant="outline" onClick={onOpenOfflineDialog}>
+            Mark as paid (offline)
+          </Button>
+          <Button size="sm" variant="outline" onClick={onOpenDeferDialog}>
+            Defer · collect later
+          </Button>
           <div className="flex items-center gap-2 ml-auto">
             <Label className="text-xs text-muted-foreground">Mark as</Label>
             <Select value={status ?? NONE} onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
@@ -1723,6 +1729,7 @@ function ActiveStagePanel({
             </Select>
           </div>
         </div>
+
       </div>
     );
   }
