@@ -1,112 +1,85 @@
 
 
-## Marketing module — full backend + admin editing wired to live data
+# Seats / Billing / CRM-Sync — Implementation Plan (with gap remedies)
 
-Confirming: yes, this plan includes the **complete backend** (DB tables, RLS, indexes, triggers) plus the UI rewiring. The existing `marketing_*` tables stay; new ones cover the gaps (targets, settings, typed records, simple cost items).
+End-to-end build to reconcile **CRM user states** (Invited / Active / Temp-deactivated / Deletion-requested / Deleted) with **Support Console billing & seat allocation**, including renewals, mid-cycle proration, and superuser-transfer governance.
 
----
+## 1. Scope confirmation
 
-### 1. Database — new tables (admin write, staff read)
+- Mid-cycle seat increases → **prorated invoice** auto-generated (days remaining ÷ cycle days × seat-rate × delta + GST). Confirmed in `apply_seat_delta`.
+- **G5 (Superuser transfer)** remedy: when a superuser-transfer is initiated, notify **all support users** (broadcast notification) AND create a **calendar event for next day** on every support user's calendar to follow up.
+- **G8 (open-work reassignment signal)** → excluded as requested.
 
-**`marketing_targets`** — quarterly + total target per tenancy per year
-`(id, year int, tenancy_type tenancy_type, q1 int, q2 int, q3 int, q4 int, total_target int, created_by, updated_at)` · UNIQUE (year, tenancy_type)
+## 2. Database migration
 
-**`marketing_settings`** — single-row admin overrides (e.g. manual Total Spend)
-`(id, total_spend_override numeric, updated_by, updated_at)` · seeded with one row.
+**Extend `account_billing_settings`**
+- `subscription_started_at`, `current_period_start`, `current_period_end`, `auto_renew bool default true`, `cancellation_requested_at`, `cancellation_effective_at`, `country text default 'IN'`.
 
-**`marketing_referrals`**
-`(id, referrer_name, referrer_phone, referrer_email, referred_company, city, status text, notes, created_by, created_at, updated_at)`
+**New tables**
+- `seat_usage_snapshots` (account_id PK, allocated, reserved, consumed, available, members_jsonb, reported_at, source).
+- `seat_change_events` (account_id, delta, reason `ONBOARDING|REQUEST_FULFILLED|RENEWAL_INCREASE|RENEWAL_DECREASE|MANUAL|SUPERUSER_TRANSFER`, effective_at, prorated_amount, invoice_id, created_by).
+- `account_renewal_decisions` (account_id, period_end, decision `RENEW|RENEW_INCREASE|RENEW_DECREASE|CANCEL`, new_seats, notes, decided_by).
+- `superuser_transfers` (account_id, from_seat_id, to_seat_id, status `INITIATED|COMPLETED|CANCELLED`, initiated_by, initiated_at, completed_at, follow_up_event_id).
 
-**`marketing_contacts`**
-`(id, name, title, company, phone, email, city, notes, created_by, created_at, updated_at)`
+**Extend `account_seats`**: `crm_state` (INVITED/ACTIVE/TEMP_DEACTIVATED/DELETION_REQUESTED/DELETED), `invitation_expires_at`, `last_active_at`, `is_superuser bool`.
 
-**`marketing_champions`**
-`(id, name, company, role, reach int, city, notes, created_by, created_at, updated_at)`
+**Extend `account_invoices`**: `kind` enum (`CYCLE|PRORATION|RENEWAL`).
 
-**`marketing_events`**
-`(id, event_name, location, city, event_date date, attendees int, notes, created_by, created_at, updated_at)`
+**RPCs**
+- `apply_seat_delta(_account_id, _delta, _reason)` → updates `seats_purchased`, computes proration, drafts a `PRORATION` invoice if mid-cycle, writes `seat_change_events`.
+- `compute_proration(_account_id, _delta)` → returns days_remaining + amount + GST preview.
+- `renew_subscription(_account_id, _decision, _new_seats, _notes)` → closes current cycle, generates `RENEWAL` invoice, advances period, releases DELETED seats.
+- `initiate_superuser_transfer(_account_id, _from_seat_id, _to_seat_id)` → writes transfer row, broadcasts notification to all support users, creates calendar event for tomorrow per support user.
 
-**`marketing_cost_items`** — the simple Title/Description/Amount spend records you described (separate from existing campaign-linked `marketing_costs`)
-`(id, title, description, amount numeric, cost_type 'ONLINE'|'OFFLINE', spend_date date, city, notes, created_by, created_at, updated_at)`
+**Cron additions** (15-min job already exists):
+- `scan_renewals_due()` → notifications at T-14 / T-7 / T-1 days.
+- `scan_crm_sync_stale()` → notify if no snapshot in 24h on LIVE accounts.
 
-**RLS on all new tables**
-- Admin: full access (`has_role(auth.uid(), 'admin')`)
-- Staff: SELECT only (read for visibility — actual page is admin-gated anyway)
+## 3. Edge functions
 
-**Indexes**: city on the 5 record tables (geography count); (year, tenancy_type) on targets; (cost_type, spend_date) on cost items.
+**Extend** `/seat-capacity` → return `allocated, reserved, consumed, available, requested, plan, cycle, current_period_start/end, country, owner_name, auto_renew`.
 
-**Triggers**: `update_updated_at_column` on each new table.
+**New**
+- `POST /seat-usage` (CRM → Console heartbeat with full member roster + per-member state).
+- `GET /account-profile` (Console → CRM reads subscription metadata).
+- `GET /seat-events?since=<ts>` (CRM polls allocation deltas to unlock invite slots).
 
----
+All authenticated via existing `x-account-api-key`.
 
-### 2. Overview tab (no UI restructure, behaviour rewired)
+## 4. Gap → remedy map
 
-- **Remove tiles**: "Cold Call Leads" and "Lead Sources".
-- **Quarterly target cards** (Agency + Builder):
-  - Q1–Q4 numbers + a new **Total Target** field, all click-to-edit (admin only). Default render is read-only chip; click → inline input → save → back to read-only.
-  - Progress denominator = quarter target. Numerator = `accounts.status='LIVE' AND tenancy_type=X` created in that calendar quarter.
-- **Cost summary tiles**:
-  - Online = SUM(`marketing_cost_items` WHERE cost_type='ONLINE')
-  - Offline = SUM(... 'OFFLINE')
-  - Total Spend = `marketing_settings.total_spend_override` (admin inline-editable; not auto-summed, per your note)
-- **Geography Coverage chips**: cities from `lookup_cities`. Count per chip = number of records across `marketing_referrals + contacts + champions + events + cost_items` with matching `city`.
+| # | Gap | Remedy in this build |
+|---|---|---|
+| G1 | No "Reserved" concept | `seat_usage_snapshots.reserved` + UI tile |
+| G2 | No CRM usage push | `POST /seat-usage` endpoint |
+| G3 | No invite TTL enforcement | CRM owns TTL; Console reads `invitation_expires_at` and excludes expired from Reserved |
+| G4 | No cycle-end seat release | `renew_subscription` releases `DELETED` seats at period rollover |
+| G5 | No superuser-transfer flow | New `superuser_transfers` table + `initiate_superuser_transfer` RPC. Notifies **all support users** and auto-creates a follow-up **calendar event for next day** on each support user's calendar |
+| G6 | No CRM role visibility | `/seat-usage` payload carries `role` + `permissions[]` per member |
+| G7 | Single seat counter, no audit | `seat_change_events` audit log |
+| G9 | No cycle window stored | `current_period_start/end` columns + auto-set trigger |
+| G10 | Reserved/Consumed split missing in UI | New 5-tile capacity panel |
 
----
+## 5. UI changes (Support Console)
 
-### 3. Pipeline KPIs tab — live data
+**Account → Seats tab** (`SeatsAndRequestsTab.tsx`): replace 4-tile block with **5 tiles** — Allocated · Reserved · Consumed · Available · Requested. Add member roster mirroring CRM with state badges. New actions: **Adjust seats** (with live proration preview), **Provision logins**, **Initiate superuser transfer**.
 
-Swap `seedEnquiries`/`seedAccounts`/`seedTickets` for live queries on `enquiries`, `accounts`, `tickets`. Same five-stage funnel, same source pie, same operational KPIs. No UI change.
+**Account → Billing tab** (`BillingTab.tsx`): add subscription start, current period, auto-renew toggle, country. Within 30 days of period-end show renewal action card (Renew / Renew + adjust / Cancel). Invoice list gets `KIND` chip.
 
----
+**Account header** (`AppHeader.tsx`/account detail): CRM-sync chip — green <1h, amber <24h, red ≥24h.
 
-### 4. Activity Log tab — empty state
+**Admin → Integrations**: new "CRM Sync Contract" doc page with endpoints, payloads, sample curl.
 
-Render "Activity log mapping coming soon." No data wiring yet (per your instruction).
+## 6. Phased delivery (this build executes all phases)
 
----
+1. DB migration + RPCs + edge functions.
+2. Seats tab redesign + proration dialog + provisioning + superuser transfer.
+3. Billing tab subscription/renewal management.
+4. Header sync chip + Integrations contract page + cron schedules for `scan_renewals_due` and `scan_crm_sync_stale`.
 
-### 5. Costs tab — editable, with add-new
+## 7. Out of scope
 
-Two cards (Online / Offline) reading from `marketing_cost_items`:
-- Each row: Title · Description · Amount · row actions (edit, delete).
-- "Add spend" button → dialog with **Title, Description, Amount** (+ optional date, city).
-- Card footer shows total; these totals feed Overview tiles.
-
----
-
-### 6. New tabs — list + add-new
-
-Final tab order: `Overview · Pipeline KPIs · Activity Log · Referrals & Contacts & Champions · Events · Costs`
-
-- **Referrals & Contacts & Champions** (single tab, three sub-toggles per your wording): each sub-view is a list with search + "Add new" dialog matching existing UI.
-- **Events**: list with search + "Add new" dialog.
-
----
-
-### 7. Access control
-
-Marketing route already admin-gated in `Marketing.tsx` (`if (!isAdmin) return <Navigate to="/" />`). No change.
-
----
-
-### Files
-
-**Migration (new)**: 7 tables + RLS policies + indexes + updated_at triggers + seed `marketing_settings` singleton row.
-
-**New code**:
-- `src/lib/marketingApi.ts` — typed CRUD helpers per table (targets, settings, referrals, contacts, champions, events, cost_items).
-- `src/components/marketing/EditableNumber.tsx` — click-to-edit numeric chip (admin gated).
-- `src/components/marketing/MarketingTargetCard.tsx` — Agency/Builder card with inline-edit Q1–Q4 + Total.
-- `src/components/marketing/AddSpendDialog.tsx`
-- `src/components/marketing/AddRecordDialog.tsx` — generic, schema-driven for referrals/contacts/champions/events.
-- `src/components/marketing/RecordsTab.tsx` — three-toggle list view.
-- `src/components/marketing/EventsTab.tsx`
-
-**Edited**: `src/pages/Marketing.tsx` — remove 2 tiles, wire targets, costs, geography, pipeline KPIs to live data; add 2 new tabs.
-
----
-
-### Open mapping note
-
-Geography count rule: a record is counted under city X when `record.city = X` (case-insensitive match against `lookup_cities.name`). Records with empty city are excluded. Multi-city tagging is out of scope here.
+- Auto-collection via Razorpay for proration/renewal invoices (stay DRAFT, finalised manually using existing flow).
+- CRM-side UI changes (only the API contract is defined).
+- G8 (open-work reassignment) — excluded per your instruction.
 
