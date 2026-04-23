@@ -822,6 +822,12 @@ export default function EnquiryDetail() {
             onDemoOutcomeChange={handleDemoOutcomeChange}
             onOpenPaymentDialog={() => setPaymentDialogOpen(true)}
             onSetPaymentStatus={setPaymentStatus}
+            onSetPaymentMode={setPaymentMode}
+            onSetTrialDate={setTrialDate}
+            onCancelPaymentLink={cancelPaymentLink}
+            onRefreshPaymentStatus={refreshPaymentStatus}
+            onDraftPaymentEmail={() => setPaymentEmailOpen(true)}
+            paymentBusy={paymentBusy}
           />
         }
       />
