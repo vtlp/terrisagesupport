@@ -69,6 +69,23 @@ export type Database = {
           id: string
           next_renewal_at: string | null
           plan_name: string
+          renewal_due_date: string | null
+          renewal_email_draft_body: string | null
+          renewal_email_draft_subject: string | null
+          renewal_email_last_drafted_at: string | null
+          renewal_email_last_sent_at: string | null
+          renewal_link_amount: number
+          renewal_link_created_at: string | null
+          renewal_link_currency: string
+          renewal_link_expires_at: string | null
+          renewal_link_id: string | null
+          renewal_link_outdated: boolean
+          renewal_link_seats: number
+          renewal_link_short_url: string | null
+          renewal_link_status: string | null
+          renewal_notes: string | null
+          renewal_paid_at: string | null
+          renewal_payment_reference: string | null
           seat_rate: number
           seats_purchased: number
           status: Database["public"]["Enums"]["subscription_status"]
@@ -90,6 +107,23 @@ export type Database = {
           id?: string
           next_renewal_at?: string | null
           plan_name?: string
+          renewal_due_date?: string | null
+          renewal_email_draft_body?: string | null
+          renewal_email_draft_subject?: string | null
+          renewal_email_last_drafted_at?: string | null
+          renewal_email_last_sent_at?: string | null
+          renewal_link_amount?: number
+          renewal_link_created_at?: string | null
+          renewal_link_currency?: string
+          renewal_link_expires_at?: string | null
+          renewal_link_id?: string | null
+          renewal_link_outdated?: boolean
+          renewal_link_seats?: number
+          renewal_link_short_url?: string | null
+          renewal_link_status?: string | null
+          renewal_notes?: string | null
+          renewal_paid_at?: string | null
+          renewal_payment_reference?: string | null
           seat_rate?: number
           seats_purchased?: number
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -111,6 +145,23 @@ export type Database = {
           id?: string
           next_renewal_at?: string | null
           plan_name?: string
+          renewal_due_date?: string | null
+          renewal_email_draft_body?: string | null
+          renewal_email_draft_subject?: string | null
+          renewal_email_last_drafted_at?: string | null
+          renewal_email_last_sent_at?: string | null
+          renewal_link_amount?: number
+          renewal_link_created_at?: string | null
+          renewal_link_currency?: string
+          renewal_link_expires_at?: string | null
+          renewal_link_id?: string | null
+          renewal_link_outdated?: boolean
+          renewal_link_seats?: number
+          renewal_link_short_url?: string | null
+          renewal_link_status?: string | null
+          renewal_notes?: string | null
+          renewal_paid_at?: string | null
+          renewal_payment_reference?: string | null
           seat_rate?: number
           seats_purchased?: number
           status?: Database["public"]["Enums"]["subscription_status"]
