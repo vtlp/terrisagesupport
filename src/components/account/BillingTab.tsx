@@ -308,12 +308,51 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 onChange={e => setSettings(s => ({ ...s, seats_purchased: Math.max(0, Number(e.target.value) || 0) }))} />
             </div>
             <div className="space-y-1.5">
+              <Label>Country</Label>
+              <Input value={settings.country} onChange={e => setSettings(s => ({ ...s, country: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="IN" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Subscription started</Label>
+              <Input type="date" value={settings.subscription_started_at ? settings.subscription_started_at.substring(0, 10) : ''}
+                onChange={e => setSettings(s => ({ ...s, subscription_started_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Current period start</Label>
+              <Input type="date" value={settings.current_period_start ? settings.current_period_start.substring(0, 10) : ''}
+                onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Current period end</Label>
+              <Input type="date" value={settings.current_period_end ? settings.current_period_end.substring(0, 10) : ''}
+                onChange={e => setSettings(s => ({ ...s, current_period_end: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+            </div>
+            <div className="space-y-1.5">
               <Label>Next renewal</Label>
               <Input type="date" value={settings.next_renewal_at ? settings.next_renewal_at.substring(0, 10) : ''}
                 onChange={e => setSettings(s => ({ ...s, next_renewal_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
             </div>
+            <div className="space-y-1.5 flex flex-col">
+              <Label>Auto-renew</Label>
+              <div className="flex items-center gap-2 h-10">
+                <Switch checked={settings.auto_renew} onCheckedChange={v => setSettings(s => ({ ...s, auto_renew: v }))} />
+                <span className="text-xs text-muted-foreground">{settings.auto_renew ? 'On' : 'Off'}</span>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+
+          {settings.cancellation_requested_at && (
+            <div className="rounded border border-destructive/40 bg-destructive/5 p-3 text-xs flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium text-destructive">Cancellation scheduled</div>
+                <div className="text-muted-foreground">
+                  Requested {format(new Date(settings.cancellation_requested_at), 'dd MMM yyyy')}
+                  {settings.cancellation_effective_at && ` · effective ${format(new Date(settings.cancellation_effective_at), 'dd MMM yyyy')}`}
+                </div>
+              </div>
+            </div>
+          )}
+
             <div className="border rounded p-3">
               <div className="text-xs text-muted-foreground">Seat capacity</div>
               <div className="text-lg font-semibold">
