@@ -413,6 +413,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">{i.invoice_no ?? '—'}</span>
+                      <Badge className={`text-[10px] ${KIND_COLORS[i.kind]}`}>{i.kind}</Badge>
                       <Badge className={`text-[10px] ${STATUS_COLORS[i.status]}`}>{i.status}</Badge>
                       {i.period_from && i.period_to && (
                         <span className="text-xs text-muted-foreground">{format(new Date(i.period_from), 'dd MMM')} – {format(new Date(i.period_to), 'dd MMM yyyy')}</span>
@@ -470,6 +471,68 @@ export function BillingTab({ accountId }: { accountId: string }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={saveInvoice} disabled={busy}>{busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={renewOpen} onOpenChange={setRenewOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage renewal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded border p-3 text-xs space-y-1 bg-muted/30">
+              <div><span className="text-muted-foreground">Current period:</span>{' '}
+                {settings.current_period_start ? format(new Date(settings.current_period_start), 'dd MMM') : '—'}
+                {' – '}
+                {settings.current_period_end ? format(new Date(settings.current_period_end), 'dd MMM yyyy') : '—'}
+              </div>
+              <div><span className="text-muted-foreground">Seats purchased:</span> {settings.seats_purchased}</div>
+              <div><span className="text-muted-foreground">Cycle:</span> {settings.billing_cycle}</div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Decision</Label>
+              <Select value={renewDecision} onValueChange={v => setRenewDecision(v as RenewalDecision)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="RENEW">Renew (same seats)</SelectItem>
+                  <SelectItem value="RENEW_INCREASE">Renew + increase seats</SelectItem>
+                  <SelectItem value="RENEW_DECREASE">Renew + decrease seats</SelectItem>
+                  <SelectItem value="CANCEL">Cancel subscription</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(renewDecision === 'RENEW_INCREASE' || renewDecision === 'RENEW_DECREASE') && (
+              <div className="space-y-1.5">
+                <Label>New seat total</Label>
+                <Input type="number" min={0} value={renewSeats}
+                  onChange={e => setRenewSeats(Math.max(0, Number(e.target.value) || 0))} />
+                <p className="text-[11px] text-muted-foreground">
+                  A new RENEWAL invoice will be drafted for the next period.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea rows={2} value={renewNotes} onChange={e => setRenewNotes(e.target.value)} placeholder="Optional context for the audit log" />
+            </div>
+
+            {renewDecision === 'CANCEL' && (
+              <div className="rounded border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>Cancellation takes effect at the end of the current period. Seats remain available until then.</div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenewOpen(false)}>Close</Button>
+            <Button onClick={submitRenewal} disabled={renewBusy} variant={renewDecision === 'CANCEL' ? 'destructive' : 'default'}>
+              {renewBusy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {renewDecision === 'CANCEL' ? 'Confirm cancellation' : 'Confirm renewal'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
