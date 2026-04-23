@@ -353,6 +353,28 @@ export function BillingTab({ accountId }: { accountId: string }) {
             </div>
           )}
 
+          {renewalWindow && (
+            <div className="rounded border bg-warning/5 border-warning/40 p-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-start gap-2">
+                <RefreshCw className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <div className="text-xs">
+                  <div className="font-medium">
+                    {daysToRenewal! >= 0
+                      ? `Renewal due in ${daysToRenewal} day(s)`
+                      : `Period ended ${Math.abs(daysToRenewal!)} day(s) ago`}
+                  </div>
+                  <div className="text-muted-foreground">
+                    Period ends {settings.current_period_end ? format(new Date(settings.current_period_end), 'dd MMM yyyy') : '—'}
+                  </div>
+                </div>
+              </div>
+              <Button size="sm" onClick={openRenew}>
+                <RefreshCw className="h-4 w-4 mr-1" /> Manage renewal
+              </Button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
             <div className="border rounded p-3">
               <div className="text-xs text-muted-foreground">Seat capacity</div>
               <div className="text-lg font-semibold">
