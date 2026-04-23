@@ -29,7 +29,8 @@ import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
 import { PaymentLinkDialog, PaymentLinkResult } from '@/components/shared/PaymentLinkDialog';
-import { fmtINR } from '@/lib/billing';
+import { PaymentEmailComposer, buildInitialPaymentEmail } from '@/components/billing/PaymentEmailComposer';
+import { calcBilling, fmtINR } from '@/lib/billing';
 import { useUser } from '@/context/UserContext';
 
 type Stage = 'NEW_ENQUIRY' | 'CONTACTED' | 'DEMO_SCHEDULED' | 'DEMO_COMPLETED' | 'PAYMENT_LINK_SENT' | 'ONBOARDING_PACK_SENT' | 'ACCOUNT_CREATED' | 'LOST';
@@ -180,6 +181,8 @@ export default function EnquiryDetail() {
   const [existingEventOptions, setExistingEventOptions] = useState<ExistingEventOption[]>([]);
   const [existingPromptOpen, setExistingPromptOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentEmailOpen, setPaymentEmailOpen] = useState(false);
+  const [paymentBusy, setPaymentBusy] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
