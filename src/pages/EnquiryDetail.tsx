@@ -390,8 +390,19 @@ export default function EnquiryDetail() {
     if (currentStage === 'DEMO_COMPLETED' && !d.payload.demo_outcome) {
       return 'Please select a demo outcome before moving on.';
     }
-    if (currentStage === 'PAYMENT_LINK_SENT' && !d.payload.payment?.status) {
-      return 'Please capture the payment outcome (Paid / Pending / Failed) before moving on.';
+    if (currentStage === 'PAYMENT_LINK_SENT') {
+      const p = d.payload.payment;
+      const mode = p?.mode ?? 'PAY_BEFORE_ACCOUNT';
+      if (mode === 'TRIAL_FIRST') {
+        if (!p?.trial?.start || !p?.trial?.end) {
+          return 'Set trial start and end dates before moving on.';
+        }
+        if (new Date(p.trial.end) < new Date(p.trial.start)) {
+          return 'Trial end date cannot be before the start date.';
+        }
+      } else if (!p?.status) {
+        return 'Please capture the payment outcome (Paid / Pending / Failed) before moving on.';
+      }
     }
     return null;
   };
