@@ -56,116 +56,44 @@ export type Database = {
       account_billing_settings: {
         Row: {
           account_id: string
-          auto_renew: boolean
           base_fee: number
           billing_cycle: Database["public"]["Enums"]["billing_cycle"]
-          cancellation_effective_at: string | null
-          cancellation_requested_at: string | null
-          country: string
           created_at: string
-          current_period_end: string | null
-          current_period_start: string | null
           gst_pct: number
           id: string
           next_renewal_at: string | null
           plan_name: string
-          renewal_due_date: string | null
-          renewal_email_draft_body: string | null
-          renewal_email_draft_subject: string | null
-          renewal_email_last_drafted_at: string | null
-          renewal_email_last_sent_at: string | null
-          renewal_link_amount: number
-          renewal_link_created_at: string | null
-          renewal_link_currency: string
-          renewal_link_expires_at: string | null
-          renewal_link_id: string | null
-          renewal_link_outdated: boolean
-          renewal_link_seats: number
-          renewal_link_short_url: string | null
-          renewal_link_status: string | null
-          renewal_notes: string | null
-          renewal_paid_at: string | null
-          renewal_payment_reference: string | null
           seat_rate: number
           seats_purchased: number
           status: Database["public"]["Enums"]["subscription_status"]
-          subscription_started_at: string | null
           updated_at: string
         }
         Insert: {
           account_id: string
-          auto_renew?: boolean
           base_fee?: number
           billing_cycle?: Database["public"]["Enums"]["billing_cycle"]
-          cancellation_effective_at?: string | null
-          cancellation_requested_at?: string | null
-          country?: string
           created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
           gst_pct?: number
           id?: string
           next_renewal_at?: string | null
           plan_name?: string
-          renewal_due_date?: string | null
-          renewal_email_draft_body?: string | null
-          renewal_email_draft_subject?: string | null
-          renewal_email_last_drafted_at?: string | null
-          renewal_email_last_sent_at?: string | null
-          renewal_link_amount?: number
-          renewal_link_created_at?: string | null
-          renewal_link_currency?: string
-          renewal_link_expires_at?: string | null
-          renewal_link_id?: string | null
-          renewal_link_outdated?: boolean
-          renewal_link_seats?: number
-          renewal_link_short_url?: string | null
-          renewal_link_status?: string | null
-          renewal_notes?: string | null
-          renewal_paid_at?: string | null
-          renewal_payment_reference?: string | null
           seat_rate?: number
           seats_purchased?: number
           status?: Database["public"]["Enums"]["subscription_status"]
-          subscription_started_at?: string | null
           updated_at?: string
         }
         Update: {
           account_id?: string
-          auto_renew?: boolean
           base_fee?: number
           billing_cycle?: Database["public"]["Enums"]["billing_cycle"]
-          cancellation_effective_at?: string | null
-          cancellation_requested_at?: string | null
-          country?: string
           created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
           gst_pct?: number
           id?: string
           next_renewal_at?: string | null
           plan_name?: string
-          renewal_due_date?: string | null
-          renewal_email_draft_body?: string | null
-          renewal_email_draft_subject?: string | null
-          renewal_email_last_drafted_at?: string | null
-          renewal_email_last_sent_at?: string | null
-          renewal_link_amount?: number
-          renewal_link_created_at?: string | null
-          renewal_link_currency?: string
-          renewal_link_expires_at?: string | null
-          renewal_link_id?: string | null
-          renewal_link_outdated?: boolean
-          renewal_link_seats?: number
-          renewal_link_short_url?: string | null
-          renewal_link_status?: string | null
-          renewal_notes?: string | null
-          renewal_paid_at?: string | null
-          renewal_payment_reference?: string | null
           seat_rate?: number
           seats_purchased?: number
           status?: Database["public"]["Enums"]["subscription_status"]
-          subscription_started_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -262,7 +190,6 @@ export type Database = {
           id: string
           invoice_no: string | null
           issued_at: string | null
-          kind: Database["public"]["Enums"]["invoice_kind"]
           notes: string | null
           paid_at: string | null
           period_from: string | null
@@ -286,7 +213,6 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           issued_at?: string | null
-          kind?: Database["public"]["Enums"]["invoice_kind"]
           notes?: string | null
           paid_at?: string | null
           period_from?: string | null
@@ -310,7 +236,6 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           issued_at?: string | null
-          kind?: Database["public"]["Enums"]["invoice_kind"]
           notes?: string | null
           paid_at?: string | null
           period_from?: string | null
@@ -393,54 +318,14 @@ export type Database = {
           },
         ]
       }
-      account_renewal_decisions: {
-        Row: {
-          account_id: string
-          created_at: string
-          decided_by: string | null
-          decision: Database["public"]["Enums"]["renewal_decision"]
-          id: string
-          new_seats: number | null
-          notes: string | null
-          period_end: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          decided_by?: string | null
-          decision: Database["public"]["Enums"]["renewal_decision"]
-          id?: string
-          new_seats?: number | null
-          notes?: string | null
-          period_end: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          decided_by?: string | null
-          decision?: Database["public"]["Enums"]["renewal_decision"]
-          id?: string
-          new_seats?: number | null
-          notes?: string | null
-          period_end?: string
-        }
-        Relationships: []
-      }
       account_seats: {
         Row: {
           account_id: string
           created_at: string
-          crm_state: Database["public"]["Enums"]["crm_seat_state"]
-          deleted_in_cycle: boolean
           email: string | null
-          external_id: string | null
           full_name: string
           id: string
-          invitation_expires_at: string | null
           is_active: boolean
-          is_superuser: boolean
-          last_active_at: string | null
-          permissions: Json
           phone: string | null
           role: string | null
           updated_at: string
@@ -448,17 +333,10 @@ export type Database = {
         Insert: {
           account_id: string
           created_at?: string
-          crm_state?: Database["public"]["Enums"]["crm_seat_state"]
-          deleted_in_cycle?: boolean
           email?: string | null
-          external_id?: string | null
           full_name: string
           id?: string
-          invitation_expires_at?: string | null
           is_active?: boolean
-          is_superuser?: boolean
-          last_active_at?: string | null
-          permissions?: Json
           phone?: string | null
           role?: string | null
           updated_at?: string
@@ -466,17 +344,10 @@ export type Database = {
         Update: {
           account_id?: string
           created_at?: string
-          crm_state?: Database["public"]["Enums"]["crm_seat_state"]
-          deleted_in_cycle?: boolean
           email?: string | null
-          external_id?: string | null
           full_name?: string
           id?: string
-          invitation_expires_at?: string | null
           is_active?: boolean
-          is_superuser?: boolean
-          last_active_at?: string | null
-          permissions?: Json
           phone?: string | null
           role?: string | null
           updated_at?: string
@@ -1921,48 +1792,6 @@ export type Database = {
         }
         Relationships: []
       }
-      seat_change_events: {
-        Row: {
-          account_id: string
-          created_at: string
-          created_by: string | null
-          delta: number
-          effective_at: string
-          id: string
-          invoice_id: string | null
-          new_total: number
-          notes: string | null
-          prorated_amount: number
-          reason: Database["public"]["Enums"]["seat_change_reason"]
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          created_by?: string | null
-          delta: number
-          effective_at?: string
-          id?: string
-          invoice_id?: string | null
-          new_total: number
-          notes?: string | null
-          prorated_amount?: number
-          reason: Database["public"]["Enums"]["seat_change_reason"]
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          created_by?: string | null
-          delta?: number
-          effective_at?: string
-          id?: string
-          invoice_id?: string | null
-          new_total?: number
-          notes?: string | null
-          prorated_amount?: number
-          reason?: Database["public"]["Enums"]["seat_change_reason"]
-        }
-        Relationships: []
-      }
       seat_requests: {
         Row: {
           account_id: string
@@ -2001,90 +1830,6 @@ export type Database = {
           requested_by_email?: string | null
           requested_seats?: number
           status?: Database["public"]["Enums"]["seat_request_status"]
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      seat_usage_snapshots: {
-        Row: {
-          account_id: string
-          allocated: number
-          available: number
-          consumed: number
-          created_at: string
-          members: Json
-          reported_at: string
-          reserved: number
-          source: string
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          allocated?: number
-          available?: number
-          consumed?: number
-          created_at?: string
-          members?: Json
-          reported_at?: string
-          reserved?: number
-          source?: string
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          allocated?: number
-          available?: number
-          consumed?: number
-          created_at?: string
-          members?: Json
-          reported_at?: string
-          reserved?: number
-          source?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      superuser_transfers: {
-        Row: {
-          account_id: string
-          completed_at: string | null
-          created_at: string
-          follow_up_event_ids: string[]
-          from_seat_id: string | null
-          id: string
-          initiated_at: string
-          initiated_by: string | null
-          notes: string | null
-          status: Database["public"]["Enums"]["superuser_transfer_status"]
-          to_seat_id: string
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          completed_at?: string | null
-          created_at?: string
-          follow_up_event_ids?: string[]
-          from_seat_id?: string | null
-          id?: string
-          initiated_at?: string
-          initiated_by?: string | null
-          notes?: string | null
-          status?: Database["public"]["Enums"]["superuser_transfer_status"]
-          to_seat_id: string
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          completed_at?: string | null
-          created_at?: string
-          follow_up_event_ids?: string[]
-          from_seat_id?: string | null
-          id?: string
-          initiated_at?: string
-          initiated_by?: string | null
-          notes?: string | null
-          status?: Database["public"]["Enums"]["superuser_transfer_status"]
-          to_seat_id?: string
           updated_at?: string
         }
         Relationships: []
@@ -2473,11 +2218,9 @@ export type Database = {
         Row: {
           account_id: string | null
           account_name: string | null
-          last_crm_sync_at: string | null
           plan_name: string | null
           seats_available: number | null
           seats_purchased: number | null
-          seats_reserved: number | null
           seats_used: number | null
           subscription_status:
             | Database["public"]["Enums"]["subscription_status"]
@@ -2537,20 +2280,7 @@ export type Database = {
       }
     }
     Functions: {
-      apply_seat_delta: {
-        Args: {
-          _account_id: string
-          _delta: number
-          _notes?: string
-          _reason?: Database["public"]["Enums"]["seat_change_reason"]
-        }
-        Returns: string
-      }
       check_submission_lock: { Args: { _enquiry_id: string }; Returns: string }
-      compute_proration: {
-        Args: { _account_id: string; _delta: number }
-        Returns: Json
-      }
       convert_enquiry_to_account: {
         Args: { _enquiry_id: string }
         Returns: string
@@ -2577,15 +2307,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      initiate_superuser_transfer: {
-        Args: {
-          _account_id: string
-          _from_seat_id: string
-          _notes?: string
-          _to_seat_id: string
-        }
-        Returns: string
-      }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       log_activity: {
         Args: {
@@ -2599,19 +2320,8 @@ export type Database = {
       }
       mark_notifications_read: { Args: { _ids?: string[] }; Returns: number }
       mark_stalled_accounts: { Args: never; Returns: number }
-      renew_subscription: {
-        Args: {
-          _account_id: string
-          _decision: Database["public"]["Enums"]["renewal_decision"]
-          _new_seats?: number
-          _notes?: string
-        }
-        Returns: string
-      }
-      scan_crm_sync_stale: { Args: never; Returns: number }
       scan_demo_not_completed: { Args: never; Returns: number }
       scan_overdue_events: { Args: never; Returns: number }
-      scan_renewals_due: { Args: never; Returns: number }
       scan_upcoming_events: { Args: never; Returns: number }
       validate_account_api_key: { Args: { _key_hash: string }; Returns: string }
     }
@@ -2657,12 +2367,6 @@ export type Database = {
         | "Vendor/Service Provider"
         | "VIP"
       content_status: "IDEA" | "DRAFT" | "SCHEDULED" | "PUBLISHED" | "ARCHIVED"
-      crm_seat_state:
-        | "INVITED"
-        | "ACTIVE"
-        | "TEMP_DEACTIVATED"
-        | "DELETION_REQUESTED"
-        | "DELETED"
       enquiry_stage:
         | "NEW_ENQUIRY"
         | "CONTACTED"
@@ -2684,7 +2388,6 @@ export type Database = {
         | "COMPLETED"
         | "FAILED"
       import_type: "LISTINGS" | "LEADS" | "CONTACTS" | "OTHER"
-      invoice_kind: "CYCLE" | "PRORATION" | "RENEWAL"
       invoice_status: "DRAFT" | "SENT" | "PAID" | "OVERDUE" | "CANCELLED"
       marketing_channel_type:
         | "PAID"
@@ -2717,18 +2420,9 @@ export type Database = {
         | "Pending"
         | "Referred"
         | "Rejected"
-      renewal_decision: "RENEW" | "RENEW_INCREASE" | "RENEW_DECREASE" | "CANCEL"
-      seat_change_reason:
-        | "ONBOARDING"
-        | "REQUEST_FULFILLED"
-        | "RENEWAL_INCREASE"
-        | "RENEWAL_DECREASE"
-        | "MANUAL"
-        | "SUPERUSER_TRANSFER"
       seat_request_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
       subscription_status: "ACTIVE" | "PAUSED" | "CANCELLED" | "OVERDUE"
-      superuser_transfer_status: "INITIATED" | "COMPLETED" | "CANCELLED"
       tenancy_type: "AGENCY_BROKERAGE_CONSULTANCY" | "BUILDER_DEVELOPER"
       ticket_category:
         | "LISTINGS_INVENTORY"
@@ -2921,13 +2615,6 @@ export const Constants = {
         "VIP",
       ],
       content_status: ["IDEA", "DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"],
-      crm_seat_state: [
-        "INVITED",
-        "ACTIVE",
-        "TEMP_DEACTIVATED",
-        "DELETION_REQUESTED",
-        "DELETED",
-      ],
       enquiry_stage: [
         "NEW_ENQUIRY",
         "CONTACTED",
@@ -2952,7 +2639,6 @@ export const Constants = {
         "FAILED",
       ],
       import_type: ["LISTINGS", "LEADS", "CONTACTS", "OTHER"],
-      invoice_kind: ["CYCLE", "PRORATION", "RENEWAL"],
       invoice_status: ["DRAFT", "SENT", "PAID", "OVERDUE", "CANCELLED"],
       marketing_channel_type: [
         "PAID",
@@ -2988,19 +2674,9 @@ export const Constants = {
         "Referred",
         "Rejected",
       ],
-      renewal_decision: ["RENEW", "RENEW_INCREASE", "RENEW_DECREASE", "CANCEL"],
-      seat_change_reason: [
-        "ONBOARDING",
-        "REQUEST_FULFILLED",
-        "RENEWAL_INCREASE",
-        "RENEWAL_DECREASE",
-        "MANUAL",
-        "SUPERUSER_TRANSFER",
-      ],
       seat_request_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
       subscription_status: ["ACTIVE", "PAUSED", "CANCELLED", "OVERDUE"],
-      superuser_transfer_status: ["INITIATED", "COMPLETED", "CANCELLED"],
       tenancy_type: ["AGENCY_BROKERAGE_CONSULTANCY", "BUILDER_DEVELOPER"],
       ticket_category: [
         "LISTINGS_INVENTORY",

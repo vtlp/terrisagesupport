@@ -9,23 +9,8 @@ verify_jwt = false
 [functions.seat-capacity]
 verify_jwt = false
 
-[functions.seat-usage]
-verify_jwt = false
-
 [functions.seat-request]
 verify_jwt = false
 
 [functions.razorpay-webhook]
-verify_jwt = false
-
-[functions.account-profile]
-verify_jwt = false
-
-[functions.seat-events]
-verify_jwt = false
-
-[functions.razorpay-cancel-payment-link]
-verify_jwt = false
-
-[functions.razorpay-link-status]
 verify_jwt = false

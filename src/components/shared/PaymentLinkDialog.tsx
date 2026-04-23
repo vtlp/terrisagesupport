@@ -34,41 +34,28 @@ export interface PaymentLinkResult {
     total: number;
   };
   created_at: string;
-  expires_at?: string;
-  outdated?: boolean;
-  mode?: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST';
 }
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  /** 'INITIAL' uses enquiry_id; 'RENEWAL' uses account_id. */
-  purpose?: 'INITIAL' | 'RENEWAL';
-  enquiryId?: string;
-  accountId?: string;
+  enquiryId: string;
   defaults: {
     seats?: number | null;
     customerName: string;
     customerEmail?: string | null;
     customerPhone?: string | null;
-    planName?: string;
-    cycle?: Cycle;
-    baseFee?: number;
-    seatRate?: number;
-    gstPct?: number;
   };
   onSuccess: (result: PaymentLinkResult) => void;
 }
 
-export function PaymentLinkDialog({
-  open, onOpenChange, purpose = 'INITIAL', enquiryId, accountId, defaults, onSuccess,
-}: Props) {
-  const [planName, setPlanName] = useState(defaults.planName ?? 'Standard');
-  const [cycle, setCycle] = useState<Cycle>(defaults.cycle ?? 'ANNUAL');
+export function PaymentLinkDialog({ open, onOpenChange, enquiryId, defaults, onSuccess }: Props) {
+  const [planName, setPlanName] = useState('Standard');
+  const [cycle, setCycle] = useState<Cycle>('ANNUAL');
   const [seats, setSeats] = useState<number>(defaults.seats ?? DEFAULT_INCLUDED_SEATS);
-  const [baseFee, setBaseFee] = useState<number>(defaults.baseFee ?? DEFAULT_BASE_FEE);
-  const [seatRate, setSeatRate] = useState<number>(defaults.seatRate ?? DEFAULT_SEAT_RATE);
-  const [gstPct, setGstPct] = useState<number>(defaults.gstPct ?? DEFAULT_GST_PCT);
+  const [baseFee, setBaseFee] = useState<number>(DEFAULT_BASE_FEE);
+  const [seatRate, setSeatRate] = useState<number>(DEFAULT_SEAT_RATE);
+  const [gstPct, setGstPct] = useState<number>(DEFAULT_GST_PCT);
   const [name, setName] = useState(defaults.customerName);
   const [email, setEmail] = useState(defaults.customerEmail ?? '');
   const [phone, setPhone] = useState(defaults.customerPhone ?? '');
@@ -76,17 +63,12 @@ export function PaymentLinkDialog({
 
   useEffect(() => {
     if (open) {
-      setPlanName(defaults.planName ?? 'Standard');
-      setCycle(defaults.cycle ?? 'ANNUAL');
       setSeats(defaults.seats && defaults.seats > 0 ? defaults.seats : DEFAULT_INCLUDED_SEATS);
-      setBaseFee(defaults.baseFee ?? DEFAULT_BASE_FEE);
-      setSeatRate(defaults.seatRate ?? DEFAULT_SEAT_RATE);
-      setGstPct(defaults.gstPct ?? DEFAULT_GST_PCT);
       setName(defaults.customerName);
       setEmail(defaults.customerEmail ?? '');
       setPhone(defaults.customerPhone ?? '');
     }
-  }, [open, defaults.seats, defaults.customerName, defaults.customerEmail, defaults.customerPhone, defaults.planName, defaults.cycle, defaults.baseFee, defaults.seatRate, defaults.gstPct]);
+  }, [open, defaults.seats, defaults.customerName, defaults.customerEmail, defaults.customerPhone]);
 
   const breakdown = useMemo(
     () => calcBilling(baseFee, seatRate, seats, gstPct, DEFAULT_INCLUDED_SEATS),
@@ -102,20 +84,10 @@ export function PaymentLinkDialog({
       toast.error('Customer name is required.');
       return;
     }
-    if (purpose === 'INITIAL' && !enquiryId) {
-      toast.error('Missing enquiry reference.');
-      return;
-    }
-    if (purpose === 'RENEWAL' && !accountId) {
-      toast.error('Missing account reference.');
-      return;
-    }
     setBusy(true);
     const { data, error } = await supabase.functions.invoke('razorpay-create-payment-link', {
       body: {
-        purpose,
         enquiry_id: enquiryId,
-        account_id: accountId,
         plan_name: planName,
         billing_cycle: cycle,
         seats: breakdown.seats,
@@ -131,10 +103,14 @@ export function PaymentLinkDialog({
     setBusy(false);
     if (error || !data?.success) {
       const msg = data?.error || error?.message || 'Failed to generate payment link';
+      await supabase.from('enquiry_notes').insert({
+        enquiry_id: enquiryId,
+        note_text: `[Payment] Link generation failed – ${msg}`,
+      });
       toast.error(msg);
       return;
     }
-    toast.success(purpose === 'RENEWAL' ? 'Renewal link created' : 'Payment link created');
+    toast.success('Payment link created');
     onSuccess(data.payment as PaymentLinkResult);
     onOpenChange(false);
   };
@@ -144,8 +120,7 @@ export function PaymentLinkDialog({
       <DialogContent className="max-w-md p-4 gap-3">
         <DialogHeader className="space-y-1">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <LinkIcon className="h-4 w-4" />
-            {purpose === 'RENEWAL' ? 'Generate renewal link' : 'Generate payment link'}
+            <LinkIcon className="h-4 w-4" /> Generate payment link
           </DialogTitle>
         </DialogHeader>
 
