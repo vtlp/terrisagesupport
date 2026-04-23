@@ -1,97 +1,100 @@
 
-## Seats, Billing & CRM Sync — revised plan (edge cases included)
+# Refactor the Payment stage — actionable, not passive
 
-### Confirmation: data flow you asked about
-- Both **Agency** and **Builder** onboarding forms already use the **same prefill mechanism** (`readOnboardingPrefill`) and submit a payload with identical keys: `owner_name / owner_phone / owner_email / company_name / city / team.seats_required / team_members[] / projects[]`.
-- The CRM-generated onboarding link carries `name`, `phone`, `email`, `team_size` query params; when present they are pre-filled and **locked** on the form. Customer can still add user details for any number of seats up to that count.
-- `convert_enquiry_to_account` reads that same payload to create the **Account**, **account_seats**, **account_billing_settings** (with `seats_purchased = team_size`) and the first **invoice** if Razorpay paid it.
-- So no schema work is needed on the form side. Locked fields, seat count source, and invoice tie-up are already correct.
+## What's wrong today
 
----
+1. The stage is named **"Payment Link Sent"** (and "Payment Sent" in lists). It reads as a *status* — but staff arrive here before any link exists. There is no clear way to say "I'll collect payment later, let me proceed to onboarding now."
+2. The action choices (**Generate link / Pay now / Pay later**) are buried inside the outcome panel and only appear after the stage is forced into `PAYMENT_LINK_SENT`. From the list view there is nothing to act on at all.
+3. Onboarding form is hard-blocked unless `payment.status === 'PAID'`. There is no supported "skip and reconcile later" path, even though the rest of the system (Account → Billing → Invoices) can absorb it.
+4. The Mark-as dropdown (Paid / Pending / Failed) is hidden next to the Generate-link button and is easy to miss.
+5. Stage gating message reads *"Please capture the payment outcome…"* — unhelpful when the user just wants to defer.
 
-### What we are building (no DB schema changes — everything below already exists)
+## Proposed flow
 
-The DB foundation is in place: `account_billing_settings` (with subscription period, auto_renew, country, cancellation), `seat_change_events`, `account_renewal_decisions`, `seat_usage_snapshots`, `crm_seat_state`, `apply_seat_delta`, `renew_subscription`, `compute_proration`, `scan_crm_sync_stale`. We will wire the **UI + edge functions + cron** on top of the existing tables and RPCs.
+Rename the stage internally `PAYMENT_LINK_SENT` → display label **"Payment"** everywhere (list, pipeline, detail header, filters). The stage is now a **decision point** with three first-class actions surfaced as buttons in the active-stage panel:
 
----
-
-### 1. Edge functions (CRM ↔ Console contract)
-
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/seat-capacity` (extend) | GET | Returns `purchased`, `in_use` (from latest snapshot), `available`, `plan`, `cycle`, `period_start/end`, `country`, `owner_name`, `auto_renew`. |
-| `/seat-request` (existing) | POST/GET | Unchanged. |
-| `/seat-usage` (new) | POST | CRM upserts `{ allocated, consumed, reserved, available, members[] }` into `seat_usage_snapshots` (one row per account). |
-| `/account-profile` (new) | GET | Subscription metadata for CRM boot: plan, cycle, start, current period, renewal, owner, country, allocated. |
-| `/seat-events` (new) | GET `?since=` | Returns recent `seat_change_events` so CRM can react (unlock invite slots after admin adds seats). |
-
-All authenticate via existing `x-account-api-key` header → `validate_account_api_key`.
-
-### 2. Seats & Requests tab (`SeatsAndRequestsTab.tsx`)
-
-Replace the four-tile grid with a capacity panel:
 ```text
-┌────────────────────────────────────────────────────────────┐
-│ Allocated │ In use (CRM) │ Available │ Pending requests   │
-│    30     │      18      │    12     │   +5 (PENDING)     │
-└────────────────────────────────────────────────────────────┘
-Last CRM sync: 2 min ago · source: CRM
+┌─────────────────────────── Payment ───────────────────────────┐
+│  How will the customer pay?                                    │
+│                                                                │
+│  [ Generate payment link ]  [ Mark as paid offline ]           │
+│  [ Defer · collect later ]                                     │
+│                                                                │
+│  Once chosen, the panel shows the link / receipt / deferral    │
+│  reason, and unlocks "Send onboarding form".                   │
+└────────────────────────────────────────────────────────────────┘
 ```
-- **Adjust seats** dialog (admin): mode add/remove, effective immediate (prorated) or next renewal, live preview from `compute_proration`, calls `apply_seat_delta`.
-- **Provision in CRM** action group on FULFILLED requests: "Auto-create logins" (loop `/admin-create-user`) or "Send dev instructions" (copy JSON+curl). Marks each `account_seats` row as provisioned.
-- **Pending logins** strip listing seats from onboarding without a created auth user yet, with one-click "Create login".
-- Realtime subscription on `seat_usage_snapshots` keeps the panel live.
 
-### 3. Billing tab (`BillingTab.tsx`)
+### The three paths
 
-- New subscription card row: **Subscription started**, **Current period** (start → end), **Auto-renew toggle**, **Country**.
-- **Renewal strip** within 30 days of `current_period_end`: `[Renew as-is] [Renew + change seats] [Cancel renewal]` → calls `renew_subscription`.
-- Invoice list shows `kind` chip (`CYCLE | PRORATION | RENEWAL`) — already in DB.
-- Manual override: admin can edit `seats_purchased` only via the Adjust-seats dialog (single source of truth).
+1. **Generate payment link** — opens existing `PaymentLinkDialog`. On success, panel shows link + status chip + Mark-as dropdown (PAID / PENDING / FAILED). Onboarding unlocks when PAID.
+2. **Mark as paid offline** — small dialog: amount (prefilled from team size × rate), reference no., paid date, optional note. Writes `payload.payment = { status: 'PAID', method: 'OFFLINE', reference, amount, paid_at }` and a categorised note `[Payment] Marked PAID offline – ref ABC123`. Onboarding unlocks immediately.
+3. **Defer · collect later** — confirm dialog explaining: "The customer will receive the onboarding form now; payment will be reconciled inside the Account once converted." Writes `payload.payment = { status: 'DEFERRED', deferred_at, deferred_by, reason }` and a note. Onboarding unlocks; a **DEFERRED** chip persists in the timeline and on the Account header until reconciled.
 
-### 4. Account header
+### Onboarding gate (revised)
 
-Small **CRM sync** chip next to the status badge: green if `reported_at < 1h`, amber 1–24h, red >24h or never. Tooltip shows last payload + endpoint.
+`handleSendOnboarding` allows send when **any** of:
+- `payment.status === 'PAID'`
+- `payment.status === 'DEFERRED'`
+- `enquiry.onboarding_pack_sent` already true (resend / regenerate)
 
-### 5. Admin → Integrations: CRM Sync Contract
+Removes the misleading `'Please capture the payment outcome…'` blocker. Stage-gate validation for moving past Payment becomes: *"Generate a link, mark as paid offline, or defer collection before moving on."*
 
-Read-only doc card listing the 5 endpoints, headers, sample request/response, plus the existing `ApiKeysCard` for key rotation. Pure documentation, no logic.
+### Account-side reconciliation (handles the Defer path cleanly)
 
-### 6. Cron additions (uses existing pg_cron)
+When `convert_enquiry_to_account` runs and `payload.payment.status === 'DEFERRED'`:
+- The Account is created with `account_billing_settings.status = 'PENDING_PAYMENT'` (new value of existing `subscription_status` enum) instead of `ACTIVE`.
+- `subscription_started_at` is **not** set yet — it starts when payment is recorded.
+- Billing tab shows a prominent **"Payment outstanding"** strip with [Generate link] / [Mark paid offline] actions. Recording payment flips status to `ACTIVE` and sets `subscription_started_at = now()` plus `current_period_start/end`.
 
-Add `scan_crm_sync_stale()` and `scan_renewals_due()` to the existing every-15-minutes job so `RENEWAL_DUE` and `CRM_SYNC_STALE` notifications fire without manual triggering.
+This matches the user's earlier note: *"the subscription would start right from the request has been received, and we have allocated the seats"* — for paid/marked-paid flows the start is the payment moment; for deferred flows it's when reconciliation happens. Both are explicit and audit-logged.
 
-### 7. Onboarding form — no functional change
-- Agency + Builder forms keep current behaviour. We will only **tighten the lock**: when `prefill.teamSize` is present, the seats field is read-only with a small "Set by your account manager" hint (already partially in place; we will make the visual treatment consistent across both forms).
-- All other fields stay editable as today.
+## Label & list changes
 
----
+| Place | Old | New |
+|---|---|---|
+| `EnquiryDetail` `stageLabels.PAYMENT_LINK_SENT` | "Payment Link Sent" | **"Payment"** |
+| `Enquiries` list | "Payment Sent" | **"Payment"** |
+| `EnquiryPipelineDashboard` | "Payment Sent" | **"Payment"** |
+| Past-stage summary chip | "No link generated" | Shows: link sent / paid offline / deferred / outstanding |
 
-### Edge cases covered
+The DB enum value `PAYMENT_LINK_SENT` stays the same (no migration needed) — only the display labels change.
 
-1. **Customer requests 10 seats but only fills 2 user details** → `seats_purchased=10`, only 2 `account_seats` rows. Seats panel shows "8 seats unallocated · Provision later" CTA. CRM `/seat-capacity` reports `purchased=10, allocated=2`.
-2. **Mid-cycle seat increase** → `apply_seat_delta` writes a `PRORATION` invoice (DRAFT) using `compute_proration` (days remaining ÷ cycle days). UI shows preview before confirm.
-3. **Seat decrease mid-cycle** → no refund, just decrements `seats_purchased`. We block decrease below `in_use` from CRM snapshot.
-4. **Seat decrease at renewal** → handled by `renew_subscription(_decision='RENEW_DECREASE', _new_seats=N)` with notes captured.
-5. **Seats marked DELETED in CRM** mid-cycle → kept until renewal, then `renew_subscription` purges them (`crm_seat_state='DELETED'` rows are deleted, freed count reported).
-6. **Race on seat-request fulfilment** → `fulfil_seat_request` already does `FOR UPDATE`; we keep that path and refactor it to call `apply_seat_delta(..., 'REQUEST_FULFILLED')` so a single audit trail exists.
-7. **Cancellation requested mid-cycle** → `auto_renew=false`, `cancellation_effective_at = current_period_end`. Subscription stays ACTIVE until then; CRM continues to read normal capacity.
-8. **CRM key compromised** → admin revokes via `ApiKeysCard`; all 5 endpoints reject immediately (no caching).
-9. **CRM offline / no usage report for 24h** → `scan_crm_sync_stale` raises `CRM_SYNC_STALE` notification (deduped per day per account).
-10. **Duplicate onboarding link click** → already guarded by `check_submission_lock` + DB unique index. No change.
-11. **Onboarding without team_size param** → seats field is editable, customer types it. Conversion sets `seats_purchased = max(team_size, member_count)` (already implemented).
-12. **Provisioning idempotency** → "Auto-create logins" skips seats whose `email` already maps to an existing auth user (prevents duplicate `admin-create-user` calls); shows per-row status (Created / Skipped / Failed).
-13. **Removing a seat that already has a CRM login** → blocked with a clear toast: "This seat is in use in the CRM. Wait for it to be released or remove it at next renewal."
-14. **Renewal on a CANCELLED subscription** → renew button disabled; only "Reactivate" surfaces, which calls `renew_subscription('RENEW')` and clears `cancellation_*`.
-15. **Plan/cycle change at renewal** → out of scope for this round; we only allow seat count change at renewal. Plan changes remain a manual edit on the billing settings row.
+## Files to edit
 
----
+- `src/pages/EnquiryDetail.tsx`
+  - `stageLabels` rename.
+  - `ActiveStagePanel` (PAYMENT_LINK_SENT branch): replace single "Generate" button + dropdown with three primary action buttons + state-aware detail block.
+  - New tiny dialogs (inline): `MarkPaidOfflineDialog`, `DeferPaymentDialog`.
+  - `validateStageGate` for `PAYMENT_LINK_SENT`: accept `PAID`, `DEFERRED`, or any link with explicit status.
+  - `handleSendOnboarding`: allow `DEFERRED` as unlock.
+  - `setPaymentStatus` extended to accept `DEFERRED` and to write `method` / `reference`.
+  - `PastStageSummary` for Payment shows the chosen path.
+- `src/pages/Enquiries.tsx`, `src/pages/EnquiryPipelineDashboard.tsx` — relabel to "Payment".
+- `src/components/account/BillingTab.tsx` — add "Payment outstanding" strip when billing status is `PENDING_PAYMENT`; reuse existing dialogs.
+- `supabase/migrations/<new>.sql`:
+  - `ALTER TYPE subscription_status ADD VALUE IF NOT EXISTS 'PENDING_PAYMENT';`
+  - Update `convert_enquiry_to_account` to read `payload.payment.status` and seed `PENDING_PAYMENT` + null `subscription_started_at` when deferred; otherwise current behaviour.
+  - New RPC `record_offline_payment(_account_id, _amount, _reference, _paid_at, _notes)` to flip the account from `PENDING_PAYMENT` → `ACTIVE`, set `subscription_started_at`, log to `seat_change_events` (reason `ONBOARDING`) and `activity_log`.
 
-### Phased delivery
+## Edge cases handled
 
-1. **Edge functions + cron**: extend `/seat-capacity`, add `/seat-usage`, `/account-profile`, `/seat-events`; schedule the two new scanners.
-2. **Seats & Requests tab**: capacity panel, Adjust-seats dialog, Provision actions, realtime sync, decrease-block guard.
-3. **Billing tab**: subscription card extras, renewal strip, invoice kind chips, cancellation flow.
-4. **Header CRM-sync chip + Admin Integrations doc card**.
+- **Defer then change mind** → "Generate link" / "Mark paid offline" remain available on the Payment stage and on the Account billing strip.
+- **Link sent, customer pays via UPI offline** → Mark-as dropdown still works; offline reference field appears when status set to PAID without a link.
+- **Regenerate link** → marks the old link `CANCELLED` in payload history (`payload.payment_history[]`), keeps audit trail.
+- **Deferred → Account → forgot to reconcile** → cron `scan_pending_payment_accounts` (added to existing 15-min job) raises a notification after 7 days.
+- **Convert blocked** stays as today (submission must be APPROVED), so a deferred-payment account still requires a valid onboarding form.
 
-No DB migration is needed — all required tables, columns, enums and RPCs are already live.
+## Out of scope (explicit)
+
+- Razorpay refund / partial-payment automation.
+- Multi-currency.
+- Per-seat invoice line splits at conversion (already covered by existing seat-change events).
+
+## Phased delivery
+
+1. **UI rename + three-action panel + Defer/Offline dialogs** (no DB change). Onboarding unlock relaxed.
+2. **Migration: `PENDING_PAYMENT` enum + updated `convert_enquiry_to_account` + `record_offline_payment` RPC.**
+3. **Billing tab "Payment outstanding" strip + cron scanner for stale deferred accounts.**
+
+Each phase is shippable on its own.

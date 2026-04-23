@@ -29,6 +29,9 @@ import { MultiSelect } from '@/components/shared/MultiSelect';
 import { VoiceTextarea } from '@/components/shared/VoiceTextarea';
 import { ExistingEventPrompt, ExistingEventOption } from '@/components/shared/ExistingEventPrompt';
 import { PaymentLinkDialog, PaymentLinkResult } from '@/components/shared/PaymentLinkDialog';
+import { PaymentOfflineDialog, OfflinePaymentResult } from '@/components/shared/PaymentOfflineDialog';
+import { PaymentDeferDialog, DeferredPaymentResult } from '@/components/shared/PaymentDeferDialog';
+import { calcBilling } from '@/lib/billing';
 import { fmtINR } from '@/lib/billing';
 import { useUser } from '@/context/UserContext';
 
@@ -60,8 +63,15 @@ interface PaymentInfo {
   short_url?: string;
   amount?: number;
   currency?: string;
-  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING';
+  status?: 'CREATED' | 'PAID' | 'CANCELLED' | 'FAILED' | 'PENDING' | 'DEFERRED';
+  // method tells us how this stage was resolved:
+  //  RAZORPAY = link generated, OFFLINE = manually marked paid, DEFER = collect later.
+  method?: 'RAZORPAY' | 'OFFLINE' | 'DEFER';
+  reference?: string;       // offline txn id / cheque no.
+  channel?: string;         // UPI / NEFT / CASH / CHEQUE / OTHER
+  reason?: string;          // defer reason
   paid_at?: string;
+  deferred_at?: string;
   created_at?: string;
   breakdown?: Record<string, unknown>;
 }
@@ -92,7 +102,7 @@ interface Submission {
 
 const stageLabels: Record<Stage, string> = {
   NEW_ENQUIRY: 'New', CONTACTED: 'Contacted', DEMO_SCHEDULED: 'Demo Scheduled',
-  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment Link Sent',
+  DEMO_COMPLETED: 'Demo Completed', PAYMENT_LINK_SENT: 'Payment',
   ONBOARDING_PACK_SENT: 'Onboarding Sent',
   ACCOUNT_CREATED: 'Account Created', LOST: 'Lost',
 };
@@ -175,6 +185,8 @@ export default function EnquiryDetail() {
   const [existingEventOptions, setExistingEventOptions] = useState<ExistingEventOption[]>([]);
   const [existingPromptOpen, setExistingPromptOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [offlineDialogOpen, setOfflineDialogOpen] = useState(false);
+  const [deferDialogOpen, setDeferDialogOpen] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
@@ -386,7 +398,7 @@ export default function EnquiryDetail() {
       return 'Please select a demo outcome before moving on.';
     }
     if (currentStage === 'PAYMENT_LINK_SENT' && !d.payload.payment?.status) {
-      return 'Please capture the payment outcome (Paid / Pending / Failed) before moving on.';
+      return 'Generate a link, mark as paid offline, or defer collection before moving on.';
     }
     return null;
   };
@@ -456,13 +468,18 @@ export default function EnquiryDetail() {
     refreshNotes(enquiry?.id ?? '');
   };
 
-  // Manually flip payment outcome (PAID / PENDING / FAILED) — used by the
-  // Payment stage outcome panel and unlocks the onboarding action when PAID.
-  const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED') => {
+  // Manually flip payment outcome (PAID / PENDING / FAILED / DEFERRED) — used by the
+  // Payment stage outcome panel and unlocks the onboarding action when PAID/DEFERRED.
+  const setPaymentStatus = async (status: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => {
     if (!enquiry) return;
     const cur = (draft?.payload.payment ?? {}) as PaymentInfo;
     const prevStatus = cur.status ?? null;
-    const nextPayment: PaymentInfo = { ...cur, status, paid_at: status === 'PAID' ? new Date().toISOString() : cur.paid_at };
+    const nextPayment: PaymentInfo = {
+      ...cur,
+      status,
+      paid_at: status === 'PAID' ? (cur.paid_at ?? new Date().toISOString()) : cur.paid_at,
+      deferred_at: status === 'DEFERRED' ? (cur.deferred_at ?? new Date().toISOString()) : cur.deferred_at,
+    };
     const nextPayload = { ...draft!.payload, payment: nextPayment };
     const { error } = await supabase.from('enquiries')
       .update({ payload: nextPayload as unknown as never })
@@ -470,7 +487,6 @@ export default function EnquiryDetail() {
     if (error) { toast.error(error.message); return; }
     setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
     setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
-    // Log the outcome to the enquiry timeline for traceability.
     if (prevStatus !== status) {
       const amt = cur.amount ? ` ${fmtINR(cur.amount)}` : '';
       await supabase.from('enquiry_notes').insert({
@@ -480,6 +496,50 @@ export default function EnquiryDetail() {
       await refreshNotes(enquiry.id);
     }
     toast.success(`Payment marked ${status}`);
+  };
+
+  // Apply offline / deferred payment results from their dialogs.
+  const applyOfflinePayment = (r: OfflinePaymentResult) => {
+    if (!enquiry || !draft) return;
+    const next: PaymentInfo = {
+      ...(draft.payload.payment ?? {}),
+      status: r.status,
+      method: r.method,
+      amount: r.amount,
+      currency: r.currency,
+      reference: r.reference,
+      channel: r.channel,
+      paid_at: r.paid_at,
+      created_at: r.created_at,
+    };
+    const nextPayload = { ...draft.payload, payment: next };
+    supabase.from('enquiries').update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id)
+      .then(({ error }) => {
+        if (error) { toast.error(error.message); return; }
+        setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+        setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+        refreshNotes(enquiry.id);
+      });
+  };
+
+  const applyDeferredPayment = (r: DeferredPaymentResult) => {
+    if (!enquiry || !draft) return;
+    const next: PaymentInfo = {
+      ...(draft.payload.payment ?? {}),
+      status: r.status,
+      method: r.method,
+      reason: r.reason,
+      deferred_at: r.deferred_at,
+      created_at: r.created_at,
+    };
+    const nextPayload = { ...draft.payload, payment: next };
+    supabase.from('enquiries').update({ payload: nextPayload as unknown as never }).eq('id', enquiry.id)
+      .then(({ error }) => {
+        if (error) { toast.error(error.message); return; }
+        setEnquiry(prev => prev ? { ...prev, payload: nextPayload } : prev);
+        setDraft(prev => prev ? { ...prev, payload: nextPayload } : prev);
+        refreshNotes(enquiry.id);
+      });
   };
 
   const addNote = async () => {
@@ -547,9 +607,10 @@ export default function EnquiryDetail() {
       setTimeout(() => el?.focus(), 300);
       return;
     }
-    const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
-    if (!enquiry.onboarding_pack_sent && !paymentPaid) {
-      toast.error('Mark the payment as Paid before sending the onboarding form.');
+    const paymentStatus = draft.payload.payment?.status ?? null;
+    const paymentResolved = paymentStatus === 'PAID' || paymentStatus === 'DEFERRED';
+    if (!enquiry.onboarding_pack_sent && !paymentResolved) {
+      toast.error('Generate a payment link, mark as paid offline, or defer collection before sending the onboarding form.');
       return;
     }
     if (!(await requireClean('send the onboarding form'))) return;
@@ -713,6 +774,8 @@ export default function EnquiryDetail() {
             onOutcomeChange={handleOutcomeChange}
             onDemoOutcomeChange={handleDemoOutcomeChange}
             onOpenPaymentDialog={() => setPaymentDialogOpen(true)}
+            onOpenOfflineDialog={() => setOfflineDialogOpen(true)}
+            onOpenDeferDialog={() => setDeferDialogOpen(true)}
             onSetPaymentStatus={setPaymentStatus}
           />
         }
@@ -726,12 +789,13 @@ export default function EnquiryDetail() {
             <div className="p-4 space-y-2.5">
               <div className="text-sm font-semibold text-foreground mb-1">Actions</div>
               {(() => {
-                const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
+                const payStatus = draft.payload.payment?.status ?? null;
+                const paymentResolved = payStatus === 'PAID' || payStatus === 'DEFERRED';
                 const onboardingSent = enquiry.onboarding_pack_sent || draft.onboarding_pack_sent;
-                const onboardEnabled = onboardingSent || paymentPaid;
+                const onboardEnabled = onboardingSent || paymentResolved;
                 const blockedReason = onboardEnabled
                   ? null
-                  : 'Mark payment as Paid to unlock onboarding.';
+                  : 'Resolve payment (link / offline / defer) to unlock onboarding.';
                 return (
                   <>
                     <div className="flex items-center gap-1.5">
@@ -1389,7 +1453,8 @@ function StageFlow({
 }
 
 function StageOutcomePanel({
-  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange, onOpenPaymentDialog, onSetPaymentStatus,
+  stage, draft, setField, setPayload, onOutcomeChange, onDemoOutcomeChange,
+  onOpenPaymentDialog, onOpenOfflineDialog, onOpenDeferDialog, onSetPaymentStatus,
 }: {
   stage: Stage;
   draft: Enquiry;
@@ -1398,7 +1463,9 @@ function StageOutcomePanel({
   onOutcomeChange: (v: string) => void;
   onDemoOutcomeChange: (v: string) => void;
   onOpenPaymentDialog: () => void;
-  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED') => void;
+  onOpenOfflineDialog: () => void;
+  onOpenDeferDialog: () => void;
+  onSetPaymentStatus: (s: 'PAID' | 'PENDING' | 'FAILED' | 'DEFERRED') => void;
 }) {
   const isLost = stage === 'LOST';
   const currentIdx = isLost ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
@@ -1421,7 +1488,10 @@ function StageOutcomePanel({
         <ActiveStagePanel
           stage={stage} draft={draft} setField={setField} setPayload={setPayload}
           onOutcomeChange={onOutcomeChange} onDemoOutcomeChange={onDemoOutcomeChange}
-          onOpenPaymentDialog={onOpenPaymentDialog} onSetPaymentStatus={onSetPaymentStatus}
+          onOpenPaymentDialog={onOpenPaymentDialog}
+          onOpenOfflineDialog={onOpenOfflineDialog}
+          onOpenDeferDialog={onOpenDeferDialog}
+          onSetPaymentStatus={onSetPaymentStatus}
         />
       </div>
     </div>
@@ -1460,9 +1530,15 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
     );
   } else if (stage === 'PAYMENT_LINK_SENT') {
     const p = draft.payload.payment;
-    body = p?.short_url
-      ? <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>
-      : <span className="text-muted-foreground">No link generated</span>;
+    if (p?.status === 'DEFERRED') {
+      body = <span><span className="font-medium">Deferred</span>{p.reason ? ` · ${p.reason}` : ''}</span>;
+    } else if (p?.method === 'OFFLINE') {
+      body = <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">PAID offline</span>{p.reference ? ` · ref ${p.reference}` : ''}</span>;
+    } else if (p?.short_url) {
+      body = <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>;
+    } else {
+      body = <span className="text-muted-foreground">Not resolved yet</span>;
+    }
   } else if (stage === 'ONBOARDING_PACK_SENT') {
     body = <span>Onboarding form sent</span>;
   } else if (stage === 'ACCOUNT_CREATED') {
