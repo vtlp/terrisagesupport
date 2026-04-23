@@ -21,6 +21,7 @@ import { PaymentEmailComposer, buildRenewalPaymentEmail } from '@/components/bil
 interface Props { accountId: string }
 
 interface RenewalState {
+  status: 'TRIAL' | 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE';
   plan_name: string;
   base_fee: number;
   seat_rate: number;
