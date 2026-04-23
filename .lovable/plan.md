@@ -1,85 +1,73 @@
 
 
-# Seats / Billing / CRM-Sync — Implementation Plan (with gap remedies)
+# CRM Integration Handover Pack — Documentation Plan
 
-End-to-end build to reconcile **CRM user states** (Invited / Active / Temp-deactivated / Deletion-requested / Deleted) with **Support Console billing & seat allocation**, including renewals, mid-cycle proration, and superuser-transfer governance.
+Generate a complete, self-contained integration document the CRM team can implement against, plus a short "Console-side checklist" describing what we own. Delivered as a downloadable Markdown file in `/mnt/documents/` and (optionally) as a new in-app reference page extending the existing `AdminCrmSyncContract` screen.
 
-## 1. Scope confirmation
+## 1. Deliverable format
 
-- Mid-cycle seat increases → **prorated invoice** auto-generated (days remaining ÷ cycle days × seat-rate × delta + GST). Confirmed in `apply_seat_delta`.
-- **G5 (Superuser transfer)** remedy: when a superuser-transfer is initiated, notify **all support users** (broadcast notification) AND create a **calendar event for next day** on every support user's calendar to follow up.
-- **G8 (open-work reassignment signal)** → excluded as requested.
+- **Primary**: `CRM_Integration_Handover_v1.md` saved to `/mnt/documents/` for the user to share with the CRM developer.
+- **Secondary** (in-app): expand `src/pages/admin/AdminCrmSyncContract.tsx` with three tabs — *Our Setup*, *Their Setup*, *API Reference* — mirroring the same content so it stays accessible inside the Console.
 
-## 2. Database migration
+## 2. Document structure
 
-**Extend `account_billing_settings`**
-- `subscription_started_at`, `current_period_start`, `current_period_end`, `auto_renew bool default true`, `cancellation_requested_at`, `cancellation_effective_at`, `country text default 'IN'`.
+### Section A — Overview
+- One-paragraph context (Console = billing & seat allocation source of truth; CRM = user lifecycle source of truth).
+- The five seat states (`INVITED`, `ACTIVE`, `TEMP_DEACTIVATED`, `DELETION_REQUESTED`, `DELETED`) and the four-counter model (Allocated / Reserved / Consumed / Available).
+- Reconciliation rules (block invites when Available = 0, stale-snapshot alerts at 24h, deleted seats released at renewal).
 
-**New tables**
-- `seat_usage_snapshots` (account_id PK, allocated, reserved, consumed, available, members_jsonb, reported_at, source).
-- `seat_change_events` (account_id, delta, reason `ONBOARDING|REQUEST_FULFILLED|RENEWAL_INCREASE|RENEWAL_DECREASE|MANUAL|SUPERUSER_TRANSFER`, effective_at, prorated_amount, invoice_id, created_by).
-- `account_renewal_decisions` (account_id, period_end, decision `RENEW|RENEW_INCREASE|RENEW_DECREASE|CANCEL`, new_seats, notes, decided_by).
-- `superuser_transfers` (account_id, from_seat_id, to_seat_id, status `INITIATED|COMPLETED|CANCELLED`, initiated_by, initiated_at, completed_at, follow_up_event_id).
+### Section B — What the Console team configures (our side)
+1. Generate per-account API key from **Account → API Keys** (`account_api_keys`, hashed with SHA-256).
+2. Share with CRM team: `account_id`, `x-account-api-key`, base URL `https://phkzxeajzglbmaymvtmt.supabase.co/functions/v1/`.
+3. Confirm `account_billing_settings` row exists with `subscription_started_at`, `current_period_start/end`, `billing_cycle`, `seats_purchased`, `seat_rate`, `gst_pct`, `country`.
+4. Approve seat-increase requests via Seats tab → triggers `apply_seat_delta` → emits `SEAT_INCREASE` event for CRM polling.
+5. Run renewals via Billing tab → emits `RENEWAL` event.
 
-**Extend `account_seats`**: `crm_state` (INVITED/ACTIVE/TEMP_DEACTIVATED/DELETION_REQUESTED/DELETED), `invitation_expires_at`, `last_active_at`, `is_superuser bool`.
+### Section C — What the CRM developer must build (their side)
+1. **Store credentials** securely: `account_id` + `x-account-api-key` per tenant.
+2. **Boot read** — call `GET /seat-capacity` on app start to learn entitlement (allocated, current_period_end, owner_name, country, auto_renew).
+3. **Heartbeat push** — call `POST /seat-usage` every 5 min AND on every member state change, with the full member roster (no diffs).
+4. **Invite TTL ownership** — set `invitation_expires_at` (recommended 7 days); expired invites must drop back to a non-INVITED state so they stop counting as Reserved.
+5. **Block invites** when `/seat-capacity` returns `available = 0`.
+6. **Poll deltas** — call `GET /seat-events?since=<last_ts>` every 5 min; on `SEAT_INCREASE`/`RENEWAL` unlock new invite slots, on `CANCELLATION` freeze new invites.
+7. **Seat-increase request** — call `POST /seat-request` when admin asks for more seats.
+8. **Subscription metadata screen** — call `GET /account-profile` to display billing context to the CRM admin.
+9. **Superuser transfer notice** — listen for `SUPERUSER_TRANSFER` events on `/seat-events` (Console initiates, CRM reflects new superuser).
 
-**Extend `account_invoices`**: `kind` enum (`CYCLE|PRORATION|RENEWAL`).
+### Section D — API reference (verbatim contract)
+For each endpoint: method, path, headers, request body schema, response schema, sample `curl`, error codes.
 
-**RPCs**
-- `apply_seat_delta(_account_id, _delta, _reason)` → updates `seats_purchased`, computes proration, drafts a `PRORATION` invoice if mid-cycle, writes `seat_change_events`.
-- `compute_proration(_account_id, _delta)` → returns days_remaining + amount + GST preview.
-- `renew_subscription(_account_id, _decision, _new_seats, _notes)` → closes current cycle, generates `RENEWAL` invoice, advances period, releases DELETED seats.
-- `initiate_superuser_transfer(_account_id, _from_seat_id, _to_seat_id)` → writes transfer row, broadcasts notification to all support users, creates calendar event for tomorrow per support user.
-
-**Cron additions** (15-min job already exists):
-- `scan_renewals_due()` → notifications at T-14 / T-7 / T-1 days.
-- `scan_crm_sync_stale()` → notify if no snapshot in 24h on LIVE accounts.
-
-## 3. Edge functions
-
-**Extend** `/seat-capacity` → return `allocated, reserved, consumed, available, requested, plan, cycle, current_period_start/end, country, owner_name, auto_renew`.
-
-**New**
-- `POST /seat-usage` (CRM → Console heartbeat with full member roster + per-member state).
-- `GET /account-profile` (Console → CRM reads subscription metadata).
-- `GET /seat-events?since=<ts>` (CRM polls allocation deltas to unlock invite slots).
-
-All authenticated via existing `x-account-api-key`.
-
-## 4. Gap → remedy map
-
-| # | Gap | Remedy in this build |
+| Endpoint | Direction | Auth |
 |---|---|---|
-| G1 | No "Reserved" concept | `seat_usage_snapshots.reserved` + UI tile |
-| G2 | No CRM usage push | `POST /seat-usage` endpoint |
-| G3 | No invite TTL enforcement | CRM owns TTL; Console reads `invitation_expires_at` and excludes expired from Reserved |
-| G4 | No cycle-end seat release | `renew_subscription` releases `DELETED` seats at period rollover |
-| G5 | No superuser-transfer flow | New `superuser_transfers` table + `initiate_superuser_transfer` RPC. Notifies **all support users** and auto-creates a follow-up **calendar event for next day** on each support user's calendar |
-| G6 | No CRM role visibility | `/seat-usage` payload carries `role` + `permissions[]` per member |
-| G7 | Single seat counter, no audit | `seat_change_events` audit log |
-| G9 | No cycle window stored | `current_period_start/end` columns + auto-set trigger |
-| G10 | Reserved/Consumed split missing in UI | New 5-tile capacity panel |
+| `GET /seat-capacity` | CRM → Console | `x-account-api-key` |
+| `GET /account-profile` | CRM → Console | `x-account-api-key` |
+| `GET /seat-events?since=` | CRM → Console | `x-account-api-key` |
+| `POST /seat-usage` | CRM → Console | `x-account-api-key` |
+| `POST /seat-request` | CRM → Console | `x-account-api-key` |
 
-## 5. UI changes (Support Console)
+Each entry includes the full JSON payload taken from the live edge functions (`seat-usage`, `seat-capacity`, `account-profile`, `seat-events`, `seat-request`).
 
-**Account → Seats tab** (`SeatsAndRequestsTab.tsx`): replace 4-tile block with **5 tiles** — Allocated · Reserved · Consumed · Available · Requested. Add member roster mirroring CRM with state badges. New actions: **Adjust seats** (with live proration preview), **Provision logins**, **Initiate superuser transfer**.
+### Section E — Member payload schema (for `/seat-usage`)
+Field-by-field table: `external_id`, `full_name`, `email`, `phone`, `role`, `permissions[]`, `state`, `invited_at`, `invitation_expires_at`, `activated_at`, `last_active_at`, `is_superuser` — with required/optional, type, and the rule that derives Reserved/Consumed.
 
-**Account → Billing tab** (`BillingTab.tsx`): add subscription start, current period, auto-renew toggle, country. Within 30 days of period-end show renewal action card (Renew / Renew + adjust / Cancel). Invoice list gets `KIND` chip.
+### Section F — Reconciliation & error handling
+- Counter math (`reserved`, `consumed`, `available`) the Console performs server-side.
+- `OVER_CAPACITY` response when `consumed > allocated`.
+- Retry policy: exponential backoff on 5xx, 24-hour silence triggers `CRM_SYNC_STALE` notification on Console bell.
+- Idempotency: `/seat-usage` upserts by `account_id`; `/seat-request` deduplicates by pending status.
 
-**Account header** (`AppHeader.tsx`/account detail): CRM-sync chip — green <1h, amber <24h, red ≥24h.
+### Section G — Test plan
+- Curl commands for each endpoint with sample payloads.
+- Walk-through scenarios: invite a user → verify Reserved tile; activate user → Consumed bumps; expire invite → Reserved drops; request +5 seats → approval bumps Allocated → CRM polls event.
 
-**Admin → Integrations**: new "CRM Sync Contract" doc page with endpoints, payloads, sample curl.
+### Section H — Out of scope (so CRM team doesn't expect it)
+- Concurrent-seat licensing, open-work reassignment signal, Razorpay auto-collection, CRM-side UI mockups.
 
-## 6. Phased delivery (this build executes all phases)
+## 3. Console-side code change (small, optional)
+Extend `src/pages/admin/AdminCrmSyncContract.tsx` to render the same handover content in a tabbed view so the doc lives next to the API key management screen. No new tables or RPCs needed.
 
-1. DB migration + RPCs + edge functions.
-2. Seats tab redesign + proration dialog + provisioning + superuser transfer.
-3. Billing tab subscription/renewal management.
-4. Header sync chip + Integrations contract page + cron schedules for `scan_renewals_due` and `scan_crm_sync_stale`.
+## 4. Out of scope for this build
 
-## 7. Out of scope
-
-- Auto-collection via Razorpay for proration/renewal invoices (stay DRAFT, finalised manually using existing flow).
-- CRM-side UI changes (only the API contract is defined).
-- G8 (open-work reassignment) — excluded per your instruction.
+- No new edge functions, RPCs, or migrations.
+- No CRM-side code (we only document what they must build).
 
