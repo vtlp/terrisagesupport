@@ -131,6 +131,99 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ---------- TRIAL_CONVERSION PAID branch ----------
+    if (purpose === 'TRIAL_CONVERSION' && accountIdNote) {
+      const { data: settings } = await admin.from('account_billing_settings')
+        .select('trial_link_seats, seats_purchased, billing_cycle, plan_name, base_fee, seat_rate, gst_pct, trial_link_amount')
+        .eq('account_id', accountIdNote).maybeSingle();
+
+      const trialSeats = Number(settings?.trial_link_seats ?? 0);
+      const newSeats = trialSeats > 0 ? trialSeats : Number(settings?.seats_purchased ?? 0);
+      const cycle = (settings?.billing_cycle as string) ?? 'ANNUAL';
+      const planName = (settings?.plan_name as string) ?? 'Standard';
+      const baseFee = Number(settings?.base_fee ?? 33000);
+      const seatRate = Number(settings?.seat_rate ?? 7000);
+      const gstPct = Number(settings?.gst_pct ?? 18);
+      const subtotal = baseFee + seatRate * Math.max(newSeats - 3, 0);
+      const gstAmount = (subtotal * gstPct) / 100;
+      const totalCalc = subtotal + gstAmount;
+      const total = Number(settings?.trial_link_amount ?? totalCalc);
+
+      // Compute period start (now) and end (now + cycle).
+      const periodStart = new Date();
+      const periodEnd = new Date(periodStart);
+      if (cycle === 'MONTHLY') periodEnd.setMonth(periodEnd.getMonth() + 1);
+      else if (cycle === 'QUARTERLY') periodEnd.setMonth(periodEnd.getMonth() + 3);
+      else periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+
+      // Flip account out of trial → active, stamp lifecycle dates,
+      // sync seats_purchased to whatever was paid for, and clear the trial-link state.
+      await admin.from('account_billing_settings').update({
+        status: 'ACTIVE',
+        seats_purchased: newSeats,
+        subscription_started_at: periodStart.toISOString(),
+        current_period_start: periodStart.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+        next_renewal_at: periodEnd.toISOString(),
+        trial_link_status: 'PAID',
+        trial_paid_at: nowIso,
+        trial_payment_reference: linkId ?? null,
+      }).eq('account_id', accountIdNote);
+
+      // Mirror the PAID invoice (dedupe by link id in notes).
+      const dedupeKey = linkId ?? '';
+      if (dedupeKey) {
+        const { data: existing } = await admin
+          .from('account_invoices')
+          .select('id')
+          .eq('account_id', accountIdNote)
+          .eq('status', 'PAID')
+          .ilike('notes', `%${dedupeKey}%`)
+          .limit(1).maybeSingle();
+        if (!existing) {
+          await admin.from('account_invoices').insert({
+            account_id: accountIdNote,
+            plan_name: planName,
+            seat_count: newSeats,
+            seat_rate: seatRate,
+            base_fee: baseFee,
+            subtotal,
+            gst_pct: gstPct,
+            gst_amount: gstAmount,
+            total,
+            status: 'PAID',
+            kind: 'CYCLE',
+            issued_at: nowIso,
+            paid_at: nowIso,
+            period_from: periodStart.toISOString().substring(0, 10),
+            period_to: periodEnd.toISOString().substring(0, 10),
+            notes: `Razorpay trial conversion · ${linkId ?? '—'}`,
+          });
+        }
+      }
+
+      // Tick the "Collect trial conversion payment" checklist item if present.
+      await admin.from('account_checklist_items').update({
+        is_done: true, done_at: nowIso,
+      }).eq('account_id', accountIdNote)
+        .eq('label', 'Collect trial conversion payment')
+        .eq('is_done', false);
+
+      await admin.from('account_notes').insert({
+        account_id: accountIdNote,
+        note_text: `[Trial] Conversion payment received via Razorpay · subscription now ACTIVE`,
+      });
+      await admin.from('activity_log').insert({
+        entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
+        summary: '[Trial] Conversion payment received · activated',
+        details: { module: 'trial', link_id: linkId, seats: newSeats, total },
+      });
+
+      return new Response(JSON.stringify({ success: true, branch: 'TRIAL_CONVERSION' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ---------- INITIAL PAID branch (existing behaviour) ----------
     if (!enquiryId) {
       return new Response(JSON.stringify({ success: true, ignored: 'no enquiry_id' }), {
