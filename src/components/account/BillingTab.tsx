@@ -8,13 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Receipt, Plus, Pencil, Trash2, Loader2, Save } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Receipt, Plus, Pencil, Trash2, Loader2, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, differenceInCalendarDays } from 'date-fns';
 
 type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
 type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+type InvoiceKind = 'CYCLE' | 'PRORATION' | 'RENEWAL';
+type RenewalDecision = 'RENEW' | 'RENEW_INCREASE' | 'RENEW_DECREASE' | 'CANCEL';
 
 interface Settings {
   id?: string;
@@ -26,13 +29,21 @@ interface Settings {
   gst_pct: number;
   next_renewal_at: string | null;
   status: SubStatus;
+  country: string;
+  auto_renew: boolean;
+  subscription_started_at: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancellation_requested_at: string | null;
+  cancellation_effective_at: string | null;
 }
 
 interface Invoice {
   id: string; invoice_no: string | null; period_from: string | null; period_to: string | null;
   plan_name: string | null; seat_count: number; seat_rate: number; base_fee: number;
   subtotal: number; gst_pct: number; gst_amount: number; total: number;
-  status: InvoiceStatus; issued_at: string | null; due_at: string | null; paid_at: string | null; notes: string | null;
+  status: InvoiceStatus; kind: InvoiceKind;
+  issued_at: string | null; due_at: string | null; paid_at: string | null; notes: string | null;
 }
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -43,11 +54,20 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
   CANCELLED: 'bg-muted text-muted-foreground',
 };
 
+const KIND_COLORS: Record<InvoiceKind, string> = {
+  CYCLE: 'bg-primary/10 text-primary',
+  PRORATION: 'bg-warning/15 text-warning',
+  RENEWAL: 'bg-success/15 text-success',
+};
+
 const fmtINR = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 const DEFAULT_SETTINGS: Settings = {
   plan_name: 'Standard', billing_cycle: 'MONTHLY', base_fee: 33000, seat_rate: 7000, seats_purchased: 0,
   gst_pct: 18, next_renewal_at: null, status: 'ACTIVE',
+  country: 'IN', auto_renew: true,
+  subscription_started_at: null, current_period_start: null, current_period_end: null,
+  cancellation_requested_at: null, cancellation_effective_at: null,
 };
 
 export function BillingTab({ accountId }: { accountId: string }) {
@@ -72,18 +92,27 @@ export function BillingTab({ accountId }: { accountId: string }) {
       supabase.from('account_seats').select('id', { count: 'exact', head: true }).eq('account_id', accountId).eq('is_active', true),
     ]);
     if (s.data) {
+      const d = s.data as Record<string, unknown>;
       const loaded: Settings = {
         id: s.data.id, plan_name: s.data.plan_name, billing_cycle: s.data.billing_cycle,
         base_fee: Number(s.data.base_fee), seat_rate: Number(s.data.seat_rate),
         seats_purchased: Number((s.data as { seats_purchased?: number }).seats_purchased ?? 0),
         gst_pct: Number(s.data.gst_pct),
         next_renewal_at: s.data.next_renewal_at, status: s.data.status,
+        country: (d.country as string) ?? 'IN',
+        auto_renew: (d.auto_renew as boolean) ?? true,
+        subscription_started_at: (d.subscription_started_at as string | null) ?? null,
+        current_period_start: (d.current_period_start as string | null) ?? null,
+        current_period_end: (d.current_period_end as string | null) ?? null,
+        cancellation_requested_at: (d.cancellation_requested_at as string | null) ?? null,
+        cancellation_effective_at: (d.cancellation_effective_at as string | null) ?? null,
       };
       setSettings(loaded); setSavedSettings(loaded);
     }
     setInvoices((inv.data ?? []).map(i => ({
       ...i, seat_count: i.seat_count, seat_rate: Number(i.seat_rate), base_fee: Number(i.base_fee),
       subtotal: Number(i.subtotal), gst_pct: Number(i.gst_pct), gst_amount: Number(i.gst_amount), total: Number(i.total),
+      kind: ((i as { kind?: InvoiceKind }).kind ?? 'CYCLE') as InvoiceKind,
     })) as Invoice[]);
     setSeatCount(seats.count ?? 0);
     setLoading(false);
