@@ -607,9 +607,10 @@ export default function EnquiryDetail() {
       setTimeout(() => el?.focus(), 300);
       return;
     }
-    const paymentPaid = (draft.payload.payment?.status ?? null) === 'PAID';
-    if (!enquiry.onboarding_pack_sent && !paymentPaid) {
-      toast.error('Mark the payment as Paid before sending the onboarding form.');
+    const paymentStatus = draft.payload.payment?.status ?? null;
+    const paymentResolved = paymentStatus === 'PAID' || paymentStatus === 'DEFERRED';
+    if (!enquiry.onboarding_pack_sent && !paymentResolved) {
+      toast.error('Generate a payment link, mark as paid offline, or defer collection before sending the onboarding form.');
       return;
     }
     if (!(await requireClean('send the onboarding form'))) return;
