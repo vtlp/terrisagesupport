@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.seat-events]
 verify_jwt = false
+
+[functions.razorpay-cancel-payment-link]
+verify_jwt = false
+
+[functions.razorpay-link-status]
+verify_jwt = false

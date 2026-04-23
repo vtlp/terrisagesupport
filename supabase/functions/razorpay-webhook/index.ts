@@ -1,5 +1,10 @@
 // Razorpay webhook receiver. Verifies signature with RAZORPAY_WEBHOOK_SECRET,
-// flips enquiry payload payment.status to PAID on `payment_link.paid`.
+// then branches on `notes.purpose`:
+//   - 'INITIAL' (default): flips enquiry payload payment.status to PAID
+//     and mirrors a PAID invoice on the account if already converted.
+//   - 'RENEWAL': marks renewal_link_status PAID on account_billing_settings,
+//     calls renew_subscription RPC to roll the period forward and create the
+//     PAID renewal invoice, then clears the open renewal-link fields.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 const corsHeaders = {
@@ -35,23 +40,97 @@ Deno.serve(async (req) => {
     }
 
     const event = JSON.parse(raw) as { event?: string; payload?: Record<string, unknown> };
+    const linkObj = (event.payload as { payment_link?: { entity?: Record<string, unknown> } } | undefined)?.payment_link?.entity ?? {};
+    const linkId = linkObj.id as string | undefined;
+    const notes = (linkObj.notes ?? {}) as Record<string, string>;
+    const purpose = (notes.purpose as 'INITIAL' | 'RENEWAL' | undefined) ?? 'INITIAL';
+    const enquiryId = notes.enquiry_id;
+    const accountIdNote = notes.account_id;
+
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const nowIso = new Date().toISOString();
+
+    // Handle cancelled / expired explicitly so the source row reflects reality.
+    if (event.event === 'payment_link.cancelled' || event.event === 'payment_link.expired') {
+      const newStatus = event.event === 'payment_link.cancelled' ? 'CANCELLED' : 'EXPIRED';
+
+      if (purpose === 'INITIAL' && enquiryId) {
+        const { data: enq } = await admin.from('enquiries').select('payload').eq('id', enquiryId).maybeSingle();
+        const payload = (enq?.payload ?? {}) as Record<string, unknown>;
+        const payment = (payload.payment ?? {}) as Record<string, unknown>;
+        await admin.from('enquiries').update({
+          payload: { ...payload, payment: { ...payment, status: newStatus } },
+        }).eq('id', enquiryId);
+        await admin.from('activity_log').insert({
+          entity_type: 'ENQUIRY', entity_id: enquiryId, event_type: 'FIELD_EDIT',
+          summary: `[Payment] Link ${newStatus.toLowerCase()} (Razorpay)`,
+          details: { module: 'billing', link_id: linkId },
+        });
+      } else if (purpose === 'RENEWAL' && accountIdNote) {
+        await admin.from('account_billing_settings').update({ renewal_link_status: newStatus }).eq('account_id', accountIdNote);
+        await admin.from('activity_log').insert({
+          entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
+          summary: `[Renewal] Link ${newStatus.toLowerCase()} (Razorpay)`,
+          details: { module: 'renewal', link_id: linkId },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, handled: newStatus }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (event.event !== 'payment_link.paid') {
       return new Response(JSON.stringify({ success: true, ignored: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const linkObj = (event.payload as { payment_link?: { entity?: Record<string, unknown> } } | undefined)?.payment_link?.entity ?? {};
-    const linkId = linkObj.id as string | undefined;
-    const notes = (linkObj.notes ?? {}) as Record<string, string>;
-    const enquiryId = notes.enquiry_id;
+    // ---------- RENEWAL PAID branch ----------
+    if (purpose === 'RENEWAL' && accountIdNote) {
+      const { data: settings } = await admin.from('account_billing_settings')
+        .select('renewal_link_seats, seats_purchased, current_period_end')
+        .eq('account_id', accountIdNote).maybeSingle();
+      const newSeats = Number(settings?.renewal_link_seats ?? 0);
+      const currentSeats = Number(settings?.seats_purchased ?? 0);
+      const decision = newSeats === 0 || newSeats === currentSeats
+        ? 'RENEW'
+        : newSeats > currentSeats ? 'RENEW_INCREASE' : 'RENEW_DECREASE';
+
+      const { error: rpcErr } = await admin.rpc('renew_subscription', {
+        _account_id: accountIdNote,
+        _decision: decision,
+        _new_seats: decision === 'RENEW' ? null : newSeats,
+        _notes: `Razorpay renewal payment received · ${linkId ?? ''}`,
+      });
+      if (rpcErr) console.error('renew_subscription failed', rpcErr);
+
+      // Mark the open renewal-link fields PAID and clear them so the next cycle
+      // starts fresh.
+      await admin.from('account_billing_settings').update({
+        renewal_link_status: 'PAID',
+        renewal_paid_at: nowIso,
+        renewal_payment_reference: linkId ?? null,
+      }).eq('account_id', accountIdNote);
+
+      await admin.from('activity_log').insert({
+        entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
+        summary: '[Renewal] Payment received via Razorpay',
+        details: { module: 'renewal', link_id: linkId, decision, seats: newSeats },
+      });
+
+      return new Response(JSON.stringify({ success: true, branch: 'RENEWAL' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ---------- INITIAL PAID branch (existing behaviour) ----------
     if (!enquiryId) {
       return new Response(JSON.stringify({ success: true, ignored: 'no enquiry_id' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const { data: enq } = await admin
       .from('enquiries')
       .select('payload, converted_account_id')
@@ -59,25 +138,22 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const payload = (enq?.payload ?? {}) as Record<string, unknown>;
     const payment = (payload.payment ?? {}) as Record<string, unknown>;
-    const paidAtIso = new Date().toISOString();
-    const nextPayment = { ...payment, status: 'PAID', paid_at: paidAtIso, link_id: payment.link_id ?? linkId };
+    const nextPayment = { ...payment, status: 'PAID', paid_at: nowIso, link_id: payment.link_id ?? linkId };
     await admin.from('enquiries').update({ payload: { ...payload, payment: nextPayment } }).eq('id', enquiryId);
 
     await admin.from('activity_log').insert({
       entity_type: 'ENQUIRY', entity_id: enquiryId, event_type: 'FIELD_EDIT',
       summary: '[Payment] Marked Paid via Razorpay webhook',
-      details: { link_id: payment.link_id ?? linkId },
+      details: { module: 'billing', link_id: payment.link_id ?? linkId },
     });
 
-    // If the enquiry is already converted to an account, mirror this as a PAID invoice
-    // on the account so the Billing tab reflects the Razorpay payment immediately.
+    // Mirror PAID invoice onto the account when already converted.
     const accountId = enq?.converted_account_id as string | null | undefined;
     if (accountId) {
       const breakdown = (payment.breakdown ?? {}) as Record<string, unknown>;
       const planName = (breakdown.plan_name as string) || 'Standard';
       const baseFee = Number(breakdown.base_fee ?? 33000);
       const seatRate = Number(breakdown.per_seat_rate ?? 7000);
-      // Invoice seats reflect what was PURCHASED on the payment link, not active members.
       const seats = Number(breakdown.seats ?? 0);
       const gstPct = Number(breakdown.gst_pct ?? 18);
       const subtotal = Number(breakdown.subtotal ?? baseFee + seatRate * Math.max(seats - 3, 0));
@@ -107,14 +183,14 @@ Deno.serve(async (req) => {
           gst_amount: gstAmount,
           total,
           status: 'PAID',
-          issued_at: (payment.created_at as string) || paidAtIso,
-          paid_at: paidAtIso,
+          issued_at: (payment.created_at as string) || nowIso,
+          paid_at: nowIso,
           notes: `Razorpay payment link · ${shortUrl || linkId || '—'}`,
         });
       }
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, branch: 'INITIAL' }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

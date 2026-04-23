@@ -1,0 +1,18 @@
+ALTER TABLE public.account_billing_settings
+  ADD COLUMN IF NOT EXISTS renewal_link_id text,
+  ADD COLUMN IF NOT EXISTS renewal_link_short_url text,
+  ADD COLUMN IF NOT EXISTS renewal_link_amount numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS renewal_link_seats integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS renewal_link_currency text NOT NULL DEFAULT 'INR',
+  ADD COLUMN IF NOT EXISTS renewal_link_status text,
+  ADD COLUMN IF NOT EXISTS renewal_link_created_at timestamptz,
+  ADD COLUMN IF NOT EXISTS renewal_link_expires_at timestamptz,
+  ADD COLUMN IF NOT EXISTS renewal_link_outdated boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS renewal_email_last_drafted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS renewal_email_last_sent_at timestamptz,
+  ADD COLUMN IF NOT EXISTS renewal_email_draft_subject text,
+  ADD COLUMN IF NOT EXISTS renewal_email_draft_body text,
+  ADD COLUMN IF NOT EXISTS renewal_due_date date,
+  ADD COLUMN IF NOT EXISTS renewal_notes text,
+  ADD COLUMN IF NOT EXISTS renewal_paid_at timestamptz,
+  ADD COLUMN IF NOT EXISTS renewal_payment_reference text;
