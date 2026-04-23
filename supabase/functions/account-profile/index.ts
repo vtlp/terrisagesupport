@@ -1,3 +1,4 @@
+// Console → CRM: subscription/profile metadata for the calling account.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -27,56 +28,31 @@ Deno.serve(async (req) => {
 
   const keyHash = await sha256Hex(apiKey);
   const { data: accountId, error: keyErr } = await supabase.rpc('validate_account_api_key', { _key_hash: keyHash });
-
   if (keyErr || !accountId) {
     return new Response(JSON.stringify({ error: 'Invalid API key' }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  // Capacity from view (purchased, used, reserved, available, last_crm_sync_at)
-  const { data: cap, error: capErr } = await supabase
-    .from('account_seat_capacity')
-    .select('seats_purchased, seats_used, seats_reserved, seats_available, plan_name, subscription_status, account_name, last_crm_sync_at')
+  const { data: acct } = await supabase
+    .from('accounts')
+    .select('account_name, account_code, owner_name, owner_email, owner_phone, status, tenancy_type, city')
+    .eq('id', accountId)
+    .maybeSingle();
+
+  const { data: bs } = await supabase
+    .from('account_billing_settings')
+    .select('plan_name, billing_cycle, base_fee, seat_rate, gst_pct, country, status, auto_renew, subscription_started_at, current_period_start, current_period_end, next_renewal_at, seats_purchased, cancellation_requested_at, cancellation_effective_at')
     .eq('account_id', accountId)
     .maybeSingle();
 
-  if (capErr || !cap) {
+  if (!acct) {
     return new Response(JSON.stringify({ error: 'Account not found' }),
       { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  // Subscription metadata
-  const { data: bs } = await supabase
-    .from('account_billing_settings')
-    .select('billing_cycle, current_period_start, current_period_end, next_renewal_at, country, auto_renew, subscription_started_at, cancellation_effective_at')
-    .eq('account_id', accountId)
-    .maybeSingle();
-
-  // Owner name
-  const { data: acct } = await supabase
-    .from('accounts')
-    .select('owner_name')
-    .eq('id', accountId)
-    .maybeSingle();
-
   return new Response(JSON.stringify({
     account_id: accountId,
-    account_name: cap.account_name,
-    owner_name: acct?.owner_name ?? null,
-    plan: cap.plan_name,
-    cycle: bs?.billing_cycle ?? null,
-    status: cap.subscription_status,
-    country: bs?.country ?? 'IN',
-    auto_renew: bs?.auto_renew ?? true,
-    subscription_started_at: bs?.subscription_started_at ?? null,
-    period_start: bs?.current_period_start ?? null,
-    period_end: bs?.current_period_end ?? null,
-    next_renewal_at: bs?.next_renewal_at ?? null,
-    cancellation_effective_at: bs?.cancellation_effective_at ?? null,
-    purchased: cap.seats_purchased,
-    in_use: cap.seats_used,
-    reserved: cap.seats_reserved,
-    available: cap.seats_available,
-    last_crm_sync_at: cap.last_crm_sync_at,
+    account: acct,
+    subscription: bs ?? null,
   }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 });
