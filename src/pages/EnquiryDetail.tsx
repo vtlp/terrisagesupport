@@ -1723,37 +1723,124 @@ function ActiveStagePanel({
   if (stage === 'PAYMENT_LINK_SENT') {
     const payment = draft.payload.payment;
     const status = payment?.status ?? null;
+    const mode = payment?.mode ?? 'PAY_BEFORE_ACCOUNT';
+    const teamSize = (draft.payload.team_size_estimate as number | null | undefined) ?? null;
+    const breakdownSeats = (payment?.breakdown as { seats?: number } | undefined)?.seats ?? null;
+    const seatsDrifted = payment?.short_url && breakdownSeats !== null && teamSize !== null && breakdownSeats !== teamSize;
+    const isOutdated = !!(payment?.outdated || seatsDrifted);
+    const linkExpired = payment?.expires_at ? new Date(payment.expires_at) < new Date() : false;
+    const linkActive = !!payment?.short_url && status !== 'PAID' && status !== 'CANCELLED' && !linkExpired;
+
     const statusBadge = (s: string) => {
       const cls = s === 'PAID' ? 'bg-success/15 text-success border-success/30'
-        : s === 'FAILED' ? 'bg-destructive/15 text-destructive border-destructive/30'
+        : s === 'FAILED' || s === 'EXPIRED' ? 'bg-destructive/15 text-destructive border-destructive/30'
         : s === 'CANCELLED' ? 'bg-muted text-muted-foreground'
+        : s === 'EMAIL_SENT' ? 'bg-success/10 text-success border-success/30'
+        : s === 'EMAIL_DRAFTED' ? 'bg-warning/15 text-warning border-warning/30'
         : 'bg-primary/15 text-primary border-primary/30';
-      return <Badge variant="outline" className={cn('text-[10px]', cls)}>{s}</Badge>;
+      return <Badge variant="outline" className={cn('text-[10px]', cls)}>{s.replace('_', ' ')}</Badge>;
     };
+
     return (
       <div className="space-y-3">
+        {/* Mode toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Label className="text-xs text-muted-foreground">Billing mode</Label>
+          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            <button
+              type="button"
+              onClick={() => mode !== 'PAY_BEFORE_ACCOUNT' && onSetPaymentMode('PAY_BEFORE_ACCOUNT')}
+              className={cn('px-3 py-1 text-xs rounded transition-colors',
+                mode === 'PAY_BEFORE_ACCOUNT' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground')}
+            >Pay first</button>
+            <button
+              type="button"
+              onClick={() => mode !== 'TRIAL_FIRST' && onSetPaymentMode('TRIAL_FIRST')}
+              className={cn('px-3 py-1 text-xs rounded transition-colors',
+                mode === 'TRIAL_FIRST' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground')}
+            >Trial first</button>
+          </div>
+          {teamSize !== null && (
+            <span className="text-[11px] text-muted-foreground ml-auto">Seats: <span className="font-medium text-foreground">{teamSize}</span></span>
+          )}
+        </div>
+
+        {/* Trial date inputs */}
+        {mode === 'TRIAL_FIRST' && (
+          <div className="grid grid-cols-2 gap-2 rounded-md border border-dashed bg-muted/20 p-3">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Trial start</Label>
+              <Input
+                type="date"
+                className="h-8"
+                value={payment?.trial?.start ?? ''}
+                onChange={e => onSetTrialDate('start', e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Trial end</Label>
+              <Input
+                type="date"
+                className="h-8"
+                value={payment?.trial?.end ?? ''}
+                onChange={e => onSetTrialDate('end', e.target.value)}
+              />
+            </div>
+            <p className="col-span-2 text-[11px] text-muted-foreground">
+              Trial mode allows account creation without immediate payment. Capture both dates before progressing.
+            </p>
+          </div>
+        )}
+
+        {/* Link card */}
         {payment?.short_url ? (
-          <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+          <div className={cn('rounded-md border p-3 space-y-2',
+            isOutdated ? 'border-warning/40 bg-warning/5' : 'bg-muted/20')}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold">{fmtINR(payment.amount ?? 0)}</span>
                 {status && statusBadge(status)}
+                {isOutdated && (
+                  <Badge variant="outline" className="text-[10px] bg-warning/15 text-warning border-warning/40">Outdated</Badge>
+                )}
+                {linkExpired && (
+                  <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/40">Expired</Badge>
+                )}
                 {payment.created_at && (
                   <span className="text-[11px] text-muted-foreground">
                     Sent {format(new Date(payment.created_at), 'dd MMM, HH:mm')}
                   </span>
                 )}
+                {payment.expires_at && (
+                  <span className="text-[11px] text-muted-foreground">
+                    · Expires {format(new Date(payment.expires_at), 'dd MMM yyyy')}
+                  </span>
+                )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(payment.short_url!); toast.success('Link copied'); }}>
                   <CopyIcon className="h-3.5 w-3.5 mr-1" /> Copy
                 </Button>
                 <a href={payment.short_url} target="_blank" rel="noreferrer">
                   <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Open</Button>
                 </a>
+                <Button size="sm" variant="outline" onClick={onRefreshPaymentStatus} disabled={paymentBusy}>
+                  <RefreshCw className={cn('h-3.5 w-3.5 mr-1', paymentBusy && 'animate-spin')} /> Refresh
+                </Button>
               </div>
             </div>
             <div className="text-[11px] text-muted-foreground break-all">{payment.short_url}</div>
+            {(payment.email?.last_drafted_at || payment.email?.last_sent_at) && (
+              <div className="text-[11px] text-muted-foreground border-t pt-1.5 flex gap-4 flex-wrap">
+                {payment.email?.last_sent_at && <span>Email sent {format(new Date(payment.email.last_sent_at), 'dd MMM, HH:mm')}</span>}
+                {payment.email?.last_drafted_at && !payment.email?.last_sent_at && (
+                  <span>Email drafted {format(new Date(payment.email.last_drafted_at), 'dd MMM, HH:mm')}</span>
+                )}
+              </div>
+            )}
+            {isOutdated && (
+              <p className="text-[11px] text-warning">Seats or amount have changed since this link was created. Regenerate before sending.</p>
+            )}
           </div>
         ) : (
           <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
@@ -1761,13 +1848,25 @@ function ActiveStagePanel({
           </div>
         )}
 
+        {/* Action row */}
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={onOpenPaymentDialog}>
-            {payment?.short_url ? 'Generate new link' : 'Generate payment link'}
+          <Button size="sm" onClick={onOpenPaymentDialog} disabled={paymentBusy}>
+            {payment?.short_url ? 'Regenerate link' : 'Generate payment link'}
           </Button>
+          {payment?.short_url && (
+            <Button size="sm" variant="outline" onClick={onDraftPaymentEmail} disabled={paymentBusy || isOutdated}>
+              Draft email
+            </Button>
+          )}
+          {linkActive && (
+            <Button size="sm" variant="outline" onClick={onCancelPaymentLink} disabled={paymentBusy}>
+              Cancel link
+            </Button>
+          )}
           <div className="flex items-center gap-2 ml-auto">
             <Label className="text-xs text-muted-foreground">Mark as</Label>
-            <Select value={status ?? NONE} onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
+            <Select value={status === 'PAID' || status === 'PENDING' || status === 'FAILED' ? status : NONE}
+              onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
               <SelectTrigger className="h-9 w-36"><SelectValue placeholder="Set status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="PAID">Paid</SelectItem>
