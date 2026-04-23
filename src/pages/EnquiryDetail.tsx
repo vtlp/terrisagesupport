@@ -185,6 +185,8 @@ export default function EnquiryDetail() {
   const [existingEventOptions, setExistingEventOptions] = useState<ExistingEventOption[]>([]);
   const [existingPromptOpen, setExistingPromptOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [offlineDialogOpen, setOfflineDialogOpen] = useState(false);
+  const [deferDialogOpen, setDeferDialogOpen] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
   const [duplicateOf, setDuplicateOf] = useState<DuplicateOf | null>(null);
