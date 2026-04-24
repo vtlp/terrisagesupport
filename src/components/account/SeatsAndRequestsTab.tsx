@@ -45,7 +45,7 @@ const STATUS_COLORS: Record<Status, string> = {
   FULFILLED: 'bg-success/15 text-success',
 };
 
-interface Props { accountId: string; activeSeatsUsed: number; onboardingPayload?: unknown; }
+interface Props { accountId: string; activeSeatsUsed: number; onboardingPayload?: unknown; tenantId?: string | null; }
 
 function getTeamMembers(payload: unknown): SubmissionTeamMember[] {
   const members = (payload as { team?: { members?: SubmissionTeamMember[] } } | null)?.team?.members;
@@ -59,11 +59,13 @@ function getMemberPermissions(member: SubmissionTeamMember): string[] {
   return labels;
 }
 
-export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayload }: Props) {
+export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayload, tenantId }: Props) {
   const [rows, setRows] = useState<SeatRequest[]>([]);
   const [capacity, setCapacity] = useState<Capacity | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [crmLinked, setCrmLinked] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const [mockOpen, setMockOpen] = useState(false);
   const [mockSeats, setMockSeats] = useState('');
