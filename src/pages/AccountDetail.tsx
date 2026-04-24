@@ -483,7 +483,7 @@ export default function AccountDetail() {
               )}
             </CardContent>
           </Card>
-          <SeatsAndRequestsTab accountId={acc.id} activeSeatsUsed={seats.filter(s => s.is_active).length} onboardingPayload={acc.payload} />
+          <SeatsAndRequestsTab accountId={acc.id} activeSeatsUsed={seats.filter(s => s.is_active).length} onboardingPayload={acc.payload} tenantId={acc.tenant_id} />
         </TabsContent>
 
         <TabsContent value="checklist" className="space-y-4">
