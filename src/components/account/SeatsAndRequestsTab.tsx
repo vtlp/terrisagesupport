@@ -87,7 +87,31 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
     setLoading(false);
   }, [accountId]);
 
+  // Sync live seat capacity from Terrisage CRM if tenant_id is linked
+  const syncFromCrm = useCallback(async () => {
+    if (!tenantId) { setCrmLinked(false); return; }
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('terrisage-seat-sync', {
+        body: { accountId },
+      });
+      if (error) { setCrmLinked(false); return; }
+      const linked = Boolean((data as { linked?: boolean } | null)?.linked);
+      setCrmLinked(linked);
+      if (linked) {
+        // Reload capacity from snapshot view
+        const capRes = await supabase.from('account_seat_capacity')
+          .select('seats_purchased, seats_used, seats_reserved, seats_available, last_crm_sync_at')
+          .eq('account_id', accountId).maybeSingle();
+        setCapacity((capRes.data ?? null) as Capacity | null);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  }, [accountId, tenantId]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { syncFromCrm(); }, [syncFromCrm]);
 
   const setStatus = async (id: string, status: Status) => {
     setBusyId(id);
