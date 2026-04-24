@@ -127,7 +127,7 @@ export default function Profile() {
             </div>
           </div>
           <div className="flex justify-end">
-            <Button onClick={saveName} disabled={savingName}>
+            <Button onClick={saveName} disabled={savingName || !nameDirty}>
               {savingName && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
             </Button>
@@ -173,7 +173,7 @@ export default function Profile() {
             />
           </div>
           <div className="flex justify-end">
-            <Button onClick={changePassword} disabled={savingPassword}>
+            <Button onClick={changePassword} disabled={savingPassword || !passwordDirty}>
               {savingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Update Password
             </Button>
