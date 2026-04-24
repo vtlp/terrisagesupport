@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone, Crown, Plus, Minus, ShieldCheck, UserCog } from 'lucide-react';
+import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -13,10 +13,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FULFILLED';
-type CrmState = 'INVITED' | 'ACTIVE' | 'TEMP_DEACTIVATED' | 'DELETION_REQUESTED' | 'DELETED';
 
 type SubmissionTeamMember = {
+  id?: string;
+  fullName?: string;
   email?: string;
+  mobile?: string;
+  mobileCode?: string;
+  role?: string;
   orgWideAccess?: boolean;
   agentNetworksAccess?: boolean;
 };
@@ -34,13 +38,6 @@ interface Capacity {
   last_crm_sync_at?: string | null;
 }
 
-interface Seat {
-  id: string; full_name: string; email: string | null; role: string | null;
-  crm_state: CrmState; is_superuser: boolean; last_active_at: string | null;
-  invitation_expires_at: string | null; is_active: boolean;
-  permissions: unknown;
-}
-
 const STATUS_COLORS: Record<Status, string> = {
   PENDING: 'bg-warning/15 text-warning',
   APPROVED: 'bg-primary/15 text-primary',
@@ -48,41 +45,23 @@ const STATUS_COLORS: Record<Status, string> = {
   FULFILLED: 'bg-success/15 text-success',
 };
 
-const STATE_COLORS: Record<CrmState, string> = {
-  INVITED: 'border-warning/30 bg-warning/15 text-warning',
-  ACTIVE: 'border-accent/30 bg-accent/10 text-accent-foreground',
-  TEMP_DEACTIVATED: 'border-border bg-secondary text-secondary-foreground',
-  DELETION_REQUESTED: 'border-destructive/30 bg-destructive/15 text-destructive',
-  DELETED: 'border-border bg-muted text-muted-foreground',
-};
-
 interface Props { accountId: string; activeSeatsUsed: number; onboardingPayload?: unknown; }
 
-function getSubmissionPermissions(payload: unknown, email: string | null): string[] {
-  if (!email) return [];
+function getTeamMembers(payload: unknown): SubmissionTeamMember[] {
+  const members = (payload as { team?: { members?: SubmissionTeamMember[] } } | null)?.team?.members;
+  return Array.isArray(members) ? members : [];
+}
 
-  const teamMembers = (((payload as { team?: { members?: SubmissionTeamMember[] } } | null)?.team?.members) ?? []);
-  const match = teamMembers.find((member) => (member.email ?? '').toLowerCase() === email.toLowerCase());
+function getMemberPermissions(member: SubmissionTeamMember): string[] {
   const labels: string[] = [];
-
-  if (match?.orgWideAccess) labels.push('Org-wide access');
-  if (match?.agentNetworksAccess) labels.push('Agent networks');
-
+  if (member.orgWideAccess) labels.push('Org-wide access');
+  if (member.agentNetworksAccess) labels.push('Agent networks');
   return labels;
-}
-
-function getStoredPermissions(permissions: unknown): string[] {
-  return Array.isArray(permissions) ? permissions.map((permission) => String(permission)).filter(Boolean) : [];
-}
-
-function formatCrmState(state: CrmState) {
-  return state.replace(/_/g, ' ');
 }
 
 export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayload }: Props) {
   const [rows, setRows] = useState<SeatRequest[]>([]);
   const [capacity, setCapacity] = useState<Capacity | null>(null);
-  const [seats, setSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -92,18 +71,17 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const [mockReason, setMockReason] = useState('');
   const [submittingMock, setSubmittingMock] = useState(false);
 
+  const members = getTeamMembers(onboardingPayload);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [reqRes, capRes, seatsRes] = await Promise.all([
+    const [reqRes, capRes] = await Promise.all([
       supabase.from('seat_requests').select('*').eq('account_id', accountId).order('created_at', { ascending: false }),
       supabase.from('account_seat_capacity').select('seats_purchased, seats_used, seats_reserved, seats_available, last_crm_sync_at').eq('account_id', accountId).maybeSingle(),
-      supabase.from('account_seats').select('id, full_name, email, role, crm_state, is_superuser, last_active_at, invitation_expires_at, is_active, permissions').eq('account_id', accountId).order('is_superuser', { ascending: false }).order('full_name'),
     ]);
     if (reqRes.error) toast.error(reqRes.error.message);
     setRows((reqRes.data ?? []) as SeatRequest[]);
     setCapacity((capRes.data ?? null) as Capacity | null);
-    setSeats((seatsRes.data ?? []) as Seat[]);
     setLoading(false);
   }, [accountId]);
 
@@ -148,7 +126,7 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const reserved = capacity?.seats_reserved ?? 0;
   const available = capacity?.seats_available ?? Math.max(0, purchased - consumed - reserved);
   const pendingRequested = rows.filter(r => r.status === 'PENDING' || r.status === 'APPROVED').reduce((acc, r) => acc + r.requested_seats, 0);
-  const currentSuperuser = seats.find(s => s.is_superuser);
+  
   const lastSync = capacity?.last_crm_sync_at;
 
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;
@@ -180,45 +158,41 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         </CardContent>
       </Card>
 
-      {/* Members roster */}
+      {/* Members from onboarding submission */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Members ({seats.length})</CardTitle>
+          <CardTitle className="text-base">Members from onboarding ({members.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {seats.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No members yet.</p>
+          {members.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No team members captured in the onboarding submission.
+            </p>
           ) : (
             <div className="space-y-2">
-              {seats.map(s => {
-                const perms = getStoredPermissions(s.permissions);
+              {members.map((m, idx) => {
+                const perms = getMemberPermissions(m);
+                const phone = m.mobile ? `${m.mobileCode ?? ''} ${m.mobile}`.trim() : '';
                 return (
-                  <div key={s.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
+                  <div key={m.id ?? `${m.email ?? 'member'}-${idx}`} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {s.is_superuser && <Crown className="h-3.5 w-3.5 text-warning" />}
-                        <span className="font-medium text-sm">{s.full_name}</span>
+                        <span className="font-medium text-sm">{m.fullName || '—'}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {s.email ?? '—'}
-                        {s.last_active_at && <> · last active {formatDistanceToNow(new Date(s.last_active_at), { addSuffix: true })}</>}
-                        {s.invitation_expires_at && s.crm_state === 'INVITED' && (
-                          <> · invite expires {format(new Date(s.invitation_expires_at), 'dd MMM')}</>
-                        )}
+                        {m.email || '—'}
+                        {phone && <> · {phone}</>}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                        {s.role && (
-                          <Badge className={`text-[10px] ${s.is_superuser ? 'border-success/30 bg-success/15 text-success' : 'border-primary/30 bg-primary/10 text-primary'}`}>
-                            Role: {s.role}
+                        {m.role && (
+                          <Badge className="text-[10px] border-primary/30 bg-primary/10 text-primary">
+                            Role: {m.role}
                           </Badge>
                         )}
-                        <Badge className={`text-[10px] ${STATE_COLORS[s.crm_state]}`}>
-                          Status: {formatCrmState(s.crm_state)}
-                        </Badge>
                         {perms.length > 0 ? (
                           perms.map((p, i) => (
                             <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">
-                              Permission: {String(p)}
+                              Permission: {p}
                             </Badge>
                           ))
                         ) : (
