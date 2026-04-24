@@ -438,7 +438,6 @@ export default function AccountDetail() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Team seats</CardTitle>
-                <Button size="sm" onClick={openAddSeat}><Plus className="h-4 w-4 mr-1" /> Add seat</Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -486,7 +485,7 @@ export default function AccountDetail() {
               )}
             </CardContent>
           </Card>
-          <SeatsAndRequestsTab accountId={acc.id} activeSeatsUsed={seats.filter(s => s.is_active).length} />
+          <SeatsAndRequestsTab accountId={acc.id} activeSeatsUsed={seats.filter(s => s.is_active).length} onboardingPayload={acc.payload} />
         </TabsContent>
 
         <TabsContent value="checklist" className="space-y-4">
