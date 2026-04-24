@@ -15,6 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FULFILLED';
 type CrmState = 'INVITED' | 'ACTIVE' | 'TEMP_DEACTIVATED' | 'DELETION_REQUESTED' | 'DELETED';
 
+type SubmissionTeamMember = {
+  email?: string;
+  orgWideAccess?: boolean;
+  agentNetworksAccess?: boolean;
+};
+
 interface SeatRequest {
   id: string; account_id: string; requested_seats: number; requested_by_email: string | null;
   reason: string | null; status: Status; created_at: string; decided_at: string | null; fulfilled_at: string | null;
@@ -43,16 +49,37 @@ const STATUS_COLORS: Record<Status, string> = {
 };
 
 const STATE_COLORS: Record<CrmState, string> = {
-  INVITED: 'bg-warning/15 text-warning',
-  ACTIVE: 'bg-success/15 text-success',
-  TEMP_DEACTIVATED: 'bg-muted text-muted-foreground',
-  DELETION_REQUESTED: 'bg-destructive/15 text-destructive',
-  DELETED: 'bg-destructive/25 text-destructive',
+  INVITED: 'border-warning/30 bg-warning/15 text-warning',
+  ACTIVE: 'border-accent/30 bg-accent/10 text-accent-foreground',
+  TEMP_DEACTIVATED: 'border-border bg-secondary text-secondary-foreground',
+  DELETION_REQUESTED: 'border-destructive/30 bg-destructive/15 text-destructive',
+  DELETED: 'border-border bg-muted text-muted-foreground',
 };
 
-interface Props { accountId: string; activeSeatsUsed: number; }
+interface Props { accountId: string; activeSeatsUsed: number; onboardingPayload?: unknown; }
 
-export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
+function getSubmissionPermissions(payload: unknown, email: string | null): string[] {
+  if (!email) return [];
+
+  const teamMembers = (((payload as { team?: { members?: SubmissionTeamMember[] } } | null)?.team?.members) ?? []);
+  const match = teamMembers.find((member) => (member.email ?? '').toLowerCase() === email.toLowerCase());
+  const labels: string[] = [];
+
+  if (match?.orgWideAccess) labels.push('Org-wide access');
+  if (match?.agentNetworksAccess) labels.push('Agent networks');
+
+  return labels;
+}
+
+function getStoredPermissions(permissions: unknown): string[] {
+  return Array.isArray(permissions) ? permissions.map((permission) => String(permission)).filter(Boolean) : [];
+}
+
+function formatCrmState(state: CrmState) {
+  return state.replace(/_/g, ' ');
+}
+
+export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayload }: Props) {
   const [rows, setRows] = useState<SeatRequest[]>([]);
   const [capacity, setCapacity] = useState<Capacity | null>(null);
   const [seats, setSeats] = useState<Seat[]>([]);
@@ -184,7 +211,8 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
           ) : (
             <div className="space-y-2">
               {seats.map(s => {
-                const perms = Array.isArray(s.permissions) ? (s.permissions as string[]) : [];
+                const formPermissions = getSubmissionPermissions(onboardingPayload, s.email);
+                const perms = formPermissions.length > 0 ? formPermissions : getStoredPermissions(s.permissions);
                 return (
                   <div key={s.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
                     <div className="min-w-0 flex-1">
@@ -201,17 +229,17 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap mt-2">
                         {s.role && (
-                          <Badge className={`text-[10px] ${s.is_superuser ? 'bg-success/15 text-success hover:bg-success/15' : 'bg-primary/15 text-primary hover:bg-primary/15'}`}>
+                          <Badge className={`text-[10px] ${s.is_superuser ? 'border-success/30 bg-success/15 text-success' : 'border-primary/30 bg-primary/10 text-primary'}`}>
                             Role: {s.role}
                           </Badge>
                         )}
-                        <Badge className={`text-[10px] ${STATE_COLORS[s.crm_state]} hover:${STATE_COLORS[s.crm_state]}`}>
-                          Status: {s.crm_state.replace('_', ' ')}
+                        <Badge className={`text-[10px] ${STATE_COLORS[s.crm_state]}`}>
+                          Status: {formatCrmState(s.crm_state)}
                         </Badge>
                         {perms.length > 0 ? (
                           perms.map((p, i) => (
-                            <Badge key={i} variant="outline" className="text-[10px] bg-accent/10 text-accent-foreground border-accent/30">
-                              {String(p)}
+                            <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">
+                              Permission: {String(p)}
                             </Badge>
                           ))
                         ) : (

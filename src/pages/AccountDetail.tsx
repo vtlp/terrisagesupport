@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, Plus, Trash2, UserCheck, UserX, CheckCircle2, Circle, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Trash2, UserCheck, UserX, CheckCircle2, Circle, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -438,7 +438,6 @@ export default function AccountDetail() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Team seats</CardTitle>
-                <Button size="sm" onClick={openAddSeat}><Plus className="h-4 w-4 mr-1" /> Add seat</Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -457,10 +456,12 @@ export default function AccountDetail() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm">{s.full_name}</span>
-                            <Badge variant="outline" className="text-[10px]">{s.role ?? 'Agent'}</Badge>
-                            {!s.is_active && <Badge variant="outline" className="text-[10px]">Inactive</Badge>}
+                            <Badge variant="outline" className="text-[10px] border-primary/30 bg-primary/10 text-primary">Role: {s.role ?? 'Agent'}</Badge>
+                            <Badge variant="outline" className={`text-[10px] ${s.is_active ? 'border-accent/30 bg-accent/10 text-accent-foreground' : 'border-border bg-secondary text-secondary-foreground'}`}>
+                              Status: {s.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
                             {perms.map(p => (
-                              <Badge key={p} variant="secondary" className="text-[10px]">{p}</Badge>
+                              <Badge key={p} variant="outline" className="text-[10px] border-warning/30 bg-warning/10 text-warning">Permission: {p}</Badge>
                             ))}
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5 truncate">
@@ -486,7 +487,7 @@ export default function AccountDetail() {
               )}
             </CardContent>
           </Card>
-          <SeatsAndRequestsTab accountId={acc.id} activeSeatsUsed={seats.filter(s => s.is_active).length} />
+          <SeatsAndRequestsTab accountId={acc.id} activeSeatsUsed={seats.filter(s => s.is_active).length} onboardingPayload={acc.payload} />
         </TabsContent>
 
         <TabsContent value="checklist" className="space-y-4">
