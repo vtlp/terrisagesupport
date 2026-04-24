@@ -150,19 +150,29 @@ export function BillingTab({ accountId }: { accountId: string }) {
   const draftGst = draftSubtotal * (Number(draft.gst_pct) || 0) / 100;
   const draftTotal = draftSubtotal + draftGst;
 
+  // Derive next renewal from subscription start + cycle length.
+  // Support sets the subscription start when the first payment is received;
+  // we keep next_renewal_at consistent with that anchor automatically.
+  const derivedNextRenewal = useMemo(() => {
+    if (!settings.subscription_started_at) return settings.next_renewal_at;
+    const months = CYCLE_MONTHS[settings.billing_cycle] ?? 12;
+    return addMonths(settings.subscription_started_at, months);
+  }, [settings.subscription_started_at, settings.billing_cycle, settings.next_renewal_at]);
+
   const saveSettings = async () => {
     setSavingSettings(true);
+    const nextRenewal = settings.subscription_started_at
+      ? addMonths(settings.subscription_started_at, CYCLE_MONTHS[settings.billing_cycle] ?? 12)
+      : settings.next_renewal_at;
     const payload = {
       account_id: accountId, plan_name: settings.plan_name, billing_cycle: settings.billing_cycle,
       base_fee: settings.base_fee, seat_rate: settings.seat_rate,
       seats_purchased: settings.seats_purchased,
       gst_pct: settings.gst_pct,
-      next_renewal_at: settings.next_renewal_at, status: settings.status,
+      next_renewal_at: nextRenewal, status: settings.status,
       country: settings.country,
       auto_renew: settings.auto_renew,
       subscription_started_at: settings.subscription_started_at,
-      current_period_start: settings.current_period_start,
-      current_period_end: settings.current_period_end,
     };
     const { error } = settings.id
       ? await supabase.from('account_billing_settings').update(payload).eq('id', settings.id)
