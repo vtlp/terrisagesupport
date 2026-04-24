@@ -1994,20 +1994,6 @@ function ActiveStagePanel({
                 </Button>
               )}
               <div className="flex items-center gap-2 ml-auto">
-                {payment?.short_url && (
-                  <>
-                    {(payment as { razorpay_status?: string }).razorpay_status && (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="text-[10px] uppercase text-muted-foreground">Razorpay:</span>
-                        {statusBadge((payment as { razorpay_status: string }).razorpay_status)}
-                      </span>
-                    )}
-                    <Button size="sm" variant="outline" onClick={onRefreshPaymentStatus} disabled={paymentBusy}
-                      title="Refresh status from Razorpay">
-                      <RefreshCw className={cn('h-3.5 w-3.5 mr-1', paymentBusy && 'animate-spin')} /> Refresh
-                    </Button>
-                  </>
-                )}
                 <Label className="text-xs text-muted-foreground">Mark as</Label>
                 <Select value={status === 'PAID' || status === 'PENDING' || status === 'FAILED' ? status : NONE}
                   onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
