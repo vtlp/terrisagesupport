@@ -499,9 +499,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
           <div className="space-y-4">
             <div className="rounded border p-3 text-xs space-y-1 bg-muted/30">
               <div><span className="text-muted-foreground">Current period:</span>{' '}
-                {settings.subscription_started_at ? format(new Date(settings.subscription_started_at), 'dd MMM') : '—'}
+                {settings.current_period_start ? format(new Date(settings.current_period_start), 'dd MMM') : (settings.subscription_started_at ? format(new Date(settings.subscription_started_at), 'dd MMM') : '—')}
                 {' – '}
-                {derivedNextRenewal ? format(new Date(derivedNextRenewal), 'dd MMM yyyy') : '—'}
+                {effectivePeriodEnd ? format(new Date(effectivePeriodEnd), 'dd MMM yyyy') : '—'}
               </div>
               <div><span className="text-muted-foreground">Seats purchased:</span> {settings.seats_purchased}</div>
               <div><span className="text-muted-foreground">Cycle:</span> {settings.billing_cycle}</div>
