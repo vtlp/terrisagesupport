@@ -30,6 +30,8 @@ interface Body {
   expires_in_days?: number;
   notes?: string;
   prorata?: { days_remaining: number; days_in_cycle: number };
+  subscription_start_at?: string;
+  subscription_end_at?: string;
 }
 
 const fmtINR = (n: number) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -178,6 +180,9 @@ Deno.serve(async (req) => {
         gst_amount: body.gst_amount,
         total: body.total,
       },
+      subscription: body.subscription_start_at && body.subscription_end_at
+        ? { start_at: body.subscription_start_at, end_at: body.subscription_end_at }
+        : undefined,
       created_at: createdAtIso,
       expires_at: expiresAtIso,
       outdated: false,

@@ -4,10 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Link as LinkIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Loader2, Link as LinkIcon, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { calcBilling, fmtINR } from '@/lib/billing';
+import { cn } from '@/lib/utils';
 
 type Cycle = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
 
@@ -33,10 +37,26 @@ export interface PaymentLinkResult {
     gst_amount: number;
     total: number;
   };
+  subscription?: {
+    start_at: string; // ISO date
+    end_at: string;   // ISO date
+  };
   created_at: string;
   expires_at?: string;
   outdated?: boolean;
   mode?: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST';
+}
+
+function addCycle(start: Date, cycle: Cycle): Date {
+  const d = new Date(start);
+  switch (cycle) {
+    case 'MONTHLY':     d.setMonth(d.getMonth() + 1); break;
+    case 'QUARTERLY':   d.setMonth(d.getMonth() + 3); break;
+    case 'HALF_YEARLY': d.setMonth(d.getMonth() + 6); break;
+    case 'ANNUAL':
+    default:            d.setFullYear(d.getFullYear() + 1); break;
+  }
+  return d;
 }
 
 interface Props {
@@ -72,6 +92,7 @@ export function PaymentLinkDialog({
   const [name, setName] = useState(defaults.customerName);
   const [email, setEmail] = useState(defaults.customerEmail ?? '');
   const [phone, setPhone] = useState(defaults.customerPhone ?? '');
+  const [startDate, setStartDate] = useState<Date>(new Date());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -85,6 +106,7 @@ export function PaymentLinkDialog({
       setName(defaults.customerName);
       setEmail(defaults.customerEmail ?? '');
       setPhone(defaults.customerPhone ?? '');
+      setStartDate(new Date());
     }
   }, [open, defaults.seats, defaults.customerName, defaults.customerEmail, defaults.customerPhone, defaults.planName, defaults.cycle, defaults.baseFee, defaults.seatRate, defaults.gstPct]);
 
@@ -92,6 +114,8 @@ export function PaymentLinkDialog({
     () => calcBilling(baseFee, seatRate, seats, gstPct, DEFAULT_INCLUDED_SEATS),
     [baseFee, seatRate, seats, gstPct],
   );
+
+  const endDate = useMemo(() => addCycle(startDate, cycle), [startDate, cycle]);
 
   const submit = async () => {
     if (breakdown.total <= 0) {
@@ -111,6 +135,8 @@ export function PaymentLinkDialog({
       return;
     }
     setBusy(true);
+    const startIso = startDate.toISOString();
+    const endIso = endDate.toISOString();
     const { data, error } = await supabase.functions.invoke('razorpay-create-payment-link', {
       body: {
         purpose,
@@ -125,6 +151,8 @@ export function PaymentLinkDialog({
         subtotal: breakdown.subtotal,
         gst_amount: breakdown.gstAmount,
         total: breakdown.total,
+        subscription_start_at: startIso,
+        subscription_end_at: endIso,
         customer: { name, email: email || undefined, phone: phone || undefined },
       },
     });
@@ -189,6 +217,36 @@ export function PaymentLinkDialog({
         <p className="text-[11px] text-muted-foreground -mt-1">
           Base covers first {DEFAULT_INCLUDED_SEATS} seats. Extra seats charged at per-seat rate.
         </p>
+
+        <div className="space-y-2 pt-2 border-t">
+          <Label className="text-[11px] uppercase text-muted-foreground tracking-wide">Subscription period</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Start date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm"
+                    className={cn('h-8 w-full justify-start text-left font-normal', !startDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                    {startDate ? format(startDate, 'dd MMM yyyy') : 'Pick a date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={startDate}
+                    onSelect={(d) => d && setStartDate(d)} initialFocus
+                    className={cn('p-3 pointer-events-auto')} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">End date (auto)</Label>
+              <Input className="h-8 bg-muted" value={format(endDate, 'dd MMM yyyy')} readOnly />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            End date is calculated from the billing cycle ({cycle.replace('_', '-').toLowerCase()}).
+          </p>
+        </div>
 
         <div className="space-y-2 pt-2 border-t">
           <Label className="text-[11px] uppercase text-muted-foreground tracking-wide">Customer</Label>
