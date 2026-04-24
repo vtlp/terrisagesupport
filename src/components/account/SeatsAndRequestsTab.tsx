@@ -126,7 +126,7 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const reserved = capacity?.seats_reserved ?? 0;
   const available = capacity?.seats_available ?? Math.max(0, purchased - consumed - reserved);
   const pendingRequested = rows.filter(r => r.status === 'PENDING' || r.status === 'APPROVED').reduce((acc, r) => acc + r.requested_seats, 0);
-  const currentSuperuser = seats.find(s => s.is_superuser);
+  
   const lastSync = capacity?.last_crm_sync_at;
 
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;
