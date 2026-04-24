@@ -25,6 +25,8 @@ interface DayPayload {
   conversions?: number;
   tasksCompleted?: number;
   lastActiveAt?: string | null;
+  // Per-feature adoption percentages (0-100). Optional.
+  featureUsage?: Record<string, number>;
 }
 
 Deno.serve(async (req) => {
@@ -126,6 +128,7 @@ Deno.serve(async (req) => {
           conversions: num(d.conversions),
           tasks_completed: num(d.tasksCompleted),
           last_active_at: d.lastActiveAt ?? null,
+          feature_usage: sanitiseFeatureUsage(d.featureUsage),
           source: "terrisage",
           updated_at: new Date().toISOString(),
         });
@@ -155,6 +158,29 @@ Deno.serve(async (req) => {
 function num(v: unknown): number {
   const n = typeof v === "number" ? v : parseInt(String(v ?? 0), 10);
   return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+const FEATURE_KEYS = [
+  "enquiry_capture",
+  "convert_to_lead",
+  "manual_leads",
+  "creating_tasks",
+  "task_types",
+  "channel_partner",
+] as const;
+
+function sanitiseFeatureUsage(input: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!input || typeof input !== "object") return out;
+  const src = input as Record<string, unknown>;
+  for (const key of FEATURE_KEYS) {
+    const raw = src[key];
+    const n = typeof raw === "number" ? raw : parseFloat(String(raw ?? ""));
+    if (Number.isFinite(n)) {
+      out[key] = Math.max(0, Math.min(100, Math.round(n)));
+    }
+  }
+  return out;
 }
 
 function json(body: unknown, status = 200) {

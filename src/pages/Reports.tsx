@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Download, BarChart3, TrendingUp, Users, Activity, Zap, Clock, AlertTriangle } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Download, TrendingUp, Activity, Zap, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent,
 } from '@/components/ui/chart';
@@ -14,61 +18,37 @@ import {
   PieChart as RPieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line,
 } from 'recharts';
-import { seedAccounts } from '@/data/seedData';
 import { AccountStatus, TenancyType } from '@/types/core';
 
-// ── CRM Client Usage Analytics ─────────────────
+// ── Types for live data ──────────────────────────
+interface UsageRow {
+  name: string;
+  city: string;
+  tenancy: string;
+  status: string;
+  dau: number;
+  wau: number;
+  mau: number;
+  leadsCreated: number;
+  followUps: number;
+  conversions: number;
+  tasksCompleted: number;
+  sessions: number;
+  lastActive: string;
+  lastActiveAt: Date | null;
+  inactivityDays: number;
+  featureUsage: Record<string, number>;
+  weeklySeries: { date: string; activeUsers: number; sessions: number }[];
+}
 
-// Simulated usage data per account
-const usageData = seedAccounts.map(a => ({
-  name: a.account_name,
-  city: a.city,
-  tenancy: a.tenancy_type,
-  status: a.status,
-  dau: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 12) + 3 : a.status === AccountStatus.ONBOARDING_IN_PROGRESS ? Math.floor(Math.random() * 5) + 1 : 0,
-  wau: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 25) + 10 : a.status === AccountStatus.ONBOARDING_IN_PROGRESS ? Math.floor(Math.random() * 10) + 2 : 0,
-  mau: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 40) + 15 : a.status === AccountStatus.ONBOARDING_IN_PROGRESS ? Math.floor(Math.random() * 20) + 5 : 0,
-  leadsCreated: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 200) + 30 : Math.floor(Math.random() * 20),
-  followUps: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 150) + 20 : Math.floor(Math.random() * 10),
-  conversions: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 30) + 5 : 0,
-  tasksCompleted: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 80) + 10 : Math.floor(Math.random() * 5),
-  lastActive: a.status === AccountStatus.DEACTIVATED ? 'Inactive' : `${Math.floor(Math.random() * 48) + 1}h ago`,
-  inactivityDays: a.status === AccountStatus.DEACTIVATED ? 60 + Math.floor(Math.random() * 60) : a.status === AccountStatus.STALLED_ONBOARDING ? 7 + Math.floor(Math.random() * 14) : 0,
-  sessions: a.status === AccountStatus.LIVE ? Math.floor(Math.random() * 200) + 50 : Math.floor(Math.random() * 30),
-}));
-
-const activeAccounts = usageData.filter(a => a.status === AccountStatus.LIVE || a.status === AccountStatus.ONBOARDING_IN_PROGRESS);
-
-// Feature adoption data
-const featureAdoption = [
-  { feature: 'Enquiry Capture', adoption: 92 },
-  { feature: 'Convert to Lead Button', adoption: 78 },
-  { feature: 'Creating Manual Leads', adoption: 65 },
-  { feature: 'Creating Tasks', adoption: 58 },
-  { feature: 'Task Types Usage', adoption: 42 },
-  { feature: 'Channel Partner Section', adoption: 35 },
+const FEATURE_DEFS: { key: string; label: string }[] = [
+  { key: 'enquiry_capture', label: 'Enquiry Capture' },
+  { key: 'convert_to_lead', label: 'Convert to Lead Button' },
+  { key: 'manual_leads', label: 'Creating Manual Leads' },
+  { key: 'creating_tasks', label: 'Creating Tasks' },
+  { key: 'task_types', label: 'Task Types Usage' },
+  { key: 'channel_partner', label: 'Channel Partner Section' },
 ];
-
-// Engagement trend (weekly)
-const engagementTrend = [
-  { week: 'W1 Jan', activeUsers: 28, sessions: 340 },
-  { week: 'W2 Jan', activeUsers: 32, sessions: 420 },
-  { week: 'W3 Jan', activeUsers: 35, sessions: 450 },
-  { week: 'W4 Jan', activeUsers: 38, sessions: 510 },
-  { week: 'W1 Feb', activeUsers: 42, sessions: 580 },
-  { week: 'W2 Feb', activeUsers: 45, sessions: 620 },
-];
-
-// Tenancy breakdown
-const tenancyUsage = [
-  { name: 'Agency', value: usageData.filter(a => a.tenancy === TenancyType.AGENCY_BROKERAGE_CONSULTANCY && a.status === AccountStatus.LIVE).length },
-  { name: 'Builder', value: usageData.filter(a => a.tenancy === TenancyType.BUILDER_DEVELOPER && a.status === AccountStatus.LIVE).length },
-];
-
-// City usage
-const cityUsageMap = new Map<string, number>();
-activeAccounts.forEach(a => cityUsageMap.set(a.city, (cityUsageMap.get(a.city) ?? 0) + a.sessions));
-const cityUsage = [...cityUsageMap.entries()].map(([city, sessions]) => ({ city, sessions })).sort((a, b) => b.sessions - a.sessions);
 
 const PIE_COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(var(--info))', 'hsl(var(--warning))'];
 const chartConfig = {
@@ -78,28 +58,267 @@ const chartConfig = {
   sessions: { label: 'Sessions', color: 'hsl(var(--info))' },
 };
 
+function relativeFromNow(d: Date | null): string {
+  if (!d) return 'Never';
+  const diffMs = Date.now() - d.getTime();
+  if (diffMs < 0) return 'Just now';
+  const h = Math.floor(diffMs / 3_600_000);
+  if (h < 1) return 'Just now';
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function isoWeekLabel(date: Date): string {
+  const tmp = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = tmp.getUTCDay() || 7;
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((tmp.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
+  const monthShort = date.toLocaleString('en-GB', { month: 'short' });
+  return `W${weekNo} ${monthShort}`;
+}
+
 export default function Reports() {
   const [tab, setTab] = useState('overview');
   const [tenancyFilter, setTenancyFilter] = useState<string>('all');
+  const [usageData, setUsageData] = useState<UsageRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fire a fresh pull from Terrisage on every Reports open.
-  // Silent — no UI surface; existing display continues unchanged.
+  // Fire fresh pull from Terrisage on every Reports open, then load.
   useEffect(() => {
-    supabase.functions.invoke('terrisage-usage-sync', { body: { days: 30 } })
-      .catch((err) => console.warn('[reports] terrisage usage sync failed', err));
+    let cancelled = false;
+    (async () => {
+      try {
+        await supabase.functions.invoke('terrisage-usage-sync', { body: { days: 30 } });
+      } catch (err) {
+        console.warn('[reports] terrisage usage sync failed', err);
+      }
+      if (cancelled) return;
+      await loadData();
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = tenancyFilter === 'all' ? activeAccounts : activeAccounts.filter(a => a.tenancy === tenancyFilter);
+  // Realtime: refresh when ingest pushes new snapshots.
+  useEffect(() => {
+    const channel = supabase
+      .channel('reports-usage-snapshots')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'account_usage_snapshots' },
+        () => { void loadData(); })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    const since = new Date();
+    since.setDate(since.getDate() - 60);
+    const sinceStr = since.toISOString().slice(0, 10);
+
+    const [{ data: accounts }, { data: snaps }] = await Promise.all([
+      supabase.from('accounts')
+        .select('id, account_name, city, tenancy_type, status'),
+      supabase.from('account_usage_snapshots')
+        .select('account_id, snapshot_date, dau, wau, mau, sessions, leads_created, follow_ups, conversions, tasks_completed, last_active_at, feature_usage')
+        .gte('snapshot_date', sinceStr)
+        .order('snapshot_date', { ascending: true }),
+    ]);
+
+    const byAccount = new Map<string, typeof snaps>();
+    for (const s of snaps ?? []) {
+      const arr = byAccount.get(s.account_id) ?? [];
+      arr.push(s);
+      byAccount.set(s.account_id, arr);
+    }
+
+    const rows: UsageRow[] = (accounts ?? []).map((a) => {
+      const series = byAccount.get(a.id) ?? [];
+      const latest = series[series.length - 1];
+      const last30 = series.slice(-30);
+
+      const sumOf = (k: keyof typeof latest) =>
+        last30.reduce((acc, s) => acc + (Number(s[k]) || 0), 0);
+
+      const lastActiveAt = latest?.last_active_at ? new Date(latest.last_active_at) : null;
+      const inactivityDays = lastActiveAt
+        ? Math.max(0, Math.floor((Date.now() - lastActiveAt.getTime()) / 86_400_000))
+        : 0;
+
+      const weeklySeries = last30.map((s) => ({
+        date: s.snapshot_date,
+        activeUsers: Number(s.dau) || 0,
+        sessions: Number(s.sessions) || 0,
+      }));
+
+      return {
+        name: a.account_name,
+        city: a.city ?? '—',
+        tenancy: a.tenancy_type,
+        status: a.status,
+        dau: Number(latest?.dau) || 0,
+        wau: Number(latest?.wau) || 0,
+        mau: Number(latest?.mau) || 0,
+        leadsCreated: sumOf('leads_created'),
+        followUps: sumOf('follow_ups'),
+        conversions: sumOf('conversions'),
+        tasksCompleted: sumOf('tasks_completed'),
+        sessions: sumOf('sessions'),
+        lastActive: a.status === AccountStatus.DEACTIVATED ? 'Inactive' : relativeFromNow(lastActiveAt),
+        lastActiveAt,
+        inactivityDays: a.status === AccountStatus.DEACTIVATED ? Math.max(60, inactivityDays) : inactivityDays,
+        featureUsage: (latest?.feature_usage as Record<string, number>) ?? {},
+        weeklySeries,
+      };
+    });
+
+    setUsageData(rows);
+    setLoading(false);
+  }
+
+  const activeAccounts = useMemo(
+    () => usageData.filter(a => a.status === AccountStatus.LIVE || a.status === AccountStatus.ONBOARDING_IN_PROGRESS),
+    [usageData],
+  );
+
+  const filtered = useMemo(
+    () => tenancyFilter === 'all' ? activeAccounts : activeAccounts.filter(a => a.tenancy === tenancyFilter),
+    [activeAccounts, tenancyFilter],
+  );
+
   const totalSessions = filtered.reduce((s, a) => s + a.sessions, 0);
   const avgDau = filtered.length ? Math.round(filtered.reduce((s, a) => s + a.dau, 0) / filtered.length) : 0;
   const inactiveAlerts = usageData.filter(a => a.inactivityDays > 7 && a.status !== AccountStatus.DEACTIVATED);
+
+  // ── Derived: tenancy + city breakdowns ─────────
+  const tenancyUsage = [
+    { name: 'Agency', value: usageData.filter(a => a.tenancy === TenancyType.AGENCY_BROKERAGE_CONSULTANCY && a.status === AccountStatus.LIVE).length },
+    { name: 'Builder', value: usageData.filter(a => a.tenancy === TenancyType.BUILDER_DEVELOPER && a.status === AccountStatus.LIVE).length },
+  ];
+  const cityUsageMap = new Map<string, number>();
+  filtered.forEach(a => cityUsageMap.set(a.city, (cityUsageMap.get(a.city) ?? 0) + a.sessions));
+  const cityUsage = [...cityUsageMap.entries()]
+    .map(([city, sessions]) => ({ city, sessions }))
+    .sort((a, b) => b.sessions - a.sessions);
+
+  // ── Feature Adoption: average across filtered accounts ─
+  const featureAdoption = FEATURE_DEFS.map(({ key, label }) => {
+    const vals = filtered.map(a => Number(a.featureUsage[key]) || 0).filter(v => v > 0);
+    const adoption = vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
+    return { feature: label, adoption };
+  });
+
+  // ── Engagement weekly trend (rolled-up daily snapshots) ─
+  const engagementTrend = useMemo(() => {
+    const byWeek = new Map<string, { activeUsersSum: number; sessionsSum: number; count: number; sortKey: number }>();
+    filtered.forEach(a => {
+      a.weeklySeries.forEach(d => {
+        const dt = new Date(d.date + 'T00:00:00Z');
+        const day = dt.getUTCDay() || 7;
+        const monday = new Date(dt); monday.setUTCDate(dt.getUTCDate() - day + 1);
+        const key = monday.toISOString().slice(0, 10);
+        const label = isoWeekLabel(monday);
+        const cur = byWeek.get(label) ?? { activeUsersSum: 0, sessionsSum: 0, count: 0, sortKey: monday.getTime() };
+        cur.activeUsersSum += d.activeUsers;
+        cur.sessionsSum += d.sessions;
+        cur.count += 1;
+        cur.sortKey = monday.getTime();
+        byWeek.set(label, cur);
+        // Use key only to dedupe weeks across years — discard
+        void key;
+      });
+    });
+    return [...byWeek.entries()]
+      .sort((a, b) => a[1].sortKey - b[1].sortKey)
+      .slice(-6)
+      .map(([week, v]) => ({
+        week,
+        activeUsers: Math.round(v.activeUsersSum / Math.max(1, v.count)),
+        sessions: v.sessionsSum,
+      }));
+  }, [filtered]);
+
+  // ── Export (CSV / XLSX) ────────────────────────
+  function buildExportSheets() {
+    const filterLabel = tenancyFilter === 'all' ? 'All' :
+      tenancyFilter === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder';
+
+    const usageSheet = filtered.map(a => ({
+      Account: a.name,
+      City: a.city,
+      Type: a.tenancy === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder',
+      Status: a.status,
+      DAU: a.dau,
+      WAU: a.wau,
+      MAU: a.mau,
+      'Sessions (30d)': a.sessions,
+      'Leads (30d)': a.leadsCreated,
+      'Follow-ups (30d)': a.followUps,
+      'Conversions (30d)': a.conversions,
+      'Tasks Completed (30d)': a.tasksCompleted,
+      'Last Active': a.lastActive,
+    }));
+
+    const adoptionSheet = featureAdoption.map(f => ({
+      Feature: f.feature,
+      'Adoption %': f.adoption,
+    }));
+
+    const engagementSheet = engagementTrend.map(w => ({
+      Week: w.week,
+      'Active Users': w.activeUsers,
+      Sessions: w.sessions,
+    }));
+
+    const alertsSheet = inactiveAlerts.map(a => ({
+      Account: a.name,
+      City: a.city,
+      Type: a.tenancy === TenancyType.AGENCY_BROKERAGE_CONSULTANCY ? 'Agency' : 'Builder',
+      'Days Inactive': a.inactivityDays,
+      'Last Active': a.lastActive,
+    }));
+
+    return { filterLabel, usageSheet, adoptionSheet, engagementSheet, alertsSheet };
+  }
+
+  function handleExportCSV() {
+    const { filterLabel, usageSheet } = buildExportSheets();
+    const ws = XLSX.utils.json_to_sheet(usageSheet);
+    const csv = XLSX.utils.sheet_to_csv(ws);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+      `reports-${filterLabel.toLowerCase()}-${stamp}.csv`);
+  }
+
+  function handleExportXLSX() {
+    const { filterLabel, usageSheet, adoptionSheet, engagementSheet, alertsSheet } = buildExportSheets();
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(usageSheet), 'Usage');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(adoptionSheet), 'Feature Adoption');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(engagementSheet), 'Engagement');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(alertsSheet), 'Alerts');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `reports-${filterLabel.toLowerCase()}-${stamp}.xlsx`);
+  }
+
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Reports</h1>
-          <p className="text-muted-foreground text-sm">CRM client usage analytics & engagement insights</p>
+          <p className="text-muted-foreground text-sm">CRM client usage analytics &amp; engagement insights</p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={tenancyFilter} onValueChange={setTenancyFilter}>
@@ -110,7 +329,15 @@ export default function Reports() {
               <SelectItem value={TenancyType.BUILDER_DEVELOPER}>Builder</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1" />Export</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1" />Export</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportXLSX}>Excel (.xlsx)</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCSV}>CSV (.csv)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -149,7 +376,6 @@ export default function Reports() {
         {/* Usage Tab */}
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Account Usage Table */}
             <Card className="lg:col-span-2">
               <CardHeader className="pb-2"><CardTitle className="text-base">Account Usage Summary</CardTitle></CardHeader>
               <CardContent>
@@ -167,6 +393,11 @@ export default function Reports() {
                       </tr>
                     </thead>
                     <tbody>
+                      {filtered.length === 0 && !loading && (
+                        <tr><td colSpan={7} className="py-6 text-center text-muted-foreground text-xs">
+                          No usage data yet. Awaiting Terrisage sync.
+                        </td></tr>
+                      )}
                       {filtered.map(a => (
                         <tr key={a.name} className="border-b border-border/50 hover:bg-muted/30">
                           <td className="py-2 pr-3 font-medium truncate max-w-[180px]">{a.name}</td>
@@ -184,7 +415,6 @@ export default function Reports() {
               </CardContent>
             </Card>
 
-            {/* By Tenancy Pie */}
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base">Live Accounts by Type</CardTitle></CardHeader>
               <CardContent className="h-[250px]">
@@ -199,7 +429,6 @@ export default function Reports() {
               </CardContent>
             </Card>
 
-            {/* By City */}
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base">Sessions by City</CardTitle></CardHeader>
               <CardContent className="h-[250px]">
@@ -260,7 +489,7 @@ export default function Reports() {
         {/* Engagement Trend */}
         <TabsContent value="engagement" className="space-y-6">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">Weekly Active Users & Sessions</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Weekly Active Users &amp; Sessions</CardTitle></CardHeader>
             <CardContent className="h-[300px]">
               <ChartContainer config={chartConfig} className="h-full w-full">
                 <LineChart data={engagementTrend}>
@@ -279,14 +508,26 @@ export default function Reports() {
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">DAU/WAU Ratio</p>
-                <p className="text-2xl font-bold text-foreground">{filtered.length ? ((filtered.reduce((s, a) => s + a.dau, 0) / filtered.reduce((s, a) => s + a.wau, 0)) * 100).toFixed(0) : 0}%</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {(() => {
+                    const dauSum = filtered.reduce((s, a) => s + a.dau, 0);
+                    const wauSum = filtered.reduce((s, a) => s + a.wau, 0);
+                    return wauSum > 0 ? `${Math.round((dauSum / wauSum) * 100)}%` : '0%';
+                  })()}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">Stickiness metric</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">WAU/MAU Ratio</p>
-                <p className="text-2xl font-bold text-foreground">{filtered.length ? ((filtered.reduce((s, a) => s + a.wau, 0) / filtered.reduce((s, a) => s + a.mau, 0)) * 100).toFixed(0) : 0}%</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {(() => {
+                    const wauSum = filtered.reduce((s, a) => s + a.wau, 0);
+                    const mauSum = filtered.reduce((s, a) => s + a.mau, 0);
+                    return mauSum > 0 ? `${Math.round((wauSum / mauSum) * 100)}%` : '0%';
+                  })()}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">Weekly engagement</p>
               </CardContent>
             </Card>
@@ -323,26 +564,6 @@ export default function Reports() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4 text-warning" /> Low Engagement</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {activeAccounts.filter(a => a.dau < 3 && a.status === AccountStatus.LIVE).map(a => (
-                  <div key={a.name} className="flex items-center justify-between p-3 bg-warning/5 border border-warning/20 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">{a.name}</p>
-                      <p className="text-xs text-muted-foreground">{a.city}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-warning">{a.dau} DAU</p>
-                      <p className="text-xs text-muted-foreground">{a.sessions} sessions</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

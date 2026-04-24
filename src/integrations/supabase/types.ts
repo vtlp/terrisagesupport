@@ -562,6 +562,7 @@ export type Database = {
           conversions: number
           created_at: string
           dau: number
+          feature_usage: Json
           follow_ups: number
           id: string
           last_active_at: string | null
@@ -579,6 +580,7 @@ export type Database = {
           conversions?: number
           created_at?: string
           dau?: number
+          feature_usage?: Json
           follow_ups?: number
           id?: string
           last_active_at?: string | null
@@ -596,6 +598,7 @@ export type Database = {
           conversions?: number
           created_at?: string
           dau?: number
+          feature_usage?: Json
           follow_ups?: number
           id?: string
           last_active_at?: string | null
