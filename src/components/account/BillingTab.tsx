@@ -358,9 +358,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
             </div>
             <div className="space-y-1.5">
               <Label>Current cycle start</Label>
-              <Input type="date" value={settings.current_period_start ? settings.current_period_start.substring(0, 10) : ''}
+              <Input type="date" value={effectiveCurrentStart ? effectiveCurrentStart.substring(0, 10) : ''}
                 onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
-              <p className="text-[10px] text-muted-foreground">Updates each renewal; drives pro-rata calculations.</p>
+              <p className="text-[10px] text-muted-foreground">Defaults to subscription start for the first cycle; updates each renewal.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Current cycle end (auto)</Label>
