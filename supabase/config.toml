@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.razorpay-link-status]
 verify_jwt = false
+
+[functions.terrisage-usage-ingest]
+verify_jwt = false

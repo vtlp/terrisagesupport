@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Download, BarChart3, TrendingUp, Users, Activity, Zap, Clock, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,6 +81,13 @@ const chartConfig = {
 export default function Reports() {
   const [tab, setTab] = useState('overview');
   const [tenancyFilter, setTenancyFilter] = useState<string>('all');
+
+  // Fire a fresh pull from Terrisage on every Reports open.
+  // Silent — no UI surface; existing display continues unchanged.
+  useEffect(() => {
+    supabase.functions.invoke('terrisage-usage-sync', { body: { days: 30 } })
+      .catch((err) => console.warn('[reports] terrisage usage sync failed', err));
+  }, []);
 
   const filtered = tenancyFilter === 'all' ? activeAccounts : activeAccounts.filter(a => a.tenancy === tenancyFilter);
   const totalSessions = filtered.reduce((s, a) => s + a.sessions, 0);

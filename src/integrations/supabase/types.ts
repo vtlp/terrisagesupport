@@ -556,6 +556,82 @@ export type Database = {
           },
         ]
       }
+      account_usage_snapshots: {
+        Row: {
+          account_id: string
+          conversions: number
+          created_at: string
+          dau: number
+          follow_ups: number
+          id: string
+          last_active_at: string | null
+          leads_created: number
+          mau: number
+          sessions: number
+          snapshot_date: string
+          source: string
+          tasks_completed: number
+          updated_at: string
+          wau: number
+        }
+        Insert: {
+          account_id: string
+          conversions?: number
+          created_at?: string
+          dau?: number
+          follow_ups?: number
+          id?: string
+          last_active_at?: string | null
+          leads_created?: number
+          mau?: number
+          sessions?: number
+          snapshot_date: string
+          source?: string
+          tasks_completed?: number
+          updated_at?: string
+          wau?: number
+        }
+        Update: {
+          account_id?: string
+          conversions?: number
+          created_at?: string
+          dau?: number
+          follow_ups?: number
+          id?: string
+          last_active_at?: string | null
+          leads_created?: number
+          mau?: number
+          sessions?: number
+          snapshot_date?: string
+          source?: string
+          tasks_completed?: number
+          updated_at?: string
+          wau?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_usage_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "account_usage_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_usage_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
+          },
+        ]
+      }
       account_verifications: {
         Row: {
           account_id: string
@@ -2670,6 +2746,7 @@ export type Database = {
         Returns: string
       }
       check_submission_lock: { Args: { _enquiry_id: string }; Returns: string }
+      cleanup_usage_snapshots: { Args: never; Returns: number }
       compute_proration: {
         Args: { _account_id: string; _delta: number }
         Returns: Json
