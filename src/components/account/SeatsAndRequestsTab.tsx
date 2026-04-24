@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone, Crown, Plus, Minus, ShieldCheck, UserCog } from 'lucide-react';
+import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
