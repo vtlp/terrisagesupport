@@ -139,10 +139,12 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
       account_id: accountId, requested_seats: additional,
       requested_by_email: mockEmail.trim() || null,
       reason: mockReason.trim() || `Added by support on behalf of customer — +${additional} seats`,
+      status: 'APPROVED',
+      decided_at: new Date().toISOString(),
     });
     setSubmittingMock(false);
     if (error) { toast.error(error.message); return; }
-    toast.success('Seat request added');
+    toast.success('Seat request added & auto-approved');
     setMockOpen(false); setMockSeats(''); setMockEmail(''); setMockReason('');
     load();
   };
