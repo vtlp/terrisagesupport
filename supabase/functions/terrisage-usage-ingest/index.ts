@@ -129,6 +129,29 @@ function num(v: unknown): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
+const FEATURE_KEYS = [
+  "enquiry_capture",
+  "convert_to_lead",
+  "manual_leads",
+  "creating_tasks",
+  "task_types",
+  "channel_partner",
+] as const;
+
+function sanitiseFeatureUsage(input: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!input || typeof input !== "object") return out;
+  const src = input as Record<string, unknown>;
+  for (const key of FEATURE_KEYS) {
+    const raw = src[key];
+    const n = typeof raw === "number" ? raw : parseFloat(String(raw ?? ""));
+    if (Number.isFinite(n)) {
+      out[key] = Math.max(0, Math.min(100, Math.round(n)));
+    }
+  }
+  return out;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
