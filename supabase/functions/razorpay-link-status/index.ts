@@ -95,7 +95,16 @@ Deno.serve(async (req) => {
       const { data: enq } = await admin.from('enquiries').select('payload').eq('id', body.enquiry_id).maybeSingle();
       const payload = (enq?.payload ?? {}) as Record<string, unknown>;
       const payment = (payload.payment ?? {}) as Record<string, unknown>;
-      const next = { ...payment, status, ...(paidAt ? { paid_at: paidAt } : {}) };
+      // Mirror status into both `status` (user-visible badge) and `razorpay_status`
+      // (separate pill so the manual override and the API-reported state can be
+      // compared at a glance).
+      const next = {
+        ...payment,
+        status,
+        razorpay_status: status,
+        razorpay_status_checked_at: new Date().toISOString(),
+        ...(paidAt ? { paid_at: paidAt } : {}),
+      };
       await admin.from('enquiries').update({ payload: { ...payload, payment: next } }).eq('id', body.enquiry_id);
       await admin.from('activity_log').insert({
         entity_type: 'ENQUIRY', entity_id: body.enquiry_id, event_type: 'FIELD_EDIT',
