@@ -142,7 +142,7 @@ export default function AccountDetail() {
       account_name: draft.account_name, city: draft.city, status: draft.status, tenancy_type: draft.tenancy_type,
       owner_name: draft.owner_name, owner_phone: draft.owner_phone, owner_email: draft.owner_email,
       gst_number: draft.gst_number, pan_number: draft.pan_number, rera_number: draft.rera_number, website: draft.website,
-      tenant_id: draft.tenant_id?.trim() ? draft.tenant_id.trim() : null,
+      
       payload: draft.payload as never,
     }).eq('id', acc.id);
     setSaving(false);
@@ -432,14 +432,9 @@ export default function AccountDetail() {
               <div><div className="text-xs text-muted-foreground">Account code</div><div>{acc.account_code ?? '—'}</div></div>
               <div><div className="text-xs text-muted-foreground">Source enquiry</div><div>{acc.source_enquiry_id ? <Link to={`/enquiries/${acc.source_enquiry_id}`} className="text-primary hover:underline">Open</Link> : '—'}</div></div>
               <div className="md:col-span-2">
-                <Label className="text-xs text-muted-foreground">Terrisage tenant ID</Label>
-                <Input
-                  value={draft?.tenant_id ?? ''}
-                  onChange={e => setField('tenant_id', e.target.value)}
-                  placeholder="e.g. 9f8c1d3a-…"
-                  className="mt-1 font-mono text-xs"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">Used to identify this account in the Terrisage CRM seat APIs. Must be unique.</p>
+                <div className="text-xs text-muted-foreground">Terrisage tenant ID</div>
+                <div className="mt-1 font-mono text-xs break-all">{acc.tenant_id ?? <span className="text-muted-foreground italic font-sans">Not yet linked from Terrisage</span>}</div>
+                <p className="mt-1 text-xs text-muted-foreground">Auto-populated from Terrisage CRM. Read-only.</p>
               </div>
             </CardContent>
           </Card>
