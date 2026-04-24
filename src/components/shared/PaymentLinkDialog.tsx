@@ -219,6 +219,36 @@ export function PaymentLinkDialog({
         </p>
 
         <div className="space-y-2 pt-2 border-t">
+          <Label className="text-[11px] uppercase text-muted-foreground tracking-wide">Subscription period</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Start date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm"
+                    className={cn('h-8 w-full justify-start text-left font-normal', !startDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                    {startDate ? format(startDate, 'dd MMM yyyy') : 'Pick a date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={startDate}
+                    onSelect={(d) => d && setStartDate(d)} initialFocus
+                    className={cn('p-3 pointer-events-auto')} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">End date (auto)</Label>
+              <Input className="h-8 bg-muted" value={format(endDate, 'dd MMM yyyy')} readOnly />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            End date is calculated from the billing cycle ({cycle.replace('_', '-').toLowerCase()}).
+          </p>
+        </div>
+
+        <div className="space-y-2 pt-2 border-t">
           <Label className="text-[11px] uppercase text-muted-foreground tracking-wide">Customer</Label>
           <div className="grid grid-cols-2 gap-2">
             <Input className="h-8" placeholder="Name" value={name} onChange={e => setName(e.target.value)} />
