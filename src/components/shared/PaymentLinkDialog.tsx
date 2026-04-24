@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { calcBilling, fmtINR } from '@/lib/billing';
 
-type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+type Cycle = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
 
 const DEFAULT_BASE_FEE = 33000;
 const DEFAULT_SEAT_RATE = 7000;
