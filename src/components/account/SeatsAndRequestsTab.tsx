@@ -62,7 +62,6 @@ function getMemberPermissions(member: SubmissionTeamMember): string[] {
 export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayload }: Props) {
   const [rows, setRows] = useState<SeatRequest[]>([]);
   const [capacity, setCapacity] = useState<Capacity | null>(null);
-  const [seats, setSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -72,18 +71,17 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const [mockReason, setMockReason] = useState('');
   const [submittingMock, setSubmittingMock] = useState(false);
 
+  const members = getTeamMembers(onboardingPayload);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [reqRes, capRes, seatsRes] = await Promise.all([
+    const [reqRes, capRes] = await Promise.all([
       supabase.from('seat_requests').select('*').eq('account_id', accountId).order('created_at', { ascending: false }),
       supabase.from('account_seat_capacity').select('seats_purchased, seats_used, seats_reserved, seats_available, last_crm_sync_at').eq('account_id', accountId).maybeSingle(),
-      supabase.from('account_seats').select('id, full_name, email, role, crm_state, is_superuser, last_active_at, invitation_expires_at, is_active, permissions').eq('account_id', accountId).order('is_superuser', { ascending: false }).order('full_name'),
     ]);
     if (reqRes.error) toast.error(reqRes.error.message);
     setRows((reqRes.data ?? []) as SeatRequest[]);
     setCapacity((capRes.data ?? null) as Capacity | null);
-    setSeats((seatsRes.data ?? []) as Seat[]);
     setLoading(false);
   }, [accountId]);
 
