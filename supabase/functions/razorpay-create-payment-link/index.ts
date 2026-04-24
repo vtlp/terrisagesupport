@@ -69,8 +69,13 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    if ((purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION') && !body.account_id) {
+    if ((purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION' || purpose === 'SEAT_UPSELL') && !body.account_id) {
       return new Response(JSON.stringify({ success: false, error: `account_id required for ${purpose} purpose` }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (purpose === 'SEAT_UPSELL' && !body.seat_request_id) {
+      return new Response(JSON.stringify({ success: false, error: 'seat_request_id required for SEAT_UPSELL purpose' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
