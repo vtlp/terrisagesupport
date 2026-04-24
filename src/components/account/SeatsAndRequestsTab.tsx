@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone, Plus } from 'lucide-react';
+import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -112,11 +112,11 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
     const { error } = await supabase.from('seat_requests').insert({
       account_id: accountId, requested_seats: additional,
       requested_by_email: mockEmail.trim() || null,
-      reason: mockReason.trim() || `Requested via Terrisage app — +${additional} additional seats`,
+      reason: mockReason.trim() || `Added by support on behalf of customer — +${additional} seats`,
     });
     setSubmittingMock(false);
     if (error) { toast.error(error.message); return; }
-    toast.success('Mock request submitted');
+    toast.success('Seat request added');
     setMockOpen(false); setMockSeats(''); setMockEmail(''); setMockReason('');
     load();
   };
@@ -215,7 +215,7 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <CardTitle className="text-base">Seat requests ({rows.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setMockOpen(true)}>
-            <Smartphone className="h-4 w-4 mr-1" /> Mock request from Terrisage app
+            <Plus className="h-4 w-4 mr-1" /> Add seat request
           </Button>
         </CardHeader>
         <CardContent>
@@ -261,12 +261,15 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         </CardContent>
       </Card>
 
-      {/* Mock request dialog */}
+      {/* Add seat request dialog (manual entry by support — e.g. customer phoned in) */}
       <Dialog open={mockOpen} onOpenChange={setMockOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request more seats</DialogTitle>
-            <DialogDescription>Current allocation: {purchased} seats.</DialogDescription>
+            <DialogTitle>Add seat request</DialogTitle>
+            <DialogDescription>
+              Use this when a customer requests additional seats by phone or email. Requests sent from the Terrisage CRM app will appear here automatically.
+              <br />Current allocation: {purchased} seats.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
