@@ -460,10 +460,8 @@ export default function EnquiryDetail() {
       toast.success('Stage updated');
       setEnquiry(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
       setDraft(prev => prev ? { ...prev, ...updates } as Enquiry : prev);
-      // When entering Payment Link Sent, prompt the dialog if no link exists yet.
-      if (stage === 'PAYMENT_LINK_SENT' && !draft.payload.payment?.short_url) {
-        setPaymentDialogOpen(true);
-      }
+      // Note: payment dialog is no longer auto-opened on entering the Payment stage.
+      // Users can open it manually from the Payment stage panel when ready.
     }
     setBusy(false);
   };
