@@ -1739,15 +1739,39 @@ function ActiveStagePanel({
   }
 
   if (stage === 'DEMO_COMPLETED') {
+    const scheduledAt = draft.demo_scheduled_at;
+    const minDateTime = scheduledAt ? scheduledAt.slice(0, 16) : undefined;
+    const completedTooEarly = !!(scheduledAt && draft.demo_completed_at
+      && new Date(draft.demo_completed_at) < new Date(scheduledAt));
     return (
       <div className="grid md:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs">Demo completed at</Label>
           <Input
             type="datetime-local"
+            min={minDateTime}
+            disabled={!scheduledAt}
             value={draft.demo_completed_at ? draft.demo_completed_at.slice(0, 16) : ''}
-            onChange={e => setField('demo_completed_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+            onChange={e => {
+              const val = e.target.value ? new Date(e.target.value).toISOString() : null;
+              if (val && scheduledAt && new Date(val) < new Date(scheduledAt)) {
+                toast.error('Demo completion cannot be before the scheduled time.');
+                return;
+              }
+              setField('demo_completed_at', val);
+            }}
           />
+          {!scheduledAt && (
+            <p className="text-[11px] text-warning">Schedule the demo first to set a completion time.</p>
+          )}
+          {completedTooEarly && (
+            <p className="text-[11px] text-destructive">Completion is earlier than scheduled — please correct.</p>
+          )}
+          {scheduledAt && (
+            <p className="text-[11px] text-muted-foreground">
+              Must be on or after {format(new Date(scheduledAt), 'dd MMM yyyy, HH:mm')}.
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Demo outcome</Label>
@@ -1808,32 +1832,75 @@ function ActiveStagePanel({
           )}
         </div>
 
-        {/* Trial date inputs */}
-        {mode === 'TRIAL_FIRST' && (
-          <div className="grid grid-cols-2 gap-2 rounded-md border border-dashed bg-muted/20 p-3">
-            <div className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Trial start</Label>
-              <Input
-                type="date"
-                className="h-8"
-                value={payment?.trial?.start ?? ''}
-                onChange={e => onSetTrialDate('start', e.target.value)}
-              />
+        {/* Trial date inputs with presets */}
+        {mode === 'TRIAL_FIRST' && (() => {
+          const trialStart = payment?.trial?.start ?? '';
+          const trialEnd = payment?.trial?.end ?? '';
+          const PRESETS: { label: string; days: number }[] = [
+            { label: '1 week', days: 7 },
+            { label: '2 weeks', days: 14 },
+            { label: '1 month', days: 30 },
+          ];
+          const applyPreset = (days: number) => {
+            const start = trialStart ? new Date(trialStart) : new Date();
+            if (!trialStart) {
+              const isoStart = start.toISOString().slice(0, 10);
+              onSetTrialDate('start', isoStart);
+            }
+            const end = new Date(start);
+            end.setDate(end.getDate() + days);
+            onSetTrialDate('end', end.toISOString().slice(0, 10));
+          };
+          const activePreset = (() => {
+            if (!trialStart || !trialEnd) return null;
+            const diff = Math.round((new Date(trialEnd).getTime() - new Date(trialStart).getTime()) / 86400_000);
+            return PRESETS.find(p => p.days === diff)?.days ?? null;
+          })();
+          return (
+            <div className="space-y-2 rounded-md border border-dashed bg-muted/20 p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Trial start</Label>
+                  <Input
+                    type="date"
+                    className="h-8"
+                    value={trialStart}
+                    onChange={e => onSetTrialDate('start', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Trial end</Label>
+                  <Input
+                    type="date"
+                    className="h-8"
+                    value={trialEnd}
+                    onChange={e => onSetTrialDate('end', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] text-muted-foreground">Quick set:</span>
+                {PRESETS.map(p => (
+                  <button
+                    key={p.days}
+                    type="button"
+                    onClick={() => applyPreset(p.days)}
+                    className={cn(
+                      'px-2 py-0.5 text-[11px] rounded border transition-colors',
+                      activePreset === p.days
+                        ? 'bg-primary/10 border-primary/40 text-primary font-medium'
+                        : 'border-border hover:bg-muted',
+                    )}
+                  >{p.label}</button>
+                ))}
+                <span className="text-[11px] text-muted-foreground ml-1">(end date can still be edited)</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Trial mode allows account creation without immediate payment. Capture both dates before progressing.
+              </p>
             </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Trial end</Label>
-              <Input
-                type="date"
-                className="h-8"
-                value={payment?.trial?.end ?? ''}
-                onChange={e => onSetTrialDate('end', e.target.value)}
-              />
-            </div>
-            <p className="col-span-2 text-[11px] text-muted-foreground">
-              Trial mode allows account creation without immediate payment. Capture both dates before progressing.
-            </p>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Trial-first mode: hide link generation entirely. */}
         {mode === 'TRIAL_FIRST' ? (

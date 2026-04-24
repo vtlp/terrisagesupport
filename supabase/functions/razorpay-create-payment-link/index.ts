@@ -15,7 +15,8 @@ const corsHeaders = {
 interface Body {
   enquiry_id?: string;
   account_id?: string;
-  purpose?: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION';
+  seat_request_id?: string;
+  purpose?: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | 'SEAT_UPSELL';
   plan_name: string;
   billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   seats: number;
@@ -28,6 +29,7 @@ interface Body {
   customer: { name: string; email?: string; phone?: string };
   expires_in_days?: number;
   notes?: string;
+  prorata?: { days_remaining: number; days_in_cycle: number };
 }
 
 const fmtINR = (n: number) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -67,8 +69,13 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    if ((purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION') && !body.account_id) {
+    if ((purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION' || purpose === 'SEAT_UPSELL') && !body.account_id) {
       return new Response(JSON.stringify({ success: false, error: `account_id required for ${purpose} purpose` }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (purpose === 'SEAT_UPSELL' && !body.seat_request_id) {
+      return new Response(JSON.stringify({ success: false, error: 'seat_request_id required for SEAT_UPSELL purpose' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -95,9 +102,14 @@ Deno.serve(async (req) => {
       const amountPaise = Math.round(body.total * 100);
       const auth = btoa(`${keyId}:${keySecret}`);
 
-      const refId = (purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION')
-        ? `acc_${body.account_id}_${purpose.toLowerCase()}_${Date.now()}`
-        : `enq_${body.enquiry_id}_${Date.now()}`;
+      const refId = purpose === 'INITIAL'
+        ? `enq_${body.enquiry_id}_${Date.now()}`
+        : `acc_${body.account_id}_${purpose.toLowerCase()}_${Date.now()}`;
+
+      const descSuffix = purpose === 'RENEWAL' ? ' · Renewal'
+        : purpose === 'TRIAL_CONVERSION' ? ' · Trial conversion'
+        : purpose === 'SEAT_UPSELL' ? ' · Seat upsell (pro-rata)'
+        : '';
 
       const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
         method: 'POST',
@@ -107,7 +119,7 @@ Deno.serve(async (req) => {
           currency: 'INR',
           accept_partial: false,
           expire_by: Math.floor(expiresAt.getTime() / 1000),
-          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}${purpose === 'RENEWAL' ? ' · Renewal' : purpose === 'TRIAL_CONVERSION' ? ' · Trial conversion' : ''}`,
+          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}${descSuffix}`,
           customer: {
             name: body.customer.name,
             email: body.customer.email,
@@ -120,6 +132,7 @@ Deno.serve(async (req) => {
             purpose,
             enquiry_id: body.enquiry_id ?? '',
             account_id: body.account_id ?? '',
+            seat_request_id: body.seat_request_id ?? '',
             plan: body.plan_name,
             cycle: body.billing_cycle,
             seats: String(body.seats),
@@ -256,6 +269,41 @@ Deno.serve(async (req) => {
       });
 
       return new Response(JSON.stringify({ success: true, payment }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (purpose === 'SEAT_UPSELL' && body.account_id && body.seat_request_id) {
+      const { data: inserted, error: upErr } = await admin.from('seat_upsell_links').insert({
+        account_id: body.account_id,
+        seat_request_id: body.seat_request_id,
+        seats_extra: body.seats,
+        per_seat_rate: body.per_seat_rate,
+        days_remaining: body.prorata?.days_remaining ?? 0,
+        days_in_cycle: body.prorata?.days_in_cycle ?? 0,
+        prorated_subtotal: body.subtotal,
+        gst_pct: body.gst_pct,
+        gst_amount: body.gst_amount,
+        total: body.total,
+        link_id: payment.link_id,
+        short_url: payment.short_url,
+        status: 'CREATED',
+        expires_at: expiresAtIso,
+        created_by: user.id,
+      }).select('id').maybeSingle();
+      if (upErr) console.error('seat_upsell_links insert failed', upErr);
+
+      await admin.from('account_notes').insert({
+        account_id: body.account_id,
+        note_text: `[Seat upsell] Pro-rata link generated ${fmtINR(body.total)} for +${body.seats} seat(s) · ${payment.short_url}`,
+      });
+      await admin.from('activity_log').insert({
+        entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
+        summary: `[Seat upsell] Pro-rata link generated ${fmtINR(body.total)}`,
+        details: { module: 'seat_upsell', link_id: payment.link_id, seats: body.seats, total: body.total, seat_request_id: body.seat_request_id, upsell_link_id: inserted?.id },
+      });
+
+      return new Response(JSON.stringify({ success: true, payment, upsell_link_id: inserted?.id }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

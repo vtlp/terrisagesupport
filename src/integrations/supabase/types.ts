@@ -2056,6 +2056,75 @@ export type Database = {
         }
         Relationships: []
       }
+      seat_upsell_links: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          days_in_cycle: number
+          days_remaining: number
+          expires_at: string | null
+          gst_amount: number
+          gst_pct: number
+          id: string
+          link_id: string | null
+          paid_at: string | null
+          payment_reference: string | null
+          per_seat_rate: number
+          prorated_subtotal: number
+          seat_request_id: string
+          seats_extra: number
+          short_url: string | null
+          status: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          days_in_cycle: number
+          days_remaining: number
+          expires_at?: string | null
+          gst_amount?: number
+          gst_pct?: number
+          id?: string
+          link_id?: string | null
+          paid_at?: string | null
+          payment_reference?: string | null
+          per_seat_rate?: number
+          prorated_subtotal?: number
+          seat_request_id: string
+          seats_extra: number
+          short_url?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          days_in_cycle?: number
+          days_remaining?: number
+          expires_at?: string | null
+          gst_amount?: number
+          gst_pct?: number
+          id?: string
+          link_id?: string | null
+          paid_at?: string | null
+          payment_reference?: string | null
+          per_seat_rate?: number
+          prorated_subtotal?: number
+          seat_request_id?: string
+          seats_extra?: number
+          short_url?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       seat_usage_snapshots: {
         Row: {
           account_id: string

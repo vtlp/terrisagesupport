@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Receipt, Plus, Pencil, Trash2, Loader2, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInCalendarDays } from 'date-fns';
+import { SeatUpsellCard } from './SeatUpsellCard';
 
 type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
 type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE' | 'TRIAL';
@@ -396,6 +397,8 @@ export function BillingTab({ accountId }: { accountId: string }) {
           </div>
         </CardContent>
       </Card>
+
+      <SeatUpsellCard accountId={accountId} />
 
       <Card>
         <CardHeader>
