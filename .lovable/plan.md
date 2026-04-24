@@ -1,62 +1,58 @@
 
 
-## Rename "Payment Link Sent" → "Payment" + fix downstream trial gates
+## Review: `CRM_Integration_Handover_v1.md`
 
-### Why
-- "Payment Link Sent" reads as a status. It's actually a **stage** where staff decide: collect now (Pay-Before) or start a trial (Trial-First). "Payment" is the honest label.
-- The Actions card currently gates "Send onboarding form" on `paymentPaid` only. In Trial-First there is no payment status (by design), so the button stays disabled and staff can't progress — even though `handleSendOnboarding` itself already accepts a valid trial. The button enable logic and the helper text need to match the handler.
+**Verdict:** Still valuable as the backbone — the five seat states, four-counter model, endpoint list and reconciliation rules all match what's deployed. But it has **6 factual drifts** versus the live edge functions and **1 major gap** (no mention of TRIAL accounts, which we shipped today). It should be re-issued as **v1.1** before handover.
 
-### Changes
+---
 
-**1. Stage label rename (display only — DB enum stays `PAYMENT_LINK_SENT`)**
+### Drifts vs. implementation
 
-Files: `src/pages/EnquiryDetail.tsx`, `src/pages/Enquiries.tsx`, `src/pages/EnquiryPipelineDashboard.tsx`, `src/components/shared/CreateEnquiryDialog.tsx` (if it lists this stage).
+| # | Doc says | Code actually does | Fix |
+|---|---|---|---|
+| 1 | `GET /seat-capacity` returns fields named `plan_name`, `billing_cycle`, `subscription_status`, `next_renewal_at`, `requested_pending`, `as_of` | Returns `plan`, `cycle`, `status`, no `next_renewal_at`, field is `requested` (not `_pending`), timestamp is `last_crm_sync_at` (not `as_of`) | Update D1 sample response to match `seat-capacity/index.ts` exactly, or rename the function fields to match the doc — pick one. |
+| 2 | `POST /seat-usage` 200 body lists `allocated/reserved/consumed/available/over_capacity` | Code also returns `account_id` | Add `account_id` to the D4 example. |
+| 3 | `POST /seat-request` returns 200 | Code returns **201 Created** on insert; idempotent-return-of-existing-PENDING is **not** implemented (DB has no unique constraint on `(account_id, status='PENDING')`) | Either (a) implement the idempotency the doc promises, or (b) remove the "same row is returned" sentence and document 201. |
+| 4 | `GET /seat-request/:id` exists for status polling (in code) | Not mentioned in the doc at all | Add as D5b — the CRM will want to poll request status without waiting for a `REQUEST_FULFILLED` event. |
+| 5 | `seat-usage` payload requires `external_id` | Code falls back to `email` as match key when `external_id` is missing | Mark `external_id` as "✅ recommended" with note: "if absent, Console matches on `email`; rows with neither are skipped." |
+| 6 | `CRM_SYNC_STALE` raised after 24h with no heartbeat | No cron is currently deployed that writes this notification — the threshold exists in spec only | Either ship the cron now or downgrade the wording to "planned" so the CRM team doesn't expect the alert in pilot. |
 
-```
-PAYMENT_LINK_SENT: 'Payment Link Sent' / 'Payment Sent'  →  'Payment'
-```
+---
 
-No migration needed — enum value unchanged, only the human label.
+### Major gap — TRIAL accounts (shipped today)
 
-**2. Onboarding button gate — accept valid trial as well as Paid**
+The doc assumes every account is `ACTIVE` from day one. Post-today, an account can open in `subscription_status = 'TRIAL'`, with the first paid invoice raised only after the trial-conversion link is paid. CRM behaviour during `TRIAL` is currently undefined for the integrator. Add a short section:
 
-`src/pages/EnquiryDetail.tsx` (around line 854-860 in the Actions card):
+- **`status` enum**: add `TRIAL` to D1 / D2 / E.
+- **Behaviour during TRIAL**: seats are still allocated (`seats_purchased` from billing settings); CRM should treat capacity exactly as it does for `ACTIVE`. No proration applies.
+- **Transition signal**: when the trial-conversion payment lands, the Console flips status `TRIAL → ACTIVE` and creates the first `CYCLE` invoice. Today this is **silent on `/seat-events`** (no event reason exists for it). Decide: either add a new event reason `TRIAL_CONVERTED`, or have the CRM detect it by polling `/account-profile` for the status change. Recommendation: add `TRIAL_CONVERTED` to the events stream — it's the cleanest signal and matches the existing pattern.
 
-```ts
-const p = draft.payload.payment;
-const paymentPaid = p?.status === 'PAID';
-const trialMode = p?.mode === 'TRIAL_FIRST';
-const trialValid = trialMode && !!p?.trial?.start && !!p?.trial?.end
-                   && new Date(p.trial.end) >= new Date(p.trial.start);
-const onboardingSent = enquiry.onboarding_pack_sent || draft.onboarding_pack_sent;
-const onboardEnabled = onboardingSent || paymentPaid || trialValid;
-const blockedReason = onboardEnabled ? null
-  : trialMode
-    ? 'Set valid trial start and end dates to unlock onboarding.'
-    : 'Mark payment as Paid, or switch to Trial-First with valid dates, to unlock onboarding.';
-```
+---
 
-This makes the Trial-First flow self-consistent: pick mode → set trial dates → "Send onboarding form" lights up → submit form → "Convert to account" (already trial-aware) → account opens in `TRIAL` status with `TrialConversionCard` taking over.
+### Minor copy/clarity tweaks
 
-**3. Verify nothing else silently expects `payment.status` in trial mode**
+- Section A: rename the stage-context table header so "Counts as" reads "Reserved (R) / Consumed (C) / Released at renewal" — current single-column form is ambiguous for `DELETION_REQUESTED`.
+- Section B row 2: `current_period_start/end` are nullable while in `TRIAL`; flag this.
+- Section C3: clarify that the 5-min keepalive is **in addition to** state-change pushes, not a replacement.
+- Section F "Rate limits": these are aspirational — no limiter is enforced server-side. Mark as "soft target, monitored, not enforced".
+- Section H: add "Trial-conversion payment collection — handled inside Console, CRM sees only the resulting status flip."
 
-Quick audit pass on `EnquiryDetail.tsx`:
-- `validateStageGate` at line 396 — already trial-aware. ✓
-- `convertToAccount` block — already trial-aware (per previous changes). ✓
-- Activity timeline / notes — purely descriptive, no gating. ✓
+---
 
-**4. Keep the existing trial explainer copy in the Payment card aligned**
+### What stays as-is (no change needed)
 
-Where the enquiry-side card currently says "A trial conversion link will be available on the account once it's created", make sure it now also notes: "You can send the onboarding form straight away once trial dates are set." (one-line tweak).
+- Five-state model, counter math, hard rules block (A).
+- Auth via `x-account-api-key` SHA-256 (D, F).
+- Event reasons `REQUEST_FULFILLED / RENEWAL / MANUAL_ADJUSTMENT / CANCELLATION / SUPERUSER_TRANSFER` (C6, D3) — all still emitted.
+- Member schema in E.
+- Test plan in G — scenarios all still execute correctly; just add a TRIAL → ACTIVE scenario.
+- Quick handover checklist (closing) — still the right pre-flight.
 
-### Out of scope
-- DB enum rename (unnecessary; would force a heavy migration and break activity-log history).
-- Any change to Account-side `TrialConversionCard` / `RenewalsCard` — they're already correct after the previous round.
-- Stage colour tokens stay as-is (warning amber suits "Payment" too).
+---
 
-### Files touched
-- `src/pages/EnquiryDetail.tsx` — label + button gate + explainer tweak
-- `src/pages/Enquiries.tsx` — label
-- `src/pages/EnquiryPipelineDashboard.tsx` — label
-- `src/components/shared/CreateEnquiryDialog.tsx` — label (if present)
+### Proposed action
+
+Re-issue as **v1.1** with: (a) the 6 field/return-code corrections, (b) the TRIAL section, (c) the `GET /seat-request/:id` addition, (d) decision on `TRIAL_CONVERTED` event, (e) the "soft / aspirational" hedging on rate-limit and stale-sync claims that aren't enforced yet. Roughly 15-20 line diff, no structural rewrite.
+
+If you want, I can produce the v1.1 markdown in one pass — say the word and I'll switch to default mode and write the updated file plus, if you choose, the `TRIAL_CONVERTED` event wiring in the webhook.
 
