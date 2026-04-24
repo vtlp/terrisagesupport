@@ -1739,15 +1739,39 @@ function ActiveStagePanel({
   }
 
   if (stage === 'DEMO_COMPLETED') {
+    const scheduledAt = draft.demo_scheduled_at;
+    const minDateTime = scheduledAt ? scheduledAt.slice(0, 16) : undefined;
+    const completedTooEarly = !!(scheduledAt && draft.demo_completed_at
+      && new Date(draft.demo_completed_at) < new Date(scheduledAt));
     return (
       <div className="grid md:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs">Demo completed at</Label>
           <Input
             type="datetime-local"
+            min={minDateTime}
+            disabled={!scheduledAt}
             value={draft.demo_completed_at ? draft.demo_completed_at.slice(0, 16) : ''}
-            onChange={e => setField('demo_completed_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+            onChange={e => {
+              const val = e.target.value ? new Date(e.target.value).toISOString() : null;
+              if (val && scheduledAt && new Date(val) < new Date(scheduledAt)) {
+                toast.error('Demo completion cannot be before the scheduled time.');
+                return;
+              }
+              setField('demo_completed_at', val);
+            }}
           />
+          {!scheduledAt && (
+            <p className="text-[11px] text-warning">Schedule the demo first to set a completion time.</p>
+          )}
+          {completedTooEarly && (
+            <p className="text-[11px] text-destructive">Completion is earlier than scheduled — please correct.</p>
+          )}
+          {scheduledAt && (
+            <p className="text-[11px] text-muted-foreground">
+              Must be on or after {format(new Date(scheduledAt), 'dd MMM yyyy, HH:mm')}.
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Demo outcome</Label>
