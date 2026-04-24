@@ -52,6 +52,10 @@ interface BillingCtx {
   gst_pct: number;
   current_period_start: string | null;
   current_period_end: string | null;
+  subscription_started_at: string | null;
+  next_renewal_at: string | null;
+  trial_starts_at: string | null;
+  trial_ends_at: string | null;
 }
 
 interface AccountInfo {
@@ -83,7 +87,7 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     const [b, a, r, l] = await Promise.all([
-      supabase.from('account_billing_settings').select('plan_name, billing_cycle, base_fee, seat_rate, seats_purchased, gst_pct, current_period_start, current_period_end').eq('account_id', accountId).maybeSingle(),
+      supabase.from('account_billing_settings').select('plan_name, billing_cycle, base_fee, seat_rate, seats_purchased, gst_pct, current_period_start, current_period_end, subscription_started_at, next_renewal_at, trial_starts_at, trial_ends_at').eq('account_id', accountId).maybeSingle(),
       supabase.from('accounts').select('account_name, owner_name, owner_email, owner_phone').eq('id', accountId).maybeSingle(),
       supabase.from('seat_requests').select('*').eq('account_id', accountId).eq('status', 'APPROVED').order('decided_at', { ascending: false }),
       supabase.from('seat_upsell_links').select('*').eq('account_id', accountId).order('created_at', { ascending: false }),
@@ -97,6 +101,10 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
       gst_pct: Number(b.data.gst_pct),
       current_period_start: b.data.current_period_start,
       current_period_end: b.data.current_period_end,
+      subscription_started_at: b.data.subscription_started_at,
+      next_renewal_at: b.data.next_renewal_at,
+      trial_starts_at: b.data.trial_starts_at,
+      trial_ends_at: b.data.trial_ends_at,
     });
     if (a.data) setAccount(a.data as AccountInfo);
     setRequests((r.data ?? []) as SeatRequest[]);
@@ -132,21 +140,39 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
 
   const proRata = useMemo(() => {
     if (!billing || !activeRequest) return null;
-    const periodStart = billing.current_period_start ? new Date(billing.current_period_start) : null;
-    const periodEnd = billing.current_period_end ? new Date(billing.current_period_end) : null;
-    if (!periodStart || !periodEnd) return null;
+    // Resolve cycle window with fallbacks: explicit period → subscription → trial → derived from billing cycle
+    const cycleMonths = billing.billing_cycle === 'MONTHLY' ? 1 : billing.billing_cycle === 'QUARTERLY' ? 3 : 12;
+    let periodStart: Date | null = billing.current_period_start ? new Date(billing.current_period_start) : null;
+    let periodEnd: Date | null = billing.current_period_end ? new Date(billing.current_period_end) : null;
+    if (!periodStart && billing.subscription_started_at) periodStart = new Date(billing.subscription_started_at);
+    if (!periodEnd && billing.next_renewal_at) periodEnd = new Date(billing.next_renewal_at);
+    if (!periodStart && billing.trial_starts_at) periodStart = new Date(billing.trial_starts_at);
+    if (!periodEnd && billing.trial_ends_at) periodEnd = new Date(billing.trial_ends_at);
+    // Last-resort: derive from today
+    if (!periodStart && periodEnd) {
+      const ps = new Date(periodEnd); ps.setMonth(ps.getMonth() - cycleMonths); periodStart = ps;
+    }
+    if (!periodEnd && periodStart) {
+      const pe = new Date(periodStart); pe.setMonth(pe.getMonth() + cycleMonths); periodEnd = pe;
+    }
+    if (!periodStart || !periodEnd) {
+      periodStart = new Date();
+      periodEnd = new Date(); periodEnd.setMonth(periodEnd.getMonth() + cycleMonths);
+    }
     const daysInCycle = Math.max(1, differenceInCalendarDays(periodEnd, periodStart));
-    const daysRemaining = Math.max(0, differenceInCalendarDays(periodEnd, new Date()));
+    const daysRemaining = Math.max(0, Math.min(daysInCycle, differenceInCalendarDays(periodEnd, new Date())));
     const seatsExtra = activeRequest.requested_seats;
     const fullSubtotal = billing.seat_rate * seatsExtra;
     const proratedSubtotal = Math.round(fullSubtotal * (daysRemaining / daysInCycle));
-    const gstAmount = (proratedSubtotal * billing.gst_pct) / 100;
+    const gstAmount = Math.round((proratedSubtotal * billing.gst_pct) / 100);
     const total = proratedSubtotal + gstAmount;
     return {
       daysInCycle, daysRemaining, seatsExtra,
       perSeatRate: billing.seat_rate,
       fullSubtotal, proratedSubtotal,
       gstPct: billing.gst_pct, gstAmount, total,
+      periodStart, periodEnd,
+      derived: !billing.current_period_start || !billing.current_period_end,
     };
   }, [billing, activeRequest]);
 
@@ -297,7 +323,7 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
                   <div className="flex justify-between"><span className="text-muted-foreground">Extra seats</span><span className="font-medium">+{proRata.seatsExtra}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Per-seat rate</span><span className="font-medium">{fmtINR(proRata.perSeatRate)}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Cycle window</span><span className="font-medium">
-                    {billing.current_period_start ? format(new Date(billing.current_period_start), 'dd MMM') : '—'} – {billing.current_period_end ? format(new Date(billing.current_period_end), 'dd MMM yyyy') : '—'}
+                    {format(proRata.periodStart, 'dd MMM')} – {format(proRata.periodEnd, 'dd MMM yyyy')}
                   </span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Days remaining / cycle</span><span className="font-medium">{proRata.daysRemaining} / {proRata.daysInCycle}</span></div>
                 </div>
@@ -307,8 +333,8 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
                   <div className="flex justify-between"><span className="text-muted-foreground">GST ({proRata.gstPct}%)</span><span>{fmtINR(proRata.gstAmount)}</span></div>
                   <div className="flex justify-between font-semibold pt-1 border-t mt-1 text-primary"><span>Total</span><span>{fmtINR(proRata.total)}</span></div>
                 </div>
-                {!billing.current_period_end && (
-                  <p className="text-[11px] text-warning">No active billing period set — cannot prorate. Set the cycle in Plan & subscription first.</p>
+                {proRata.derived && (
+                  <p className="text-[11px] text-warning">Billing cycle dates not set explicitly — using {billing.subscription_started_at || billing.next_renewal_at ? 'subscription' : billing.trial_starts_at ? 'trial' : 'estimated'} dates. Set the cycle in Plan & subscription for accurate proration.</p>
                 )}
                 <div className="space-y-1">
                   <Label className="text-xs">Customer</Label>
