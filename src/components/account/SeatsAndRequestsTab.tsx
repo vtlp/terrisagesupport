@@ -162,24 +162,42 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Seat capacity</CardTitle>
-          {lastSync && (
+          {crmLinked && lastSync ? (
             <Badge variant="outline" className="text-[10px]">
               CRM synced {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px] border-warning/40 bg-warning/10 text-warning">
+              {syncing ? 'Syncing…' : tenantId ? 'CRM unreachable' : 'Not linked to Terrisage'}
             </Badge>
           )}
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <CapacityStat icon={<Users className="h-4 w-4 text-primary" />} label="Allocated" value={purchased} hint="Seats purchased" />
-            <CapacityStat icon={<Clock className="h-4 w-4 text-warning" />} label="Reserved" value={reserved} hint="Pending invites" />
-            <CapacityStat icon={<Check className="h-4 w-4 text-success" />} label="Consumed" value={consumed} hint="In use this cycle" />
-            <CapacityStat icon={<UserPlus className="h-4 w-4 text-accent" />} label="Available" value={available} hint="Free to invite" />
-            <CapacityStat icon={<Plus className="h-4 w-4 text-warning" />} label="Requested" value={pendingRequested} hint="Pending requests" />
-          </div>
-          {consumed > purchased && purchased > 0 && (
-            <p className="mt-3 text-xs text-destructive">
-              Over capacity: {consumed - purchased} seat(s) in use beyond allocation.
-            </p>
+          {crmLinked ? (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <CapacityStat icon={<Users className="h-4 w-4 text-primary" />} label="Allocated" value={purchased} hint="Seats purchased" />
+                <CapacityStat icon={<Clock className="h-4 w-4 text-warning" />} label="Reserved" value={reserved} hint="Pending invites" />
+                <CapacityStat icon={<Check className="h-4 w-4 text-success" />} label="Consumed" value={consumed} hint="In use this cycle" />
+                <CapacityStat icon={<UserPlus className="h-4 w-4 text-accent" />} label="Available" value={available} hint="Free to invite" />
+                <CapacityStat icon={<Plus className="h-4 w-4 text-warning" />} label="Requested" value={pendingRequested} hint="Pending requests" />
+              </div>
+              {consumed > purchased && purchased > 0 && (
+                <p className="mt-3 text-xs text-destructive">
+                  Over capacity: {consumed - purchased} seat(s) in use beyond allocation.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
+                <CapacityStat icon={<Users className="h-4 w-4 text-primary" />} label="Allocated" value={purchased} hint="From onboarding form" />
+                <CapacityStat icon={<Plus className="h-4 w-4 text-warning" />} label="Requested" value={pendingRequested} hint="Pending requests" />
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Live consumed/reserved/available figures will appear once the account is linked to Terrisage CRM.
+              </p>
+            </>
           )}
         </CardContent>
       </Card>
