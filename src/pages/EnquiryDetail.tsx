@@ -1922,7 +1922,18 @@ function ActiveStagePanel({
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold">{fmtINR(payment.amount ?? 0)}</span>
-                    {status && statusBadge(status)}
+                    {status && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-[10px] uppercase text-muted-foreground">Manual:</span>
+                        {statusBadge(status)}
+                      </span>
+                    )}
+                    {(payment as { razorpay_status?: string }).razorpay_status && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-[10px] uppercase text-muted-foreground">Razorpay:</span>
+                        {statusBadge((payment as { razorpay_status: string }).razorpay_status)}
+                      </span>
+                    )}
                     {isOutdated && (
                       <Badge variant="outline" className="text-[10px] bg-warning/15 text-warning border-warning/40">Outdated</Badge>
                     )}
