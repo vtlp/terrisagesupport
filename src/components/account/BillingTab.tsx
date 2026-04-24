@@ -344,13 +344,6 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 value={derivedNextRenewal ? derivedNextRenewal.substring(0, 10) : ''} />
               <p className="text-[10px] text-muted-foreground">Derived from subscription start + cycle.</p>
             </div>
-            <div className="space-y-1.5 flex flex-col">
-              <Label>Auto-renew</Label>
-              <div className="flex items-center gap-2 h-10">
-                <Switch checked={settings.auto_renew} onCheckedChange={v => setSettings(s => ({ ...s, auto_renew: v }))} />
-                <span className="text-xs text-muted-foreground">{settings.auto_renew ? 'On' : 'Off'}</span>
-              </div>
-            </div>
           </div>
 
           {settings.cancellation_requested_at && (
