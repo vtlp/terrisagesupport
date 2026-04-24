@@ -344,13 +344,6 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 value={derivedNextRenewal ? derivedNextRenewal.substring(0, 10) : ''} />
               <p className="text-[10px] text-muted-foreground">Derived from subscription start + cycle.</p>
             </div>
-            <div className="space-y-1.5 flex flex-col">
-              <Label>Auto-renew</Label>
-              <div className="flex items-center gap-2 h-10">
-                <Switch checked={settings.auto_renew} onCheckedChange={v => setSettings(s => ({ ...s, auto_renew: v }))} />
-                <span className="text-xs text-muted-foreground">{settings.auto_renew ? 'On' : 'Off'}</span>
-              </div>
-            </div>
           </div>
 
           {settings.cancellation_requested_at && (
@@ -429,13 +422,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
                     <div className="text-[10px] text-muted-foreground">incl. GST</div>
                   </div>
                   <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEdit(i)}
-                      disabled={i.status !== 'DRAFT'}
-                      title={i.status !== 'DRAFT' ? 'Only draft invoices can be edited' : 'Edit invoice'}
-                    ><Pencil className="h-4 w-4" /></Button>
+                    {i.status === 'DRAFT' && (
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(i)} title="Edit invoice"><Pencil className="h-4 w-4" /></Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => remove(i.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 </div>
