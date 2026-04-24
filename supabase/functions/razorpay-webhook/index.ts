@@ -43,7 +43,8 @@ Deno.serve(async (req) => {
     const linkObj = (event.payload as { payment_link?: { entity?: Record<string, unknown> } } | undefined)?.payment_link?.entity ?? {};
     const linkId = linkObj.id as string | undefined;
     const notes = (linkObj.notes ?? {}) as Record<string, string>;
-    const purpose = (notes.purpose as 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | undefined) ?? 'INITIAL';
+    const purpose = (notes.purpose as 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | 'SEAT_UPSELL' | undefined) ?? 'INITIAL';
+    const seatRequestIdNote = notes.seat_request_id;
     const enquiryId = notes.enquiry_id;
     const accountIdNote = notes.account_id;
 
