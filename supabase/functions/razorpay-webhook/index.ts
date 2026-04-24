@@ -219,6 +219,21 @@ Deno.serve(async (req) => {
         details: { module: 'trial', link_id: linkId, seats: newSeats, total },
       });
 
+      // Emit a TRIAL_CONVERTED seat-change event so the connected CRM picks up
+      // the TRIAL → ACTIVE transition through /seat-events without polling
+      // /account-profile. delta = 0 because seats_purchased is unchanged here
+      // (any seat-count change at conversion is reflected via newSeats above
+      // and surfaced through /seat-capacity).
+      await admin.from('seat_change_events').insert({
+        account_id: accountIdNote,
+        delta: 0,
+        new_total: newSeats,
+        reason: 'TRIAL_CONVERTED',
+        effective_at: nowIso,
+        prorated_amount: 0,
+        notes: `Trial conversion via Razorpay · ${linkId ?? '—'}`,
+      });
+
       return new Response(JSON.stringify({ success: true, branch: 'TRIAL_CONVERSION' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
