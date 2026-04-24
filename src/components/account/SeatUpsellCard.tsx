@@ -87,7 +87,7 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     const [b, a, r, l] = await Promise.all([
-      supabase.from('account_billing_settings').select('plan_name, billing_cycle, base_fee, seat_rate, seats_purchased, gst_pct, current_period_start, current_period_end').eq('account_id', accountId).maybeSingle(),
+      supabase.from('account_billing_settings').select('plan_name, billing_cycle, base_fee, seat_rate, seats_purchased, gst_pct, current_period_start, current_period_end, subscription_started_at, next_renewal_at, trial_starts_at, trial_ends_at').eq('account_id', accountId).maybeSingle(),
       supabase.from('accounts').select('account_name, owner_name, owner_email, owner_phone').eq('id', accountId).maybeSingle(),
       supabase.from('seat_requests').select('*').eq('account_id', accountId).eq('status', 'APPROVED').order('decided_at', { ascending: false }),
       supabase.from('seat_upsell_links').select('*').eq('account_id', accountId).order('created_at', { ascending: false }),
@@ -101,6 +101,10 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
       gst_pct: Number(b.data.gst_pct),
       current_period_start: b.data.current_period_start,
       current_period_end: b.data.current_period_end,
+      subscription_started_at: b.data.subscription_started_at,
+      next_renewal_at: b.data.next_renewal_at,
+      trial_starts_at: b.data.trial_starts_at,
+      trial_ends_at: b.data.trial_ends_at,
     });
     if (a.data) setAccount(a.data as AccountInfo);
     setRequests((r.data ?? []) as SeatRequest[]);
