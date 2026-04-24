@@ -422,13 +422,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
                     <div className="text-[10px] text-muted-foreground">incl. GST</div>
                   </div>
                   <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEdit(i)}
-                      disabled={i.status !== 'DRAFT'}
-                      title={i.status !== 'DRAFT' ? 'Only draft invoices can be edited' : 'Edit invoice'}
-                    ><Pencil className="h-4 w-4" /></Button>
+                    {i.status === 'DRAFT' && (
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(i)} title="Edit invoice"><Pencil className="h-4 w-4" /></Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => remove(i.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 </div>
