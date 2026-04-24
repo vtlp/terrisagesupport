@@ -113,21 +113,47 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
     if (!form.title.trim()) { toast.error('Title is required'); return; }
     if (!form.scheduled_at) { toast.error('Date & time is required'); return; }
     setBusy(true);
+    const newIso = new Date(form.scheduled_at).toISOString();
     const { error } = await supabase.from('calendar_events')
       .update({
         title: form.title.trim(),
-        scheduled_at: new Date(form.scheduled_at).toISOString(),
+        scheduled_at: newIso,
         event_type: form.event_type as 'DEMO',
         notes: form.notes.trim() || null,
         duration_min: Number(form.duration_min) || 30,
       })
       .eq('id', event.id);
+    if (error) { setBusy(false); toast.error(error.message); return; }
+
+    // If this is a DEMO linked to an enquiry that hasn't been completed yet,
+    // keep the enquiry's demo_scheduled_at in sync with the rescheduled event.
+    if (form.event_type === 'DEMO' && event.related_entity_type === 'ENQUIRY' && event.related_entity_id) {
+      const { data: enq } = await supabase.from('enquiries')
+        .select('demo_completed_at')
+        .eq('id', event.related_entity_id)
+        .maybeSingle();
+      if (enq && !enq.demo_completed_at) {
+        const { error: enqErr } = await supabase.from('enquiries')
+          .update({ demo_scheduled_at: newIso })
+          .eq('id', event.related_entity_id);
+        if (enqErr) {
+          toast.warning(`Event saved, but couldn't update linked enquiry: ${enqErr.message}`);
+        } else {
+          toast.success('Event updated and linked enquiry rescheduled');
+          setBusy(false);
+          setEditing(false);
+          onChanged?.();
+          return;
+        }
+      }
+    }
+
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
     toast.success('Event updated');
     setEditing(false);
     onChanged?.();
   };
+
 
   const remove = async () => {
     if (!confirm('Delete this event?')) return;
