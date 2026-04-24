@@ -26,7 +26,7 @@ interface TrialState {
   seat_rate: number;
   gst_pct: number;
   seats_purchased: number;
-  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
   trial_starts_at: string | null;
   trial_ends_at: string | null;
   trial_link_id: string | null;
