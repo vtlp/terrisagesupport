@@ -92,10 +92,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const [mockReason, setMockReason] = useState('');
   const [submittingMock, setSubmittingMock] = useState(false);
 
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [transferFrom, setTransferFrom] = useState<string>('');
-  const [transferTo, setTransferTo] = useState<string>('');
-  const [transferring, setTransferring] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,19 +143,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
     load();
   };
 
-  const initiateTransfer = async () => {
-    if (!transferTo) { toast.error('Pick a new superuser'); return; }
-    setTransferring(true);
-    const { error } = await supabase.rpc('initiate_superuser_transfer', {
-      _account_id: accountId, _from_seat_id: transferFrom || null, _to_seat_id: transferTo, _notes: null,
-    });
-    setTransferring(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Superuser transfer initiated · all support users notified');
-    setTransferOpen(false); setTransferFrom(''); setTransferTo('');
-    load();
-  };
-
   const purchased = capacity?.seats_purchased ?? 0;
   const consumed = capacity?.seats_used ?? activeSeatsUsed;
   const reserved = capacity?.seats_reserved ?? 0;
@@ -201,9 +184,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Members ({seats.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => { setTransferFrom(currentSuperuser?.id ?? ''); setTransferOpen(true); }}>
-            <ShieldCheck className="h-4 w-4 mr-1" /> Transfer superuser
-          </Button>
         </CardHeader>
         <CardContent>
           {seats.length === 0 ? (
@@ -211,8 +191,7 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
           ) : (
             <div className="space-y-2">
               {seats.map(s => {
-                const formPermissions = getSubmissionPermissions(onboardingPayload, s.email);
-                const perms = formPermissions.length > 0 ? formPermissions : getStoredPermissions(s.permissions);
+                const perms = getStoredPermissions(s.permissions);
                 return (
                   <div key={s.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
                     <div className="min-w-0 flex-1">
@@ -243,8 +222,8 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
                             </Badge>
                           ))
                         ) : (
-                          <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground">
-                            Permissions: default
+                          <Badge variant="outline" className="text-[10px] border-success/30 bg-success/10 text-success">
+                            All permissions
                           </Badge>
                         )}
                       </div>
@@ -307,44 +286,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
           )}
         </CardContent>
       </Card>
-
-      {/* Superuser transfer */}
-      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Transfer superuser</DialogTitle>
-            <DialogDescription>
-              All support users will be notified and a follow-up calendar event will be created on each support user's calendar for tomorrow.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Current superuser</Label>
-              <Select value={transferFrom} onValueChange={setTransferFrom}>
-                <SelectTrigger><SelectValue placeholder="None set" /></SelectTrigger>
-                <SelectContent>
-                  {seats.map(s => <SelectItem key={s.id} value={s.id}>{s.full_name}{s.is_superuser ? ' ★' : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>New superuser *</Label>
-              <Select value={transferTo} onValueChange={setTransferTo}>
-                <SelectTrigger><SelectValue placeholder="Pick a member" /></SelectTrigger>
-                <SelectContent>
-                  {seats.filter(s => s.id !== transferFrom).map(s => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTransferOpen(false)}>Cancel</Button>
-            <Button onClick={initiateTransfer} disabled={transferring || !transferTo}>
-              {transferring && <Loader2 className="h-4 w-4 mr-1 animate-spin" />} Initiate transfer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Mock request dialog */}
       <Dialog open={mockOpen} onOpenChange={setMockOpen}>
