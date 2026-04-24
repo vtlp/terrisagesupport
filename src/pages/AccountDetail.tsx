@@ -437,7 +437,7 @@ export default function AccountDetail() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Team seats</CardTitle>
+                <CardTitle className="text-base">Team Seats Info from onboarding</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
