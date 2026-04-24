@@ -434,7 +434,7 @@ export default function AccountDetail() {
               <div className="md:col-span-2">
                 <div className="text-xs text-muted-foreground">Terrisage tenant ID</div>
                 <div className="mt-1 font-mono text-xs break-all">{acc.tenant_id ?? <span className="text-muted-foreground italic font-sans">Not yet linked from Terrisage</span>}</div>
-                <p className="mt-1 text-xs text-muted-foreground">Auto-populated from Terrisage CRM. Read-only.</p>
+                
               </div>
             </CardContent>
           </Card>
