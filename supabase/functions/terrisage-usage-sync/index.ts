@@ -25,6 +25,8 @@ interface DayPayload {
   conversions?: number;
   tasksCompleted?: number;
   lastActiveAt?: string | null;
+  // Per-feature adoption percentages (0-100). Optional.
+  featureUsage?: Record<string, number>;
 }
 
 Deno.serve(async (req) => {
