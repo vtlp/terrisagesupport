@@ -159,11 +159,22 @@ export function BillingTab({ accountId }: { accountId: string }) {
     return addMonths(settings.subscription_started_at, months);
   }, [settings.subscription_started_at, settings.billing_cycle, settings.next_renewal_at]);
 
+  // Current cycle end auto-derives from current cycle start + billing cycle length.
+  const derivedCurrentEnd = useMemo(() => {
+    if (!settings.current_period_start) return settings.current_period_end;
+    const months = CYCLE_MONTHS[settings.billing_cycle] ?? 12;
+    return addMonths(settings.current_period_start, months);
+  }, [settings.current_period_start, settings.billing_cycle, settings.current_period_end]);
+
   const saveSettings = async () => {
     setSavingSettings(true);
-    const nextRenewal = settings.subscription_started_at
-      ? addMonths(settings.subscription_started_at, CYCLE_MONTHS[settings.billing_cycle] ?? 12)
-      : settings.next_renewal_at;
+    const currentEnd = settings.current_period_start
+      ? addMonths(settings.current_period_start, CYCLE_MONTHS[settings.billing_cycle] ?? 12)
+      : settings.current_period_end;
+    const nextRenewal = currentEnd
+      ?? (settings.subscription_started_at
+        ? addMonths(settings.subscription_started_at, CYCLE_MONTHS[settings.billing_cycle] ?? 12)
+        : settings.next_renewal_at);
     const payload = {
       account_id: accountId, plan_name: settings.plan_name, billing_cycle: settings.billing_cycle,
       base_fee: settings.base_fee, seat_rate: settings.seat_rate,
@@ -173,6 +184,8 @@ export function BillingTab({ accountId }: { accountId: string }) {
       country: settings.country,
       auto_renew: settings.auto_renew,
       subscription_started_at: settings.subscription_started_at,
+      current_period_start: settings.current_period_start,
+      current_period_end: currentEnd,
     };
     const { error } = settings.id
       ? await supabase.from('account_billing_settings').update(payload).eq('id', settings.id)
@@ -244,7 +257,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
   };
 
   const submitRenewal = async () => {
-    if (!derivedNextRenewal) { toast.error('Set the subscription start date first.'); return; }
+    if (!derivedCurrentEnd && !derivedNextRenewal) { toast.error('Set the current cycle start date first.'); return; }
     setRenewBusy(true);
     const seatsArg = renewDecision === 'RENEW' || renewDecision === 'CANCEL'
       ? null
@@ -262,8 +275,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
     load();
   };
 
-  const daysToRenewal = derivedNextRenewal
-    ? differenceInCalendarDays(new Date(derivedNextRenewal), new Date())
+  const effectivePeriodEnd = derivedCurrentEnd ?? derivedNextRenewal;
+  const daysToRenewal = effectivePeriodEnd
+    ? differenceInCalendarDays(new Date(effectivePeriodEnd), new Date())
     : null;
   const renewalWindow = daysToRenewal !== null && daysToRenewal <= 30 && daysToRenewal >= -7;
 
@@ -336,13 +350,19 @@ export function BillingTab({ accountId }: { accountId: string }) {
               <Label>Subscription started</Label>
               <Input type="date" value={settings.subscription_started_at ? settings.subscription_started_at.substring(0, 10) : ''}
                 onChange={e => setSettings(s => ({ ...s, subscription_started_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
-              <p className="text-[10px] text-muted-foreground">Set when the first payment is received and the account is created.</p>
+              <p className="text-[10px] text-muted-foreground">Anchor — first payment received. Stays fixed across renewals.</p>
             </div>
             <div className="space-y-1.5">
-              <Label>Next renewal (auto)</Label>
+              <Label>Current cycle start</Label>
+              <Input type="date" value={settings.current_period_start ? settings.current_period_start.substring(0, 10) : ''}
+                onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+              <p className="text-[10px] text-muted-foreground">Updates each renewal; drives pro-rata calculations.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Current cycle end (auto)</Label>
               <Input type="date" disabled
-                value={derivedNextRenewal ? derivedNextRenewal.substring(0, 10) : ''} />
-              <p className="text-[10px] text-muted-foreground">Derived from subscription start + cycle.</p>
+                value={derivedCurrentEnd ? derivedCurrentEnd.substring(0, 10) : ''} />
+              <p className="text-[10px] text-muted-foreground">Derived from current start + cycle.</p>
             </div>
           </div>
 
@@ -370,7 +390,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                       : `Period ended ${Math.abs(daysToRenewal!)} day(s) ago`}
                   </div>
                   <div className="text-muted-foreground">
-                    Period ends {derivedNextRenewal ? format(new Date(derivedNextRenewal), 'dd MMM yyyy') : '—'}
+                    Period ends {effectivePeriodEnd ? format(new Date(effectivePeriodEnd), 'dd MMM yyyy') : '—'}
                   </div>
                 </div>
               </div>
@@ -423,9 +443,11 @@ export function BillingTab({ accountId }: { accountId: string }) {
                   </div>
                   <div className="flex gap-1">
                     {i.status === 'DRAFT' && (
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(i)} title="Edit invoice"><Pencil className="h-4 w-4" /></Button>
+                      <>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(i)} title="Edit invoice"><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => remove(i.id)} title="Delete draft invoice"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => remove(i.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 </div>
               ))}
@@ -479,9 +501,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
           <div className="space-y-4">
             <div className="rounded border p-3 text-xs space-y-1 bg-muted/30">
               <div><span className="text-muted-foreground">Current period:</span>{' '}
-                {settings.subscription_started_at ? format(new Date(settings.subscription_started_at), 'dd MMM') : '—'}
+                {settings.current_period_start ? format(new Date(settings.current_period_start), 'dd MMM') : (settings.subscription_started_at ? format(new Date(settings.subscription_started_at), 'dd MMM') : '—')}
                 {' – '}
-                {derivedNextRenewal ? format(new Date(derivedNextRenewal), 'dd MMM yyyy') : '—'}
+                {effectivePeriodEnd ? format(new Date(effectivePeriodEnd), 'dd MMM yyyy') : '—'}
               </div>
               <div><span className="text-muted-foreground">Seats purchased:</span> {settings.seats_purchased}</div>
               <div><span className="text-muted-foreground">Cycle:</span> {settings.billing_cycle}</div>
