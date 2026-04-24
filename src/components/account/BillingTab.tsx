@@ -387,21 +387,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-            <div className="border rounded p-3">
-              <div className="text-xs text-muted-foreground">Seat capacity</div>
-              <div className="text-lg font-semibold">
-                {seatCount} / {settings.seats_purchased}
-                {settings.seats_purchased > 0 && (
-                  <span className={`ml-2 text-xs font-normal ${seatCount > settings.seats_purchased ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {Math.max(settings.seats_purchased - seatCount, 0)} available
-                  </span>
-                )}
-              </div>
-              {seatCount > settings.seats_purchased && settings.seats_purchased > 0 && (
-                <div className="text-[10px] text-destructive mt-0.5">Over capacity</div>
-              )}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
             <div className="border rounded p-3"><div className="text-xs text-muted-foreground">Subtotal / cycle</div><div className="text-lg font-semibold">{fmtINR(settings.base_fee + settings.seat_rate * billedSeats)}</div></div>
             <div className="border rounded p-3"><div className="text-xs text-muted-foreground">GST ({settings.gst_pct}%)</div><div className="text-lg font-semibold">{fmtINR((settings.base_fee + settings.seat_rate * billedSeats) * settings.gst_pct / 100)}</div></div>
             <div className="border rounded p-3 bg-primary/5"><div className="text-xs text-muted-foreground">Total / cycle</div><div className="text-lg font-semibold text-primary">{fmtINR(monthlyTotal)}</div></div>
