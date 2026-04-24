@@ -12,9 +12,10 @@ const corsHeaders = {
 
 interface Body {
   link_id: string;
-  purpose: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION';
+  purpose: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | 'SEAT_UPSELL';
   enquiry_id?: string;
   account_id?: string;
+  upsell_link_id?: string;
 }
 
 // Razorpay link statuses → our internal status enum
