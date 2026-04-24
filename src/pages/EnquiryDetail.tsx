@@ -1953,6 +1953,9 @@ function ActiveStagePanel({
                     <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(payment.short_url!); toast.success('Link copied'); }}>
                       <CopyIcon className="h-3.5 w-3.5 mr-1" /> Copy
                     </Button>
+                    <Button size="sm" variant="outline" onClick={onRefreshPaymentStatus} disabled={paymentBusy} title="Refresh status from Razorpay">
+                      <RefreshCw className={cn('h-3.5 w-3.5 mr-1', paymentBusy && 'animate-spin')} /> Refresh
+                    </Button>
                   </div>
                 </div>
                 <div className="text-[11px] text-muted-foreground break-all">{payment.short_url}</div>
