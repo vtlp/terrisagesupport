@@ -443,9 +443,11 @@ export function BillingTab({ accountId }: { accountId: string }) {
                   </div>
                   <div className="flex gap-1">
                     {i.status === 'DRAFT' && (
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(i)} title="Edit invoice"><Pencil className="h-4 w-4" /></Button>
+                      <>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(i)} title="Edit invoice"><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => remove(i.id)} title="Delete draft invoice"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => remove(i.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 </div>
               ))}
