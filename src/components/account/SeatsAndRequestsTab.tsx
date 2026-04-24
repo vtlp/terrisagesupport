@@ -143,19 +143,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
     load();
   };
 
-  const initiateTransfer = async () => {
-    if (!transferTo) { toast.error('Pick a new superuser'); return; }
-    setTransferring(true);
-    const { error } = await supabase.rpc('initiate_superuser_transfer', {
-      _account_id: accountId, _from_seat_id: transferFrom || null, _to_seat_id: transferTo, _notes: null,
-    });
-    setTransferring(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Superuser transfer initiated · all support users notified');
-    setTransferOpen(false); setTransferFrom(''); setTransferTo('');
-    load();
-  };
-
   const purchased = capacity?.seats_purchased ?? 0;
   const consumed = capacity?.seats_used ?? activeSeatsUsed;
   const reserved = capacity?.seats_reserved ?? 0;
