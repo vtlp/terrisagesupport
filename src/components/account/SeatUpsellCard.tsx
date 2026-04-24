@@ -323,7 +323,7 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
                   <div className="flex justify-between"><span className="text-muted-foreground">Extra seats</span><span className="font-medium">+{proRata.seatsExtra}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Per-seat rate</span><span className="font-medium">{fmtINR(proRata.perSeatRate)}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Cycle window</span><span className="font-medium">
-                    {billing.current_period_start ? format(new Date(billing.current_period_start), 'dd MMM') : '—'} – {billing.current_period_end ? format(new Date(billing.current_period_end), 'dd MMM yyyy') : '—'}
+                    {format(proRata.periodStart, 'dd MMM')} – {format(proRata.periodEnd, 'dd MMM yyyy')}
                   </span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Days remaining / cycle</span><span className="font-medium">{proRata.daysRemaining} / {proRata.daysInCycle}</span></div>
                 </div>
@@ -333,8 +333,8 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
                   <div className="flex justify-between"><span className="text-muted-foreground">GST ({proRata.gstPct}%)</span><span>{fmtINR(proRata.gstAmount)}</span></div>
                   <div className="flex justify-between font-semibold pt-1 border-t mt-1 text-primary"><span>Total</span><span>{fmtINR(proRata.total)}</span></div>
                 </div>
-                {!billing.current_period_end && (
-                  <p className="text-[11px] text-warning">No active billing period set — cannot prorate. Set the cycle in Plan & subscription first.</p>
+                {proRata.derived && (
+                  <p className="text-[11px] text-warning">Billing cycle dates not set explicitly — using {billing.subscription_started_at || billing.next_renewal_at ? 'subscription' : billing.trial_starts_at ? 'trial' : 'estimated'} dates. Set the cycle in Plan & subscription for accurate proration.</p>
                 )}
                 <div className="space-y-1">
                   <Label className="text-xs">Customer</Label>
