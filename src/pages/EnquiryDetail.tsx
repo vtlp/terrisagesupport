@@ -1579,7 +1579,7 @@ function StageOutcomePanel({
           </div>
         </div>
       )}
-      <div>
+      <div onClick={(e) => e.stopPropagation()}>
         <div className="text-xs font-medium text-primary uppercase tracking-wide mb-2">Current stage · {stageLabels[stage]}</div>
         <ActiveStagePanel
           stage={stage} draft={draft} setField={setField} setPayload={setPayload}
