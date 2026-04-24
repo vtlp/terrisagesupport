@@ -120,20 +120,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
     load();
   };
 
-  const applyAdjust = async () => {
-    const d = parseInt(adjustDelta, 10);
-    if (!Number.isFinite(d) || d === 0) { toast.error('Enter a non-zero delta'); return; }
-    setAdjusting(true);
-    const { error } = await supabase.rpc('apply_seat_delta', {
-      _account_id: accountId, _delta: d, _reason: 'MANUAL', _notes: adjustNotes.trim() || null,
-    });
-    setAdjusting(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success(d > 0 ? `Added ${d} seats${proration?.total ? ` · ₹${proration.total} draft proration invoice created` : ''}` : `Removed ${Math.abs(d)} seats`);
-    setAdjustOpen(false); setAdjustDelta('1'); setAdjustNotes('');
-    load();
-  };
-
   const initiateTransfer = async () => {
     if (!transferTo) { toast.error('Pick a new superuser'); return; }
     setTransferring(true);
