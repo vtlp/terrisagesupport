@@ -180,6 +180,9 @@ Deno.serve(async (req) => {
         gst_amount: body.gst_amount,
         total: body.total,
       },
+      subscription: body.subscription_start_at && body.subscription_end_at
+        ? { start_at: body.subscription_start_at, end_at: body.subscription_end_at }
+        : undefined,
       created_at: createdAtIso,
       expires_at: expiresAtIso,
       outdated: false,
