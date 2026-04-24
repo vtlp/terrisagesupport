@@ -65,12 +65,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   const [mockReason, setMockReason] = useState('');
   const [submittingMock, setSubmittingMock] = useState(false);
 
-  const [adjustOpen, setAdjustOpen] = useState(false);
-  const [adjustDelta, setAdjustDelta] = useState('1');
-  const [adjustNotes, setAdjustNotes] = useState('');
-  const [proration, setProration] = useState<{ amount: number; gst_amount: number; total: number; days_remaining: number; cycle_days: number } | null>(null);
-  const [adjusting, setAdjusting] = useState(false);
-
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferFrom, setTransferFrom] = useState<string>('');
   const [transferTo, setTransferTo] = useState<string>('');
@@ -91,18 +85,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   }, [accountId]);
 
   useEffect(() => { load(); }, [load]);
-
-  // Live proration preview
-  useEffect(() => {
-    if (!adjustOpen) { setProration(null); return; }
-    const d = parseInt(adjustDelta, 10);
-    if (!Number.isFinite(d) || d === 0) { setProration(null); return; }
-    let cancel = false;
-    supabase.rpc('compute_proration', { _account_id: accountId, _delta: d }).then(({ data }) => {
-      if (!cancel && data) setProration(data as never);
-    });
-    return () => { cancel = true; };
-  }, [accountId, adjustOpen, adjustDelta]);
 
   const setStatus = async (id: string, status: Status) => {
     setBusyId(id);
@@ -135,20 +117,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
     if (error) { toast.error(error.message); return; }
     toast.success('Mock request submitted');
     setMockOpen(false); setMockSeats(''); setMockEmail(''); setMockReason('');
-    load();
-  };
-
-  const applyAdjust = async () => {
-    const d = parseInt(adjustDelta, 10);
-    if (!Number.isFinite(d) || d === 0) { toast.error('Enter a non-zero delta'); return; }
-    setAdjusting(true);
-    const { error } = await supabase.rpc('apply_seat_delta', {
-      _account_id: accountId, _delta: d, _reason: 'MANUAL', _notes: adjustNotes.trim() || null,
-    });
-    setAdjusting(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success(d > 0 ? `Added ${d} seats${proration?.total ? ` · ₹${proration.total} draft proration invoice created` : ''}` : `Removed ${Math.abs(d)} seats`);
-    setAdjustOpen(false); setAdjustDelta('1'); setAdjustNotes('');
     load();
   };
 
@@ -311,48 +279,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
           )}
         </CardContent>
       </Card>
-
-      {/* Adjust seats dialog */}
-      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adjust seat allocation</DialogTitle>
-            <DialogDescription>
-              Current allocation: {purchased} seats. Positive delta mid-cycle drafts a prorated invoice.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Delta (+/−)</Label>
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon" onClick={() => setAdjustDelta(String((parseInt(adjustDelta, 10) || 0) - 1))}><Minus className="h-4 w-4" /></Button>
-                <Input type="number" value={adjustDelta} onChange={e => setAdjustDelta(e.target.value)} className="text-center" />
-                <Button variant="outline" size="icon" onClick={() => setAdjustDelta(String((parseInt(adjustDelta, 10) || 0) + 1))}><Plus className="h-4 w-4" /></Button>
-              </div>
-              <p className="text-xs text-muted-foreground">New total will be {Math.max(0, purchased + (parseInt(adjustDelta, 10) || 0))} seats.</p>
-            </div>
-            {proration && (parseInt(adjustDelta, 10) || 0) > 0 && proration.total > 0 && (
-              <div className="rounded border p-3 bg-muted/30 text-xs space-y-1">
-                <div className="font-medium text-sm">Prorated charge preview</div>
-                <div>Days remaining: {proration.days_remaining} / {proration.cycle_days}</div>
-                <div>Subtotal: ₹{proration.amount.toLocaleString('en-IN')}</div>
-                <div>GST: ₹{proration.gst_amount.toLocaleString('en-IN')}</div>
-                <div className="font-semibold text-primary">Total draft invoice: ₹{proration.total.toLocaleString('en-IN')}</div>
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label>Notes (optional)</Label>
-              <Textarea rows={2} value={adjustNotes} onChange={e => setAdjustNotes(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancel</Button>
-            <Button onClick={applyAdjust} disabled={adjusting}>
-              {adjusting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />} Apply
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Superuser transfer */}
       <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
