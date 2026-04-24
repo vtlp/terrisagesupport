@@ -638,6 +638,7 @@ export type Database = {
           source_submission_id: string | null
           status: Database["public"]["Enums"]["account_status"]
           tenancy_type: Database["public"]["Enums"]["tenancy_type"]
+          tenant_id: string | null
           updated_at: string
           website: string | null
         }
@@ -658,6 +659,7 @@ export type Database = {
           source_submission_id?: string | null
           status?: Database["public"]["Enums"]["account_status"]
           tenancy_type: Database["public"]["Enums"]["tenancy_type"]
+          tenant_id?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -678,6 +680,7 @@ export type Database = {
           source_submission_id?: string | null
           status?: Database["public"]["Enums"]["account_status"]
           tenancy_type?: Database["public"]["Enums"]["tenancy_type"]
+          tenant_id?: string | null
           updated_at?: string
           website?: string | null
         }
