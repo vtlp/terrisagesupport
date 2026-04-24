@@ -52,6 +52,10 @@ interface BillingCtx {
   gst_pct: number;
   current_period_start: string | null;
   current_period_end: string | null;
+  subscription_started_at: string | null;
+  next_renewal_at: string | null;
+  trial_starts_at: string | null;
+  trial_ends_at: string | null;
 }
 
 interface AccountInfo {
