@@ -1925,6 +1925,7 @@ function ActiveStagePanel({
                         <span className="text-[10px] uppercase text-muted-foreground">Manual:</span>
                         {statusBadge(status)}
                       </span>
+                    )}
                     {(payment as { razorpay_status?: string }).razorpay_status && (
                       <span className="inline-flex items-center gap-1">
                         <span className="text-[10px] uppercase text-muted-foreground">Razorpay:</span>
