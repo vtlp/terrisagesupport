@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket, LogOut, AlertTriangle, Users, ExternalLink, Calendar as CalendarIcon, Inbox, FileCheck, CheckCheck } from 'lucide-react';
+import { Bell, Search, Menu, ChevronDown, Plus, PhoneCall, Ticket, LogOut, AlertTriangle, Users, ExternalLink, Calendar as CalendarIcon, Inbox, FileCheck, CheckCheck, UserCog } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -271,6 +271,10 @@ export function AppHeader() {
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/profile')}>
+              <UserCog className="h-4 w-4 mr-2" />
+              My Profile
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out

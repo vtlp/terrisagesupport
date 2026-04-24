@@ -31,6 +31,7 @@ import AdminQueues from "@/pages/admin/AdminQueues";
 import AdminLookups from "@/pages/admin/AdminLookups";
 import AdminIntegrations from "@/pages/admin/AdminIntegrations";
 import AdminCrmSyncContract from "@/pages/admin/AdminCrmSyncContract";
+import Profile from "@/pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -81,6 +82,7 @@ const App = () => {
                 <Route path="/knowledge" element={<Knowledge />} />
                 <Route path="/marketing" element={<Marketing />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/profile" element={<Profile />} />
                 <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
                 <Route path="/admin/queues" element={<ProtectedRoute adminOnly><AdminQueues /></ProtectedRoute>} />
                 <Route path="/admin/lookups" element={<ProtectedRoute adminOnly><AdminLookups /></ProtectedRoute>} />
