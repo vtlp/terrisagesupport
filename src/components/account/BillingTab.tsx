@@ -110,7 +110,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
     if (s.data) {
       const d = s.data as Record<string, unknown>;
       const loaded: Settings = {
-        id: s.data.id, plan_name: s.data.plan_name, billing_cycle: s.data.billing_cycle,
+        id: s.data.id, plan_name: s.data.plan_name, billing_cycle: s.data.billing_cycle as Cycle,
         base_fee: Number(s.data.base_fee), seat_rate: Number(s.data.seat_rate),
         seats_purchased: Number((s.data as { seats_purchased?: number }).seats_purchased ?? 0),
         gst_pct: Number(s.data.gst_pct),
