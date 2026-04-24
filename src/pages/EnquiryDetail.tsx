@@ -1953,12 +1953,6 @@ function ActiveStagePanel({
                     <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(payment.short_url!); toast.success('Link copied'); }}>
                       <CopyIcon className="h-3.5 w-3.5 mr-1" /> Copy
                     </Button>
-                    <a href={payment.short_url} target="_blank" rel="noreferrer">
-                      <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Open</Button>
-                    </a>
-                    <Button size="sm" variant="outline" onClick={onRefreshPaymentStatus} disabled={paymentBusy}>
-                      <RefreshCw className={cn('h-3.5 w-3.5 mr-1', paymentBusy && 'animate-spin')} /> Refresh
-                    </Button>
                   </div>
                 </div>
                 <div className="text-[11px] text-muted-foreground break-all">{payment.short_url}</div>
