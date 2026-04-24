@@ -15,7 +15,8 @@ const corsHeaders = {
 interface Body {
   enquiry_id?: string;
   account_id?: string;
-  purpose?: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION';
+  seat_request_id?: string;
+  purpose?: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | 'SEAT_UPSELL';
   plan_name: string;
   billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   seats: number;
@@ -28,6 +29,7 @@ interface Body {
   customer: { name: string; email?: string; phone?: string };
   expires_in_days?: number;
   notes?: string;
+  prorata?: { days_remaining: number; days_in_cycle: number };
 }
 
 const fmtINR = (n: number) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
