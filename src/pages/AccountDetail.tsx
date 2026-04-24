@@ -457,9 +457,6 @@ export default function AccountDetail() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm">{s.full_name}</span>
                             <Badge variant="outline" className="text-[10px] border-primary/30 bg-primary/10 text-primary">Role: {s.role ?? 'Agent'}</Badge>
-                            <Badge variant="outline" className={`text-[10px] ${s.is_active ? 'border-accent/30 bg-accent/10 text-accent-foreground' : 'border-border bg-secondary text-secondary-foreground'}`}>
-                              Status: {s.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
                             {perms.map(p => (
                               <Badge key={p} variant="outline" className="text-[10px] border-warning/30 bg-warning/10 text-warning">Permission: {p}</Badge>
                             ))}
