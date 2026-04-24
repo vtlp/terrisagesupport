@@ -32,6 +32,7 @@ interface Seat {
   id: string; full_name: string; email: string | null; role: string | null;
   crm_state: CrmState; is_superuser: boolean; last_active_at: string | null;
   invitation_expires_at: string | null; is_active: boolean;
+  permissions: unknown;
 }
 
 const STATUS_COLORS: Record<Status, string> = {
