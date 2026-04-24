@@ -244,7 +244,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
   };
 
   const submitRenewal = async () => {
-    if (!settings.current_period_end) { toast.error('No active billing period set.'); return; }
+    if (!derivedNextRenewal) { toast.error('Set the subscription start date first.'); return; }
     setRenewBusy(true);
     const seatsArg = renewDecision === 'RENEW' || renewDecision === 'CANCEL'
       ? null
@@ -262,8 +262,8 @@ export function BillingTab({ accountId }: { accountId: string }) {
     load();
   };
 
-  const daysToRenewal = settings.current_period_end
-    ? differenceInCalendarDays(new Date(settings.current_period_end), new Date())
+  const daysToRenewal = derivedNextRenewal
+    ? differenceInCalendarDays(new Date(derivedNextRenewal), new Date())
     : null;
   const renewalWindow = daysToRenewal !== null && daysToRenewal <= 30 && daysToRenewal >= -7;
 
