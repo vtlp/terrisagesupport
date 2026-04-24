@@ -80,6 +80,14 @@ Deno.serve(async (req) => {
           summary: `[Trial] Link ${newStatus.toLowerCase()} (Razorpay)`,
           details: { module: 'trial', link_id: linkId },
         });
+      } else if (purpose === 'SEAT_UPSELL' && accountIdNote && linkId) {
+        await admin.from('seat_upsell_links').update({ status: newStatus })
+          .eq('account_id', accountIdNote).eq('link_id', linkId);
+        await admin.from('activity_log').insert({
+          entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
+          summary: `[Seat upsell] Link ${newStatus.toLowerCase()} (Razorpay)`,
+          details: { module: 'seat_upsell', link_id: linkId },
+        });
       }
 
       return new Response(JSON.stringify({ success: true, handled: newStatus }), {
