@@ -159,17 +159,21 @@ export function BillingTab({ accountId }: { accountId: string }) {
     return addMonths(settings.subscription_started_at, months);
   }, [settings.subscription_started_at, settings.billing_cycle, settings.next_renewal_at]);
 
+  // For the first cycle, fall back to subscription_started_at when current_period_start isn't set yet.
+  const effectiveCurrentStart = settings.current_period_start ?? settings.subscription_started_at;
+
   // Current cycle end auto-derives from current cycle start + billing cycle length.
   const derivedCurrentEnd = useMemo(() => {
-    if (!settings.current_period_start) return settings.current_period_end;
+    if (!effectiveCurrentStart) return settings.current_period_end;
     const months = CYCLE_MONTHS[settings.billing_cycle] ?? 12;
-    return addMonths(settings.current_period_start, months);
-  }, [settings.current_period_start, settings.billing_cycle, settings.current_period_end]);
+    return addMonths(effectiveCurrentStart, months);
+  }, [effectiveCurrentStart, settings.billing_cycle, settings.current_period_end]);
 
   const saveSettings = async () => {
     setSavingSettings(true);
-    const currentEnd = settings.current_period_start
-      ? addMonths(settings.current_period_start, CYCLE_MONTHS[settings.billing_cycle] ?? 12)
+    const startForCycle = settings.current_period_start ?? settings.subscription_started_at;
+    const currentEnd = startForCycle
+      ? addMonths(startForCycle, CYCLE_MONTHS[settings.billing_cycle] ?? 12)
       : settings.current_period_end;
     const nextRenewal = currentEnd
       ?? (settings.subscription_started_at
@@ -354,9 +358,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
             </div>
             <div className="space-y-1.5">
               <Label>Current cycle start</Label>
-              <Input type="date" value={settings.current_period_start ? settings.current_period_start.substring(0, 10) : ''}
+              <Input type="date" value={effectiveCurrentStart ? effectiveCurrentStart.substring(0, 10) : ''}
                 onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
-              <p className="text-[10px] text-muted-foreground">Updates each renewal; drives pro-rata calculations.</p>
+              <p className="text-[10px] text-muted-foreground">Defaults to subscription start for the first cycle; updates each renewal.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Current cycle end (auto)</Label>
