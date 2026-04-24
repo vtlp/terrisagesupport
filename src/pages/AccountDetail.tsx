@@ -43,6 +43,7 @@ interface Account {
   owner_name: string | null; owner_phone: string | null; owner_email: string | null;
   gst_number: string | null; pan_number: string | null; rera_number: string | null; website: string | null;
   source_enquiry_id: string | null; account_code: string | null;
+  tenant_id: string | null;
   payload: Record<string, unknown>;
   created_at: string; updated_at: string;
 }
