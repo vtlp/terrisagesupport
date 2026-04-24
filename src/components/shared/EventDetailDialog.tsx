@@ -51,9 +51,30 @@ const toLocalInput = (iso: string) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-export function EventDetailDialog({ event, ownerName, teamMembers = [], open, onOpenChange, onChanged }: Props) {
+export function EventDetailDialog({ event, ownerName, teamMembers: teamMembersProp, open, onOpenChange, onChanged }: Props) {
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [fetchedMembers, setFetchedMembers] = useState<{ id: string; full_name: string }[]>([]);
+
+  // If no teamMembers were provided by the parent, fetch active profiles so the
+  // owner dropdown is still populated (e.g. on Enquiry/Account detail pages).
+  useEffect(() => {
+    if (!open) return;
+    if (teamMembersProp && teamMembersProp.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('is_active', true)
+        .order('full_name');
+      if (cancelled || !data) return;
+      setFetchedMembers(data.map(p => ({ id: p.id, full_name: p.full_name || p.email || 'Unnamed' })));
+    })();
+    return () => { cancelled = true; };
+  }, [open, teamMembersProp]);
+
+  const teamMembers = teamMembersProp && teamMembersProp.length > 0 ? teamMembersProp : fetchedMembers;
   const [form, setForm] = useState({
     title: '',
     scheduled_at: '',
