@@ -102,9 +102,14 @@ Deno.serve(async (req) => {
       const amountPaise = Math.round(body.total * 100);
       const auth = btoa(`${keyId}:${keySecret}`);
 
-      const refId = (purpose === 'RENEWAL' || purpose === 'TRIAL_CONVERSION')
-        ? `acc_${body.account_id}_${purpose.toLowerCase()}_${Date.now()}`
-        : `enq_${body.enquiry_id}_${Date.now()}`;
+      const refId = purpose === 'INITIAL'
+        ? `enq_${body.enquiry_id}_${Date.now()}`
+        : `acc_${body.account_id}_${purpose.toLowerCase()}_${Date.now()}`;
+
+      const descSuffix = purpose === 'RENEWAL' ? ' · Renewal'
+        : purpose === 'TRIAL_CONVERSION' ? ' · Trial conversion'
+        : purpose === 'SEAT_UPSELL' ? ' · Seat upsell (pro-rata)'
+        : '';
 
       const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
         method: 'POST',
@@ -114,7 +119,7 @@ Deno.serve(async (req) => {
           currency: 'INR',
           accept_partial: false,
           expire_by: Math.floor(expiresAt.getTime() / 1000),
-          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}${purpose === 'RENEWAL' ? ' · Renewal' : purpose === 'TRIAL_CONVERSION' ? ' · Trial conversion' : ''}`,
+          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}${descSuffix}`,
           customer: {
             name: body.customer.name,
             email: body.customer.email,
@@ -127,6 +132,7 @@ Deno.serve(async (req) => {
             purpose,
             enquiry_id: body.enquiry_id ?? '',
             account_id: body.account_id ?? '',
+            seat_request_id: body.seat_request_id ?? '',
             plan: body.plan_name,
             cycle: body.billing_cycle,
             seats: String(body.seats),
