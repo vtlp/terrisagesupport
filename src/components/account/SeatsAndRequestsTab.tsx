@@ -158,45 +158,41 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         </CardContent>
       </Card>
 
-      {/* Members roster */}
+      {/* Members from onboarding submission */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Members ({seats.length})</CardTitle>
+          <CardTitle className="text-base">Members from onboarding ({members.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {seats.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No members yet.</p>
+          {members.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No team members captured in the onboarding submission.
+            </p>
           ) : (
             <div className="space-y-2">
-              {seats.map(s => {
-                const perms = getStoredPermissions(s.permissions);
+              {members.map((m, idx) => {
+                const perms = getMemberPermissions(m);
+                const phone = m.mobile ? `${m.mobileCode ?? ''} ${m.mobile}`.trim() : '';
                 return (
-                  <div key={s.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
+                  <div key={m.id ?? `${m.email ?? 'member'}-${idx}`} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {s.is_superuser && <Crown className="h-3.5 w-3.5 text-warning" />}
-                        <span className="font-medium text-sm">{s.full_name}</span>
+                        <span className="font-medium text-sm">{m.fullName || '—'}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {s.email ?? '—'}
-                        {s.last_active_at && <> · last active {formatDistanceToNow(new Date(s.last_active_at), { addSuffix: true })}</>}
-                        {s.invitation_expires_at && s.crm_state === 'INVITED' && (
-                          <> · invite expires {format(new Date(s.invitation_expires_at), 'dd MMM')}</>
-                        )}
+                        {m.email || '—'}
+                        {phone && <> · {phone}</>}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                        {s.role && (
-                          <Badge className={`text-[10px] ${s.is_superuser ? 'border-success/30 bg-success/15 text-success' : 'border-primary/30 bg-primary/10 text-primary'}`}>
-                            Role: {s.role}
+                        {m.role && (
+                          <Badge className="text-[10px] border-primary/30 bg-primary/10 text-primary">
+                            Role: {m.role}
                           </Badge>
                         )}
-                        <Badge className={`text-[10px] ${STATE_COLORS[s.crm_state]}`}>
-                          Status: {formatCrmState(s.crm_state)}
-                        </Badge>
                         {perms.length > 0 ? (
                           perms.map((p, i) => (
                             <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">
-                              Permission: {String(p)}
+                              Permission: {p}
                             </Badge>
                           ))
                         ) : (
