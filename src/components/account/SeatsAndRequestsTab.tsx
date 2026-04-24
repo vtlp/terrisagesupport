@@ -180,16 +180,11 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Seat capacity</CardTitle>
-          <div className="flex items-center gap-2">
-            {lastSync && (
-              <Badge variant="outline" className="text-[10px]">
-                CRM synced {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
-              </Badge>
-            )}
-            <Button size="sm" variant="outline" onClick={() => setAdjustOpen(true)}>
-              <UserCog className="h-4 w-4 mr-1" /> Adjust seats
-            </Button>
-          </div>
+          {lastSync && (
+            <Badge variant="outline" className="text-[10px]">
+              CRM synced {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
+            </Badge>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
