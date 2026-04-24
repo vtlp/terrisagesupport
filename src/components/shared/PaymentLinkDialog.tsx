@@ -92,6 +92,7 @@ export function PaymentLinkDialog({
   const [name, setName] = useState(defaults.customerName);
   const [email, setEmail] = useState(defaults.customerEmail ?? '');
   const [phone, setPhone] = useState(defaults.customerPhone ?? '');
+  const [startDate, setStartDate] = useState<Date>(new Date());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export function PaymentLinkDialog({
       setName(defaults.customerName);
       setEmail(defaults.customerEmail ?? '');
       setPhone(defaults.customerPhone ?? '');
+      setStartDate(new Date());
     }
   }, [open, defaults.seats, defaults.customerName, defaults.customerEmail, defaults.customerPhone, defaults.planName, defaults.cycle, defaults.baseFee, defaults.seatRate, defaults.gstPct]);
 
@@ -112,6 +114,8 @@ export function PaymentLinkDialog({
     () => calcBilling(baseFee, seatRate, seats, gstPct, DEFAULT_INCLUDED_SEATS),
     [baseFee, seatRate, seats, gstPct],
   );
+
+  const endDate = useMemo(() => addCycle(startDate, cycle), [startDate, cycle]);
 
   const submit = async () => {
     if (breakdown.total <= 0) {
@@ -131,6 +135,8 @@ export function PaymentLinkDialog({
       return;
     }
     setBusy(true);
+    const startIso = startDate.toISOString();
+    const endIso = endDate.toISOString();
     const { data, error } = await supabase.functions.invoke('razorpay-create-payment-link', {
       body: {
         purpose,
@@ -145,9 +151,21 @@ export function PaymentLinkDialog({
         subtotal: breakdown.subtotal,
         gst_amount: breakdown.gstAmount,
         total: breakdown.total,
+        subscription_start_at: startIso,
+        subscription_end_at: endIso,
         customer: { name, email: email || undefined, phone: phone || undefined },
       },
     });
+    setBusy(false);
+    if (error || !data?.success) {
+      const msg = data?.error || error?.message || 'Failed to generate payment link';
+      toast.error(msg);
+      return;
+    }
+    toast.success(purpose === 'RENEWAL' ? 'Renewal link created' : purpose === 'TRIAL_CONVERSION' ? 'Trial conversion link created' : 'Payment link created');
+    onSuccess(data.payment as PaymentLinkResult);
+    onOpenChange(false);
+  };
     setBusy(false);
     if (error || !data?.success) {
       const msg = data?.error || error?.message || 'Failed to generate payment link';
