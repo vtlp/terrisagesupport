@@ -135,6 +135,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (body.purpose === 'SEAT_UPSELL' && body.account_id) {
+      const update: Record<string, unknown> = { status };
+      if (paidAt) update.paid_at = paidAt;
+      const q = admin.from('seat_upsell_links').update(update).eq('account_id', body.account_id).eq('link_id', body.link_id);
+      await q;
+      await admin.from('activity_log').insert({
+        entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
+        summary: `[Seat upsell] Link status refreshed → ${status}`,
+        details: { module: 'seat_upsell', link_id: body.link_id, status },
+      });
+      return new Response(JSON.stringify({ success: true, status, paid_at: paidAt }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ success: false, error: 'Missing target id for purpose' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
