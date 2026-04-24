@@ -1926,12 +1926,19 @@ function ActiveStagePanel({
                         {statusBadge(status)}
                       </span>
                     )}
-                    {(payment as { razorpay_status?: string }).razorpay_status && (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="text-[10px] uppercase text-muted-foreground">Razorpay:</span>
-                        {statusBadge((payment as { razorpay_status: string }).razorpay_status)}
-                      </span>
-                    )}
+                    {(() => {
+                      const rzp = (payment as { razorpay_status?: string }).razorpay_status ?? 'CREATED';
+                      const isDummy = !(payment as { razorpay_status?: string }).razorpay_status;
+                      return (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="text-[10px] uppercase text-muted-foreground">Razorpay:</span>
+                          {statusBadge(rzp)}
+                          {isDummy && (
+                            <span className="text-[10px] uppercase text-muted-foreground">(demo)</span>
+                          )}
+                        </span>
+                      );
+                    })()}
                     {isOutdated && (
                       <Badge variant="outline" className="text-[10px] bg-warning/15 text-warning border-warning/40">Outdated</Badge>
                     )}
