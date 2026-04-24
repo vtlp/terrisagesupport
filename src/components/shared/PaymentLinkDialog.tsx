@@ -78,7 +78,7 @@ export function PaymentLinkDialog({
     if (open) {
       setPlanName(defaults.planName ?? 'Standard');
       setCycle(defaults.cycle ?? 'ANNUAL');
-      setSeats(defaults.seats && defaults.seats > 0 ? defaults.seats : DEFAULT_INCLUDED_SEATS);
+      setSeats(defaults.seats && defaults.seats > 0 ? defaults.seats : 0);
       setBaseFee(defaults.baseFee ?? DEFAULT_BASE_FEE);
       setSeatRate(defaults.seatRate ?? DEFAULT_SEAT_RATE);
       setGstPct(defaults.gstPct ?? DEFAULT_GST_PCT);
