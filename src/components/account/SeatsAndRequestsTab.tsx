@@ -304,44 +304,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         </CardContent>
       </Card>
 
-      {/* Superuser transfer */}
-      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Transfer superuser</DialogTitle>
-            <DialogDescription>
-              All support users will be notified and a follow-up calendar event will be created on each support user's calendar for tomorrow.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Current superuser</Label>
-              <Select value={transferFrom} onValueChange={setTransferFrom}>
-                <SelectTrigger><SelectValue placeholder="None set" /></SelectTrigger>
-                <SelectContent>
-                  {seats.map(s => <SelectItem key={s.id} value={s.id}>{s.full_name}{s.is_superuser ? ' ★' : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>New superuser *</Label>
-              <Select value={transferTo} onValueChange={setTransferTo}>
-                <SelectTrigger><SelectValue placeholder="Pick a member" /></SelectTrigger>
-                <SelectContent>
-                  {seats.filter(s => s.id !== transferFrom).map(s => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTransferOpen(false)}>Cancel</Button>
-            <Button onClick={initiateTransfer} disabled={transferring || !transferTo}>
-              {transferring && <Loader2 className="h-4 w-4 mr-1 animate-spin" />} Initiate transfer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Mock request dialog */}
       <Dialog open={mockOpen} onOpenChange={setMockOpen}>
         <DialogContent>
