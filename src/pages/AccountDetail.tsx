@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, Plus, Trash2, UserCheck, UserX, CheckCircle2, Circle, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Trash2, UserCheck, UserX, CheckCircle2, Circle, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -456,10 +456,12 @@ export default function AccountDetail() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm">{s.full_name}</span>
-                            <Badge variant="outline" className="text-[10px]">{s.role ?? 'Agent'}</Badge>
-                            {!s.is_active && <Badge variant="outline" className="text-[10px]">Inactive</Badge>}
+                            <Badge variant="outline" className="text-[10px] border-primary/30 bg-primary/10 text-primary">Role: {s.role ?? 'Agent'}</Badge>
+                            <Badge variant="outline" className={`text-[10px] ${s.is_active ? 'border-accent/30 bg-accent/10 text-accent-foreground' : 'border-border bg-secondary text-secondary-foreground'}`}>
+                              Status: {s.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
                             {perms.map(p => (
-                              <Badge key={p} variant="secondary" className="text-[10px]">{p}</Badge>
+                              <Badge key={p} variant="outline" className="text-[10px] border-warning/30 bg-warning/10 text-warning">Permission: {p}</Badge>
                             ))}
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5 truncate">
