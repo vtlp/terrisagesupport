@@ -377,7 +377,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                       : `Period ended ${Math.abs(daysToRenewal!)} day(s) ago`}
                   </div>
                   <div className="text-muted-foreground">
-                    Period ends {settings.current_period_end ? format(new Date(settings.current_period_end), 'dd MMM yyyy') : '—'}
+                    Period ends {derivedNextRenewal ? format(new Date(derivedNextRenewal), 'dd MMM yyyy') : '—'}
                   </div>
                 </div>
               </div>
