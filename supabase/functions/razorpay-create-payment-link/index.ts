@@ -273,6 +273,41 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (purpose === 'SEAT_UPSELL' && body.account_id && body.seat_request_id) {
+      const { data: inserted, error: upErr } = await admin.from('seat_upsell_links').insert({
+        account_id: body.account_id,
+        seat_request_id: body.seat_request_id,
+        seats_extra: body.seats,
+        per_seat_rate: body.per_seat_rate,
+        days_remaining: body.prorata?.days_remaining ?? 0,
+        days_in_cycle: body.prorata?.days_in_cycle ?? 0,
+        prorated_subtotal: body.subtotal,
+        gst_pct: body.gst_pct,
+        gst_amount: body.gst_amount,
+        total: body.total,
+        link_id: payment.link_id,
+        short_url: payment.short_url,
+        status: 'CREATED',
+        expires_at: expiresAtIso,
+        created_by: user.id,
+      }).select('id').maybeSingle();
+      if (upErr) console.error('seat_upsell_links insert failed', upErr);
+
+      await admin.from('account_notes').insert({
+        account_id: body.account_id,
+        note_text: `[Seat upsell] Pro-rata link generated ${fmtINR(body.total)} for +${body.seats} seat(s) · ${payment.short_url}`,
+      });
+      await admin.from('activity_log').insert({
+        entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
+        summary: `[Seat upsell] Pro-rata link generated ${fmtINR(body.total)}`,
+        details: { module: 'seat_upsell', link_id: payment.link_id, seats: body.seats, total: body.total, seat_request_id: body.seat_request_id, upsell_link_id: inserted?.id },
+      });
+
+      return new Response(JSON.stringify({ success: true, payment, upsell_link_id: inserted?.id }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ success: false, error: 'Unhandled purpose' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
