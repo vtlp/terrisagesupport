@@ -201,9 +201,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Members ({seats.length})</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => { setTransferFrom(currentSuperuser?.id ?? ''); setTransferOpen(true); }}>
-            <ShieldCheck className="h-4 w-4 mr-1" /> Transfer superuser
-          </Button>
         </CardHeader>
         <CardContent>
           {seats.length === 0 ? (
@@ -211,8 +208,7 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
           ) : (
             <div className="space-y-2">
               {seats.map(s => {
-                const formPermissions = getSubmissionPermissions(onboardingPayload, s.email);
-                const perms = formPermissions.length > 0 ? formPermissions : getStoredPermissions(s.permissions);
+                const perms = getStoredPermissions(s.permissions);
                 return (
                   <div key={s.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
                     <div className="min-w-0 flex-1">
@@ -243,8 +239,8 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
                             </Badge>
                           ))
                         ) : (
-                          <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground">
-                            Permissions: default
+                          <Badge variant="outline" className="text-[10px] border-success/30 bg-success/10 text-success">
+                            All permissions
                           </Badge>
                         )}
                       </div>
