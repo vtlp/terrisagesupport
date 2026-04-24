@@ -336,21 +336,13 @@ export function BillingTab({ accountId }: { accountId: string }) {
               <Label>Subscription started</Label>
               <Input type="date" value={settings.subscription_started_at ? settings.subscription_started_at.substring(0, 10) : ''}
                 onChange={e => setSettings(s => ({ ...s, subscription_started_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+              <p className="text-[10px] text-muted-foreground">Set when the first payment is received and the account is created.</p>
             </div>
             <div className="space-y-1.5">
-              <Label>Current period start</Label>
-              <Input type="date" value={settings.current_period_start ? settings.current_period_start.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Current period end</Label>
-              <Input type="date" value={settings.current_period_end ? settings.current_period_end.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, current_period_end: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Next renewal</Label>
-              <Input type="date" value={settings.next_renewal_at ? settings.next_renewal_at.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, next_renewal_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+              <Label>Next renewal (auto)</Label>
+              <Input type="date" disabled
+                value={derivedNextRenewal ? derivedNextRenewal.substring(0, 10) : ''} />
+              <p className="text-[10px] text-muted-foreground">Derived from subscription start + cycle.</p>
             </div>
             <div className="space-y-1.5 flex flex-col">
               <Label>Auto-renew</Label>
