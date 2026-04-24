@@ -86,18 +86,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Live proration preview
-  useEffect(() => {
-    if (!adjustOpen) { setProration(null); return; }
-    const d = parseInt(adjustDelta, 10);
-    if (!Number.isFinite(d) || d === 0) { setProration(null); return; }
-    let cancel = false;
-    supabase.rpc('compute_proration', { _account_id: accountId, _delta: d }).then(({ data }) => {
-      if (!cancel && data) setProration(data as never);
-    });
-    return () => { cancel = true; };
-  }, [accountId, adjustOpen, adjustDelta]);
-
   const setStatus = async (id: string, status: Status) => {
     setBusyId(id);
     const { error } = await supabase.from('seat_requests').update({ status, decided_at: new Date().toISOString() }).eq('id', id);
