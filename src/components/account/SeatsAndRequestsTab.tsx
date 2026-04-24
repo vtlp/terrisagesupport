@@ -312,48 +312,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
         </CardContent>
       </Card>
 
-      {/* Adjust seats dialog */}
-      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adjust seat allocation</DialogTitle>
-            <DialogDescription>
-              Current allocation: {purchased} seats. Positive delta mid-cycle drafts a prorated invoice.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Delta (+/−)</Label>
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon" onClick={() => setAdjustDelta(String((parseInt(adjustDelta, 10) || 0) - 1))}><Minus className="h-4 w-4" /></Button>
-                <Input type="number" value={adjustDelta} onChange={e => setAdjustDelta(e.target.value)} className="text-center" />
-                <Button variant="outline" size="icon" onClick={() => setAdjustDelta(String((parseInt(adjustDelta, 10) || 0) + 1))}><Plus className="h-4 w-4" /></Button>
-              </div>
-              <p className="text-xs text-muted-foreground">New total will be {Math.max(0, purchased + (parseInt(adjustDelta, 10) || 0))} seats.</p>
-            </div>
-            {proration && (parseInt(adjustDelta, 10) || 0) > 0 && proration.total > 0 && (
-              <div className="rounded border p-3 bg-muted/30 text-xs space-y-1">
-                <div className="font-medium text-sm">Prorated charge preview</div>
-                <div>Days remaining: {proration.days_remaining} / {proration.cycle_days}</div>
-                <div>Subtotal: ₹{proration.amount.toLocaleString('en-IN')}</div>
-                <div>GST: ₹{proration.gst_amount.toLocaleString('en-IN')}</div>
-                <div className="font-semibold text-primary">Total draft invoice: ₹{proration.total.toLocaleString('en-IN')}</div>
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label>Notes (optional)</Label>
-              <Textarea rows={2} value={adjustNotes} onChange={e => setAdjustNotes(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancel</Button>
-            <Button onClick={applyAdjust} disabled={adjusting}>
-              {adjusting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />} Apply
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Superuser transfer */}
       <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
         <DialogContent>
