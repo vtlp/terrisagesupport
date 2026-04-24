@@ -190,8 +190,11 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
             </>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <CapacityStat icon={<Users className="h-4 w-4 text-primary" />} label="Allocated" value={purchased} hint="From onboarding form" />
+                <CapacityStat icon={<Clock className="h-4 w-4 text-warning" />} label="Reserved" value={0} hint="Awaiting CRM sync" />
+                <CapacityStat icon={<Check className="h-4 w-4 text-success" />} label="Consumed" value={0} hint="Awaiting CRM sync" />
+                <CapacityStat icon={<UserPlus className="h-4 w-4 text-accent" />} label="Available" value={0} hint="Awaiting CRM sync" />
                 <CapacityStat icon={<Plus className="h-4 w-4 text-warning" />} label="Requested" value={pendingRequested} hint="Pending requests" />
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
