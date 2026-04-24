@@ -60,6 +60,7 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
     event_type: 'GENERAL',
     notes: '',
     duration_min: 30,
+    assigned_to: '' as string,
   });
 
   // Sync local form state whenever the event changes / dialog opens.
@@ -71,6 +72,7 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
       event_type: event.event_type ?? 'GENERAL',
       notes: event.notes ?? '',
       duration_min: event.duration_min ?? 30,
+      assigned_to: event.assigned_to ?? event.created_by ?? 'unassigned',
     });
     setEditing(false);
   }, [event?.id, open]);
@@ -121,6 +123,7 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
         event_type: form.event_type as 'DEMO',
         notes: form.notes.trim() || null,
         duration_min: Number(form.duration_min) || 30,
+        assigned_to: form.assigned_to === 'unassigned' ? null : form.assigned_to,
       })
       .eq('id', event.id);
     if (error) { setBusy(false); toast.error(error.message); return; }
@@ -219,6 +222,16 @@ export function EventDetailDialog({ event, ownerName, teamMembers = [], open, on
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {EVENT_TYPES.map(t => <SelectItem key={t} value={t}>{eventTypeLabels[t] ?? t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Owner (assigned to)</Label>
+                <Select value={form.assigned_to || 'unassigned'} onValueChange={v => setForm(f => ({ ...f, assigned_to: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {teamMembers.map(m => <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
