@@ -215,31 +215,47 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
             <p className="text-sm text-muted-foreground text-center py-6">No members yet.</p>
           ) : (
             <div className="space-y-2">
-              {seats.map(s => (
-                <div key={s.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {s.is_superuser && <Crown className="h-3.5 w-3.5 text-warning" />}
-                      <span className="font-medium text-sm">{s.full_name}</span>
-                      <Badge className={`text-[10px] ${STATE_COLORS[s.crm_state]}`}>{s.crm_state.replace('_', ' ')}</Badge>
-                      {s.role && (
-                        s.is_superuser ? (
-                          <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">{s.role}</Badge>
+              {seats.map(s => {
+                const perms = Array.isArray(s.permissions) ? (s.permissions as string[]) : [];
+                return (
+                  <div key={s.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {s.is_superuser && <Crown className="h-3.5 w-3.5 text-warning" />}
+                        <span className="font-medium text-sm">{s.full_name}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {s.email ?? '—'}
+                        {s.last_active_at && <> · last active {formatDistanceToNow(new Date(s.last_active_at), { addSuffix: true })}</>}
+                        {s.invitation_expires_at && s.crm_state === 'INVITED' && (
+                          <> · invite expires {format(new Date(s.invitation_expires_at), 'dd MMM')}</>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                        {s.role && (
+                          <Badge className={`text-[10px] ${s.is_superuser ? 'bg-success/15 text-success hover:bg-success/15' : 'bg-primary/15 text-primary hover:bg-primary/15'}`}>
+                            Role: {s.role}
+                          </Badge>
+                        )}
+                        <Badge className={`text-[10px] ${STATE_COLORS[s.crm_state]} hover:${STATE_COLORS[s.crm_state]}`}>
+                          Status: {s.crm_state.replace('_', ' ')}
+                        </Badge>
+                        {perms.length > 0 ? (
+                          perms.map((p, i) => (
+                            <Badge key={i} variant="outline" className="text-[10px] bg-accent/10 text-accent-foreground border-accent/30">
+                              {String(p)}
+                            </Badge>
+                          ))
                         ) : (
-                          <span className="text-xs text-muted-foreground">{s.role}</span>
-                        )
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {s.email ?? '—'}
-                      {s.last_active_at && <> · last active {formatDistanceToNow(new Date(s.last_active_at), { addSuffix: true })}</>}
-                      {s.invitation_expires_at && s.crm_state === 'INVITED' && (
-                        <> · invite expires {format(new Date(s.invitation_expires_at), 'dd MMM')}</>
-                      )}
+                          <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground">
+                            Permissions: default
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
