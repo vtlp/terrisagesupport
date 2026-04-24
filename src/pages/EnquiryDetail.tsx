@@ -426,12 +426,19 @@ export default function EnquiryDetail() {
     const fromIdx = STAGE_ORDER.indexOf(enquiry.stage);
     const toIdx = STAGE_ORDER.indexOf(stage);
     const onboardingIdx = STAGE_ORDER.indexOf('ONBOARDING_PACK_SENT');
+    const paymentIdx = STAGE_ORDER.indexOf('PAYMENT_LINK_SENT');
 
     // Once the onboarding pack has been sent, do not allow moving back into
-    // pre-onboarding stages (NEW_ENQUIRY … DEMO_COMPLETED). Backward moves
-    // among those earlier stages remain allowed.
+    // pre-onboarding stages (NEW_ENQUIRY … DEMO_COMPLETED).
     if (stage !== 'LOST' && fromIdx >= onboardingIdx && toIdx < onboardingIdx) {
       toast.error('Cannot move back to earlier stages once the onboarding form has been sent.');
+      return;
+    }
+
+    // Once on or past Payment, prevent moving back to any earlier stage —
+    // payment data must not be silently discarded.
+    if (stage !== 'LOST' && fromIdx >= paymentIdx && toIdx < paymentIdx) {
+      toast.error('Cannot move back from the Payment stage. Payment details have been captured.');
       return;
     }
 
