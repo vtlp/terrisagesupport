@@ -398,6 +398,8 @@ export function BillingTab({ accountId }: { accountId: string }) {
         </CardContent>
       </Card>
 
+      <SeatUpsellCard accountId={accountId} />
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
