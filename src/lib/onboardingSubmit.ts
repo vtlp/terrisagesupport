@@ -70,6 +70,11 @@ export async function submitOnboarding(
 
   // Use SECURITY DEFINER RPC so the anonymous role never needs SELECT on
   // `enquiries` (private PII) to satisfy the FK check on `onboarding_submissions`.
+  // Build marker — helps verify the latest bundle is loaded if RLS errors recur.
+  console.info("[onboarding] submit via RPC submit_onboarding_public", {
+    tenancy,
+    hasEnquiryId: Boolean(enquiryId),
+  });
   const { error } = await supabase.rpc("submit_onboarding_public", {
     _tenancy_type: tenancy,
     _payload: payload as never,
