@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Smartphone, Plus } from 'lucide-react';
+import { Loader2, Check, X, PlayCircle, Users, UserPlus, Clock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -215,7 +215,7 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <CardTitle className="text-base">Seat requests ({rows.length})</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setMockOpen(true)}>
-            <Smartphone className="h-4 w-4 mr-1" /> Mock request from Terrisage app
+            <Plus className="h-4 w-4 mr-1" /> Add seat request
           </Button>
         </CardHeader>
         <CardContent>
