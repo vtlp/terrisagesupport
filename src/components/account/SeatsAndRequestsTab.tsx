@@ -210,58 +210,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         </CardContent>
       </Card>
 
-      {/* Members from onboarding submission (no status — onboarding form does not capture it) */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Members from onboarding ({members.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {members.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              No team members captured in the onboarding submission.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {members.map((m, idx) => {
-                const perms = getMemberPermissions(m);
-                const phone = m.mobile ? `${m.mobileCode ?? ''} ${m.mobile}`.trim() : '';
-                return (
-                  <div key={m.id ?? `${m.email ?? 'member'}-${idx}`} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{m.fullName || '—'}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {m.email || '—'}
-                        {phone && <> · {phone}</>}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                        {m.role && (
-                          <Badge className="text-[10px] border-primary/30 bg-primary/10 text-primary">
-                            Role: {m.role}
-                          </Badge>
-                        )}
-                        {perms.length > 0 ? (
-                          perms.map((p, i) => (
-                            <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">
-                              Permission: {p}
-                            </Badge>
-                          ))
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] border-success/30 bg-success/10 text-success">
-                            All permissions
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Seat requests */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
