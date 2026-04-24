@@ -427,12 +427,23 @@ export default function AccountDetail() {
 
           <Card>
             <CardHeader><CardTitle className="text-base">Metadata</CardTitle></CardHeader>
-            <CardContent className="grid md:grid-cols-3 gap-3 text-sm">
+            <CardContent className="grid md:grid-cols-2 gap-3 text-sm">
               <div><div className="text-xs text-muted-foreground">Created</div><div>{format(new Date(acc.created_at), 'dd MMM yyyy')}</div></div>
               <div><div className="text-xs text-muted-foreground">Account code</div><div>{acc.account_code ?? '—'}</div></div>
               <div><div className="text-xs text-muted-foreground">Source enquiry</div><div>{acc.source_enquiry_id ? <Link to={`/enquiries/${acc.source_enquiry_id}`} className="text-primary hover:underline">Open</Link> : '—'}</div></div>
+              <div className="md:col-span-2">
+                <Label className="text-xs text-muted-foreground">Terrisage tenant ID</Label>
+                <Input
+                  value={draft?.tenant_id ?? ''}
+                  onChange={e => setField('tenant_id', e.target.value)}
+                  placeholder="e.g. 9f8c1d3a-…"
+                  className="mt-1 font-mono text-xs"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Used to identify this account in the Terrisage CRM seat APIs. Must be unique.</p>
+              </div>
             </CardContent>
           </Card>
+
         </TabsContent>
 
         <TabsContent value="seats" className="space-y-4">
