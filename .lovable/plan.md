@@ -1,62 +1,98 @@
 
+## Fix the repeating onboarding RLS failure at the real root
 
-## Rename "Payment Link Sent" → "Payment" + fix downstream trial gates
+### What is actually happening
+The repeat error is no longer coming from the notification or activity-log triggers.
 
-### Why
-- "Payment Link Sent" reads as a status. It's actually a **stage** where staff decide: collect now (Pay-Before) or start a trial (Trial-First). "Payment" is the honest label.
-- The Actions card currently gates "Send onboarding form" on `paymentPaid` only. In Trial-First there is no payment status (by design), so the button stays disabled and staff can't progress — even though `handleSendOnboarding` itself already accepts a valid trial. The button enable logic and the helper text need to match the handler.
+The strongest clue is this:
+- a fresh `onboarding_submissions` row was inserted successfully with `enquiry_id = null`
+- the failing user flow is a linked onboarding form, which sends a real `enquiry_id`
 
-### Changes
+That means the base insert path now works, but the linked insert still fails. The likely blocker is the foreign-key + RLS interaction on `enquiries`:
+- `onboarding_submissions.enquiry_id` references `public.enquiries(id)`
+- `enquiries` only has a staff-only RLS policy
+- public onboarding users cannot see the parent enquiry row
+- when the linked submission tries to insert, the database cannot validate that foreign-key target under the current anonymous role, so the insert is rejected and bubbles up as an RLS failure on `onboarding_submissions`
 
-**1. Stage label rename (display only — DB enum stays `PAYMENT_LINK_SENT`)**
+### Implementation plan
 
-Files: `src/pages/EnquiryDetail.tsx`, `src/pages/Enquiries.tsx`, `src/pages/EnquiryPipelineDashboard.tsx`, `src/components/shared/CreateEnquiryDialog.tsx` (if it lists this stage).
+#### 1. Stop inserting linked onboarding rows directly from the public client
+Replace the public client-side `.from("onboarding_submissions").insert(...)` flow with a dedicated `SECURITY DEFINER` database function, for example:
 
-```
-PAYMENT_LINK_SENT: 'Payment Link Sent' / 'Payment Sent'  →  'Payment'
-```
-
-No migration needed — enum value unchanged, only the human label.
-
-**2. Onboarding button gate — accept valid trial as well as Paid**
-
-`src/pages/EnquiryDetail.tsx` (around line 854-860 in the Actions card):
-
-```ts
-const p = draft.payload.payment;
-const paymentPaid = p?.status === 'PAID';
-const trialMode = p?.mode === 'TRIAL_FIRST';
-const trialValid = trialMode && !!p?.trial?.start && !!p?.trial?.end
-                   && new Date(p.trial.end) >= new Date(p.trial.start);
-const onboardingSent = enquiry.onboarding_pack_sent || draft.onboarding_pack_sent;
-const onboardEnabled = onboardingSent || paymentPaid || trialValid;
-const blockedReason = onboardEnabled ? null
-  : trialMode
-    ? 'Set valid trial start and end dates to unlock onboarding.'
-    : 'Mark payment as Paid, or switch to Trial-First with valid dates, to unlock onboarding.';
+```sql
+public.submit_onboarding_public(
+  _tenancy_type public.tenancy_type,
+  _payload jsonb,
+  _enquiry_id uuid
+)
 ```
 
-This makes the Trial-First flow self-consistent: pick mode → set trial dates → "Send onboarding form" lights up → submit form → "Convert to account" (already trial-aware) → account opens in `TRIAL` status with `TrialConversionCard` taking over.
+What that function will do:
+- validate the enquiry link safely on the server
+- call `check_submission_lock(_enquiry_id)` before insert
+- insert into `public.onboarding_submissions` using definer privileges
+- return the new submission id / submitted timestamp
+- raise a clear exception if the link is already locked
 
-**3. Verify nothing else silently expects `payment.status` in trial mode**
+This avoids exposing `enquiries` to anonymous users and removes FK/RLS friction from the public browser path.
 
-Quick audit pass on `EnquiryDetail.tsx`:
-- `validateStageGate` at line 396 — already trial-aware. ✓
-- `convertToAccount` block — already trial-aware (per previous changes). ✓
-- Activity timeline / notes — purely descriptive, no gating. ✓
+#### 2. Keep `enquiries` private
+Do not add broad anonymous `SELECT` access to `public.enquiries`.
 
-**4. Keep the existing trial explainer copy in the Payment card aligned**
+That table contains contact data and should stay staff-only. The secure function above is the right abstraction because it:
+- validates the link server-side
+- preserves privacy
+- avoids weakening RLS on a PII table
 
-Where the enquiry-side card currently says "A trial conversion link will be available on the account once it's created", make sure it now also notes: "You can send the onboarding form straight away once trial dates are set." (one-line tweak).
+#### 3. Update the frontend submit flow to call the RPC
+In `src/lib/onboardingSubmit.ts`:
+- replace the direct `.insert(...)` with `supabase.rpc("submit_onboarding_public", ...)`
+- map known database errors into friendly UI messages:
+  - already submitted
+  - invalid or expired onboarding link
+  - generic submission failure
 
-### Out of scope
-- DB enum rename (unnecessary; would force a heavy migration and break activity-log history).
-- Any change to Account-side `TrialConversionCard` / `RenewalsCard` — they're already correct after the previous round.
-- Stage colour tokens stay as-is (warning amber suits "Payment" too).
+This keeps the public forms working without changing the rest of the form payload logic.
 
-### Files touched
-- `src/pages/EnquiryDetail.tsx` — label + button gate + explainer tweak
-- `src/pages/Enquiries.tsx` — label
-- `src/pages/EnquiryPipelineDashboard.tsx` — label
-- `src/components/shared/CreateEnquiryDialog.tsx` — label (if present)
+#### 4. Preserve the existing trigger-based staff side-effects
+Keep the existing triggers in place:
+- `trg_notify_submission`
+- `trg_submissions_activity`
 
+Those were sensible fixes, and they should continue to run after the secure insert function writes the row.
+
+#### 5. Add one more hardening pass around linked submissions
+Inside the new function:
+- reject blank payloads
+- allow `null` enquiry ids only if that is still a valid public fallback path
+- if linked flow is expected, verify the enquiry exists before insert
+- return a deterministic error message instead of raw database text
+
+#### 6. Verify the full end-to-end paths
+After implementation, test both cases:
+1. Public onboarding with a valid `enquiry_id`
+2. Public onboarding without an `enquiry_id`
+
+Expected results:
+- linked submission inserts successfully
+- staff can still review the submission from the enquiry screen
+- notification and activity entries still get created
+- duplicate submission attempts show the friendly “already submitted” message
+
+### Files to change
+- `src/lib/onboardingSubmit.ts` — switch public submission to RPC
+- `supabase/migrations/...sql` — create `submit_onboarding_public(...)` function and grant execute to `anon, authenticated`
+
+### Technical notes
+- No change to the `onboarding_submissions` table structure is needed
+- No broad public policy should be added to `enquiries`
+- This is a security-preserving fix, not a permission-broadening fix
+- The earlier trigger changes can remain; they were not the final root cause, but they are still useful for server-side inserts
+
+### Why this is the right fix
+A real-user linked onboarding form needs to reference a private enquiry without making that enquiry publicly readable. The correct pattern is:
+```text
+Public form -> secure backend function -> validated insert -> normal staff review flow
+```
+
+That solves the repeating error at the correct layer instead of continuing to patch downstream trigger symptoms.
