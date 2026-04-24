@@ -105,6 +105,7 @@ Deno.serve(async (req) => {
       conversions: num(s.conversions),
       tasks_completed: num(s.tasksCompleted),
       last_active_at: s.lastActiveAt ?? null,
+      feature_usage: sanitiseFeatureUsage(s.featureUsage),
       source: "terrisage",
       updated_at: new Date().toISOString(),
     });
