@@ -43,7 +43,8 @@ Deno.serve(async (req) => {
     const linkObj = (event.payload as { payment_link?: { entity?: Record<string, unknown> } } | undefined)?.payment_link?.entity ?? {};
     const linkId = linkObj.id as string | undefined;
     const notes = (linkObj.notes ?? {}) as Record<string, string>;
-    const purpose = (notes.purpose as 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | undefined) ?? 'INITIAL';
+    const purpose = (notes.purpose as 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | 'SEAT_UPSELL' | undefined) ?? 'INITIAL';
+    const seatRequestIdNote = notes.seat_request_id;
     const enquiryId = notes.enquiry_id;
     const accountIdNote = notes.account_id;
 
@@ -79,6 +80,14 @@ Deno.serve(async (req) => {
           entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
           summary: `[Trial] Link ${newStatus.toLowerCase()} (Razorpay)`,
           details: { module: 'trial', link_id: linkId },
+        });
+      } else if (purpose === 'SEAT_UPSELL' && accountIdNote && linkId) {
+        await admin.from('seat_upsell_links').update({ status: newStatus })
+          .eq('account_id', accountIdNote).eq('link_id', linkId);
+        await admin.from('activity_log').insert({
+          entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
+          summary: `[Seat upsell] Link ${newStatus.toLowerCase()} (Razorpay)`,
+          details: { module: 'seat_upsell', link_id: linkId },
         });
       }
 
@@ -239,7 +248,84 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---------- INITIAL PAID branch (existing behaviour) ----------
+    // ---------- SEAT_UPSELL PAID branch ----------
+    // Mark the upsell link PAID, fulfil the seat request (which bumps
+    // seats_purchased), and record a SEAT_UPSELL invoice + seat-change event
+    // so /seat-events surfaces the change to connected CRMs.
+    if (purpose === 'SEAT_UPSELL' && accountIdNote && linkId) {
+      const { data: link } = await admin
+        .from('seat_upsell_links')
+        .select('id, seat_request_id, seats_extra, prorated_subtotal, gst_pct, gst_amount, total, status')
+        .eq('account_id', accountIdNote)
+        .eq('link_id', linkId)
+        .maybeSingle();
+
+      // Idempotent: skip if already PAID.
+      if (link && link.status !== 'PAID') {
+        await admin.from('seat_upsell_links').update({
+          status: 'PAID',
+          paid_at: nowIso,
+          payment_reference: linkId,
+        }).eq('id', link.id);
+
+        // Fulfil the seat request → bumps seats_purchased atomically.
+        const reqId = link.seat_request_id ?? seatRequestIdNote;
+        if (reqId) {
+          const { error: fulErr } = await admin.rpc('fulfil_seat_request', { _request_id: reqId });
+          if (fulErr) console.error('fulfil_seat_request failed', fulErr);
+        }
+
+        // Pull plan details for the invoice mirror.
+        const { data: bs } = await admin.from('account_billing_settings')
+          .select('plan_name, seat_rate, current_period_start, current_period_end, seats_purchased')
+          .eq('account_id', accountIdNote).maybeSingle();
+
+        await admin.from('account_invoices').insert({
+          account_id: accountIdNote,
+          plan_name: bs?.plan_name ?? 'Standard',
+          seat_count: link.seats_extra,
+          seat_rate: Number(bs?.seat_rate ?? 0),
+          base_fee: 0,
+          subtotal: Number(link.prorated_subtotal),
+          gst_pct: Number(link.gst_pct),
+          gst_amount: Number(link.gst_amount),
+          total: Number(link.total),
+          status: 'PAID',
+          kind: 'PRORATION',
+          issued_at: nowIso,
+          paid_at: nowIso,
+          period_from: bs?.current_period_start ? new Date(bs.current_period_start).toISOString().substring(0, 10) : null,
+          period_to: bs?.current_period_end ? new Date(bs.current_period_end).toISOString().substring(0, 10) : null,
+          notes: `Razorpay seat upsell · +${link.seats_extra} seat(s) · ${linkId}`,
+        });
+
+        await admin.from('seat_change_events').insert({
+          account_id: accountIdNote,
+          delta: link.seats_extra,
+          new_total: Number(bs?.seats_purchased ?? 0),
+          reason: 'MANUAL',
+          effective_at: nowIso,
+          prorated_amount: Number(link.total),
+          notes: `Seat upsell paid via Razorpay · ${linkId}`,
+        });
+
+        await admin.from('account_notes').insert({
+          account_id: accountIdNote,
+          note_text: `[Seat upsell] Pro-rata payment received · +${link.seats_extra} seat(s) added`,
+        });
+        await admin.from('activity_log').insert({
+          entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
+          summary: `[Seat upsell] Payment received · +${link.seats_extra} seat(s)`,
+          details: { module: 'seat_upsell', link_id: linkId, seats: link.seats_extra, total: link.total },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, branch: 'SEAT_UPSELL' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+
     if (!enquiryId) {
       return new Response(JSON.stringify({ success: true, ignored: 'no enquiry_id' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
