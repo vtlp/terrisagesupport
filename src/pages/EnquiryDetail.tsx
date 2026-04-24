@@ -831,9 +831,9 @@ export default function EnquiryDetail() {
             onOutcomeChange={handleOutcomeChange}
             onDemoOutcomeChange={handleDemoOutcomeChange}
             onOpenPaymentDialog={() => {
-              const teamSize = draft?.payload.team_size_estimate;
-              if (teamSize === null || teamSize === undefined || Number(teamSize) <= 0) {
-                toast.error('Please enter the team / seat size before generating a payment link.');
+              const teamSize = Number(draft?.payload.team_size_estimate ?? 0);
+              if (!teamSize || teamSize < 3) {
+                toast.error('Team / seat size must be at least 3 before generating a payment link.');
                 const el = document.querySelector<HTMLInputElement>('input[data-field="team_size_estimate"]');
                 el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 setTimeout(() => el?.focus(), 300);
@@ -1060,9 +1060,13 @@ export default function EnquiryDetail() {
                 <Input
                   data-field="team_size_estimate"
                   type="number"
-                  min={0}
+                  min={3}
                   value={draft.payload.team_size_estimate ?? ''}
-                  onChange={e => setPayload('team_size_estimate', e.target.value === '' ? null : Number(e.target.value))}
+                  onChange={e => {
+                    if (e.target.value === '') return setPayload('team_size_estimate', null);
+                    const n = Number(e.target.value);
+                    setPayload('team_size_estimate', Number.isFinite(n) ? Math.max(3, n) : null);
+                  }}
                 />
               </div>
               <div className="space-y-1.5">
