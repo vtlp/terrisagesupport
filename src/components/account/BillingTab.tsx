@@ -257,7 +257,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
   };
 
   const submitRenewal = async () => {
-    if (!derivedNextRenewal) { toast.error('Set the subscription start date first.'); return; }
+    if (!derivedCurrentEnd && !derivedNextRenewal) { toast.error('Set the current cycle start date first.'); return; }
     setRenewBusy(true);
     const seatsArg = renewDecision === 'RENEW' || renewDecision === 'CANCEL'
       ? null
