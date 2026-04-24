@@ -432,14 +432,9 @@ export default function AccountDetail() {
               <div><div className="text-xs text-muted-foreground">Account code</div><div>{acc.account_code ?? '—'}</div></div>
               <div><div className="text-xs text-muted-foreground">Source enquiry</div><div>{acc.source_enquiry_id ? <Link to={`/enquiries/${acc.source_enquiry_id}`} className="text-primary hover:underline">Open</Link> : '—'}</div></div>
               <div className="md:col-span-2">
-                <Label className="text-xs text-muted-foreground">Terrisage tenant ID</Label>
-                <Input
-                  value={draft?.tenant_id ?? ''}
-                  onChange={e => setField('tenant_id', e.target.value)}
-                  placeholder="e.g. 9f8c1d3a-…"
-                  className="mt-1 font-mono text-xs"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">Used to identify this account in the Terrisage CRM seat APIs. Must be unique.</p>
+                <div className="text-xs text-muted-foreground">Terrisage tenant ID</div>
+                <div className="mt-1 font-mono text-xs break-all">{acc.tenant_id ?? <span className="text-muted-foreground italic font-sans">Not yet linked from Terrisage</span>}</div>
+                <p className="mt-1 text-xs text-muted-foreground">Auto-populated from Terrisage CRM. Read-only.</p>
               </div>
             </CardContent>
           </Card>
