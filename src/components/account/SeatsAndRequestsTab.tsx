@@ -81,7 +81,7 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
     const [reqRes, capRes, seatsRes] = await Promise.all([
       supabase.from('seat_requests').select('*').eq('account_id', accountId).order('created_at', { ascending: false }),
       supabase.from('account_seat_capacity').select('seats_purchased, seats_used, seats_reserved, seats_available, last_crm_sync_at').eq('account_id', accountId).maybeSingle(),
-      supabase.from('account_seats').select('id, full_name, email, role, crm_state, is_superuser, last_active_at, invitation_expires_at, is_active').eq('account_id', accountId).order('is_superuser', { ascending: false }).order('full_name'),
+      supabase.from('account_seats').select('id, full_name, email, role, crm_state, is_superuser, last_active_at, invitation_expires_at, is_active, permissions').eq('account_id', accountId).order('is_superuser', { ascending: false }).order('full_name'),
     ]);
     if (reqRes.error) toast.error(reqRes.error.message);
     setRows((reqRes.data ?? []) as SeatRequest[]);
