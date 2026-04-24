@@ -275,8 +275,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
     load();
   };
 
-  const daysToRenewal = derivedNextRenewal
-    ? differenceInCalendarDays(new Date(derivedNextRenewal), new Date())
+  const effectivePeriodEnd = derivedCurrentEnd ?? derivedNextRenewal;
+  const daysToRenewal = effectivePeriodEnd
+    ? differenceInCalendarDays(new Date(effectivePeriodEnd), new Date())
     : null;
   const renewalWindow = daysToRenewal !== null && daysToRenewal <= 30 && daysToRenewal >= -7;
 
