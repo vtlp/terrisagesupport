@@ -226,7 +226,13 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
                       {s.is_superuser && <Crown className="h-3.5 w-3.5 text-warning" />}
                       <span className="font-medium text-sm">{s.full_name}</span>
                       <Badge className={`text-[10px] ${STATE_COLORS[s.crm_state]}`}>{s.crm_state.replace('_', ' ')}</Badge>
-                      {s.role && <span className="text-xs text-muted-foreground">{s.role}</span>}
+                      {s.role && (
+                        s.is_superuser ? (
+                          <Badge className="text-[10px] bg-success/15 text-success hover:bg-success/15">{s.role}</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{s.role}</span>
+                        )
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {s.email ?? '—'}
