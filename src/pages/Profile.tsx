@@ -84,6 +84,9 @@ export default function Profile() {
     toast.success('Password updated');
   };
 
+  const nameDirty = fullName.trim() !== (profile?.full_name ?? '').trim() && fullName.trim().length > 0;
+  const passwordDirty = currentPassword.length > 0 || newPassword.length > 0 || confirmPassword.length > 0;
+
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
