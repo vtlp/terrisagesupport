@@ -2666,14 +2666,6 @@ export type Database = {
       scan_overdue_events: { Args: never; Returns: number }
       scan_renewals_due: { Args: never; Returns: number }
       scan_upcoming_events: { Args: never; Returns: number }
-      submit_onboarding_public: {
-        Args: {
-          _enquiry_id?: string
-          _payload: Json
-          _tenancy_type: Database["public"]["Enums"]["tenancy_type"]
-        }
-        Returns: Json
-      }
       validate_account_api_key: { Args: { _key_hash: string }; Returns: string }
     }
     Enums: {

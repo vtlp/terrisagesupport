@@ -68,34 +68,22 @@ export async function submitOnboarding(
     }
   }
 
-  // Use SECURITY DEFINER RPC so the anonymous role never needs SELECT on
-  // `enquiries` (private PII) to satisfy the FK check on `onboarding_submissions`.
-  // Build marker — helps verify the latest bundle is loaded if RLS errors recur.
-  console.info("[onboarding] submit via RPC submit_onboarding_public", {
-    tenancy,
-    hasEnquiryId: Boolean(enquiryId),
-  });
-  const { error } = await supabase.rpc("submit_onboarding_public", {
-    _tenancy_type: tenancy,
-    _payload: payload as never,
-    _enquiry_id: enquiryId,
-  });
-
+  const { data, error } = await supabase
+    .from("onboarding_submissions")
+    .insert({ tenancy_type: tenancy, payload: payload as never, enquiry_id: enquiryId })
+    .select("id")
+    .single();
   if (error) {
     console.error("Onboarding submission insert failed", error);
-    const code = (error as { code?: string }).code;
-    const message = error.message || "";
-    // Friendly mapping for our explicit RAISE codes + race-condition unique violation.
-    if (code === "P0003" || code === "23505" || /already been submitted/i.test(message)) {
+    // Postgres unique-violation code = 23505. Surfaces when two submissions race.
+    if ((error as { code?: string }).code === "23505") {
       throw new AlreadySubmittedError(
         "This onboarding form has already been submitted for this link.",
       );
     }
-    if (code === "P0002" || /invalid or expired/i.test(message)) {
-      throw new Error("This onboarding link is invalid or has expired. Please contact support.");
-    }
     throw new Error(`Submission failed: ${error.message}`);
   }
+  return data.id as string;
 }
 
 export function getEnquiryIdFromUrl(): string | null {
