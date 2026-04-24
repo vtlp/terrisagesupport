@@ -293,8 +293,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
               <Select value={settings.billing_cycle} onValueChange={v => setSettings(s => ({ ...s, billing_cycle: v as Cycle }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MONTHLY">Monthly</SelectItem>
-                  <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                  <SelectItem value="HALF_YEARLY">Half-yearly</SelectItem>
                   <SelectItem value="ANNUAL">Annual</SelectItem>
                 </SelectContent>
               </Select>
