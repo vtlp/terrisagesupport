@@ -831,9 +831,9 @@ export default function EnquiryDetail() {
             onOutcomeChange={handleOutcomeChange}
             onDemoOutcomeChange={handleDemoOutcomeChange}
             onOpenPaymentDialog={() => {
-              const teamSize = draft?.payload.team_size_estimate;
-              if (teamSize === null || teamSize === undefined || Number(teamSize) <= 0) {
-                toast.error('Please enter the team / seat size before generating a payment link.');
+              const teamSize = Number(draft?.payload.team_size_estimate ?? 0);
+              if (!teamSize || teamSize < 3) {
+                toast.error('Team / seat size must be at least 3 before generating a payment link.');
                 const el = document.querySelector<HTMLInputElement>('input[data-field="team_size_estimate"]');
                 el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 setTimeout(() => el?.focus(), 300);
