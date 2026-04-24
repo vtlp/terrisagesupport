@@ -30,6 +30,8 @@ interface Body {
   expires_in_days?: number;
   notes?: string;
   prorata?: { days_remaining: number; days_in_cycle: number };
+  subscription_start_at?: string;
+  subscription_end_at?: string;
 }
 
 const fmtINR = (n: number) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
