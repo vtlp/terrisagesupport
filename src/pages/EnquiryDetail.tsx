@@ -1060,9 +1060,13 @@ export default function EnquiryDetail() {
                 <Input
                   data-field="team_size_estimate"
                   type="number"
-                  min={0}
+                  min={3}
                   value={draft.payload.team_size_estimate ?? ''}
-                  onChange={e => setPayload('team_size_estimate', e.target.value === '' ? null : Number(e.target.value))}
+                  onChange={e => {
+                    if (e.target.value === '') return setPayload('team_size_estimate', null);
+                    const n = Number(e.target.value);
+                    setPayload('team_size_estimate', Number.isFinite(n) ? Math.max(3, n) : null);
+                  }}
                 />
               </div>
               <div className="space-y-1.5">
