@@ -45,7 +45,7 @@ const STATUS_COLORS: Record<Status, string> = {
   FULFILLED: 'bg-success/15 text-success',
 };
 
-interface Props { accountId: string; activeSeatsUsed: number; onboardingPayload?: unknown; }
+interface Props { accountId: string; activeSeatsUsed: number; onboardingPayload?: unknown; tenantId?: string | null; }
 
 function getTeamMembers(payload: unknown): SubmissionTeamMember[] {
   const members = (payload as { team?: { members?: SubmissionTeamMember[] } } | null)?.team?.members;
@@ -59,11 +59,13 @@ function getMemberPermissions(member: SubmissionTeamMember): string[] {
   return labels;
 }
 
-export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayload }: Props) {
+export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayload, tenantId }: Props) {
   const [rows, setRows] = useState<SeatRequest[]>([]);
   const [capacity, setCapacity] = useState<Capacity | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [crmLinked, setCrmLinked] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const [mockOpen, setMockOpen] = useState(false);
   const [mockSeats, setMockSeats] = useState('');
@@ -85,7 +87,31 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
     setLoading(false);
   }, [accountId]);
 
+  // Sync live seat capacity from Terrisage CRM if tenant_id is linked
+  const syncFromCrm = useCallback(async () => {
+    if (!tenantId) { setCrmLinked(false); return; }
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('terrisage-seat-sync', {
+        body: { accountId },
+      });
+      if (error) { setCrmLinked(false); return; }
+      const linked = Boolean((data as { linked?: boolean } | null)?.linked);
+      setCrmLinked(linked);
+      if (linked) {
+        // Reload capacity from snapshot view
+        const capRes = await supabase.from('account_seat_capacity')
+          .select('seats_purchased, seats_used, seats_reserved, seats_available, last_crm_sync_at')
+          .eq('account_id', accountId).maybeSingle();
+        setCapacity((capRes.data ?? null) as Capacity | null);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  }, [accountId, tenantId]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { syncFromCrm(); }, [syncFromCrm]);
 
   const setStatus = async (id: string, status: Status) => {
     setBusyId(id);
@@ -136,24 +162,42 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Seat capacity</CardTitle>
-          {lastSync && (
+          {crmLinked && lastSync ? (
             <Badge variant="outline" className="text-[10px]">
               CRM synced {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px] border-warning/40 bg-warning/10 text-warning">
+              {syncing ? 'Syncing…' : tenantId ? 'CRM unreachable' : 'Not linked to Terrisage'}
             </Badge>
           )}
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <CapacityStat icon={<Users className="h-4 w-4 text-primary" />} label="Allocated" value={purchased} hint="Seats purchased" />
-            <CapacityStat icon={<Clock className="h-4 w-4 text-warning" />} label="Reserved" value={reserved} hint="Pending invites" />
-            <CapacityStat icon={<Check className="h-4 w-4 text-success" />} label="Consumed" value={consumed} hint="In use this cycle" />
-            <CapacityStat icon={<UserPlus className="h-4 w-4 text-accent" />} label="Available" value={available} hint="Free to invite" />
-            <CapacityStat icon={<Plus className="h-4 w-4 text-warning" />} label="Requested" value={pendingRequested} hint="Pending requests" />
-          </div>
-          {consumed > purchased && purchased > 0 && (
-            <p className="mt-3 text-xs text-destructive">
-              Over capacity: {consumed - purchased} seat(s) in use beyond allocation.
-            </p>
+          {crmLinked ? (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <CapacityStat icon={<Users className="h-4 w-4 text-primary" />} label="Allocated" value={purchased} hint="Seats purchased" />
+                <CapacityStat icon={<Clock className="h-4 w-4 text-warning" />} label="Reserved" value={reserved} hint="Pending invites" />
+                <CapacityStat icon={<Check className="h-4 w-4 text-success" />} label="Consumed" value={consumed} hint="In use this cycle" />
+                <CapacityStat icon={<UserPlus className="h-4 w-4 text-accent" />} label="Available" value={available} hint="Free to invite" />
+                <CapacityStat icon={<Plus className="h-4 w-4 text-warning" />} label="Requested" value={pendingRequested} hint="Pending requests" />
+              </div>
+              {consumed > purchased && purchased > 0 && (
+                <p className="mt-3 text-xs text-destructive">
+                  Over capacity: {consumed - purchased} seat(s) in use beyond allocation.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
+                <CapacityStat icon={<Users className="h-4 w-4 text-primary" />} label="Allocated" value={purchased} hint="From onboarding form" />
+                <CapacityStat icon={<Plus className="h-4 w-4 text-warning" />} label="Requested" value={pendingRequested} hint="Pending requests" />
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Live consumed/reserved/available figures will appear once the account is linked to Terrisage CRM.
+              </p>
+            </>
           )}
         </CardContent>
       </Card>
