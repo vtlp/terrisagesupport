@@ -45,7 +45,7 @@ interface UpsellLink {
 
 interface BillingCtx {
   plan_name: string;
-  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
   base_fee: number;
   seat_rate: number;
   seats_purchased: number;
