@@ -159,8 +159,7 @@ export function PaymentLinkDialog({
             <Select value={cycle} onValueChange={v => setCycle(v as Cycle)}>
               <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="MONTHLY">Monthly</SelectItem>
-                <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                <SelectItem value="HALF_YEARLY">Half-yearly</SelectItem>
                 <SelectItem value="ANNUAL">Annual</SelectItem>
               </SelectContent>
             </Select>
