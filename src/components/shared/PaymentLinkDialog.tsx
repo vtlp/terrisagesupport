@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { calcBilling, fmtINR } from '@/lib/billing';
 
-type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+type Cycle = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
 
 const DEFAULT_BASE_FEE = 33000;
 const DEFAULT_SEAT_RATE = 7000;
@@ -159,8 +159,7 @@ export function PaymentLinkDialog({
             <Select value={cycle} onValueChange={v => setCycle(v as Cycle)}>
               <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="MONTHLY">Monthly</SelectItem>
-                <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                <SelectItem value="HALF_YEARLY">Half-yearly</SelectItem>
                 <SelectItem value="ANNUAL">Annual</SelectItem>
               </SelectContent>
             </Select>

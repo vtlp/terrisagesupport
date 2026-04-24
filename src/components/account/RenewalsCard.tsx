@@ -27,7 +27,7 @@ interface RenewalState {
   seat_rate: number;
   gst_pct: number;
   seats_purchased: number;
-  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
   current_period_end: string | null;
   renewal_due_date: string | null;
   renewal_notes: string | null;

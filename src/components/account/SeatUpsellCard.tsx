@@ -45,7 +45,7 @@ interface UpsellLink {
 
 interface BillingCtx {
   plan_name: string;
-  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
   base_fee: number;
   seat_rate: number;
   seats_purchased: number;
@@ -141,7 +141,7 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
   const proRata = useMemo(() => {
     if (!billing || !activeRequest) return null;
     // Resolve cycle window with fallbacks: explicit period → subscription → trial → derived from billing cycle
-    const cycleMonths = billing.billing_cycle === 'MONTHLY' ? 1 : billing.billing_cycle === 'QUARTERLY' ? 3 : 12;
+    const cycleMonths = billing.billing_cycle === 'MONTHLY' ? 1 : billing.billing_cycle === 'QUARTERLY' ? 3 : billing.billing_cycle === 'HALF_YEARLY' ? 6 : 12;
     let periodStart: Date | null = billing.current_period_start ? new Date(billing.current_period_start) : null;
     let periodEnd: Date | null = billing.current_period_end ? new Date(billing.current_period_end) : null;
     if (!periodStart && billing.subscription_started_at) periodStart = new Date(billing.subscription_started_at);

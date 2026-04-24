@@ -163,6 +163,7 @@ Deno.serve(async (req) => {
       const periodEnd = new Date(periodStart);
       if (cycle === 'MONTHLY') periodEnd.setMonth(periodEnd.getMonth() + 1);
       else if (cycle === 'QUARTERLY') periodEnd.setMonth(periodEnd.getMonth() + 3);
+      else if (cycle === 'HALF_YEARLY') periodEnd.setMonth(periodEnd.getMonth() + 6);
       else periodEnd.setFullYear(periodEnd.getFullYear() + 1);
 
       // Flip account out of trial → active, stamp lifecycle dates,

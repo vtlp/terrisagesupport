@@ -14,7 +14,17 @@ import { toast } from 'sonner';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { SeatUpsellCard } from './SeatUpsellCard';
 
-type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+type Cycle = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
+
+// Months per supported cycle. Only HALF_YEARLY and ANNUAL are offered going forward;
+// legacy MONTHLY/QUARTERLY values are still recognised for backward-compat reads.
+const CYCLE_MONTHS: Record<Cycle, number> = { MONTHLY: 1, QUARTERLY: 3, HALF_YEARLY: 6, ANNUAL: 12 };
+
+function addMonths(iso: string, months: number): string {
+  const d = new Date(iso);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString();
+}
 type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE' | 'TRIAL';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 type InvoiceKind = 'CYCLE' | 'PRORATION' | 'RENEWAL';
@@ -64,7 +74,7 @@ const KIND_COLORS: Record<InvoiceKind, string> = {
 const fmtINR = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 const DEFAULT_SETTINGS: Settings = {
-  plan_name: 'Standard', billing_cycle: 'MONTHLY', base_fee: 33000, seat_rate: 7000, seats_purchased: 0,
+  plan_name: 'Standard', billing_cycle: 'ANNUAL', base_fee: 33000, seat_rate: 7000, seats_purchased: 0,
   gst_pct: 18, next_renewal_at: null, status: 'ACTIVE',
   country: 'IN', auto_renew: true,
   subscription_started_at: null, current_period_start: null, current_period_end: null,
@@ -100,7 +110,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
     if (s.data) {
       const d = s.data as Record<string, unknown>;
       const loaded: Settings = {
-        id: s.data.id, plan_name: s.data.plan_name, billing_cycle: s.data.billing_cycle,
+        id: s.data.id, plan_name: s.data.plan_name, billing_cycle: s.data.billing_cycle as Cycle,
         base_fee: Number(s.data.base_fee), seat_rate: Number(s.data.seat_rate),
         seats_purchased: Number((s.data as { seats_purchased?: number }).seats_purchased ?? 0),
         gst_pct: Number(s.data.gst_pct),
@@ -140,19 +150,29 @@ export function BillingTab({ accountId }: { accountId: string }) {
   const draftGst = draftSubtotal * (Number(draft.gst_pct) || 0) / 100;
   const draftTotal = draftSubtotal + draftGst;
 
+  // Derive next renewal from subscription start + cycle length.
+  // Support sets the subscription start when the first payment is received;
+  // we keep next_renewal_at consistent with that anchor automatically.
+  const derivedNextRenewal = useMemo(() => {
+    if (!settings.subscription_started_at) return settings.next_renewal_at;
+    const months = CYCLE_MONTHS[settings.billing_cycle] ?? 12;
+    return addMonths(settings.subscription_started_at, months);
+  }, [settings.subscription_started_at, settings.billing_cycle, settings.next_renewal_at]);
+
   const saveSettings = async () => {
     setSavingSettings(true);
+    const nextRenewal = settings.subscription_started_at
+      ? addMonths(settings.subscription_started_at, CYCLE_MONTHS[settings.billing_cycle] ?? 12)
+      : settings.next_renewal_at;
     const payload = {
       account_id: accountId, plan_name: settings.plan_name, billing_cycle: settings.billing_cycle,
       base_fee: settings.base_fee, seat_rate: settings.seat_rate,
       seats_purchased: settings.seats_purchased,
       gst_pct: settings.gst_pct,
-      next_renewal_at: settings.next_renewal_at, status: settings.status,
+      next_renewal_at: nextRenewal, status: settings.status,
       country: settings.country,
       auto_renew: settings.auto_renew,
       subscription_started_at: settings.subscription_started_at,
-      current_period_start: settings.current_period_start,
-      current_period_end: settings.current_period_end,
     };
     const { error } = settings.id
       ? await supabase.from('account_billing_settings').update(payload).eq('id', settings.id)
@@ -224,7 +244,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
   };
 
   const submitRenewal = async () => {
-    if (!settings.current_period_end) { toast.error('No active billing period set.'); return; }
+    if (!derivedNextRenewal) { toast.error('Set the subscription start date first.'); return; }
     setRenewBusy(true);
     const seatsArg = renewDecision === 'RENEW' || renewDecision === 'CANCEL'
       ? null
@@ -242,8 +262,8 @@ export function BillingTab({ accountId }: { accountId: string }) {
     load();
   };
 
-  const daysToRenewal = settings.current_period_end
-    ? differenceInCalendarDays(new Date(settings.current_period_end), new Date())
+  const daysToRenewal = derivedNextRenewal
+    ? differenceInCalendarDays(new Date(derivedNextRenewal), new Date())
     : null;
   const renewalWindow = daysToRenewal !== null && daysToRenewal <= 30 && daysToRenewal >= -7;
 
@@ -273,8 +293,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
               <Select value={settings.billing_cycle} onValueChange={v => setSettings(s => ({ ...s, billing_cycle: v as Cycle }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MONTHLY">Monthly</SelectItem>
-                  <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                  <SelectItem value="HALF_YEARLY">Half-yearly</SelectItem>
                   <SelectItem value="ANNUAL">Annual</SelectItem>
                 </SelectContent>
               </Select>
@@ -317,21 +336,13 @@ export function BillingTab({ accountId }: { accountId: string }) {
               <Label>Subscription started</Label>
               <Input type="date" value={settings.subscription_started_at ? settings.subscription_started_at.substring(0, 10) : ''}
                 onChange={e => setSettings(s => ({ ...s, subscription_started_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+              <p className="text-[10px] text-muted-foreground">Set when the first payment is received and the account is created.</p>
             </div>
             <div className="space-y-1.5">
-              <Label>Current period start</Label>
-              <Input type="date" value={settings.current_period_start ? settings.current_period_start.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Current period end</Label>
-              <Input type="date" value={settings.current_period_end ? settings.current_period_end.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, current_period_end: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Next renewal</Label>
-              <Input type="date" value={settings.next_renewal_at ? settings.next_renewal_at.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, next_renewal_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+              <Label>Next renewal (auto)</Label>
+              <Input type="date" disabled
+                value={derivedNextRenewal ? derivedNextRenewal.substring(0, 10) : ''} />
+              <p className="text-[10px] text-muted-foreground">Derived from subscription start + cycle.</p>
             </div>
             <div className="space-y-1.5 flex flex-col">
               <Label>Auto-renew</Label>
@@ -366,7 +377,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                       : `Period ended ${Math.abs(daysToRenewal!)} day(s) ago`}
                   </div>
                   <div className="text-muted-foreground">
-                    Period ends {settings.current_period_end ? format(new Date(settings.current_period_end), 'dd MMM yyyy') : '—'}
+                    Period ends {derivedNextRenewal ? format(new Date(derivedNextRenewal), 'dd MMM yyyy') : '—'}
                   </div>
                 </div>
               </div>
@@ -487,9 +498,9 @@ export function BillingTab({ accountId }: { accountId: string }) {
           <div className="space-y-4">
             <div className="rounded border p-3 text-xs space-y-1 bg-muted/30">
               <div><span className="text-muted-foreground">Current period:</span>{' '}
-                {settings.current_period_start ? format(new Date(settings.current_period_start), 'dd MMM') : '—'}
+                {settings.subscription_started_at ? format(new Date(settings.subscription_started_at), 'dd MMM') : '—'}
                 {' – '}
-                {settings.current_period_end ? format(new Date(settings.current_period_end), 'dd MMM yyyy') : '—'}
+                {derivedNextRenewal ? format(new Date(derivedNextRenewal), 'dd MMM yyyy') : '—'}
               </div>
               <div><span className="text-muted-foreground">Seats purchased:</span> {settings.seats_purchased}</div>
               <div><span className="text-muted-foreground">Cycle:</span> {settings.billing_cycle}</div>

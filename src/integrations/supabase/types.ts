@@ -2768,7 +2768,7 @@ export type Database = {
         | "IMPORT"
         | "TICKET"
       app_role: "admin" | "support_agent"
-      billing_cycle: "MONTHLY" | "QUARTERLY" | "ANNUAL"
+      billing_cycle: "MONTHLY" | "QUARTERLY" | "ANNUAL" | "HALF_YEARLY"
       calendar_event_status: "SCHEDULED" | "COMPLETED" | "CANCELLED" | "NO_SHOW"
       calendar_event_type:
         | "DEMO"
@@ -3036,7 +3036,7 @@ export const Constants = {
         "TICKET",
       ],
       app_role: ["admin", "support_agent"],
-      billing_cycle: ["MONTHLY", "QUARTERLY", "ANNUAL"],
+      billing_cycle: ["MONTHLY", "QUARTERLY", "ANNUAL", "HALF_YEARLY"],
       calendar_event_status: ["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"],
       calendar_event_type: [
         "DEMO",

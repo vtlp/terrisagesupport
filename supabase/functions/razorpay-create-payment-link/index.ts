@@ -18,7 +18,7 @@ interface Body {
   seat_request_id?: string;
   purpose?: 'INITIAL' | 'RENEWAL' | 'TRIAL_CONVERSION' | 'SEAT_UPSELL';
   plan_name: string;
-  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
   seats: number;
   base_fee: number;
   per_seat_rate: number;
