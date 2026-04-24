@@ -2786,6 +2786,7 @@ export type Database = {
         | "RENEWAL_DECREASE"
         | "MANUAL"
         | "SUPERUSER_TRANSFER"
+        | "TRIAL_CONVERTED"
       seat_request_status: "PENDING" | "APPROVED" | "REJECTED" | "FULFILLED"
       submission_status: "PENDING_REVIEW" | "APPROVED" | "REJECTED"
       subscription_status:
@@ -3062,6 +3063,7 @@ export const Constants = {
         "RENEWAL_DECREASE",
         "MANUAL",
         "SUPERUSER_TRANSFER",
+        "TRIAL_CONVERTED",
       ],
       seat_request_status: ["PENDING", "APPROVED", "REJECTED", "FULFILLED"],
       submission_status: ["PENDING_REVIEW", "APPROVED", "REJECTED"],
