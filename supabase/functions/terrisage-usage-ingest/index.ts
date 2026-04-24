@@ -21,6 +21,10 @@ interface SnapshotPayload {
   conversions?: number;
   tasksCompleted?: number;
   lastActiveAt?: string | null;
+  // Per-feature adoption percentages (0-100). Keys:
+  //   enquiry_capture, convert_to_lead, manual_leads,
+  //   creating_tasks, task_types, channel_partner
+  featureUsage?: Record<string, number>;
 }
 
 interface IngestBody {
