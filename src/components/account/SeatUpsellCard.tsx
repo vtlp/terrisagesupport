@@ -140,21 +140,39 @@ export function SeatUpsellCard({ accountId }: { accountId: string }) {
 
   const proRata = useMemo(() => {
     if (!billing || !activeRequest) return null;
-    const periodStart = billing.current_period_start ? new Date(billing.current_period_start) : null;
-    const periodEnd = billing.current_period_end ? new Date(billing.current_period_end) : null;
-    if (!periodStart || !periodEnd) return null;
+    // Resolve cycle window with fallbacks: explicit period → subscription → trial → derived from billing cycle
+    const cycleMonths = billing.billing_cycle === 'MONTHLY' ? 1 : billing.billing_cycle === 'QUARTERLY' ? 3 : 12;
+    let periodStart: Date | null = billing.current_period_start ? new Date(billing.current_period_start) : null;
+    let periodEnd: Date | null = billing.current_period_end ? new Date(billing.current_period_end) : null;
+    if (!periodStart && billing.subscription_started_at) periodStart = new Date(billing.subscription_started_at);
+    if (!periodEnd && billing.next_renewal_at) periodEnd = new Date(billing.next_renewal_at);
+    if (!periodStart && billing.trial_starts_at) periodStart = new Date(billing.trial_starts_at);
+    if (!periodEnd && billing.trial_ends_at) periodEnd = new Date(billing.trial_ends_at);
+    // Last-resort: derive from today
+    if (!periodStart && periodEnd) {
+      const ps = new Date(periodEnd); ps.setMonth(ps.getMonth() - cycleMonths); periodStart = ps;
+    }
+    if (!periodEnd && periodStart) {
+      const pe = new Date(periodStart); pe.setMonth(pe.getMonth() + cycleMonths); periodEnd = pe;
+    }
+    if (!periodStart || !periodEnd) {
+      periodStart = new Date();
+      periodEnd = new Date(); periodEnd.setMonth(periodEnd.getMonth() + cycleMonths);
+    }
     const daysInCycle = Math.max(1, differenceInCalendarDays(periodEnd, periodStart));
-    const daysRemaining = Math.max(0, differenceInCalendarDays(periodEnd, new Date()));
+    const daysRemaining = Math.max(0, Math.min(daysInCycle, differenceInCalendarDays(periodEnd, new Date())));
     const seatsExtra = activeRequest.requested_seats;
     const fullSubtotal = billing.seat_rate * seatsExtra;
     const proratedSubtotal = Math.round(fullSubtotal * (daysRemaining / daysInCycle));
-    const gstAmount = (proratedSubtotal * billing.gst_pct) / 100;
+    const gstAmount = Math.round((proratedSubtotal * billing.gst_pct) / 100);
     const total = proratedSubtotal + gstAmount;
     return {
       daysInCycle, daysRemaining, seatsExtra,
       perSeatRate: billing.seat_rate,
       fullSubtotal, proratedSubtotal,
       gstPct: billing.gst_pct, gstAmount, total,
+      periodStart, periodEnd,
+      derived: !billing.current_period_start || !billing.current_period_end,
     };
   }, [billing, activeRequest]);
 
