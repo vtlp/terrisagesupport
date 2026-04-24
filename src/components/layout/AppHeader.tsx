@@ -22,7 +22,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useUser } from '@/context/UserContext';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
-import { CrmSyncChip } from '@/components/layout/CrmSyncChip';
+
 
 type NotifType =
   | 'EVENT_DUE' | 'EVENT_OVERDUE' | 'REMINDER'
@@ -169,7 +169,7 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <CrmSyncChip />
+        
         <ThemeToggle />
 
         {/* Notifications */}
