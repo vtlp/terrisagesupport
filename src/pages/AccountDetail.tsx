@@ -468,15 +468,6 @@ export default function AccountDetail() {
                             <div className="text-[11px] text-muted-foreground mt-0.5">No special permissions granted</div>
                           )}
                         </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => openEditSeat(s)}>Edit</Button>
-                          <Button variant="ghost" size="sm" onClick={() => toggleSeatActive(s)}>
-                            {s.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => removeSeat(s.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
                       </div>
                     );
                   })}
