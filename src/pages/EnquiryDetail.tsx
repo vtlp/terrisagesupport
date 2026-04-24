@@ -1926,12 +1926,6 @@ function ActiveStagePanel({
                         {statusBadge(status)}
                       </span>
                     )}
-                    {(payment as { razorpay_status?: string }).razorpay_status && (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="text-[10px] uppercase text-muted-foreground">Razorpay:</span>
-                        {statusBadge((payment as { razorpay_status: string }).razorpay_status)}
-                      </span>
-                    )}
                     {isOutdated && (
                       <Badge variant="outline" className="text-[10px] bg-warning/15 text-warning border-warning/40">Outdated</Badge>
                     )}
@@ -1952,12 +1946,6 @@ function ActiveStagePanel({
                   <div className="flex gap-1.5">
                     <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(payment.short_url!); toast.success('Link copied'); }}>
                       <CopyIcon className="h-3.5 w-3.5 mr-1" /> Copy
-                    </Button>
-                    <a href={payment.short_url} target="_blank" rel="noreferrer">
-                      <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Open</Button>
-                    </a>
-                    <Button size="sm" variant="outline" onClick={onRefreshPaymentStatus} disabled={paymentBusy}>
-                      <RefreshCw className={cn('h-3.5 w-3.5 mr-1', paymentBusy && 'animate-spin')} /> Refresh
                     </Button>
                   </div>
                 </div>
@@ -1981,8 +1969,9 @@ function ActiveStagePanel({
             )}
 
             {/* Action row (pay-first only) */}
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={onOpenPaymentDialog} disabled={paymentBusy}>
+            <div className="flex flex-wrap gap-2 items-center">
+              <Button size="sm" onClick={onOpenPaymentDialog} disabled={paymentBusy || linkActive}
+                title={linkActive ? 'Cancel the active link before regenerating' : undefined}>
                 {payment?.short_url ? 'Regenerate link' : 'Generate payment link'}
               </Button>
               {payment?.short_url && (
@@ -1996,6 +1985,20 @@ function ActiveStagePanel({
                 </Button>
               )}
               <div className="flex items-center gap-2 ml-auto">
+                {payment?.short_url && (
+                  <>
+                    {(payment as { razorpay_status?: string }).razorpay_status && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-[10px] uppercase text-muted-foreground">Razorpay:</span>
+                        {statusBadge((payment as { razorpay_status: string }).razorpay_status)}
+                      </span>
+                    )}
+                    <Button size="sm" variant="outline" onClick={onRefreshPaymentStatus} disabled={paymentBusy}
+                      title="Refresh status from Razorpay">
+                      <RefreshCw className={cn('h-3.5 w-3.5 mr-1', paymentBusy && 'animate-spin')} /> Refresh
+                    </Button>
+                  </>
+                )}
                 <Label className="text-xs text-muted-foreground">Mark as</Label>
                 <Select value={status === 'PAID' || status === 'PENDING' || status === 'FAILED' ? status : NONE}
                   onValueChange={v => v !== NONE && onSetPaymentStatus(v as 'PAID' | 'PENDING' | 'FAILED')}>
