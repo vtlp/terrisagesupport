@@ -65,12 +65,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed }: Props) {
   const [mockReason, setMockReason] = useState('');
   const [submittingMock, setSubmittingMock] = useState(false);
 
-  const [adjustOpen, setAdjustOpen] = useState(false);
-  const [adjustDelta, setAdjustDelta] = useState('1');
-  const [adjustNotes, setAdjustNotes] = useState('');
-  const [proration, setProration] = useState<{ amount: number; gst_amount: number; total: number; days_remaining: number; cycle_days: number } | null>(null);
-  const [adjusting, setAdjusting] = useState(false);
-
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferFrom, setTransferFrom] = useState<string>('');
   const [transferTo, setTransferTo] = useState<string>('');
