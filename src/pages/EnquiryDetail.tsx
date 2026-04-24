@@ -830,7 +830,17 @@ export default function EnquiryDetail() {
             setPayload={setPayload}
             onOutcomeChange={handleOutcomeChange}
             onDemoOutcomeChange={handleDemoOutcomeChange}
-            onOpenPaymentDialog={() => setPaymentDialogOpen(true)}
+            onOpenPaymentDialog={() => {
+              const teamSize = draft?.payload.team_size_estimate;
+              if (teamSize === null || teamSize === undefined || Number(teamSize) <= 0) {
+                toast.error('Please enter the team / seat size before generating a payment link.');
+                const el = document.querySelector<HTMLInputElement>('input[data-field="team_size_estimate"]');
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => el?.focus(), 300);
+                return;
+              }
+              setPaymentDialogOpen(true);
+            }}
             onSetPaymentStatus={setPaymentStatus}
             onSetPaymentMode={setPaymentMode}
             onSetTrialDate={setTrialDate}

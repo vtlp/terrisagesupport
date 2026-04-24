@@ -65,7 +65,7 @@ export function PaymentLinkDialog({
 }: Props) {
   const [planName, setPlanName] = useState(defaults.planName ?? 'Standard');
   const [cycle, setCycle] = useState<Cycle>(defaults.cycle ?? 'ANNUAL');
-  const [seats, setSeats] = useState<number>(defaults.seats ?? DEFAULT_INCLUDED_SEATS);
+  const [seats, setSeats] = useState<number>(defaults.seats ?? 0);
   const [baseFee, setBaseFee] = useState<number>(defaults.baseFee ?? DEFAULT_BASE_FEE);
   const [seatRate, setSeatRate] = useState<number>(defaults.seatRate ?? DEFAULT_SEAT_RATE);
   const [gstPct, setGstPct] = useState<number>(defaults.gstPct ?? DEFAULT_GST_PCT);
@@ -78,7 +78,7 @@ export function PaymentLinkDialog({
     if (open) {
       setPlanName(defaults.planName ?? 'Standard');
       setCycle(defaults.cycle ?? 'ANNUAL');
-      setSeats(defaults.seats && defaults.seats > 0 ? defaults.seats : DEFAULT_INCLUDED_SEATS);
+      setSeats(defaults.seats && defaults.seats > 0 ? defaults.seats : 0);
       setBaseFee(defaults.baseFee ?? DEFAULT_BASE_FEE);
       setSeatRate(defaults.seatRate ?? DEFAULT_SEAT_RATE);
       setGstPct(defaults.gstPct ?? DEFAULT_GST_PCT);
