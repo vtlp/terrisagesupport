@@ -14,7 +14,17 @@ import { toast } from 'sonner';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { SeatUpsellCard } from './SeatUpsellCard';
 
-type Cycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+type Cycle = 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL';
+
+// Months per supported cycle. Only HALF_YEARLY and ANNUAL are offered going forward;
+// legacy MONTHLY/QUARTERLY values are still recognised for backward-compat reads.
+const CYCLE_MONTHS: Record<Cycle, number> = { MONTHLY: 1, QUARTERLY: 3, HALF_YEARLY: 6, ANNUAL: 12 };
+
+function addMonths(iso: string, months: number): string {
+  const d = new Date(iso);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString();
+}
 type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE' | 'TRIAL';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 type InvoiceKind = 'CYCLE' | 'PRORATION' | 'RENEWAL';
