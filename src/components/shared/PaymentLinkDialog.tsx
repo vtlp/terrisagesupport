@@ -37,10 +37,26 @@ export interface PaymentLinkResult {
     gst_amount: number;
     total: number;
   };
+  subscription?: {
+    start_at: string; // ISO date
+    end_at: string;   // ISO date
+  };
   created_at: string;
   expires_at?: string;
   outdated?: boolean;
   mode?: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST';
+}
+
+function addCycle(start: Date, cycle: Cycle): Date {
+  const d = new Date(start);
+  switch (cycle) {
+    case 'MONTHLY':     d.setMonth(d.getMonth() + 1); break;
+    case 'QUARTERLY':   d.setMonth(d.getMonth() + 3); break;
+    case 'HALF_YEARLY': d.setMonth(d.getMonth() + 6); break;
+    case 'ANNUAL':
+    default:            d.setFullYear(d.getFullYear() + 1); break;
+  }
+  return d;
 }
 
 interface Props {
