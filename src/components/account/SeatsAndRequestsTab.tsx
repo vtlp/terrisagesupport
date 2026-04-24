@@ -13,10 +13,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'FULFILLED';
-type CrmState = 'INVITED' | 'ACTIVE' | 'TEMP_DEACTIVATED' | 'DELETION_REQUESTED' | 'DELETED';
 
 type SubmissionTeamMember = {
+  id?: string;
+  fullName?: string;
   email?: string;
+  mobile?: string;
+  mobileCode?: string;
+  role?: string;
   orgWideAccess?: boolean;
   agentNetworksAccess?: boolean;
 };
@@ -34,13 +38,6 @@ interface Capacity {
   last_crm_sync_at?: string | null;
 }
 
-interface Seat {
-  id: string; full_name: string; email: string | null; role: string | null;
-  crm_state: CrmState; is_superuser: boolean; last_active_at: string | null;
-  invitation_expires_at: string | null; is_active: boolean;
-  permissions: unknown;
-}
-
 const STATUS_COLORS: Record<Status, string> = {
   PENDING: 'bg-warning/15 text-warning',
   APPROVED: 'bg-primary/15 text-primary',
@@ -48,35 +45,18 @@ const STATUS_COLORS: Record<Status, string> = {
   FULFILLED: 'bg-success/15 text-success',
 };
 
-const STATE_COLORS: Record<CrmState, string> = {
-  INVITED: 'border-warning/30 bg-warning/15 text-warning',
-  ACTIVE: 'border-accent/30 bg-accent/10 text-accent-foreground',
-  TEMP_DEACTIVATED: 'border-border bg-secondary text-secondary-foreground',
-  DELETION_REQUESTED: 'border-destructive/30 bg-destructive/15 text-destructive',
-  DELETED: 'border-border bg-muted text-muted-foreground',
-};
-
 interface Props { accountId: string; activeSeatsUsed: number; onboardingPayload?: unknown; }
 
-function getSubmissionPermissions(payload: unknown, email: string | null): string[] {
-  if (!email) return [];
+function getTeamMembers(payload: unknown): SubmissionTeamMember[] {
+  const members = (payload as { team?: { members?: SubmissionTeamMember[] } } | null)?.team?.members;
+  return Array.isArray(members) ? members : [];
+}
 
-  const teamMembers = (((payload as { team?: { members?: SubmissionTeamMember[] } } | null)?.team?.members) ?? []);
-  const match = teamMembers.find((member) => (member.email ?? '').toLowerCase() === email.toLowerCase());
+function getMemberPermissions(member: SubmissionTeamMember): string[] {
   const labels: string[] = [];
-
-  if (match?.orgWideAccess) labels.push('Org-wide access');
-  if (match?.agentNetworksAccess) labels.push('Agent networks');
-
+  if (member.orgWideAccess) labels.push('Org-wide access');
+  if (member.agentNetworksAccess) labels.push('Agent networks');
   return labels;
-}
-
-function getStoredPermissions(permissions: unknown): string[] {
-  return Array.isArray(permissions) ? permissions.map((permission) => String(permission)).filter(Boolean) : [];
-}
-
-function formatCrmState(state: CrmState) {
-  return state.replace(/_/g, ' ');
 }
 
 export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayload }: Props) {
