@@ -92,10 +92,6 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const [mockReason, setMockReason] = useState('');
   const [submittingMock, setSubmittingMock] = useState(false);
 
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [transferFrom, setTransferFrom] = useState<string>('');
-  const [transferTo, setTransferTo] = useState<string>('');
-  const [transferring, setTransferring] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
