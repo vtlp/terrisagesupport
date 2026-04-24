@@ -166,16 +166,6 @@ export function PaymentLinkDialog({
     onSuccess(data.payment as PaymentLinkResult);
     onOpenChange(false);
   };
-    setBusy(false);
-    if (error || !data?.success) {
-      const msg = data?.error || error?.message || 'Failed to generate payment link';
-      toast.error(msg);
-      return;
-    }
-    toast.success(purpose === 'RENEWAL' ? 'Renewal link created' : purpose === 'TRIAL_CONVERSION' ? 'Trial conversion link created' : 'Payment link created');
-    onSuccess(data.payment as PaymentLinkResult);
-    onOpenChange(false);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
