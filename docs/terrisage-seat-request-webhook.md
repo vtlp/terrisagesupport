@@ -244,12 +244,23 @@ or billing frequency change).
 | `seatBillingCycleEndAt`   | ISO 8601 timestamp (UTC)   | Exclusive end; always strictly greater than start. |
 | `seatBillingFrequency`    | enum                       | `"SIX_MONTH"` or `"YEARLY"`. (Monthly / quarterly cycles are not pushed.) |
 
-**Expected response:** `200 OK` with any JSON body (Terrisage Support only
-checks the HTTP status). Non-2xx is treated as a soft failure.
+**Validation (Terrisage CRM side):**
+- `seatBillingCycleStartAt < seatBillingCycleEndAt`
+- `seatBillingFrequency` must be `"SIX_MONTH"` or `"YEARLY"`
+
+**Expected response (200):**
+
+```json
+{ "ok": true }
+```
+
+Non-2xx is treated as a soft failure on Terrisage Support (logged + warning toast, never blocks the user).
 
 ---
 
-### 10.2 `POST /api/integrations/seats/seat-allocation` — fulfilment callback ✅ built
+### 10.2 `POST /api/integrations/seats/seat-allocation` — apply seat allocation (absolute) ✅ built
+
+**Purpose:** set the tenant's `allocatedSeats` on Terrisage CRM to an absolute target via `newAllocatedTotal`.
 
 **When Terrisage Support calls it:** immediately after a Support admin clicks
 **Fulfil** on a seat request (the request that originally arrived via the
@@ -260,8 +271,9 @@ inbound webhook in §1–§7).
 ```json
 {
   "tenantId": "c39aa7cf-b452-4235-bdcb-0fc3a62fbf18",
-  "newAllocatedTotal": 12,
-  "idempotencyKey": "fulfil-<accountId>-<seatRequestId>"
+  "newAllocatedTotal": 15,
+  "invoiceRef": "INV-2026-1001",
+  "idempotencyKey": "alloc-<tenantId>-<invoiceRef>"
 }
 ```
 
@@ -269,10 +281,21 @@ inbound webhook in §1–§7).
 |---------------------|----------------|-------|
 | `tenantId`          | string (UUID)  | Same tenant as the original request. |
 | `newAllocatedTotal` | integer ≥ 0    | The **new absolute** seat total on the account, not a delta. |
-| `idempotencyKey`    | string ≤ 128   | Stable per fulfilment. Safe-retry key — Terrisage CRM should ignore duplicates. |
+| `invoiceRef`        | string         | Support-side invoice reference for the fulfilment. |
+| `idempotencyKey`    | string ≤ 128   | Stable per fulfilment. Recommended pattern: `alloc-<tenantId>-<invoiceRef>`. |
 
-**Expected response:** `200 OK`. Terrisage CRM should set the tenant's seat
-cap to `newAllocatedTotal`. Duplicate `idempotencyKey` → no-op `200`.
+**Expected response (200):**
+
+```json
+{ "ok": true, "beforeAllocated": 10, "afterAllocated": 15 }
+```
+
+**Rules / errors (Terrisage CRM side):**
+- Reject if `newAllocatedTotal < 0`.
+- Reject if `newAllocatedTotal < consumedSeats` → error code `ALLOCATION_BELOW_CONSUMED`.
+- Idempotency:
+  - Same `idempotencyKey` + same `tenantId` + same `newAllocatedTotal` → replay success (no-op `200`).
+  - Same `idempotencyKey` + different `tenantId` or `newAllocatedTotal` → conflict error.
 
 ---
 
