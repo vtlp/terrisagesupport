@@ -66,16 +66,23 @@ Deno.serve(async (req) => {
 
   const tenantId =
     typeof body.tenantId === "string" ? body.tenantId.trim() : "";
+  const rawSeats =
+    body.requestedAdditionalSeats !== undefined
+      ? body.requestedAdditionalSeats
+      : body.requestedSeats;
   const requestedSeats =
-    typeof body.requestedSeats === "number"
-      ? body.requestedSeats
-      : Number(body.requestedSeats);
+    typeof rawSeats === "number" ? rawSeats : Number(rawSeats);
   const requestedByEmail =
     typeof body.requestedByEmail === "string"
       ? body.requestedByEmail.trim().toLowerCase()
       : "";
-  const reason =
-    typeof body.reason === "string" ? body.reason.trim().slice(0, 500) : null;
+  const rawReason =
+    typeof body.note === "string" && body.note
+      ? body.note
+      : typeof body.reason === "string"
+        ? body.reason
+        : "";
+  const reason = rawReason ? rawReason.trim().slice(0, 500) : null;
   const idempotencyKey =
     typeof body.idempotencyKey === "string"
       ? body.idempotencyKey.trim().slice(0, 128)
@@ -84,6 +91,17 @@ Deno.serve(async (req) => {
     typeof body.requestedAt === "string" && body.requestedAt
       ? body.requestedAt
       : null;
+
+  console.log("[seat-request] payload", {
+    tenantId,
+    requestedSeats,
+    hasEmail: !!requestedByEmail,
+    hasNote: !!reason,
+    idempotencyKey,
+    seatRequestId: typeof body.seatRequestId === "string" ? body.seatRequestId : null,
+    createdByAgentId: typeof body.createdByAgentId === "string" ? body.createdByAgentId : null,
+    requestedAt,
+  });
 
   const errors: string[] = [];
   if (!tenantId) {
