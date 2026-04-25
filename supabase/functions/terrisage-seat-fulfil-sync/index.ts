@@ -54,14 +54,25 @@ Deno.serve(async (req) => {
     }
 
     // Look up the seat request to know how many seats were requested.
+    // Also guard: if this request has already been pushed, do not push again.
     let requestedSeats = 0;
     if (requestId) {
       const { data: sr, error: srErr } = await supabase
         .from("seat_requests")
-        .select("requested_seats")
+        .select("requested_seats, terrisage_pushed_at")
         .eq("id", requestId)
         .maybeSingle();
       if (srErr) return json({ error: srErr.message }, 500);
+      if (sr?.terrisage_pushed_at) {
+        return json(
+          {
+            pushed: false,
+            reason: "ALREADY_PUSHED",
+            pushedAt: sr.terrisage_pushed_at,
+          },
+          200,
+        );
+      }
       requestedSeats = Number(sr?.requested_seats ?? 0);
     }
     if (!Number.isFinite(requestedSeats) || requestedSeats < 0) {
@@ -190,6 +201,14 @@ Deno.serve(async (req) => {
         },
         200,
       );
+    }
+
+    // Mark this request as pushed so we never push it twice.
+    if (requestId) {
+      await supabase
+        .from("seat_requests")
+        .update({ terrisage_pushed_at: new Date().toISOString() })
+        .eq("id", requestId);
     }
 
     return json({
