@@ -295,9 +295,22 @@ export default function AccountDetail() {
                       <Select value={draft.status} onValueChange={v => setField('status', v as Status)}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {(Object.keys(statusLabels) as Status[]).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
+                          {(Object.keys(statusLabels) as Status[]).map(s => (
+                            <SelectItem
+                              key={s}
+                              value={s}
+                              disabled={s === 'LIVE' && acc?.status !== 'LIVE' && !allChecklistDone}
+                            >
+                              {statusLabels[s]}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      {acc?.status !== 'LIVE' && !allChecklistDone && (
+                        <p className="text-xs text-muted-foreground">
+                          Complete all onboarding tasks to enable Live.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <Label>City</Label>
