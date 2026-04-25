@@ -281,8 +281,8 @@ inbound webhook in §1–§7).
 |---------------------|----------------|-------|
 | `tenantId`          | string (UUID)  | Same tenant as the original request. |
 | `newAllocatedTotal` | integer ≥ 0    | The **new absolute** seat total on the account, not a delta. |
-| `invoiceRef`        | string         | Support-side invoice reference for the fulfilment. |
-| `idempotencyKey`    | string ≤ 128   | Stable per fulfilment. Recommended pattern: `alloc-<tenantId>-<invoiceRef>`. |
+| `invoiceRef`        | string (optional) | Support-side invoice reference for the fulfilment. Optional for now — may be omitted; will become required in a later phase. |
+| `idempotencyKey`    | string ≤ 128   | Stable per fulfilment. Recommended pattern: `alloc-<tenantId>-<invoiceRef>` when `invoiceRef` is present, otherwise `alloc-<tenantId>-<seatRequestId>`. |
 
 **Expected response (200):**
 
