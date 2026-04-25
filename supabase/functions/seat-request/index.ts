@@ -19,9 +19,13 @@ const corsHeaders = {
 interface Body {
   tenantId?: unknown;
   requestedSeats?: unknown;
+  requestedAdditionalSeats?: unknown;
   requestedByEmail?: unknown;
+  createdByAgentId?: unknown;
   reason?: unknown;
+  note?: unknown;
   idempotencyKey?: unknown;
+  seatRequestId?: unknown;
   requestedAt?: unknown;
 }
 
