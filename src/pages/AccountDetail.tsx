@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Save, Trash2, UserCheck, UserX, CheckCircle2, Circle, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,6 +69,15 @@ const ROLES = ['Admin', 'Manager', 'Agent'];
 export default function AccountDetail() {
   const { accountId } = useParams<{ accountId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const VALID_TABS = ['overview','seats','checklist','verification','billing','projects','documents','imports','notes','calendar','activity'];
+  const tabParam = searchParams.get('tab');
+  const activeTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'overview';
+  const handleTabChange = (v: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', v);
+    setSearchParams(next, { replace: true });
+  };
   const [acc, setAcc] = useState<Account | null>(null);
   const [draft, setDraft] = useState<Account | null>(null);
   const [seats, setSeats] = useState<Seat[]>([]);
@@ -254,7 +263,7 @@ export default function AccountDetail() {
         )}
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="seats">Seats &amp; requests ({seats.filter(s => s.is_active).length})</TabsTrigger>
