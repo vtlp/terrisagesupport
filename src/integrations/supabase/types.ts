@@ -84,6 +84,7 @@ export type Database = {
           renewal_link_short_url: string | null
           renewal_link_status: string | null
           renewal_notes: string | null
+          renewal_order_no: string | null
           renewal_paid_at: string | null
           renewal_payment_reference: string | null
           seat_rate: number
@@ -104,6 +105,7 @@ export type Database = {
           trial_link_seats: number
           trial_link_short_url: string | null
           trial_link_status: string | null
+          trial_order_no: string | null
           trial_paid_at: string | null
           trial_payment_reference: string | null
           trial_starts_at: string | null
@@ -139,6 +141,7 @@ export type Database = {
           renewal_link_short_url?: string | null
           renewal_link_status?: string | null
           renewal_notes?: string | null
+          renewal_order_no?: string | null
           renewal_paid_at?: string | null
           renewal_payment_reference?: string | null
           seat_rate?: number
@@ -159,6 +162,7 @@ export type Database = {
           trial_link_seats?: number
           trial_link_short_url?: string | null
           trial_link_status?: string | null
+          trial_order_no?: string | null
           trial_paid_at?: string | null
           trial_payment_reference?: string | null
           trial_starts_at?: string | null
@@ -194,6 +198,7 @@ export type Database = {
           renewal_link_short_url?: string | null
           renewal_link_status?: string | null
           renewal_notes?: string | null
+          renewal_order_no?: string | null
           renewal_paid_at?: string | null
           renewal_payment_reference?: string | null
           seat_rate?: number
@@ -214,6 +219,7 @@ export type Database = {
           trial_link_seats?: number
           trial_link_short_url?: string | null
           trial_link_status?: string | null
+          trial_order_no?: string | null
           trial_paid_at?: string | null
           trial_payment_reference?: string | null
           trial_starts_at?: string | null
@@ -2150,6 +2156,7 @@ export type Database = {
           gst_pct: number
           id: string
           link_id: string | null
+          order_no: string | null
           paid_at: string | null
           payment_reference: string | null
           per_seat_rate: number
@@ -2172,6 +2179,7 @@ export type Database = {
           gst_pct?: number
           id?: string
           link_id?: string | null
+          order_no?: string | null
           paid_at?: string | null
           payment_reference?: string | null
           per_seat_rate?: number
@@ -2194,6 +2202,7 @@ export type Database = {
           gst_pct?: number
           id?: string
           link_id?: string | null
+          order_no?: string | null
           paid_at?: string | null
           payment_reference?: string | null
           per_seat_rate?: number
@@ -2804,6 +2813,7 @@ export type Database = {
       }
       mark_notifications_read: { Args: { _ids?: string[] }; Returns: number }
       mark_stalled_accounts: { Args: never; Returns: number }
+      next_payment_order_no: { Args: never; Returns: string }
       renew_subscription: {
         Args: {
           _account_id: string
