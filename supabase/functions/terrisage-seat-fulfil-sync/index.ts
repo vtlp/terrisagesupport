@@ -1,7 +1,12 @@
 // Pushes the new absolute seat allocation to Terrisage CRM after a seat
 // request has been fulfilled on Support.
 //
-// Calls: POST /api/integrations/seats/seat-allocation
+// Flow:
+//   1. GET  /api/integrations/seats/seat-snapshot      (read CRM baseline)
+//   2. newAllocatedTotal = CRM.allocatedSeats + requested_seats
+//   3. UPDATE local account_billing_settings.seats_purchased = newAllocatedTotal
+//   4. POST /api/integrations/seats/seat-allocation    (push absolute total)
+//
 // Cycle metadata is pushed separately by `terrisage-seat-cycle-sync` whenever
 // the billing cycle dates are saved on the BillingTab.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
@@ -24,6 +29,7 @@ Deno.serve(async (req) => {
 
   try {
     const { accountId, requestId } = (await req.json().catch(() => ({}))) as Body;
+    console.log("[terrisage-seat-fulfil-sync] invoked", { accountId, requestId });
     if (!accountId) return json({ error: "accountId required" }, 400);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -47,21 +53,80 @@ Deno.serve(async (req) => {
       return json({ pushed: false, reason: "INTEGRATION_NOT_CONFIGURED" }, 200);
     }
 
-    const { data: bs, error: bsErr } = await supabase
-      .from("account_billing_settings")
-      .select("seats_purchased")
-      .eq("account_id", accountId)
-      .maybeSingle();
-    if (bsErr) return json({ error: bsErr.message }, 500);
-    if (!bs) return json({ pushed: false, reason: "NO_BILLING_SETTINGS" }, 200);
+    // Look up the seat request to know how many seats were requested.
+    let requestedSeats = 0;
+    if (requestId) {
+      const { data: sr, error: srErr } = await supabase
+        .from("seat_requests")
+        .select("requested_seats")
+        .eq("id", requestId)
+        .maybeSingle();
+      if (srErr) return json({ error: srErr.message }, 500);
+      requestedSeats = Number(sr?.requested_seats ?? 0);
+    }
+    if (!Number.isFinite(requestedSeats) || requestedSeats < 0) {
+      return json({ pushed: false, reason: "INVALID_REQUESTED_SEATS" }, 200);
+    }
 
-    const newAllocatedTotal = Number(bs.seats_purchased ?? 0);
-    if (!Number.isFinite(newAllocatedTotal) || newAllocatedTotal < 0) {
-      return json({ pushed: false, reason: "INVALID_SEAT_TOTAL" }, 200);
+    // Step 1: Sync down — read current allocatedSeats from Terrisage.
+    const snapshotUrl =
+      BASE_URL.replace(/\/$/, "") +
+      `/api/integrations/seats/seat-snapshot?tenantId=${encodeURIComponent(acct.tenant_id)}`;
+    console.log("[terrisage-seat-fulfil-sync] fetching CRM snapshot", { snapshotUrl });
+
+    let crmAllocated = 0;
+    try {
+      const snapRes = await fetch(snapshotUrl, {
+        method: "GET",
+        headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+      });
+      const snapText = await snapRes.text();
+      if (!snapRes.ok) {
+        console.warn("[terrisage-seat-fulfil-sync] snapshot upstream error", {
+          status: snapRes.status,
+          body: snapText.slice(0, 300),
+        });
+        return json(
+          {
+            pushed: false,
+            reason: "SNAPSHOT_UPSTREAM_ERROR",
+            status: snapRes.status,
+            detail: snapText.slice(0, 500),
+          },
+          200,
+        );
+      }
+      const snap = snapText ? JSON.parse(snapText) : {};
+      crmAllocated = Number(snap?.allocatedSeats ?? snap?.allocated ?? 0);
+      console.log("[terrisage-seat-fulfil-sync] CRM baseline", { crmAllocated });
+    } catch (e) {
+      return json(
+        { pushed: false, reason: "SNAPSHOT_UNREACHABLE", detail: String(e) },
+        200,
+      );
+    }
+
+    if (!Number.isFinite(crmAllocated) || crmAllocated < 0) crmAllocated = 0;
+
+    // Step 2: New absolute total = CRM baseline + requested.
+    const newAllocatedTotal = crmAllocated + requestedSeats;
+    console.log("[terrisage-seat-fulfil-sync] computed new total", {
+      crmAllocated,
+      requestedSeats,
+      newAllocatedTotal,
+    });
+
+    // Step 3: Update local seats_purchased to stay in sync with CRM.
+    const { error: bsErr } = await supabase
+      .from("account_billing_settings")
+      .update({ seats_purchased: newAllocatedTotal })
+      .eq("account_id", accountId);
+    if (bsErr) {
+      console.error("[terrisage-seat-fulfil-sync] local update failed", bsErr);
+      return json({ error: bsErr.message }, 500);
     }
 
     // Fetch invoiceRef from the paid upsell link tied to this seat request.
-    // Fulfilment only runs after payment, so a payment_reference should exist.
     let invoiceRef: string | null = null;
     if (requestId) {
       const { data: upsell } = await supabase
@@ -84,6 +149,7 @@ Deno.serve(async (req) => {
         ? `fulfil-${accountId}-${requestId}`
         : `fulfil-${accountId}-${newAllocatedTotal}-${Date.now()}`;
 
+    // Step 4: Push the new absolute seat total.
     const url =
       BASE_URL.replace(/\/$/, "") + `/api/integrations/seats/seat-allocation`;
 
@@ -93,6 +159,8 @@ Deno.serve(async (req) => {
       idempotencyKey: idemKey,
     };
     if (invoiceRef) payload.invoiceRef = invoiceRef;
+
+    console.log("[terrisage-seat-fulfil-sync] pushing allocation", { url, payload });
 
     let upstream: Response;
     try {
@@ -127,6 +195,8 @@ Deno.serve(async (req) => {
     return json({
       pushed: true,
       tenantId: acct.tenant_id,
+      crmAllocatedBefore: crmAllocated,
+      requestedSeats,
       newAllocatedTotal,
       response: safeParse(text),
     });
