@@ -174,7 +174,7 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
       } else if (data && data.pushed === false) {
         toast.warning(`Seat allocation not synced (${data.reason ?? 'unknown'})`);
       } else {
-        toast.success(`Terrisage updated: allocated = ${data?.afterAllocated ?? '?'}`);
+        toast.success(`Terrisage updated: allocated = ${data?.newAllocatedTotal ?? '?'} (was ${data?.crmAllocatedBefore ?? '?'}, +${data?.requestedSeats ?? '?'})`);
       }
     } catch (e) {
       toast.warning(`Terrisage sync failed: ${String(e)}`);
