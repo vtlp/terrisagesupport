@@ -77,6 +77,19 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const [requestPage, setRequestPage] = useState(1);
   const PAGE_SIZE = 5;
 
+  type CrmAgent = {
+    id: string | null;
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    status: string;
+    permissions: string[];
+  };
+  const [crmAgents, setCrmAgents] = useState<CrmAgent[] | null>(null);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
+
   const members = getTeamMembers(onboardingPayload);
 
   const load = useCallback(async () => {
@@ -114,8 +127,26 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
     }
   }, [accountId, tenantId]);
 
+  const loadAgents = useCallback(async () => {
+    if (!tenantId) { setCrmAgents(null); return; }
+    setAgentsLoading(true);
+    setAgentsError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('terrisage-tenant-agents', {
+        body: { accountId },
+      });
+      if (error) { setAgentsError(error.message); setCrmAgents(null); return; }
+      const d = data as { linked?: boolean; reason?: string; agents?: CrmAgent[] } | null;
+      if (!d?.linked) { setAgentsError(d?.reason ?? 'Not linked'); setCrmAgents(null); return; }
+      setCrmAgents(d.agents ?? []);
+    } finally {
+      setAgentsLoading(false);
+    }
+  }, [accountId, tenantId]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => { syncFromCrm(); }, [syncFromCrm]);
+  useEffect(() => { loadAgents(); }, [loadAgents]);
 
   const setStatus = async (id: string, status: Status) => {
     setBusyId(id);
@@ -229,50 +260,67 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         </CardContent>
       </Card>
 
-      {/* Members from CRM (dummy data — Terrisage CRM not connected yet) */}
+      {/* Members from Terrisage CRM (live) */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Members from Terrisage CRM</CardTitle>
-          <Badge variant="outline" className="text-[10px] border-warning/40 bg-warning/10 text-warning">
-            Dummy data · CRM not connected
-          </Badge>
+          <div className="flex items-center gap-2">
+            {crmAgents !== null ? (
+              <Badge variant="outline" className="text-[10px]">{crmAgents.length} member(s)</Badge>
+            ) : agentsError ? (
+              <Badge variant="outline" className="text-[10px] border-warning/40 bg-warning/10 text-warning">
+                {agentsError}
+              </Badge>
+            ) : null}
+            <Button size="sm" variant="outline" disabled={agentsLoading || !tenantId} onClick={loadAgents}>
+              {agentsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Refresh'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {(() => {
-            const allMembers = [
-              { name: 'Aarav Sharma', email: 'aarav@example.in', phone: '+91 98765 43210', role: 'Super User', status: 'ACTIVE', permissions: [] as string[] },
-              { name: 'Priya Iyer', email: 'priya@example.in', phone: '+91 98123 45678', role: 'Manager', status: 'ACTIVE', permissions: ['Org-wide access'] },
-              { name: 'Rohan Mehta', email: 'rohan@example.in', phone: '+91 99887 76655', role: 'Agent', status: 'INVITED', permissions: ['Agent networks'] },
-            ];
-            const totalPages = Math.max(1, Math.ceil(allMembers.length / PAGE_SIZE));
+          {agentsLoading && crmAgents === null ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin" /></div>
+          ) : crmAgents === null || crmAgents.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {!tenantId ? 'Account not linked to Terrisage CRM.' : (crmAgents?.length === 0 ? 'No members returned by CRM.' : 'Members unavailable.')}
+            </p>
+          ) : (() => {
+            const totalPages = Math.max(1, Math.ceil(crmAgents.length / PAGE_SIZE));
             const page = Math.min(memberPage, totalPages);
-            const pageMembers = allMembers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+            const pageMembers = crmAgents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
             return (
               <>
                 <div className="space-y-1.5">
                   {pageMembers.map((m, idx) => {
-                    const isSuper = m.role === 'Super User';
+                    const role = (m.role || '').toUpperCase();
+                    const status = (m.status || '').toUpperCase();
+                    const isSuper = role === 'SUPER_USER' || role === 'OWNER' || role === 'ADMIN';
+                    const isActive = status === 'ACTIVE';
                     return (
-                      <div key={idx} className="flex items-center justify-between border rounded px-3 py-2 gap-2 flex-wrap">
+                      <div key={m.id ?? idx} className="flex items-center justify-between border rounded px-3 py-2 gap-2 flex-wrap">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm truncate">{m.name}</span>
-                            <span className="text-xs text-muted-foreground truncate">{m.email}</span>
-                            <span className="text-xs text-muted-foreground">· {m.phone}</span>
+                            <span className="font-medium text-sm truncate">{m.name || '—'}</span>
+                            {m.email && <span className="text-xs text-muted-foreground truncate">{m.email}</span>}
+                            {m.phone && <span className="text-xs text-muted-foreground">· {m.phone}</span>}
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                            <Badge className={`text-[10px] ${isSuper ? 'bg-success/15 text-success border-success/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
-                              {m.role}
-                            </Badge>
-                            <Badge variant="outline" className={`text-[10px] ${m.status === 'ACTIVE' ? 'bg-accent/10 text-accent-foreground border-accent/30' : 'bg-warning/15 text-warning border-warning/30'}`}>
-                              {m.status}
-                            </Badge>
+                            {m.role && (
+                              <Badge className={`text-[10px] ${isSuper ? 'bg-success/15 text-success border-success/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
+                                {m.role}
+                              </Badge>
+                            )}
+                            {m.status && (
+                              <Badge variant="outline" className={`text-[10px] ${isActive ? 'bg-accent/10 text-accent-foreground border-accent/30' : 'bg-warning/15 text-warning border-warning/30'}`}>
+                                {m.status}
+                              </Badge>
+                            )}
                             {m.permissions.length > 0 ? (
                               m.permissions.map((p, i) => (
                                 <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">{p}</Badge>
                               ))
                             ) : (
-                              <Badge variant="outline" className="text-[10px] border-success/30 bg-success/10 text-success">All permissions</Badge>
+                              <Badge variant="outline" className="text-[10px] border-muted bg-muted/30 text-muted-foreground">No extra permissions</Badge>
                             )}
                           </div>
                         </div>
@@ -280,9 +328,9 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
                     );
                   })}
                 </div>
-                {allMembers.length > PAGE_SIZE && (
+                {crmAgents.length > PAGE_SIZE && (
                   <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-                    <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, allMembers.length)} of {allMembers.length}</span>
+                    <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, crmAgents.length)} of {crmAgents.length}</span>
                     <div className="flex gap-1">
                       <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setMemberPage(p => p - 1)}>Prev</Button>
                       <Button size="sm" variant="outline" disabled={page === totalPages} onClick={() => setMemberPage(p => p + 1)}>Next</Button>
