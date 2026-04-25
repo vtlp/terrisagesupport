@@ -135,8 +135,17 @@ export default function AccountDetail() {
     });
   };
 
+  const allChecklistDone = useMemo(
+    () => checklist.length > 0 && checklist.every(c => c.is_done),
+    [checklist]
+  );
+
   const save = async () => {
     if (!draft || !acc) return;
+    if (draft.status === 'LIVE' && acc.status !== 'LIVE' && !allChecklistDone) {
+      toast.error('Complete all onboarding tasks before going Live');
+      return;
+    }
     setSaving(true);
     const { error } = await supabase.from('accounts').update({
       account_name: draft.account_name, city: draft.city, status: draft.status, tenancy_type: draft.tenancy_type,
@@ -286,9 +295,22 @@ export default function AccountDetail() {
                       <Select value={draft.status} onValueChange={v => setField('status', v as Status)}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {(Object.keys(statusLabels) as Status[]).map(s => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
+                          {(Object.keys(statusLabels) as Status[]).map(s => (
+                            <SelectItem
+                              key={s}
+                              value={s}
+                              disabled={s === 'LIVE' && acc?.status !== 'LIVE' && !allChecklistDone}
+                            >
+                              {statusLabels[s]}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      {acc?.status !== 'LIVE' && !allChecklistDone && (
+                        <p className="text-xs text-muted-foreground">
+                          Complete all onboarding tasks to enable Live.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <Label>City</Label>
