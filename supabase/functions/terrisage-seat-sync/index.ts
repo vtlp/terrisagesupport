@@ -46,10 +46,11 @@ Deno.serve(async (req) => {
       return json({ linked: false, reason: "INTEGRATION_NOT_CONFIGURED" }, 200);
     }
 
-    // Call Terrisage to fetch current seat status for the tenant
+    // Call Terrisage to fetch current seat snapshot for the tenant.
+    // Spec: GET /api/integrations/seats/seat-snapshot?tenantId=<uuid>
     const url =
       BASE_URL.replace(/\/$/, "") +
-      `/api/integrations/seats/status?tenantId=${encodeURIComponent(
+      `/api/integrations/seats/seat-snapshot?tenantId=${encodeURIComponent(
         acct.tenant_id,
       )}`;
 
@@ -95,7 +96,27 @@ Deno.serve(async (req) => {
     const available = num(
       payload.availableSeats ?? payload.available ?? allocated - consumed - reserved,
     );
-    const members = Array.isArray(payload.members) ? payload.members : [];
+    // Extra fields exposed by /seat-snapshot — passed through on the snapshot members payload
+    // for downstream consumers without altering the existing column shape.
+    const invitableAvailable = num(
+      payload.invitableAvailableSeats ?? payload.invitable_available_seats ?? available,
+    );
+    const requested = num(payload.requestedSeats ?? payload.requested);
+    const cycleStart = (payload.seatBillingCycleStartAt as string | null) ?? null;
+    const cycleEnd = (payload.seatBillingCycleEndAt as string | null) ?? null;
+    const cycleFreq = (payload.seatBillingFrequency as string | null) ?? null;
+    const members = Array.isArray(payload.members)
+      ? payload.members
+      : [
+          {
+            __meta: true,
+            invitableAvailable,
+            requested,
+            seatBillingCycleStartAt: cycleStart,
+            seatBillingCycleEndAt: cycleEnd,
+            seatBillingFrequency: cycleFreq,
+          },
+        ];
 
     // Persist snapshot
     const { error: snapErr } = await supabase
