@@ -288,18 +288,19 @@ Deno.serve(async (req) => {
         trial_link_created_at: createdAtIso,
         trial_link_expires_at: expiresAtIso,
         trial_link_outdated: false,
+        trial_order_no: orderNo,
         trial_paid_at: null,
         trial_payment_reference: null,
       }).eq('account_id', body.account_id);
 
       await admin.from('account_notes').insert({
         account_id: body.account_id,
-        note_text: `[Trial] Conversion link generated ${fmtINR(body.total)} · ${payment.short_url}`,
+        note_text: `[Trial] Conversion link generated ${fmtINR(body.total)} · Order ${orderNo} · ${payment.short_url}`,
       });
       await admin.from('activity_log').insert({
         entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
-        summary: `[Trial] Conversion link generated ${fmtINR(body.total)}`,
-        details: { module: 'trial', link_id: payment.link_id, seats: body.seats, total: body.total },
+        summary: `[Trial] Conversion link generated ${fmtINR(body.total)} · ${orderNo}`,
+        details: { module: 'trial', order_no: orderNo, link_id: payment.link_id, seats: body.seats, total: body.total },
       });
 
       return new Response(JSON.stringify({ success: true, payment }), {
@@ -321,6 +322,7 @@ Deno.serve(async (req) => {
         total: body.total,
         link_id: payment.link_id,
         short_url: payment.short_url,
+        order_no: orderNo,
         status: 'CREATED',
         expires_at: expiresAtIso,
         created_by: user.id,
@@ -329,12 +331,12 @@ Deno.serve(async (req) => {
 
       await admin.from('account_notes').insert({
         account_id: body.account_id,
-        note_text: `[Seat upsell] Pro-rata link generated ${fmtINR(body.total)} for +${body.seats} seat(s) · ${payment.short_url}`,
+        note_text: `[Seat upsell] Pro-rata link generated ${fmtINR(body.total)} for +${body.seats} seat(s) · Order ${orderNo} · ${payment.short_url}`,
       });
       await admin.from('activity_log').insert({
         entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
-        summary: `[Seat upsell] Pro-rata link generated ${fmtINR(body.total)}`,
-        details: { module: 'seat_upsell', link_id: payment.link_id, seats: body.seats, total: body.total, seat_request_id: body.seat_request_id, upsell_link_id: inserted?.id },
+        summary: `[Seat upsell] Pro-rata link generated ${fmtINR(body.total)} · ${orderNo}`,
+        details: { module: 'seat_upsell', order_no: orderNo, link_id: payment.link_id, seats: body.seats, total: body.total, seat_request_id: body.seat_request_id, upsell_link_id: inserted?.id },
       });
 
       return new Response(JSON.stringify({ success: true, payment, upsell_link_id: inserted?.id }), {
