@@ -1,12 +1,9 @@
-// Combined Terrisage sync fired on Fulfil.
-// Pushes BOTH the new absolute seat allocation AND the current billing-cycle
-// metadata to Terrisage CRM in a single call from the client.
+// Pushes the new absolute seat allocation to Terrisage CRM after a seat
+// request has been fulfilled on Support.
 //
-// Calls (in order):
-//   1) POST /api/integrations/seats/seat-allocation   (absolute newAllocatedTotal)
-//   2) POST /api/integrations/seats/seat-cycle        (cycle window + frequency)
-//
-// Returns a per-step result so the UI can report partial success.
+// Calls: POST /api/integrations/seats/seat-allocation
+// Cycle metadata is pushed separately by `terrisage-seat-cycle-sync` whenever
+// the billing cycle dates are saved on the BillingTab.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
@@ -36,7 +33,6 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // 1. Resolve account + tenant
     const { data: acct, error: acctErr } = await supabase
       .from("accounts")
       .select("id, tenant_id")
@@ -51,139 +47,70 @@ Deno.serve(async (req) => {
       return json({ pushed: false, reason: "INTEGRATION_NOT_CONFIGURED" }, 200);
     }
 
-    // 2. Resolve billing settings (seat total + cycle)
     const { data: bs, error: bsErr } = await supabase
       .from("account_billing_settings")
-      .select(
-        "seats_purchased, billing_cycle, current_period_start, current_period_end",
-      )
+      .select("seats_purchased")
       .eq("account_id", accountId)
       .maybeSingle();
     if (bsErr) return json({ error: bsErr.message }, 500);
     if (!bs) return json({ pushed: false, reason: "NO_BILLING_SETTINGS" }, 200);
 
-    const base = BASE_URL.replace(/\/$/, "");
-    const result: Record<string, unknown> = {
-      tenantId: acct.tenant_id,
-      allocation: null,
-      cycle: null,
-    };
-
-    // ---- Step 1: seat-allocation (absolute) ----
     const newAllocatedTotal = Number(bs.seats_purchased ?? 0);
     if (!Number.isFinite(newAllocatedTotal) || newAllocatedTotal < 0) {
-      result.allocation = { pushed: false, reason: "INVALID_SEAT_TOTAL" };
-    } else {
-      const idemKey = requestId
-        ? `fulfil-${accountId}-${requestId}`
-        : `fulfil-${accountId}-${newAllocatedTotal}-${Date.now()}`;
-      try {
-        const r = await fetch(`${base}/api/integrations/seats/seat-allocation`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": API_KEY,
-          },
-          body: JSON.stringify({
-            tenantId: acct.tenant_id,
-            newAllocatedTotal,
-            idempotencyKey: idemKey,
-          }),
-        });
-        const text = await r.text();
-        result.allocation = r.ok
-          ? { pushed: true, newAllocatedTotal, response: safeParse(text) }
-          : {
-              pushed: false,
-              reason: "UPSTREAM_ERROR",
-              status: r.status,
-              detail: text.slice(0, 500),
-            };
-      } catch (e) {
-        result.allocation = {
+      return json({ pushed: false, reason: "INVALID_SEAT_TOTAL" }, 200);
+    }
+
+    const idemKey = requestId
+      ? `fulfil-${accountId}-${requestId}`
+      : `fulfil-${accountId}-${newAllocatedTotal}-${Date.now()}`;
+
+    const url =
+      BASE_URL.replace(/\/$/, "") + `/api/integrations/seats/seat-allocation`;
+
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": API_KEY,
+        },
+        body: JSON.stringify({
+          tenantId: acct.tenant_id,
+          newAllocatedTotal,
+          idempotencyKey: idemKey,
+        }),
+      });
+    } catch (e) {
+      return json(
+        { pushed: false, reason: "UPSTREAM_UNREACHABLE", detail: String(e) },
+        200,
+      );
+    }
+
+    const text = await upstream.text();
+    if (!upstream.ok) {
+      return json(
+        {
           pushed: false,
-          reason: "UPSTREAM_UNREACHABLE",
-          detail: String(e),
-        };
-      }
+          reason: "UPSTREAM_ERROR",
+          status: upstream.status,
+          detail: text.slice(0, 500),
+        },
+        200,
+      );
     }
 
-    // ---- Step 2: seat-cycle ----
-    const frequency = mapFrequency(bs.billing_cycle);
-    if (!frequency) {
-      result.cycle = {
-        pushed: false,
-        reason: "UNSUPPORTED_CYCLE",
-        cycle: bs.billing_cycle,
-      };
-    } else if (!bs.current_period_start || !bs.current_period_end) {
-      result.cycle = { pushed: false, reason: "NO_CYCLE_DATES" };
-    } else {
-      const start = new Date(bs.current_period_start).toISOString();
-      const end = new Date(bs.current_period_end).toISOString();
-      if (!(new Date(start) < new Date(end))) {
-        result.cycle = { pushed: false, reason: "INVALID_CYCLE_RANGE" };
-      } else {
-        try {
-          const r = await fetch(`${base}/api/integrations/seats/seat-cycle`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-API-Key": API_KEY,
-            },
-            body: JSON.stringify({
-              tenantId: acct.tenant_id,
-              seatBillingCycleStartAt: start,
-              seatBillingCycleEndAt: end,
-              seatBillingFrequency: frequency,
-            }),
-          });
-          const text = await r.text();
-          result.cycle = r.ok
-            ? {
-                pushed: true,
-                seatBillingCycleStartAt: start,
-                seatBillingCycleEndAt: end,
-                seatBillingFrequency: frequency,
-              }
-            : {
-                pushed: false,
-                reason: "UPSTREAM_ERROR",
-                status: r.status,
-                detail: text.slice(0, 500),
-              };
-        } catch (e) {
-          result.cycle = {
-            pushed: false,
-            reason: "UPSTREAM_UNREACHABLE",
-            detail: String(e),
-          };
-        }
-      }
-    }
-
-    const allocOk = (result.allocation as { pushed?: boolean })?.pushed === true;
-    const cycleOk = (result.cycle as { pushed?: boolean })?.pushed === true;
     return json({
-      ...result,
-      pushed: allocOk && cycleOk,
-      partial: allocOk !== cycleOk,
+      pushed: true,
+      tenantId: acct.tenant_id,
+      newAllocatedTotal,
+      response: safeParse(text),
     });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
 });
-
-function mapFrequency(cycle: string | null | undefined): string | null {
-  switch (cycle) {
-    case "HALF_YEARLY":
-      return "SIX_MONTH";
-    case "ANNUAL":
-      return "YEARLY";
-    default:
-      return null;
-  }
-}
 
 function safeParse(text: string): unknown {
   try {
