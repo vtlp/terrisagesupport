@@ -206,6 +206,30 @@ export function BillingTab({ accountId }: { accountId: string }) {
     setSavingSettings(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Billing settings saved');
+
+    // Push cycle metadata to Terrisage when the cycle window changed (or was
+    // first set). Best-effort: failures surface as a warning toast and do not
+    // block the save.
+    const cycleChanged =
+      payload.current_period_start !== savedSettings.current_period_start ||
+      currentEnd !== savedSettings.current_period_end ||
+      settings.billing_cycle !== savedSettings.billing_cycle;
+    if (cycleChanged && payload.current_period_start && currentEnd) {
+      try {
+        const { data, error: syncErr } = await supabase.functions.invoke(
+          'terrisage-seat-cycle-sync',
+          { body: { accountId } },
+        );
+        if (syncErr) {
+          toast.warning(`Terrisage cycle sync failed: ${syncErr.message}`);
+        } else if (data && data.pushed === false) {
+          toast.warning(`Cycle not synced (${data.reason ?? 'unknown'})`);
+        }
+      } catch (e) {
+        toast.warning(`Terrisage cycle sync failed: ${String(e)}`);
+      }
+    }
+
     load();
   };
 

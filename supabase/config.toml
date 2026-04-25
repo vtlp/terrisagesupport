@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.terrisage-usage-ingest]
 verify_jwt = false
+
+[functions.seat-request]
+verify_jwt = false

@@ -64,7 +64,8 @@ export function SeatRequestsTab({ accountId }: { accountId: string }) {
     if (error) { setBusyId(null); toast.error(error.message); return; }
     toast.success('Seats added and request fulfilled');
 
-    // Best-effort: push new seat total + cycle metadata to Terrisage in one call.
+    // Best-effort: push the new absolute seat total to Terrisage. Cycle metadata
+    // is pushed separately whenever the billing cycle dates are saved.
     try {
       const { data, error: syncErr } = await supabase.functions.invoke(
         'terrisage-seat-fulfil-sync',
@@ -72,15 +73,8 @@ export function SeatRequestsTab({ accountId }: { accountId: string }) {
       );
       if (syncErr) {
         toast.warning(`Terrisage sync failed: ${syncErr.message}`);
-      } else if (data) {
-        const alloc = data.allocation as { pushed?: boolean; reason?: string } | null;
-        const cycle = data.cycle as { pushed?: boolean; reason?: string } | null;
-        if (alloc && alloc.pushed === false) {
-          toast.warning(`Seat allocation not synced (${alloc.reason ?? 'unknown'})`);
-        }
-        if (cycle && cycle.pushed === false) {
-          toast.warning(`Seat cycle not synced (${cycle.reason ?? 'unknown'})`);
-        }
+      } else if (data && data.pushed === false) {
+        toast.warning(`Seat allocation not synced (${data.reason ?? 'unknown'})`);
       }
     } catch (e) {
       toast.warning(`Terrisage sync failed: ${String(e)}`);
