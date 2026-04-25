@@ -240,7 +240,7 @@ export function PaymentLinkDialog({
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar mode="single" selected={startDate}
-                    onSelect={(d) => d && setStartDate(d)} initialFocus
+                    onSelect={(d) => d && setStartDate(toUtcNoon(d))} initialFocus
                     className={cn('p-3 pointer-events-auto')} />
                 </PopoverContent>
               </Popover>
