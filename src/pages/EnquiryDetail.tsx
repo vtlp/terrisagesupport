@@ -68,6 +68,7 @@ interface PaymentInfo {
   outdated?: boolean;
   mode?: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST';
   trial?: { start?: string | null; end?: string | null };
+  subscription?: { start_at?: string | null; end_at?: string | null };
   email?: { last_drafted_at?: string; last_sent_at?: string; subject?: string; body?: string };
   breakdown?: Record<string, unknown>;
 }
