@@ -25,6 +25,15 @@ function addMonths(iso: string, months: number): string {
   d.setMonth(d.getMonth() + months);
   return d.toISOString();
 }
+
+// Convert a YYYY-MM-DD value (from <input type="date">) into an ISO timestamp
+// anchored at 12:00 UTC, so the calendar day stays stable across timezones.
+function dateInputToUtcNoonIso(value: string): string | null {
+  if (!value) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).toISOString();
+}
 type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE' | 'TRIAL';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 type InvoiceKind = 'CYCLE' | 'PRORATION' | 'RENEWAL';
