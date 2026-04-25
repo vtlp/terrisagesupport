@@ -27,6 +27,8 @@ interface Body {
 
 const MAX_SEATS = 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -80,7 +82,11 @@ Deno.serve(async (req) => {
       : null;
 
   const errors: string[] = [];
-  if (!tenantId) errors.push("tenantId is required");
+  if (!tenantId) {
+    errors.push("tenantId is required");
+  } else if (!UUID_RE.test(tenantId)) {
+    errors.push("tenantId must be a valid UUID");
+  }
   if (!idempotencyKey) errors.push("idempotencyKey is required");
   if (!requestedByEmail || !EMAIL_RE.test(requestedByEmail)) {
     errors.push("requestedByEmail must be a valid email");
