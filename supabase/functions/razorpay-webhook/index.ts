@@ -294,7 +294,7 @@ Deno.serve(async (req) => {
     if (purpose === 'SEAT_UPSELL' && accountIdNote && linkId) {
       const { data: link } = await admin
         .from('seat_upsell_links')
-        .select('id, seat_request_id, seats_extra, prorated_subtotal, gst_pct, gst_amount, total, status')
+        .select('id, seat_request_id, seats_extra, prorated_subtotal, gst_pct, gst_amount, total, status, order_no, days_remaining, days_in_cycle, per_seat_rate, short_url, created_at')
         .eq('account_id', accountIdNote)
         .eq('link_id', linkId)
         .maybeSingle();
@@ -314,16 +314,34 @@ Deno.serve(async (req) => {
           if (fulErr) console.error('fulfil_seat_request failed', fulErr);
         }
 
-        // Pull plan details for the invoice mirror.
+        // Pull plan + customer details for a self-contained invoice record.
         const { data: bs } = await admin.from('account_billing_settings')
           .select('plan_name, seat_rate, current_period_start, current_period_end, seats_purchased')
           .eq('account_id', accountIdNote).maybeSingle();
+        const { data: acct } = await admin.from('accounts')
+          .select('account_name, owner_name, owner_email, owner_phone')
+          .eq('id', accountIdNote).maybeSingle();
+
+        // Build a rich note containing every detail the upsell link held — once
+        // we mirror it onto the invoice we no longer surface upsell links in UI.
+        const upsellNote = [
+          `Razorpay seat upsell · +${link.seats_extra} seat(s)`,
+          link.order_no ? `Order ${link.order_no}` : null,
+          `Pro-rata ${link.days_remaining}/${link.days_in_cycle} days`,
+          `Per-seat ₹${Number(link.per_seat_rate ?? 0).toLocaleString('en-IN')}`,
+          `Link ${linkId}`,
+          link.short_url ? `URL ${link.short_url}` : null,
+          acct?.owner_name ? `Customer ${acct.owner_name}` : null,
+          acct?.owner_email ? `Email ${acct.owner_email}` : null,
+          acct?.owner_phone ? `Phone ${acct.owner_phone}` : null,
+        ].filter(Boolean).join(' · ');
 
         await admin.from('account_invoices').insert({
           account_id: accountIdNote,
+          invoice_no: link.order_no ?? null,
           plan_name: bs?.plan_name ?? 'Standard',
           seat_count: link.seats_extra,
-          seat_rate: Number(bs?.seat_rate ?? 0),
+          seat_rate: Number(link.per_seat_rate ?? bs?.seat_rate ?? 0),
           base_fee: 0,
           subtotal: Number(link.prorated_subtotal),
           gst_pct: Number(link.gst_pct),
@@ -335,7 +353,7 @@ Deno.serve(async (req) => {
           paid_at: nowIso,
           period_from: bs?.current_period_start ? new Date(bs.current_period_start).toISOString().substring(0, 10) : null,
           period_to: bs?.current_period_end ? new Date(bs.current_period_end).toISOString().substring(0, 10) : null,
-          notes: `Razorpay seat upsell · +${link.seats_extra} seat(s) · ${linkId}`,
+          notes: upsellNote,
         });
 
         await admin.from('seat_change_events').insert({
