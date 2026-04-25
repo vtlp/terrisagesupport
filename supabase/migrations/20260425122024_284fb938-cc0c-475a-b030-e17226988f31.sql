@@ -1,0 +1,2 @@
+ALTER TABLE public.seat_requests DROP CONSTRAINT IF EXISTS seat_requests_requested_seats_check;
+ALTER TABLE public.seat_requests ADD CONSTRAINT seat_requests_requested_seats_check CHECK (requested_seats >= 0);
