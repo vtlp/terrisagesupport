@@ -69,6 +69,15 @@ const ROLES = ['Admin', 'Manager', 'Agent'];
 export default function AccountDetail() {
   const { accountId } = useParams<{ accountId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const VALID_TABS = ['overview','seats','checklist','verification','billing','projects','documents','imports','notes','calendar','activity'];
+  const tabParam = searchParams.get('tab');
+  const activeTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'overview';
+  const handleTabChange = (v: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', v);
+    setSearchParams(next, { replace: true });
+  };
   const [acc, setAcc] = useState<Account | null>(null);
   const [draft, setDraft] = useState<Account | null>(null);
   const [seats, setSeats] = useState<Seat[]>([]);
