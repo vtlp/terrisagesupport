@@ -81,16 +81,16 @@ Deno.serve(async (req) => {
       abilities?: Record<string, unknown>;
     };
     const agents = (rawAgents as RawAgent[]).map((a) => {
-      const ab = a.abilities ?? {};
+      const ab = (a.abilities ?? {}) as Record<string, unknown>;
       const permissions: string[] = [];
-      if (ab.canAssign) permissions.push("Assign");
-      if (ab.canPublish) permissions.push("Publish");
-      if (ab.hasAgentNetworks) permissions.push("Agent networks");
-      if (ab.hasTeamManagement) permissions.push("Team mgmt");
-      if (ab.hasIntegrationsSetup) permissions.push("Integrations");
-      if (ab.hasBrandManagement) permissions.push("Brand");
-      if (ab.hasAnalytics) permissions.push("Analytics");
-      if (ab.hasSubscriptionManagement) permissions.push("Subscription");
+      const composite = String(ab.composite ?? "").toUpperCase();
+      const scope = String(ab.bestMatchScope ?? "").toUpperCase();
+      if (composite.includes("ORG_WIDE") || scope.includes("COMPANY_WIDE") || scope.includes("ORG")) {
+        permissions.push("Organisation wide");
+      }
+      if (ab.hasAgentNetworks || composite.includes("AGENT") || scope.includes("AGENT")) {
+        permissions.push("Agent network");
+      }
       return {
         id: a.id ?? null,
         name: a.name ?? "",
