@@ -187,11 +187,121 @@ Let us know if you need one.
 
 ---
 
-## 9. Open questions for Terrisage
+## 9. Open questions for Terrisage CRM
 
-- Confirm the exact shape of `tenantId` Terrisage will send — must be
-  byte-identical to what was provisioned on Support.
-- Confirm whether Terrisage wants a callback / webhook on **rejection** as
-  well as on fulfilment.
-- Confirm the source IP range Terrisage will call from, in case Support
-  needs to allow-list later.
+- Confirm the exact shape of `tenantId` Terrisage CRM will send — must be
+  byte-identical to what was provisioned on Terrisage Support.
+  (`tenant_id` is set on the Terrisage Support account when the first logins
+  are created on Terrisage CRM.)
+- Confirm whether Terrisage CRM wants a callback / webhook on **rejection**
+  as well as on fulfilment.
+- Confirm the source IP range Terrisage CRM will call from, in case Terrisage
+  Support needs to allow-list later.
+
+---
+
+## 10. Outbound endpoints — Terrisage Support to Terrisage CRM
+
+These three endpoints live on **Terrisage CRM** and are called by **Terrisage
+Support**. Endpoints 10.1 and 10.2 are **already built on Terrisage CRM** and
+in active use. Endpoint 10.3 (live capacity pull) is planned for a later
+phase.
+
+**Common to all three**
+
+```
+Base URL : {TERRISAGE_BASE_URL}                 (env var on Terrisage Support)
+Auth     : X-API-Key: <shared secret>           (same key as the inbound webhook)
+Content  : application/json; charset=utf-8
+```
+
+Terrisage Support treats every call as best-effort: a non-2xx response is
+logged and surfaced as a warning toast in the UI but never blocks the user.
+
+---
+
+### 10.1 `POST /api/integrations/seats/seat-cycle` — billing cycle push ✅ built
+
+**When Terrisage Support calls it:** every time a Support admin saves the
+billing cycle dates on the Account → Billing tab (cycle start, cycle end,
+or billing frequency change).
+
+**Request body**
+
+```json
+{
+  "tenantId": "c39aa7cf-b452-4235-bdcb-0fc3a62fbf18",
+  "seatBillingCycleStartAt": "2026-04-01T12:00:00.000Z",
+  "seatBillingCycleEndAt":   "2027-04-01T12:00:00.000Z",
+  "seatBillingFrequency":    "YEARLY"
+}
+```
+
+| Field                     | Type                       | Notes |
+|---------------------------|----------------------------|-------|
+| `tenantId`                | string (UUID)              | Must match the tenant provisioned on Terrisage CRM. |
+| `seatBillingCycleStartAt` | ISO 8601 timestamp (UTC)   | Inclusive start of current billing window. |
+| `seatBillingCycleEndAt`   | ISO 8601 timestamp (UTC)   | Exclusive end; always strictly greater than start. |
+| `seatBillingFrequency`    | enum                       | `"SIX_MONTH"` or `"YEARLY"`. (Monthly / quarterly cycles are not pushed.) |
+
+**Expected response:** `200 OK` with any JSON body (Terrisage Support only
+checks the HTTP status). Non-2xx is treated as a soft failure.
+
+---
+
+### 10.2 `POST /api/integrations/seats/seat-allocation` — fulfilment callback ✅ built
+
+**When Terrisage Support calls it:** immediately after a Support admin clicks
+**Fulfil** on a seat request (the request that originally arrived via the
+inbound webhook in §1–§7).
+
+**Request body**
+
+```json
+{
+  "tenantId": "c39aa7cf-b452-4235-bdcb-0fc3a62fbf18",
+  "newAllocatedTotal": 12,
+  "idempotencyKey": "fulfil-<accountId>-<seatRequestId>"
+}
+```
+
+| Field               | Type           | Notes |
+|---------------------|----------------|-------|
+| `tenantId`          | string (UUID)  | Same tenant as the original request. |
+| `newAllocatedTotal` | integer ≥ 0    | The **new absolute** seat total on the account, not a delta. |
+| `idempotencyKey`    | string ≤ 128   | Stable per fulfilment. Safe-retry key — Terrisage CRM should ignore duplicates. |
+
+**Expected response:** `200 OK`. Terrisage CRM should set the tenant's seat
+cap to `newAllocatedTotal`. Duplicate `idempotencyKey` → no-op `200`.
+
+---
+
+### 10.3 `GET /api/integrations/seats/seat-capacity?tenantId=<uuid>` — live capacity pull ⏳ planned
+
+Not yet wired on Terrisage Support — to be built in a later phase. Spec
+included here so both sides can plan for it.
+
+**When Terrisage Support will call it:** when a Support agent opens the Seats
+tab and clicks **Sync from CRM**, to refresh the live seat usage shown next
+to the allocated total.
+
+**Expected response (200)**
+
+```json
+{
+  "tenantId": "c39aa7cf-b452-4235-bdcb-0fc3a62fbf18",
+  "allocatedTotal": 12,
+  "activeSeats": 9,
+  "deletedInCycle": 1
+}
+```
+
+| Field            | Type          | Notes |
+|------------------|---------------|-------|
+| `allocatedTotal` | integer ≥ 0  | Current cap stored on Terrisage CRM (should match `newAllocatedTotal` from the last 10.2 call). |
+| `activeSeats`    | integer ≥ 0  | Seats currently in active use by the tenant. |
+| `deletedInCycle` | integer ≥ 0  | Seats deleted within the current billing cycle (used by Support for renewal sizing). |
+
+**Errors**
+- `404` if `tenantId` is unknown to Terrisage CRM.
+- `401` if the `X-API-Key` is wrong.
