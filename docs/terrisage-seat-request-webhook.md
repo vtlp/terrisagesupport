@@ -45,13 +45,14 @@ Headers sent by Terrisage:
 
 ```
 Content-Type: application/json
-X-API-Key: <SUPPORT_SEAT_REQUEST_API_KEY>
+X-API-Key: b7f3e9a14c8d265f0a91e7b3c6d4582a91ef03b7d8c526a9418f0e3b2d7a64c1
 X-Idempotency-Key: seat-request-<seatRequestId>
 ```
 
-- `X-API-Key` value is the shared
-  `SUPPORT_SEAT_REQUEST_API_KEY` / `SEAT_SUPPORT_INTEGRATION_API_KEY` secret
-  agreed between Terrisage and Support.
+- `X-API-Key` value is the shared secret issued by Support
+  (stored on the Support backend as `SEAT_SUPPORT_INTEGRATION_API_KEY`).
+  Current value: `b7f3e9a14c8d265f0a91e7b3c6d4582a91ef03b7d8c526a9418f0e3b2d7a64c1`.
+  Treat as a secret — store in Terrisage's secret manager, do not commit to git.
 - Requests without the header, or with a wrong key, will get `401 Unauthorized`.
 - `X-Idempotency-Key` header **must** match `idempotencyKey` in the body.
 
