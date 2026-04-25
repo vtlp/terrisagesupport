@@ -82,8 +82,46 @@ Deno.serve(async (req) => {
           details: { module: 'trial', link_id: linkId },
         });
       } else if (purpose === 'SEAT_UPSELL' && accountIdNote && linkId) {
+        const { data: link } = await admin
+          .from('seat_upsell_links')
+          .select('id, seats_extra, prorated_subtotal, gst_pct, gst_amount, total')
+          .eq('account_id', accountIdNote).eq('link_id', linkId).maybeSingle();
+
         await admin.from('seat_upsell_links').update({ status: newStatus })
           .eq('account_id', accountIdNote).eq('link_id', linkId);
+
+        // Mirror a FAILED invoice so finance has a record of the failed/cancelled
+        // attempt (dedupe by link id in notes).
+        if (link) {
+          const { data: existing } = await admin
+            .from('account_invoices').select('id')
+            .eq('account_id', accountIdNote)
+            .ilike('notes', `%${linkId}%`)
+            .limit(1).maybeSingle();
+          if (!existing) {
+            const { data: bs } = await admin.from('account_billing_settings')
+              .select('plan_name, seat_rate, current_period_start, current_period_end')
+              .eq('account_id', accountIdNote).maybeSingle();
+            await admin.from('account_invoices').insert({
+              account_id: accountIdNote,
+              plan_name: bs?.plan_name ?? 'Standard',
+              seat_count: link.seats_extra,
+              seat_rate: Number(bs?.seat_rate ?? 0),
+              base_fee: 0,
+              subtotal: Number(link.prorated_subtotal),
+              gst_pct: Number(link.gst_pct),
+              gst_amount: Number(link.gst_amount),
+              total: Number(link.total),
+              status: 'FAILED',
+              kind: 'PRORATION',
+              issued_at: nowIso,
+              period_from: bs?.current_period_start ? new Date(bs.current_period_start).toISOString().substring(0, 10) : null,
+              period_to: bs?.current_period_end ? new Date(bs.current_period_end).toISOString().substring(0, 10) : null,
+              notes: `Razorpay seat upsell ${newStatus.toLowerCase()} · +${link.seats_extra} seat(s) · ${linkId}`,
+            });
+          }
+        }
+
         await admin.from('activity_log').insert({
           entity_type: 'ACCOUNT', entity_id: accountIdNote, event_type: 'FIELD_EDIT',
           summary: `[Seat upsell] Link ${newStatus.toLowerCase()} (Razorpay)`,
