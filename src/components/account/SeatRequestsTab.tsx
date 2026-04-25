@@ -61,9 +61,25 @@ export function SeatRequestsTab({ accountId }: { accountId: string }) {
   const fulfil = async (id: string) => {
     setBusyId(id);
     const { error } = await supabase.rpc('fulfil_seat_request', { _request_id: id });
-    setBusyId(null);
-    if (error) { toast.error(error.message); return; }
+    if (error) { setBusyId(null); toast.error(error.message); return; }
     toast.success('Seats added and request fulfilled');
+
+    // Best-effort: push updated billing cycle metadata to Terrisage CRM.
+    try {
+      const { data, error: cycleErr } = await supabase.functions.invoke(
+        'terrisage-seat-cycle-sync',
+        { body: { accountId } },
+      );
+      if (cycleErr) {
+        toast.warning(`Seat cycle not synced to Terrisage: ${cycleErr.message}`);
+      } else if (data && data.pushed === false) {
+        toast.warning(`Seat cycle not synced to Terrisage (${data.reason ?? 'unknown'})`);
+      }
+    } catch (e) {
+      toast.warning(`Seat cycle sync failed: ${String(e)}`);
+    }
+
+    setBusyId(null);
     load();
   };
 
