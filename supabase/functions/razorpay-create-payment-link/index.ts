@@ -257,14 +257,19 @@ Deno.serve(async (req) => {
         renewal_link_created_at: createdAtIso,
         renewal_link_expires_at: expiresAtIso,
         renewal_link_outdated: false,
+        renewal_order_no: orderNo,
         renewal_paid_at: null,
         renewal_payment_reference: null,
       }).eq('account_id', body.account_id);
 
+      await admin.from('account_notes').insert({
+        account_id: body.account_id,
+        note_text: `[Renewal] Payment link generated ${fmtINR(body.total)} · Order ${orderNo} · ${payment.short_url}`,
+      });
       await admin.from('activity_log').insert({
         entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
-        summary: `[Renewal] Payment link generated ${fmtINR(body.total)}`,
-        details: { module: 'renewal', link_id: payment.link_id, seats: body.seats, total: body.total },
+        summary: `[Renewal] Payment link generated ${fmtINR(body.total)} · ${orderNo}`,
+        details: { module: 'renewal', order_no: orderNo, link_id: payment.link_id, seats: body.seats, total: body.total },
       });
 
       return new Response(JSON.stringify({ success: true, payment }), {
