@@ -54,7 +54,7 @@ X-API-Key: <SEAT_SUPPORT_INTEGRATION_API_KEY>
 
 ```json
 {
-  "tenantId": "tenant-abc-123",
+  "tenantId": "8b1f3c2a-4d5e-6f70-8192-a3b4c5d6e7f8",
   "requestedSeats": 5,
   "requestedByEmail": "owner@acme.com",
   "reason": "Hiring 5 new agents for Mumbai branch",
@@ -65,7 +65,7 @@ X-API-Key: <SEAT_SUPPORT_INTEGRATION_API_KEY>
 
 | Field              | Type            | Required | Notes |
 |--------------------|-----------------|----------|-------|
-| `tenantId`         | string          | yes      | Must match `accounts.tenant_id` on Support. |
+| `tenantId`         | string (UUID v4) | yes     | Must match `accounts.tenant_id` on Support. Lowercase canonical UUID format (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`). |
 | `requestedSeats`   | integer ≥ 1     | yes      | Number of **additional** seats (delta, not new total). |
 | `requestedByEmail` | string (email)  | yes      | The Terrisage user who raised the request. |
 | `reason`           | string (≤ 500)  | no       | Optional free text shown to the support agent. |
