@@ -315,13 +315,9 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
                                 {m.status}
                               </Badge>
                             )}
-                            {m.permissions.length > 0 ? (
-                              m.permissions.map((p, i) => (
-                                <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">{p}</Badge>
-                              ))
-                            ) : (
-                              <Badge variant="outline" className="text-[10px] border-muted bg-muted/30 text-muted-foreground">No extra permissions</Badge>
-                            )}
+                            {m.permissions.map((p, i) => (
+                              <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">{p}</Badge>
+                            ))}
                           </div>
                         </div>
                       </div>
