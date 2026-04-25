@@ -238,46 +238,60 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
           </Badge>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {[
-              { name: 'Aarav Sharma', email: 'aarav@example.in', phone: '+91 98765 43210', role: 'Super User', status: 'ACTIVE', permissions: [] },
+          {(() => {
+            const allMembers = [
+              { name: 'Aarav Sharma', email: 'aarav@example.in', phone: '+91 98765 43210', role: 'Super User', status: 'ACTIVE', permissions: [] as string[] },
               { name: 'Priya Iyer', email: 'priya@example.in', phone: '+91 98123 45678', role: 'Manager', status: 'ACTIVE', permissions: ['Org-wide access'] },
               { name: 'Rohan Mehta', email: 'rohan@example.in', phone: '+91 99887 76655', role: 'Agent', status: 'INVITED', permissions: ['Agent networks'] },
-            ].map((m, idx) => {
-              const isSuper = m.role === 'Super User';
-              return (
-                <div key={idx} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{m.name}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {m.email} · {m.phone}
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                      <Badge className={`text-[10px] ${isSuper ? 'bg-success/15 text-success border-success/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
-                        Role: {m.role}
-                      </Badge>
-                      <Badge variant="outline" className={`text-[10px] ${m.status === 'ACTIVE' ? 'bg-accent/10 text-accent-foreground border-accent/30' : 'bg-warning/15 text-warning border-warning/30'}`}>
-                        Status: {m.status}
-                      </Badge>
-                      {m.permissions.length > 0 ? (
-                        m.permissions.map((p, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">
-                            Permission: {p}
-                          </Badge>
-                        ))
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] border-success/30 bg-success/10 text-success">
-                          All permissions
-                        </Badge>
-                      )}
+            ];
+            const totalPages = Math.max(1, Math.ceil(allMembers.length / PAGE_SIZE));
+            const page = Math.min(memberPage, totalPages);
+            const pageMembers = allMembers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+            return (
+              <>
+                <div className="space-y-1.5">
+                  {pageMembers.map((m, idx) => {
+                    const isSuper = m.role === 'Super User';
+                    return (
+                      <div key={idx} className="flex items-center justify-between border rounded px-3 py-2 gap-2 flex-wrap">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm truncate">{m.name}</span>
+                            <span className="text-xs text-muted-foreground truncate">{m.email}</span>
+                            <span className="text-xs text-muted-foreground">· {m.phone}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            <Badge className={`text-[10px] ${isSuper ? 'bg-success/15 text-success border-success/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
+                              {m.role}
+                            </Badge>
+                            <Badge variant="outline" className={`text-[10px] ${m.status === 'ACTIVE' ? 'bg-accent/10 text-accent-foreground border-accent/30' : 'bg-warning/15 text-warning border-warning/30'}`}>
+                              {m.status}
+                            </Badge>
+                            {m.permissions.length > 0 ? (
+                              m.permissions.map((p, i) => (
+                                <Badge key={i} variant="outline" className="text-[10px] border-accent/30 bg-accent/10 text-accent-foreground">{p}</Badge>
+                              ))
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] border-success/30 bg-success/10 text-success">All permissions</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {allMembers.length > PAGE_SIZE && (
+                  <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+                    <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, allMembers.length)} of {allMembers.length}</span>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setMemberPage(p => p - 1)}>Prev</Button>
+                      <Button size="sm" variant="outline" disabled={page === totalPages} onClick={() => setMemberPage(p => p + 1)}>Next</Button>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                )}
+              </>
+            );
+          })()}
         </CardContent>
       </Card>
 
