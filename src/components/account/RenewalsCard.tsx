@@ -67,9 +67,10 @@ export function RenewalsCard({ accountId }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, a] = await Promise.all([
+    const [s, a, su] = await Promise.all([
       supabase.from('account_billing_settings').select('*').eq('account_id', accountId).maybeSingle(),
       supabase.from('accounts').select('account_name, owner_name, owner_email, owner_phone').eq('id', accountId).maybeSingle(),
+      supabase.from('account_seats').select('full_name, email, phone').eq('account_id', accountId).eq('is_superuser', true).eq('is_active', true).order('created_at', { ascending: true }).limit(1).maybeSingle(),
     ]);
     if (s.data) {
       const r = s.data as unknown as RenewalState;
@@ -77,11 +78,12 @@ export function RenewalsCard({ accountId }: Props) {
       setDueDate(r.renewal_due_date ?? '');
       setNotes(r.renewal_notes ?? '');
     }
-    if (a.data) {
+    const superUser = su.data;
+    if (a.data || superUser) {
       setOwner({
-        name: a.data.owner_name ?? a.data.account_name ?? '',
-        email: a.data.owner_email,
-        phone: a.data.owner_phone,
+        name: superUser?.full_name ?? a.data?.owner_name ?? a.data?.account_name ?? '',
+        email: superUser?.email ?? a.data?.owner_email ?? null,
+        phone: superUser?.phone ?? a.data?.owner_phone ?? null,
       });
     }
     setLoading(false);
