@@ -125,9 +125,27 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const fulfil = async (id: string) => {
     setBusyId(id);
     const { error } = await supabase.rpc('fulfil_seat_request', { _request_id: id });
-    setBusyId(null);
-    if (error) { toast.error(error.message); return; }
+    if (error) { setBusyId(null); toast.error(error.message); return; }
     toast.success('Seats added and request fulfilled');
+
+    // Push the new absolute seat total to Terrisage (sync-down then push).
+    try {
+      const { data, error: syncErr } = await supabase.functions.invoke(
+        'terrisage-seat-fulfil-sync',
+        { body: { accountId, requestId: id } },
+      );
+      if (syncErr) {
+        toast.warning(`Terrisage sync failed: ${syncErr.message}`);
+      } else if (data && data.pushed === false) {
+        toast.warning(`Seat allocation not synced (${data.reason ?? 'unknown'})`);
+      } else {
+        toast.success(`Terrisage updated: allocated = ${data?.afterAllocated ?? '?'}`);
+      }
+    } catch (e) {
+      toast.warning(`Terrisage sync failed: ${String(e)}`);
+    }
+
+    setBusyId(null);
     load();
   };
 
