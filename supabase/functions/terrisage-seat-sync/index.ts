@@ -143,7 +143,12 @@ Deno.serve(async (req) => {
       consumed,
       reserved,
       available,
-      members_count: members.length,
+      invitableAvailable,
+      requested,
+      seatBillingCycleStartAt: cycleStart,
+      seatBillingCycleEndAt: cycleEnd,
+      seatBillingFrequency: cycleFreq,
+      members_count: Array.isArray(payload.members) ? payload.members.length : 0,
     });
   } catch (e) {
     return json({ error: String(e) }, 500);
