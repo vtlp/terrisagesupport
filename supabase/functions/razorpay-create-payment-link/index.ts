@@ -104,9 +104,16 @@ Deno.serve(async (req) => {
       const amountPaise = Math.round(body.total * 100);
       const auth = btoa(`${keyId}:${keySecret}`);
 
+      // Razorpay reference_id max 40 chars — use short id slices + base36 timestamp
+      const ts = Date.now().toString(36);
+      const shortId = (id?: string | null) => (id ?? '').replace(/-/g, '').slice(0, 12);
+      const purposeTag = purpose === 'INITIAL' ? 'ini'
+        : purpose === 'RENEWAL' ? 'ren'
+        : purpose === 'TRIAL_CONVERSION' ? 'trl'
+        : 'ups';
       const refId = purpose === 'INITIAL'
-        ? `enq_${body.enquiry_id}_${Date.now()}`
-        : `acc_${body.account_id}_${purpose.toLowerCase()}_${Date.now()}`;
+        ? `e_${shortId(body.enquiry_id)}_${ts}`
+        : `a_${shortId(body.account_id)}_${purposeTag}_${ts}`;
 
       const descSuffix = purpose === 'RENEWAL' ? ' · Renewal'
         : purpose === 'TRIAL_CONVERSION' ? ' · Trial conversion'
