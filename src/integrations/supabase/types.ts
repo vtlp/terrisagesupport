@@ -2898,7 +2898,13 @@ export type Database = {
         | "FAILED"
       import_type: "LISTINGS" | "LEADS" | "CONTACTS" | "OTHER"
       invoice_kind: "CYCLE" | "PRORATION" | "RENEWAL"
-      invoice_status: "DRAFT" | "SENT" | "PAID" | "OVERDUE" | "CANCELLED"
+      invoice_status:
+        | "DRAFT"
+        | "SENT"
+        | "PAID"
+        | "OVERDUE"
+        | "CANCELLED"
+        | "FAILED"
       marketing_channel_type:
         | "PAID"
         | "ORGANIC"
@@ -3172,7 +3178,14 @@ export const Constants = {
       ],
       import_type: ["LISTINGS", "LEADS", "CONTACTS", "OTHER"],
       invoice_kind: ["CYCLE", "PRORATION", "RENEWAL"],
-      invoice_status: ["DRAFT", "SENT", "PAID", "OVERDUE", "CANCELLED"],
+      invoice_status: [
+        "DRAFT",
+        "SENT",
+        "PAID",
+        "OVERDUE",
+        "CANCELLED",
+        "FAILED",
+      ],
       marketing_channel_type: [
         "PAID",
         "ORGANIC",
