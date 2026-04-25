@@ -187,6 +187,8 @@ Deno.serve(async (req) => {
     const payment = {
       link_id: rzpJson.id,
       short_url: rzpJson.short_url,
+      order_no: orderNo,
+      reference_id: orderNo,
       amount: body.total,
       currency: 'INR' as const,
       status: 'CREATED' as const,
