@@ -1,95 +1,207 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+// Inbound webhook called by Terrisage CRM when a tenant raises a request for
+// additional seats from inside their app. Creates a `seat_requests` row on
+// Support; the matching `seat-allocation` callback is fired separately when a
+// Support admin clicks **Fulfil**.
+//
+// Public endpoint. Authentication is via shared header:
+//   X-API-Key: <SEAT_SUPPORT_INTEGRATION_API_KEY>
+//
+// Contract: see docs/terrisage-seat-request-webhook.md
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-account-api-key',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-api-key",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-async function sha256Hex(input: string) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+interface Body {
+  tenantId?: unknown;
+  requestedSeats?: unknown;
+  requestedByEmail?: unknown;
+  reason?: unknown;
+  idempotencyKey?: unknown;
+  requestedAt?: unknown;
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+const MAX_SEATS = 1000;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const apiKey = req.headers.get('x-account-api-key');
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Missing x-account-api-key header' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
+  }
+
+  // ---- Auth ----
+  const apiKeyHeader =
+    req.headers.get("x-api-key") ?? req.headers.get("X-API-Key");
+  const expectedKey = Deno.env.get("SEAT_SUPPORT_INTEGRATION_API_KEY");
+  if (!expectedKey) {
+    return json({ ok: false, error: "INTEGRATION_NOT_CONFIGURED" }, 500);
+  }
+  if (!apiKeyHeader || apiKeyHeader !== expectedKey) {
+    return json({ ok: false, error: "UNAUTHORIZED" }, 401);
+  }
+
+  // ---- Parse body ----
+  let body: Body;
+  try {
+    body = (await req.json()) as Body;
+  } catch {
+    return json(
+      { ok: false, error: "INVALID_BODY", detail: "Body must be JSON" },
+      400,
+    );
+  }
+
+  const tenantId =
+    typeof body.tenantId === "string" ? body.tenantId.trim() : "";
+  const requestedSeats =
+    typeof body.requestedSeats === "number"
+      ? body.requestedSeats
+      : Number(body.requestedSeats);
+  const requestedByEmail =
+    typeof body.requestedByEmail === "string"
+      ? body.requestedByEmail.trim().toLowerCase()
+      : "";
+  const reason =
+    typeof body.reason === "string" ? body.reason.trim().slice(0, 500) : null;
+  const idempotencyKey =
+    typeof body.idempotencyKey === "string"
+      ? body.idempotencyKey.trim().slice(0, 128)
+      : "";
+  const requestedAt =
+    typeof body.requestedAt === "string" && body.requestedAt
+      ? body.requestedAt
+      : null;
+
+  const errors: string[] = [];
+  if (!tenantId) errors.push("tenantId is required");
+  if (!idempotencyKey) errors.push("idempotencyKey is required");
+  if (!requestedByEmail || !EMAIL_RE.test(requestedByEmail)) {
+    errors.push("requestedByEmail must be a valid email");
+  }
+  if (errors.length) {
+    return json(
+      { ok: false, error: "INVALID_BODY", detail: errors.join("; ") },
+      400,
+    );
+  }
+  if (
+    !Number.isFinite(requestedSeats) ||
+    !Number.isInteger(requestedSeats) ||
+    requestedSeats < 1 ||
+    requestedSeats > MAX_SEATS
+  ) {
+    return json(
+      {
+        ok: false,
+        error: "INVALID_SEAT_COUNT",
+        detail: `requestedSeats must be an integer in [1, ${MAX_SEATS}]`,
+      },
+      422,
+    );
   }
 
   const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  const keyHash = await sha256Hex(apiKey);
-  const { data: accountId, error: keyErr } = await supabase.rpc('validate_account_api_key', { _key_hash: keyHash });
-  if (keyErr || !accountId) {
-    return new Response(JSON.stringify({ error: 'Invalid API key' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  // ---- Resolve tenant -> account ----
+  const { data: acct, error: acctErr } = await supabase
+    .from("accounts")
+    .select("id, status")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (acctErr) {
+    return json(
+      { ok: false, error: "INTERNAL_ERROR", detail: acctErr.message },
+      500,
+    );
+  }
+  if (!acct) {
+    return json({ ok: false, error: "TENANT_NOT_FOUND" }, 404);
+  }
+  if (acct.status === "CANCELLED" || acct.status === "STALLED_ONBOARDING") {
+    return json(
+      {
+        ok: false,
+        error: "ACCOUNT_NOT_ACTIVE",
+        detail: `status=${acct.status}`,
+      },
+      409,
+    );
   }
 
-  const url = new URL(req.url);
-  const segments = url.pathname.split('/').filter(Boolean);
-  const requestId = segments[segments.length - 1] !== 'seat-request' ? segments[segments.length - 1] : null;
+  // ---- Idempotency: marker prefixed in `reason` so we can dedupe lookups ----
+  const idemMarker = `[idem:${idempotencyKey}]`;
+  const composedReason = reason ? `${idemMarker} ${reason}` : idemMarker;
 
-  // GET /seat-request/:id  → status polling
-  if (req.method === 'GET') {
-    if (!requestId) {
-      return new Response(JSON.stringify({ error: 'Missing request id' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    const { data, error } = await supabase
-      .from('seat_requests')
-      .select('id, requested_seats, status, reason, created_at, decided_at, fulfilled_at')
-      .eq('id', requestId)
-      .eq('account_id', accountId)
-      .maybeSingle();
-    if (error || !data) {
-      return new Response(JSON.stringify({ error: 'Request not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const { data: existing, error: existErr } = await supabase
+    .from("seat_requests")
+    .select("id, status")
+    .eq("account_id", acct.id)
+    .ilike("reason", `${idemMarker}%`)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existErr) {
+    return json(
+      { ok: false, error: "INTERNAL_ERROR", detail: existErr.message },
+      500,
+    );
+  }
+  if (existing) {
+    return json({
+      ok: true,
+      seatRequestId: existing.id,
+      status: existing.status,
+      duplicate: true,
+    });
   }
 
-  // POST /seat-request → create
-  if (req.method === 'POST') {
-    let body: any;
-    try { body = await req.json(); } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+  // ---- Insert new seat request ----
+  const insertPayload: Record<string, unknown> = {
+    account_id: acct.id,
+    requested_seats: requestedSeats,
+    requested_by_email: requestedByEmail,
+    reason: composedReason,
+    status: "PENDING",
+  };
+  if (requestedAt) insertPayload.created_at = requestedAt;
 
-    const requested_seats = Number(body.requested_seats);
-    if (!Number.isInteger(requested_seats) || requested_seats < 1 || requested_seats > 1000) {
-      return new Response(JSON.stringify({ error: 'requested_seats must be an integer between 1 and 1000' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    const { data, error } = await supabase
-      .from('seat_requests')
-      .insert({
-        account_id: accountId,
-        requested_seats,
-        requested_by_email: typeof body.requested_by_email === 'string' ? body.requested_by_email.slice(0, 255) : null,
-        reason: typeof body.reason === 'string' ? body.reason.slice(0, 500) : null,
-      })
-      .select('id, requested_seats, status, created_at')
-      .single();
-
-    if (error) {
-      console.error('seat-request insert error:', error);
-      return new Response(JSON.stringify({ error: 'Failed to create seat request' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    return new Response(JSON.stringify(data),
-      { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const { data: created, error: insErr } = await supabase
+    .from("seat_requests")
+    .insert(insertPayload)
+    .select("id, status")
+    .single();
+  if (insErr || !created) {
+    return json(
+      {
+        ok: false,
+        error: "INTERNAL_ERROR",
+        detail: insErr?.message ?? "Insert failed",
+      },
+      500,
+    );
   }
 
-  return new Response(JSON.stringify({ error: 'Method not allowed' }),
-    { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  return json({
+    ok: true,
+    seatRequestId: created.id,
+    status: created.status,
+    duplicate: false,
+  });
 });
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
