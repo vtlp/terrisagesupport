@@ -433,8 +433,31 @@ export default function AccountDetail() {
               <div><div className="text-xs text-muted-foreground">Source enquiry</div><div>{acc.source_enquiry_id ? <Link to={`/enquiries/${acc.source_enquiry_id}`} className="text-primary hover:underline">Open</Link> : '—'}</div></div>
               <div className="md:col-span-2">
                 <div className="text-xs text-muted-foreground">Terrisage tenant ID</div>
-                <div className="mt-1 font-mono text-xs break-all">{acc.tenant_id ?? <span className="text-muted-foreground italic font-sans">Not yet linked from Terrisage</span>}</div>
-                
+                <div className="mt-1 flex gap-2 items-center">
+                  <Input
+                    value={draft?.tenant_id ?? ''}
+                    onChange={(e) => setDraft(d => d ? { ...d, tenant_id: e.target.value } : d)}
+                    placeholder="Paste Terrisage tenant UUID"
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={saving || (draft?.tenant_id ?? '') === (acc.tenant_id ?? '')}
+                    onClick={async () => {
+                      const newVal = (draft?.tenant_id ?? '').trim() || null;
+                      setSaving(true);
+                      const { error } = await supabase.from('accounts').update({ tenant_id: newVal }).eq('id', acc.id);
+                      setSaving(false);
+                      if (error) { toast.error(error.message); return; }
+                      setAcc(a => a ? { ...a, tenant_id: newVal } : a);
+                      toast.success('Tenant ID updated');
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-1">Editable for now. Will be auto-linked once Terrisage provisioning is wired in.</div>
               </div>
             </CardContent>
           </Card>
