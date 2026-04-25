@@ -64,19 +64,26 @@ export function SeatRequestsTab({ accountId }: { accountId: string }) {
     if (error) { setBusyId(null); toast.error(error.message); return; }
     toast.success('Seats added and request fulfilled');
 
-    // Best-effort: push updated billing cycle metadata to Terrisage CRM.
+    // Best-effort: push new seat total + cycle metadata to Terrisage in one call.
     try {
-      const { data, error: cycleErr } = await supabase.functions.invoke(
-        'terrisage-seat-cycle-sync',
-        { body: { accountId } },
+      const { data, error: syncErr } = await supabase.functions.invoke(
+        'terrisage-seat-fulfil-sync',
+        { body: { accountId, requestId: id } },
       );
-      if (cycleErr) {
-        toast.warning(`Seat cycle not synced to Terrisage: ${cycleErr.message}`);
-      } else if (data && data.pushed === false) {
-        toast.warning(`Seat cycle not synced to Terrisage (${data.reason ?? 'unknown'})`);
+      if (syncErr) {
+        toast.warning(`Terrisage sync failed: ${syncErr.message}`);
+      } else if (data) {
+        const alloc = data.allocation as { pushed?: boolean; reason?: string } | null;
+        const cycle = data.cycle as { pushed?: boolean; reason?: string } | null;
+        if (alloc && alloc.pushed === false) {
+          toast.warning(`Seat allocation not synced (${alloc.reason ?? 'unknown'})`);
+        }
+        if (cycle && cycle.pushed === false) {
+          toast.warning(`Seat cycle not synced (${cycle.reason ?? 'unknown'})`);
+        }
       }
     } catch (e) {
-      toast.warning(`Seat cycle sync failed: ${String(e)}`);
+      toast.warning(`Terrisage sync failed: ${String(e)}`);
     }
 
     setBusyId(null);
