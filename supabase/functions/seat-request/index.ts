@@ -88,8 +88,8 @@ Deno.serve(async (req) => {
     errors.push("tenantId must be a valid UUID");
   }
   if (!idempotencyKey) errors.push("idempotencyKey is required");
-  if (!requestedByEmail || !EMAIL_RE.test(requestedByEmail)) {
-    errors.push("requestedByEmail must be a valid email");
+  if (requestedByEmail && !EMAIL_RE.test(requestedByEmail)) {
+    errors.push("requestedByEmail must be a valid email when provided");
   }
   if (errors.length) {
     return json(
@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
   const insertPayload: Record<string, unknown> = {
     account_id: acct.id,
     requested_seats: requestedSeats,
-    requested_by_email: requestedByEmail,
+    requested_by_email: requestedByEmail || null,
     reason: composedReason,
     status: "PENDING",
   };
