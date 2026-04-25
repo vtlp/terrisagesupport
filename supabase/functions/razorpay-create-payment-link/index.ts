@@ -95,25 +95,29 @@ Deno.serve(async (req) => {
       ? new Date(Date.now() + body.expires_in_days * 86400_000)
       : new Date(Date.now() + 30 * 86400_000);
 
+    // Generate a sequential, human-readable order number (e.g. TS-ORD-000042).
+    // Used as Razorpay reference_id and persisted in our DB for full traceability.
+    let orderNo = '';
+    {
+      const { data: ordData, error: ordErr } = await admin.rpc('next_payment_order_no');
+      if (ordErr || !ordData) {
+        console.error('next_payment_order_no failed', ordErr);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to generate order number' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      orderNo = String(ordData);
+    }
+
     let rzpJson: { id: string; short_url: string };
     if (useDummy) {
       const id = `plink_dummy_${Date.now().toString(36)}`;
       rzpJson = { id, short_url: `https://rzp.io/test/${id}` };
-      console.log('Razorpay credentials missing — issuing dummy payment link', { id, purpose });
+      console.log('Razorpay credentials missing — issuing dummy payment link', { id, purpose, orderNo });
     } else {
       const amountPaise = Math.round(body.total * 100);
       const auth = btoa(`${keyId}:${keySecret}`);
-
-      // Razorpay reference_id max 40 chars — use short id slices + base36 timestamp
-      const ts = Date.now().toString(36);
-      const shortId = (id?: string | null) => (id ?? '').replace(/-/g, '').slice(0, 12);
-      const purposeTag = purpose === 'INITIAL' ? 'ini'
-        : purpose === 'RENEWAL' ? 'ren'
-        : purpose === 'TRIAL_CONVERSION' ? 'trl'
-        : 'ups';
-      const refId = purpose === 'INITIAL'
-        ? `e_${shortId(body.enquiry_id)}_${ts}`
-        : `a_${shortId(body.account_id)}_${purposeTag}_${ts}`;
 
       const descSuffix = purpose === 'RENEWAL' ? ' · Renewal'
         : purpose === 'TRIAL_CONVERSION' ? ' · Trial conversion'
@@ -128,16 +132,24 @@ Deno.serve(async (req) => {
           currency: 'INR',
           accept_partial: false,
           expire_by: Math.floor(expiresAt.getTime() / 1000),
-          description: `${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}${descSuffix}`,
+          description: `${orderNo} · ${body.plan_name} · ${body.seats} seat(s) · ${body.billing_cycle}${descSuffix}`,
+          // Customer block — flows onto the resulting payment record in Razorpay dashboard
           customer: {
             name: body.customer.name,
-            email: body.customer.email,
-            contact: body.customer.phone,
+            email: body.customer.email || undefined,
+            contact: body.customer.phone || undefined,
           },
           notify: { sms: !!body.customer.phone, email: !!body.customer.email },
           reminder_enable: true,
-          reference_id: refId,
+          // Sequential order number — surfaces on Razorpay dashboard as Reference ID
+          reference_id: orderNo,
+          // Notes — visible under the "Notes" section of every payment in Razorpay dashboard,
+          // and searchable. We enrich with app metadata + customer details so support staff
+          // can reconcile any payment without leaving the Razorpay screen.
           notes: {
+            app_name: 'Terrisage Support',
+            app_id: 'terrisage-support',
+            order_no: orderNo,
             purpose,
             enquiry_id: body.enquiry_id ?? '',
             account_id: body.account_id ?? '',
@@ -145,17 +157,20 @@ Deno.serve(async (req) => {
             plan: body.plan_name,
             cycle: body.billing_cycle,
             seats: String(body.seats),
+            customer_name: body.customer.name,
+            customer_email: body.customer.email ?? '',
+            customer_phone: body.customer.phone ?? '',
           },
         }),
       });
       const parsed = await rzpRes.json();
       if (!rzpRes.ok) {
-        console.error('Razorpay request failed', { status: rzpRes.status, body: parsed });
+        console.error('Razorpay request failed', { status: rzpRes.status, body: parsed, orderNo });
         if (purpose === 'INITIAL' && body.enquiry_id) {
           await admin.from('enquiry_notes').insert({
             enquiry_id: body.enquiry_id,
             author_id: user.id,
-            note_text: `[Payment] Link generation failed – ${parsed?.error?.description || 'Razorpay request failed'}`,
+            note_text: `[Payment] Link generation failed (${orderNo}) – ${parsed?.error?.description || 'Razorpay request failed'}`,
           });
         }
         return new Response(
