@@ -99,7 +99,7 @@ export function PaymentLinkDialog({
   const [name, setName] = useState(defaults.customerName);
   const [email, setEmail] = useState(defaults.customerEmail ?? '');
   const [phone, setPhone] = useState(defaults.customerPhone ?? '');
-  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [startDate, setStartDate] = useState<Date>(toUtcNoon(new Date()));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
