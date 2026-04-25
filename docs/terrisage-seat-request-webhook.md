@@ -299,32 +299,63 @@ inbound webhook in §1–§7).
 
 ---
 
-### 10.3 `GET /api/integrations/seats/seat-capacity?tenantId=<uuid>` — live capacity pull ⏳ planned
+### 10.3 `GET /api/integrations/seats/seat-snapshot?tenantId=<uuid>` — live tenant seat snapshot ✅ wired
 
-Not yet wired on Terrisage Support — to be built in a later phase. Spec
-included here so both sides can plan for it.
+**Purpose:** allow Terrisage Support to fetch the current seat counters for a
+specific tenant using the integration API key. Used to populate the live
+"Seat capacity" block on the Account → Seats tab.
 
-**When Terrisage Support will call it:** when a Support agent opens the Seats
-tab and clicks **Sync from CRM**, to refresh the live seat usage shown next
-to the allocated total.
+**When Terrisage Support calls it:** automatically every time a Support agent
+opens an Account detail page that has a `tenant_id` linked. The returned
+counters are upserted into Support's `seat_usage_snapshots` table so other
+views (dashboards, reports) can read the cached values. On failure, Support
+shows a warning toast and continues to display the last known snapshot.
+
+**Request**
+
+```
+GET {TERRISAGE_BASE_URL}/api/integrations/seats/seat-snapshot?tenantId=<uuid>
+Headers:
+  X-API-Key: <SEAT_SUPPORT_INTEGRATION_API_KEY>
+```
 
 **Expected response (200)**
 
 ```json
 {
+  "ok": true,
   "tenantId": "c39aa7cf-b452-4235-bdcb-0fc3a62fbf18",
-  "allocatedTotal": 12,
-  "activeSeats": 9,
-  "deletedInCycle": 1
+  "allocatedSeats": 10,
+  "consumedSeats": 8,
+  "reservedSeats": 0,
+  "availableSeats": 2,
+  "invitableAvailableSeats": 2,
+  "requestedSeats": 0,
+  "seatBillingCycleStartAt": null,
+  "seatBillingCycleEndAt": null,
+  "seatBillingFrequency": null
 }
 ```
 
-| Field            | Type          | Notes |
-|------------------|---------------|-------|
-| `allocatedTotal` | integer ≥ 0  | Current cap stored on Terrisage CRM (should match `newAllocatedTotal` from the last 10.2 call). |
-| `activeSeats`    | integer ≥ 0  | Seats currently in active use by the tenant. |
-| `deletedInCycle` | integer ≥ 0  | Seats deleted within the current billing cycle (used by Support for renewal sizing). |
+| Field                     | Type                            | Notes |
+|---------------------------|---------------------------------|-------|
+| `tenantId`                | string (UUID)                   | Echoed from the request. |
+| `allocatedSeats`          | integer ≥ 0                     | Current cap on Terrisage CRM (should match the last 10.2 `newAllocatedTotal`). |
+| `consumedSeats`           | integer ≥ 0                     | Seats currently active / in use by the tenant. |
+| `reservedSeats`           | integer ≥ 0                     | Seats held by pending invites. |
+| `availableSeats`          | integer ≥ 0                     | `allocated − consumed − reserved`. |
+| `invitableAvailableSeats` | integer ≥ 0                     | Subset of `availableSeats` that can actually be invited right now. |
+| `requestedSeats`          | integer ≥ 0                     | Open additional-seat requests on the tenant. |
+| `seatBillingCycleStartAt` | ISO 8601 timestamp (UTC) \| null | Mirrors the value last pushed via 10.1. |
+| `seatBillingCycleEndAt`   | ISO 8601 timestamp (UTC) \| null | Mirrors the value last pushed via 10.1. |
+| `seatBillingFrequency`    | `"SIX_MONTH"` \| `"YEARLY"` \| null | Mirrors the value last pushed via 10.1. |
 
-**Errors**
-- `404` if `tenantId` is unknown to Terrisage CRM.
-- `401` if the `X-API-Key` is wrong.
+**Validation / errors (Terrisage CRM side):**
+- `tenantId` query param is required and must be a valid UUID → `400 INVALID_REQUEST`.
+- Missing or wrong `X-API-Key` → `403 FORBIDDEN`.
+- Unknown tenant → `404 NOT_FOUND`.
+
+Terrisage Support treats non-2xx as a soft failure: a warning toast is shown
+and the previously cached snapshot stays on screen until the next successful
+call.
+
