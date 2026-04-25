@@ -306,43 +306,57 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
         <CardContent>
           {rows.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No seat requests yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {rows.map(r => (
-                <div key={r.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">+{r.requested_seats} seats</span>
-                      <Badge className={`text-[10px] ${STATUS_COLORS[r.status]}`}>{r.status}</Badge>
-                      {r.requested_by_email && <span className="text-xs text-muted-foreground">by {r.requested_by_email}</span>}
+          ) : (() => {
+            const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+            const page = Math.min(requestPage, totalPages);
+            const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+            return (
+              <>
+                <div className="space-y-1.5">
+                  {pageRows.map(r => (
+                    <div key={r.id} className="flex items-center justify-between border rounded px-3 py-2 gap-2 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">+{r.requested_seats} seats</span>
+                          <Badge className={`text-[10px] ${STATUS_COLORS[r.status]}`}>{r.status}</Badge>
+                          {r.requested_by_email && <span className="text-xs text-muted-foreground truncate">by {r.requested_by_email}</span>}
+                          <span className="text-xs text-muted-foreground">· {format(new Date(r.created_at), 'dd MMM yyyy, HH:mm')}</span>
+                        </div>
+                        {r.reason && <div className="text-xs text-muted-foreground mt-0.5 truncate">{r.reason}</div>}
+                      </div>
+                      <div className="flex gap-1">
+                        {r.status === 'PENDING' && (
+                          <>
+                            <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setStatus(r.id, 'APPROVED')}>
+                              <Check className="h-4 w-4 mr-1" /> Approve
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setStatus(r.id, 'REJECTED')}>
+                              <X className="h-4 w-4 mr-1" /> Reject
+                            </Button>
+                          </>
+                        )}
+                        {(r.status === 'PENDING' || r.status === 'APPROVED') && (
+                          <Button size="sm" disabled={busyId === r.id} onClick={() => fulfil(r.id)}>
+                            {busyId === r.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-1" />}
+                            Fulfil
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {format(new Date(r.created_at), 'dd MMM yyyy, HH:mm')}
-                      {r.reason && <> · {r.reason}</>}
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    {r.status === 'PENDING' && (
-                      <>
-                        <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setStatus(r.id, 'APPROVED')}>
-                          <Check className="h-4 w-4 mr-1" /> Approve
-                        </Button>
-                        <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setStatus(r.id, 'REJECTED')}>
-                          <X className="h-4 w-4 mr-1" /> Reject
-                        </Button>
-                      </>
-                    )}
-                    {(r.status === 'PENDING' || r.status === 'APPROVED') && (
-                      <Button size="sm" disabled={busyId === r.id} onClick={() => fulfil(r.id)}>
-                        {busyId === r.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-1" />}
-                        Fulfil
-                      </Button>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+                {rows.length > PAGE_SIZE && (
+                  <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+                    <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, rows.length)} of {rows.length}</span>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setRequestPage(p => p - 1)}>Prev</Button>
+                      <Button size="sm" variant="outline" disabled={page === totalPages} onClick={() => setRequestPage(p => p + 1)}>Next</Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </CardContent>
       </Card>
 
