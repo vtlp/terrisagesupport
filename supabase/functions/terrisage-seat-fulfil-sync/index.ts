@@ -60,12 +60,39 @@ Deno.serve(async (req) => {
       return json({ pushed: false, reason: "INVALID_SEAT_TOTAL" }, 200);
     }
 
-    const idemKey = requestId
-      ? `fulfil-${accountId}-${requestId}`
-      : `fulfil-${accountId}-${newAllocatedTotal}-${Date.now()}`;
+    // Fetch invoiceRef from the paid upsell link tied to this seat request.
+    // Fulfilment only runs after payment, so a payment_reference should exist.
+    let invoiceRef: string | null = null;
+    if (requestId) {
+      const { data: upsell } = await supabase
+        .from("seat_upsell_links")
+        .select("payment_reference, link_id")
+        .eq("seat_request_id", requestId)
+        .eq("status", "paid")
+        .order("paid_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      invoiceRef =
+        (upsell?.payment_reference as string | null) ??
+        (upsell?.link_id as string | null) ??
+        null;
+    }
+
+    const idemKey = invoiceRef
+      ? `alloc-${acct.tenant_id}-${invoiceRef}`
+      : requestId
+        ? `fulfil-${accountId}-${requestId}`
+        : `fulfil-${accountId}-${newAllocatedTotal}-${Date.now()}`;
 
     const url =
       BASE_URL.replace(/\/$/, "") + `/api/integrations/seats/seat-allocation`;
+
+    const payload: Record<string, unknown> = {
+      tenantId: acct.tenant_id,
+      newAllocatedTotal,
+      idempotencyKey: idemKey,
+    };
+    if (invoiceRef) payload.invoiceRef = invoiceRef;
 
     let upstream: Response;
     try {
@@ -75,11 +102,7 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
           "X-API-Key": API_KEY,
         },
-        body: JSON.stringify({
-          tenantId: acct.tenant_id,
-          newAllocatedTotal,
-          idempotencyKey: idemKey,
-        }),
+        body: JSON.stringify(payload),
       });
     } catch (e) {
       return json(
