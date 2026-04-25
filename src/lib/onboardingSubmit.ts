@@ -56,8 +56,7 @@ export async function submitOnboarding(
   payload: Record<string, unknown>,
   enquiryId: string | null,
 ) {
-  // Pre-check: refuse if link is already locked. The DB unique index is the
-  // authoritative guard; this just gives a friendlier error before insert.
+  // Pre-check for friendlier error before the RPC runs.
   if (enquiryId) {
     const lockedAt = await checkSubmissionLock(enquiryId);
     if (lockedAt) {
@@ -68,22 +67,28 @@ export async function submitOnboarding(
     }
   }
 
-  const { data, error } = await supabase
-    .from("onboarding_submissions")
-    .insert({ tenancy_type: tenancy, payload: payload as never, enquiry_id: enquiryId })
-    .select("id")
-    .single();
+  // All public submissions go through the SECURITY DEFINER RPC so that
+  // payload validation, link existence and the submission lock are always
+  // enforced server-side. Direct INSERTs are blocked by RLS.
+  const { data, error } = await supabase.rpc("submit_onboarding_public", {
+    _tenancy_type: tenancy,
+    _payload: payload as never,
+    _enquiry_id: enquiryId,
+  });
   if (error) {
-    console.error("Onboarding submission insert failed", error);
-    // Postgres unique-violation code = 23505. Surfaces when two submissions race.
-    if ((error as { code?: string }).code === "23505") {
+    console.error("Onboarding submission failed", error);
+    const code = (error as { code?: string }).code;
+    // P0003 = already-submitted guard inside the RPC; 23505 = unique-violation race.
+    if (code === "P0003" || code === "23505") {
       throw new AlreadySubmittedError(
         "This onboarding form has already been submitted for this link.",
       );
     }
     throw new Error(`Submission failed: ${error.message}`);
   }
-  return data.id as string;
+  const result = data as { id: string } | null;
+  if (!result?.id) throw new Error("Submission failed: no id returned");
+  return result.id;
 }
 
 export function getEnquiryIdFromUrl(): string | null {
