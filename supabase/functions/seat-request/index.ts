@@ -25,7 +25,7 @@ interface Body {
   requestedAt?: unknown;
 }
 
-const MAX_SEATS = 1000;
+const MAX_SEATS = 100000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -100,14 +100,14 @@ Deno.serve(async (req) => {
   if (
     !Number.isFinite(requestedSeats) ||
     !Number.isInteger(requestedSeats) ||
-    requestedSeats < 1 ||
+    requestedSeats < 0 ||
     requestedSeats > MAX_SEATS
   ) {
     return json(
       {
         ok: false,
         error: "INVALID_SEAT_COUNT",
-        detail: `requestedSeats must be an integer in [1, ${MAX_SEATS}]`,
+        detail: `requestedSeats must be an integer in [0, ${MAX_SEATS}]`,
       },
       422,
     );
