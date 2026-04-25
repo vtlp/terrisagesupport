@@ -25,7 +25,7 @@ import { RenewalsCard } from '@/components/account/RenewalsCard';
 import { TrialConversionCard } from '@/components/account/TrialConversionCard';
 import { ImportsTab } from '@/components/account/ImportsTab';
 import { SeatsAndRequestsTab } from '@/components/account/SeatsAndRequestsTab';
-import { ApiKeysCard } from '@/components/account/ApiKeysCard';
+
 import { ProjectsTab } from '@/components/account/ProjectsTab';
 import { DocumentsTab } from '@/components/account/DocumentsTab';
 
