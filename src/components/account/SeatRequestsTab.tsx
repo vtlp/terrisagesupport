@@ -80,6 +80,21 @@ export function SeatRequestsTab({ accountId }: { accountId: string }) {
       toast.warning(`Terrisage sync failed: ${String(e)}`);
     }
 
+    // Pull fresh seat snapshot from Terrisage so the UI reflects CRM state immediately.
+    try {
+      const { error: pullErr } = await supabase.functions.invoke(
+        'terrisage-seat-sync',
+        { body: { accountId } },
+      );
+      if (pullErr) {
+        toast.warning(`Terrisage refresh failed: ${pullErr.message}`);
+      } else {
+        toast.success('Terrisage data refreshed');
+      }
+    } catch (e) {
+      toast.warning(`Terrisage refresh failed: ${String(e)}`);
+    }
+
     setBusyId(null);
     load();
   };
