@@ -491,7 +491,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Due date</Label><Input type="date" value={draft.due_at?.substring(0, 10) ?? ''} onChange={e => setDraft(d => ({ ...d, due_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} /></div>
+            <div className="space-y-1.5"><Label>Due date</Label><Input type="date" value={draft.due_at?.substring(0, 10) ?? ''} onChange={e => setDraft(d => ({ ...d, due_at: dateInputToUtcNoonIso(e.target.value) }))} /></div>
             <div className="space-y-1.5 md:col-span-2"><Label>Notes</Label><Textarea rows={2} value={draft.notes ?? ''} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} /></div>
           </div>
           <div className="grid grid-cols-3 gap-3 pt-2 border-t">
