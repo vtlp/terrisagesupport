@@ -524,7 +524,7 @@ export default function AccountDetail() {
           <BillingTab accountId={acc.id} />
           <TrialConversionCard accountId={acc.id} />
           <RenewalsCard accountId={acc.id} />
-          <ApiKeysCard accountId={acc.id} />
+          
         </TabsContent>
 
 
