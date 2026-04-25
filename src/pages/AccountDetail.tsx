@@ -263,7 +263,7 @@ export default function AccountDetail() {
         )}
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="seats">Seats &amp; requests ({seats.filter(s => s.is_active).length})</TabsTrigger>
