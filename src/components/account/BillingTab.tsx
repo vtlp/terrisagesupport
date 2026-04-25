@@ -145,6 +145,18 @@ export function BillingTab({ accountId }: { accountId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // On entering the Billing tab, push the current cycle metadata to Terrisage
+  // so the CRM stays aligned with what Support shows. Best-effort: silent on
+  // failure (the explicit Save still surfaces errors as toasts).
+  useEffect(() => {
+    if (!accountId) return;
+    void supabase.functions
+      .invoke('terrisage-seat-cycle-sync', { body: { accountId } })
+      .catch((e) => {
+        console.warn('[BillingTab] cycle sync on mount failed', e);
+      });
+  }, [accountId]);
+
   const settingsDirty = useMemo(() => JSON.stringify(settings) !== JSON.stringify(savedSettings), [settings, savedSettings]);
 
   // Billing is driven by seats PURCHASED, never by active-user count.
