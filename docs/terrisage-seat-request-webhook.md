@@ -32,21 +32,28 @@ Terrisage by a tenant admin. Do **not** call it for:
 - Cycle / billing window updates (Support pushes these to Terrisage, not the
   other way round).
 
+This webhook is **best-effort** and non-blocking for the Terrisage app user
+flow. Support handles it idempotently — see §6.
+
 Retries: see §6.
 
 ---
 
 ## 3. Authentication
 
-Send the shared API key in the header:
+Headers sent by Terrisage:
 
 ```
-X-API-Key: <SEAT_SUPPORT_INTEGRATION_API_KEY>
+Content-Type: application/json
+X-API-Key: <SUPPORT_SEAT_REQUEST_API_KEY>
+X-Idempotency-Key: seat-request-<seatRequestId>
 ```
 
-- The key is the **same** secret already used for the outbound
-  `seat-allocation` and `seat-cycle` calls.
+- `X-API-Key` value is the shared
+  `SUPPORT_SEAT_REQUEST_API_KEY` / `SEAT_SUPPORT_INTEGRATION_API_KEY` secret
+  agreed between Terrisage and Support.
 - Requests without the header, or with a wrong key, will get `401 Unauthorized`.
+- `X-Idempotency-Key` header **must** match `idempotencyKey` in the body.
 
 ---
 
@@ -54,23 +61,25 @@ X-API-Key: <SEAT_SUPPORT_INTEGRATION_API_KEY>
 
 ```json
 {
-  "tenantId": "8b1f3c2a-4d5e-6f70-8192-a3b4c5d6e7f8",
-  "requestedSeats": 5,
-  "requestedByEmail": "owner@acme.com",
-  "reason": "Hiring 5 new agents for Mumbai branch",
-  "idempotencyKey": "req-tenant-abc-123-001",
-  "requestedAt": "2026-04-25T08:14:32.000Z"
+  "seatRequestId": "cm....",
+  "tenantId": "c39aa7cf-b452-4235-bdcb-0fc3a62fbf18",
+  "requestedAdditionalSeats": 3,
+  "createdByAgentId": "a2....",
+  "note": "Need seats for new hiring batch",
+  "idempotencyKey": "seat-request-cm....",
+  "requestedAt": "2026-04-24T11:35:12.000Z"
 }
 ```
 
-| Field              | Type            | Required | Notes |
-|--------------------|-----------------|----------|-------|
-| `tenantId`         | string (UUID v4) | yes     | Must match `accounts.tenant_id` on Support. Lowercase canonical UUID format (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`). |
-| `requestedSeats`   | integer ≥ 1     | yes      | Number of **additional** seats (delta, not new total). |
-| `requestedByEmail` | string (email)  | yes      | The Terrisage user who raised the request. |
-| `reason`           | string (≤ 500)  | no       | Optional free text shown to the support agent. |
-| `idempotencyKey`   | string (≤ 128)  | yes      | Stable per logical request — see §6. |
-| `requestedAt`      | string (ISO 8601, UTC) | no | Defaults to server time if omitted. |
+| Field                      | Type             | Required | Notes |
+|----------------------------|------------------|----------|-------|
+| `seatRequestId`            | string           | yes      | App-side (Terrisage) request primary identifier. |
+| `tenantId`                 | string (UUID v4) | yes      | Must match `accounts.tenant_id` on Support. Lowercase canonical UUID format (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`). |
+| `requestedAdditionalSeats` | integer ≥ 1      | yes      | Number of **additional** seats (delta, not new total). |
+| `createdByAgentId`         | string           | no       | Terrisage agent / user id that raised the request. |
+| `note`                     | string (≤ 500)   | no       | Optional free text shown to the support agent. |
+| `idempotencyKey`           | string (≤ 128)   | yes      | Stable per logical request — see §6. Must equal `X-Idempotency-Key` header. |
+| `requestedAt`              | string (ISO 8601, UTC) | no | Defaults to server time if omitted. |
 
 ---
 
@@ -104,6 +113,10 @@ X-API-Key: <SEAT_SUPPORT_INTEGRATION_API_KEY>
 
 The same `seatRequestId` is returned. No second row is created.
 
+> Note: `seatRequestId` in the response is the **Support-side** UUID for the
+> created `seat_requests` row. The Terrisage-side `seatRequestId` from the
+> request body is preserved internally for traceability.
+
 ### 5.3 Errors
 
 | HTTP | `error` code               | Meaning |
@@ -112,13 +125,14 @@ The same `seatRequestId` is returned. No second row is created.
 | 401  | `UNAUTHORIZED`             | Missing or wrong `X-API-Key`. |
 | 404  | `TENANT_NOT_FOUND`         | No `accounts` row matches `tenantId`. |
 | 409  | `ACCOUNT_NOT_ACTIVE`       | Account is `CANCELLED` / `STALLED_ONBOARDING`. |
-| 422  | `INVALID_SEAT_COUNT`       | `requestedSeats` < 1 or > 1000. |
+| 409  | `IDEMPOTENCY_MISMATCH`     | Same `idempotencyKey` reused with a different `requestedAdditionalSeats` or `tenantId`. |
+| 422  | `INVALID_SEAT_COUNT`       | `requestedAdditionalSeats` < 1 or > 1000. |
 | 500  | `INTERNAL_ERROR`           | Server-side failure. Safe to retry. |
 
 Error body shape:
 
 ```json
-{ "ok": false, "error": "INVALID_BODY", "detail": "requestedSeats must be >= 1" }
+{ "ok": false, "error": "INVALID_BODY", "detail": "requestedAdditionalSeats must be >= 1" }
 ```
 
 ---
@@ -126,10 +140,13 @@ Error body shape:
 ## 6. Idempotency & retries
 
 - Support stores `idempotencyKey` against the `seat_requests` row.
-- On retry with the **same** `idempotencyKey` → returns the original
-  `seatRequestId` with `"duplicate": true`. No state change.
+- On retry with the **same** `idempotencyKey` (and same `tenantId` +
+  `requestedAdditionalSeats`) → returns the original `seatRequestId` with
+  `"duplicate": true`. No state change.
+- Reusing the same `idempotencyKey` with a **different** `tenantId` or
+  `requestedAdditionalSeats` → `409 IDEMPOTENCY_MISMATCH`.
 - Use **exactly one** `idempotencyKey` per logical request from Terrisage
-  (e.g. `req-{tenantId}-{terrisageRequestId}`).
+  (e.g. `seat-request-<seatRequestId>`).
 - Recommended retry policy on `5xx` / network error: 3 attempts with
   exponential backoff (2 s, 10 s, 60 s).
 - Do **not** retry on `4xx` (other than `429` if we ever return it).
@@ -141,7 +158,7 @@ Error body shape:
 1. Support inserts a row into `seat_requests` with `status = 'PENDING'`.
 2. An internal notification is raised to the account owner / support agent.
 3. When a Support admin clicks **Fulfil**:
-   - `seats_purchased` on the account is incremented by `requestedSeats`.
+   - `seats_purchased` on the account is incremented by `requestedAdditionalSeats`.
    - Support calls **back** to Terrisage:
      - `POST /api/integrations/seats/seat-allocation` with the new absolute
        `newAllocatedTotal` and an idempotency key derived from the request id.
@@ -161,7 +178,7 @@ Let us know if you need one.
    `seatRequestId`.
 3. POST with `tenantId` that does not exist on Support → expect `404`
    `TENANT_NOT_FOUND`.
-4. POST with `requestedSeats: 0` → expect `422` `INVALID_SEAT_COUNT`.
+4. POST with `requestedAdditionalSeats: 0` → expect `422` `INVALID_SEAT_COUNT`.
 5. POST without `X-API-Key` → expect `401` `UNAUTHORIZED`.
 6. After a successful POST, ask Support to **Fulfil** the request and
    confirm Terrisage receives the matching `seat-allocation` callback with
