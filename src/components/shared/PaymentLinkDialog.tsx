@@ -113,7 +113,7 @@ export function PaymentLinkDialog({
       setName(defaults.customerName);
       setEmail(defaults.customerEmail ?? '');
       setPhone(defaults.customerPhone ?? '');
-      setStartDate(new Date());
+      setStartDate(toUtcNoon(new Date()));
     }
   }, [open, defaults.seats, defaults.customerName, defaults.customerEmail, defaults.customerPhone, defaults.planName, defaults.cycle, defaults.baseFee, defaults.seatRate, defaults.gstPct]);
 
