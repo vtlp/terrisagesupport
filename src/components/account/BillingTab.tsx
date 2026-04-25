@@ -362,13 +362,13 @@ export function BillingTab({ accountId }: { accountId: string }) {
             <div className="space-y-1.5">
               <Label>Subscription started</Label>
               <Input type="date" value={settings.subscription_started_at ? settings.subscription_started_at.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, subscription_started_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+                onChange={e => setSettings(s => ({ ...s, subscription_started_at: dateInputToUtcNoonIso(e.target.value) }))} />
               <p className="text-[10px] text-muted-foreground">Anchor — first payment received. Stays fixed across renewals.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Current cycle start</Label>
               <Input type="date" value={effectiveCurrentStart ? effectiveCurrentStart.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+                onChange={e => setSettings(s => ({ ...s, current_period_start: dateInputToUtcNoonIso(e.target.value) }))} />
               <p className="text-[10px] text-muted-foreground">Defaults to subscription start for the first cycle; updates each renewal.</p>
             </div>
             <div className="space-y-1.5">
