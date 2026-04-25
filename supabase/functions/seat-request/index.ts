@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
   const insertPayload: Record<string, unknown> = {
     account_id: acct.id,
     requested_seats: requestedSeats,
-    requested_by_email: requestedByEmail,
+    requested_by_email: requestedByEmail || null,
     reason: composedReason,
     status: "PENDING",
   };
