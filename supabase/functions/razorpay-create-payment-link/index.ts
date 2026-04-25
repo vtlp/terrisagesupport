@@ -233,12 +233,12 @@ Deno.serve(async (req) => {
       await admin.from('enquiry_notes').insert({
         enquiry_id: body.enquiry_id,
         author_id: user.id,
-        note_text: `[Payment] ${useDummy ? 'Dummy test link sent' : 'Link sent'} ${fmtINR(body.total)} – ${payment.short_url}`,
+        note_text: `[Payment] ${useDummy ? 'Dummy test link sent' : 'Link sent'} ${fmtINR(body.total)} · Order ${orderNo} – ${payment.short_url}`,
       });
       await admin.from('activity_log').insert({
         entity_type: 'ENQUIRY', entity_id: body.enquiry_id, event_type: 'FIELD_EDIT',
-        summary: `[Payment] Link generated ${fmtINR(body.total)}`,
-        details: { module: 'billing', link_id: payment.link_id, seats: body.seats, total: body.total },
+        summary: `[Payment] Link generated ${fmtINR(body.total)} · ${orderNo}`,
+        details: { module: 'billing', order_no: orderNo, link_id: payment.link_id, seats: body.seats, total: body.total },
       });
 
       return new Response(JSON.stringify({ success: true, payment: merged }), {
