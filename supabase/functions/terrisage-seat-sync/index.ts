@@ -19,6 +19,7 @@ Deno.serve(async (req) => {
 
   try {
     const { accountId } = (await req.json().catch(() => ({}))) as SyncBody;
+    console.log("[terrisage-seat-sync] invoked", { accountId });
     if (!accountId) {
       return json({ error: "accountId required" }, 400);
     }
@@ -27,6 +28,13 @@ Deno.serve(async (req) => {
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const BASE_URL = Deno.env.get("TERRISAGE_BASE_URL");
     const API_KEY = Deno.env.get("SEAT_SUPPORT_INTEGRATION_API_KEY");
+
+    console.log("[terrisage-seat-sync] env", {
+      hasBaseUrl: !!BASE_URL,
+      baseUrlPreview: BASE_URL ? BASE_URL.slice(0, 40) : null,
+      hasApiKey: !!API_KEY,
+      apiKeyLen: API_KEY ? API_KEY.length : 0,
+    });
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -37,12 +45,27 @@ Deno.serve(async (req) => {
       .eq("id", accountId)
       .maybeSingle();
 
-    if (acctErr) return json({ error: acctErr.message }, 500);
-    if (!acct) return json({ error: "Account not found" }, 404);
+    if (acctErr) {
+      console.error("[terrisage-seat-sync] account lookup failed", acctErr);
+      return json({ error: acctErr.message }, 500);
+    }
+    if (!acct) {
+      console.warn("[terrisage-seat-sync] account not found", { accountId });
+      return json({ error: "Account not found" }, 404);
+    }
+    console.log("[terrisage-seat-sync] account", {
+      accountId,
+      tenant_id: acct.tenant_id,
+    });
     if (!acct.tenant_id) {
+      console.warn("[terrisage-seat-sync] NO_TENANT_ID", { accountId });
       return json({ linked: false, reason: "NO_TENANT_ID" }, 200);
     }
     if (!BASE_URL || !API_KEY) {
+      console.warn("[terrisage-seat-sync] INTEGRATION_NOT_CONFIGURED", {
+        hasBaseUrl: !!BASE_URL,
+        hasApiKey: !!API_KEY,
+      });
       return json({ linked: false, reason: "INTEGRATION_NOT_CONFIGURED" }, 200);
     }
 
@@ -53,8 +76,10 @@ Deno.serve(async (req) => {
       `/api/integrations/seats/seat-snapshot?tenantId=${encodeURIComponent(
         acct.tenant_id,
       )}`;
+    console.log("[terrisage-seat-sync] calling upstream", { url });
 
     let upstream: Response;
+    const startedAt = Date.now();
     try {
       upstream = await fetch(url, {
         method: "GET",
@@ -64,6 +89,13 @@ Deno.serve(async (req) => {
         },
       });
     } catch (e) {
+      console.error("[terrisage-seat-sync] UPSTREAM_UNREACHABLE", {
+        url,
+        elapsed_ms: Date.now() - startedAt,
+        error: String(e),
+        name: (e as Error)?.name,
+        cause: String((e as { cause?: unknown })?.cause ?? ""),
+      });
       return json(
         { linked: false, reason: "UPSTREAM_UNREACHABLE", detail: String(e) },
         200,
@@ -71,6 +103,12 @@ Deno.serve(async (req) => {
     }
 
     const text = await upstream.text();
+    console.log("[terrisage-seat-sync] upstream responded", {
+      status: upstream.status,
+      ok: upstream.ok,
+      elapsed_ms: Date.now() - startedAt,
+      bodyPreview: text.slice(0, 200),
+    });
     if (!upstream.ok) {
       return json(
         {
