@@ -1,0 +1,1 @@
+ALTER TABLE public.seat_requests ADD COLUMN IF NOT EXISTS terrisage_pushed_at timestamptz;

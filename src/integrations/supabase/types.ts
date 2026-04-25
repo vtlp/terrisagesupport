@@ -2114,6 +2114,7 @@ export type Database = {
           requested_by_email: string | null
           requested_seats: number
           status: Database["public"]["Enums"]["seat_request_status"]
+          terrisage_pushed_at: string | null
           updated_at: string
         }
         Insert: {
@@ -2127,6 +2128,7 @@ export type Database = {
           requested_by_email?: string | null
           requested_seats: number
           status?: Database["public"]["Enums"]["seat_request_status"]
+          terrisage_pushed_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -2140,6 +2142,7 @@ export type Database = {
           requested_by_email?: string | null
           requested_seats?: number
           status?: Database["public"]["Enums"]["seat_request_status"]
+          terrisage_pushed_at?: string | null
           updated_at?: string
         }
         Relationships: []
