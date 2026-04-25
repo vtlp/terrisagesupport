@@ -135,8 +135,17 @@ export default function AccountDetail() {
     });
   };
 
+  const allChecklistDone = useMemo(
+    () => checklist.length > 0 && checklist.every(c => c.is_done),
+    [checklist]
+  );
+
   const save = async () => {
     if (!draft || !acc) return;
+    if (draft.status === 'LIVE' && acc.status !== 'LIVE' && !allChecklistDone) {
+      toast.error('Complete all onboarding tasks before going Live');
+      return;
+    }
     setSaving(true);
     const { error } = await supabase.from('accounts').update({
       account_name: draft.account_name, city: draft.city, status: draft.status, tenancy_type: draft.tenancy_type,
