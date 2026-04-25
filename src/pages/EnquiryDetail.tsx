@@ -68,6 +68,7 @@ interface PaymentInfo {
   outdated?: boolean;
   mode?: 'PAY_BEFORE_ACCOUNT' | 'TRIAL_FIRST';
   trial?: { start?: string | null; end?: string | null };
+  subscription?: { start_at?: string | null; end_at?: string | null };
   email?: { last_drafted_at?: string; last_sent_at?: string; subject?: string; body?: string };
   breakdown?: Record<string, unknown>;
 }
@@ -1647,8 +1648,19 @@ function PastStageSummary({ stage, draft }: { stage: Stage; draft: Enquiry }) {
     );
   } else if (stage === 'PAYMENT_LINK_SENT') {
     const p = draft.payload.payment;
+    const subStart = p?.subscription?.start_at;
+    const subEnd = p?.subscription?.end_at;
     body = p?.short_url
-      ? <span>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></span>
+      ? (
+        <div className="space-y-0.5">
+          <div>{fmtINR(p.amount ?? 0)} · <span className="font-medium">{p.status ?? 'CREATED'}</span></div>
+          {(subStart || subEnd) && (
+            <div className="text-muted-foreground text-[11px]">
+              Cycle: {subStart ? format(new Date(subStart), 'dd MMM yyyy') : '—'} → {subEnd ? format(new Date(subEnd), 'dd MMM yyyy') : '—'}
+            </div>
+          )}
+        </div>
+      )
       : <span className="text-muted-foreground">No link generated</span>;
   } else if (stage === 'ONBOARDING_PACK_SENT') {
     body = <span>Onboarding form sent</span>;
