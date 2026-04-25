@@ -73,6 +73,10 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const [mockReason, setMockReason] = useState('');
   const [submittingMock, setSubmittingMock] = useState(false);
 
+  const [memberPage, setMemberPage] = useState(1);
+  const [requestPage, setRequestPage] = useState(1);
+  const PAGE_SIZE = 5;
+
   const members = getTeamMembers(onboardingPayload);
 
   const load = useCallback(async () => {
