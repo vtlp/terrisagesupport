@@ -281,8 +281,8 @@ inbound webhook in §1–§7).
 |---------------------|----------------|-------|
 | `tenantId`          | string (UUID)  | Same tenant as the original request. |
 | `newAllocatedTotal` | integer ≥ 0    | The **new absolute** seat total on the account, not a delta. |
-| `invoiceRef`        | string (optional) | Support-side invoice reference for the fulfilment. Optional for now — may be omitted; will become required in a later phase. |
-| `idempotencyKey`    | string ≤ 128   | Stable per fulfilment. Recommended pattern: `alloc-<tenantId>-<invoiceRef>` when `invoiceRef` is present, otherwise `alloc-<tenantId>-<seatRequestId>`. |
+| `invoiceRef`        | string         | Payment reference for the upsell payment that unlocked the fulfilment (sourced from `seat_upsell_links.payment_reference`, falling back to `link_id`). Always sent in normal flow — fulfilment only runs after the upsell payment is recorded. |
+| `idempotencyKey`    | string ≤ 128   | Stable per fulfilment. Pattern: `alloc-<tenantId>-<invoiceRef>`. |
 
 **Expected response (200):**
 
