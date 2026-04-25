@@ -147,8 +147,50 @@ Deno.serve(async (req) => {
     if (body.purpose === 'SEAT_UPSELL' && body.account_id) {
       const update: Record<string, unknown> = { status };
       if (paidAt) update.paid_at = paidAt;
-      const q = admin.from('seat_upsell_links').update(update).eq('account_id', body.account_id).eq('link_id', body.link_id);
-      await q;
+      await admin.from('seat_upsell_links').update(update)
+        .eq('account_id', body.account_id).eq('link_id', body.link_id);
+
+      // Mirror an invoice entry on terminal states so finance always has a row
+      // (PAID / FAILED). Idempotent via dedupe on link_id in notes. Note: the
+      // webhook is the source of truth for fulfilment side-effects (seat counts,
+      // seat_change_events). Here we only ensure the invoice row exists.
+      if (status === 'PAID' || status === 'CANCELLED' || status === 'EXPIRED') {
+        const { data: link } = await admin.from('seat_upsell_links')
+          .select('seats_extra, prorated_subtotal, gst_pct, gst_amount, total')
+          .eq('account_id', body.account_id).eq('link_id', body.link_id).maybeSingle();
+        if (link) {
+          const { data: existing } = await admin.from('account_invoices').select('id')
+            .eq('account_id', body.account_id)
+            .ilike('notes', `%${body.link_id}%`)
+            .limit(1).maybeSingle();
+          if (!existing) {
+            const { data: bs } = await admin.from('account_billing_settings')
+              .select('plan_name, seat_rate, current_period_start, current_period_end')
+              .eq('account_id', body.account_id).maybeSingle();
+            const invStatus = status === 'PAID' ? 'PAID' : 'FAILED';
+            const nowIso = new Date().toISOString();
+            await admin.from('account_invoices').insert({
+              account_id: body.account_id,
+              plan_name: bs?.plan_name ?? 'Standard',
+              seat_count: link.seats_extra,
+              seat_rate: Number(bs?.seat_rate ?? 0),
+              base_fee: 0,
+              subtotal: Number(link.prorated_subtotal),
+              gst_pct: Number(link.gst_pct),
+              gst_amount: Number(link.gst_amount),
+              total: Number(link.total),
+              status: invStatus,
+              kind: 'PRORATION',
+              issued_at: nowIso,
+              paid_at: invStatus === 'PAID' ? (paidAt ?? nowIso) : null,
+              period_from: bs?.current_period_start ? new Date(bs.current_period_start).toISOString().substring(0, 10) : null,
+              period_to: bs?.current_period_end ? new Date(bs.current_period_end).toISOString().substring(0, 10) : null,
+              notes: `Razorpay seat upsell ${status.toLowerCase()} · +${link.seats_extra} seat(s) · ${body.link_id}`,
+            });
+          }
+        }
+      }
+
       await admin.from('activity_log').insert({
         entity_type: 'ACCOUNT', entity_id: body.account_id, event_type: 'FIELD_EDIT',
         summary: `[Seat upsell] Link status refreshed → ${status}`,
