@@ -50,13 +50,20 @@ export interface PaymentLinkResult {
 function addCycle(start: Date, cycle: Cycle): Date {
   const d = new Date(start);
   switch (cycle) {
-    case 'MONTHLY':     d.setMonth(d.getMonth() + 1); break;
-    case 'QUARTERLY':   d.setMonth(d.getMonth() + 3); break;
-    case 'HALF_YEARLY': d.setMonth(d.getMonth() + 6); break;
+    case 'MONTHLY':     d.setUTCMonth(d.getUTCMonth() + 1); break;
+    case 'QUARTERLY':   d.setUTCMonth(d.getUTCMonth() + 3); break;
+    case 'HALF_YEARLY': d.setUTCMonth(d.getUTCMonth() + 6); break;
     case 'ANNUAL':
-    default:            d.setFullYear(d.getFullYear() + 1); break;
+    default:            d.setUTCFullYear(d.getUTCFullYear() + 1); break;
   }
   return d;
+}
+
+// Normalize a date picked from the calendar (local-midnight) to 12:00 UTC on
+// the same calendar day, so the stored timestamp doesn't drift to the previous
+// day in timezones west of UTC… er, east of UTC like IST.
+function toUtcNoon(date: Date): Date {
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0));
 }
 
 interface Props {
@@ -92,7 +99,7 @@ export function PaymentLinkDialog({
   const [name, setName] = useState(defaults.customerName);
   const [email, setEmail] = useState(defaults.customerEmail ?? '');
   const [phone, setPhone] = useState(defaults.customerPhone ?? '');
-  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [startDate, setStartDate] = useState<Date>(toUtcNoon(new Date()));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -106,7 +113,7 @@ export function PaymentLinkDialog({
       setName(defaults.customerName);
       setEmail(defaults.customerEmail ?? '');
       setPhone(defaults.customerPhone ?? '');
-      setStartDate(new Date());
+      setStartDate(toUtcNoon(new Date()));
     }
   }, [open, defaults.seats, defaults.customerName, defaults.customerEmail, defaults.customerPhone, defaults.planName, defaults.cycle, defaults.baseFee, defaults.seatRate, defaults.gstPct]);
 
@@ -233,7 +240,7 @@ export function PaymentLinkDialog({
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar mode="single" selected={startDate}
-                    onSelect={(d) => d && setStartDate(d)} initialFocus
+                    onSelect={(d) => d && setStartDate(toUtcNoon(d))} initialFocus
                     className={cn('p-3 pointer-events-auto')} />
                 </PopoverContent>
               </Popover>

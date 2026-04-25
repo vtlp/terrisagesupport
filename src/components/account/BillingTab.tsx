@@ -25,6 +25,15 @@ function addMonths(iso: string, months: number): string {
   d.setMonth(d.getMonth() + months);
   return d.toISOString();
 }
+
+// Convert a YYYY-MM-DD value (from <input type="date">) into an ISO timestamp
+// anchored at 12:00 UTC, so the calendar day stays stable across timezones.
+function dateInputToUtcNoonIso(value: string): string | null {
+  if (!value) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).toISOString();
+}
 type SubStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'OVERDUE' | 'TRIAL';
 type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 type InvoiceKind = 'CYCLE' | 'PRORATION' | 'RENEWAL';
@@ -353,13 +362,13 @@ export function BillingTab({ accountId }: { accountId: string }) {
             <div className="space-y-1.5">
               <Label>Subscription started</Label>
               <Input type="date" value={settings.subscription_started_at ? settings.subscription_started_at.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, subscription_started_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+                onChange={e => setSettings(s => ({ ...s, subscription_started_at: dateInputToUtcNoonIso(e.target.value) }))} />
               <p className="text-[10px] text-muted-foreground">Anchor — first payment received. Stays fixed across renewals.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Current cycle start</Label>
               <Input type="date" value={effectiveCurrentStart ? effectiveCurrentStart.substring(0, 10) : ''}
-                onChange={e => setSettings(s => ({ ...s, current_period_start: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+                onChange={e => setSettings(s => ({ ...s, current_period_start: dateInputToUtcNoonIso(e.target.value) }))} />
               <p className="text-[10px] text-muted-foreground">Defaults to subscription start for the first cycle; updates each renewal.</p>
             </div>
             <div className="space-y-1.5">
@@ -482,7 +491,7 @@ export function BillingTab({ accountId }: { accountId: string }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Due date</Label><Input type="date" value={draft.due_at?.substring(0, 10) ?? ''} onChange={e => setDraft(d => ({ ...d, due_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} /></div>
+            <div className="space-y-1.5"><Label>Due date</Label><Input type="date" value={draft.due_at?.substring(0, 10) ?? ''} onChange={e => setDraft(d => ({ ...d, due_at: dateInputToUtcNoonIso(e.target.value) }))} /></div>
             <div className="space-y-1.5 md:col-span-2"><Label>Notes</Label><Textarea rows={2} value={draft.notes ?? ''} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} /></div>
           </div>
           <div className="grid grid-cols-3 gap-3 pt-2 border-t">
