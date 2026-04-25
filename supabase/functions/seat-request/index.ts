@@ -25,7 +25,7 @@ interface Body {
   requestedAt?: unknown;
 }
 
-const MAX_SEATS = 1000;
+const MAX_SEATS = 100000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
