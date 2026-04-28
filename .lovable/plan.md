@@ -1,58 +1,78 @@
+# Knowledge Base — Admin authoring & rename
 
+Add proper authoring tools to the Knowledge Base so admins can manage text templates and rename folders/files in place. All write actions are gated to admins (`isAdmin` from `UserContext`); support agents keep read-only access.
 
-## Review: `CRM_Integration_Handover_v1.md`
+## What changes
 
-**Verdict:** Still valuable as the backbone — the five seat states, four-counter model, endpoint list and reconciliation rules all match what's deployed. But it has **6 factual drifts** versus the live edge functions and **1 major gap** (no mention of TRIAL accounts, which we shipped today). It should be re-issued as **v1.1** before handover.
+### 1. Text templates (Articles tab) — admin authoring with rich text
 
----
+The "New article" dialog already exists but uses a plain textarea, cannot edit existing entries, and isn't gated. Improvements:
 
-### Drifts vs. implementation
+- **Gate create/edit/delete to admins.** Hide the "New article" button and edit/delete actions for non-admins.
+- **Rich text editor** for the article body, replacing the plain `Textarea`:
+  - Use **TipTap** (`@tiptap/react` + `@tiptap/starter-kit` + `@tiptap/extension-link`), which is the standard React-friendly rich text editor and works well with Tailwind. Lightweight, no external service.
+  - Toolbar with: bold, italic, underline, strikethrough, H1/H2/H3, bulleted list, numbered list, blockquote, code block, link (add/remove), and clear-formatting.
+  - Stores the body as **HTML** in `kb_articles.body` (existing `text` column, no migration).
+  - Article detail view renders the HTML safely with a `prose` Tailwind class for nice typography, replacing the current `whitespace-pre-wrap` block.
+  - "Copy" button copies both rich HTML and a plain-text fallback to the clipboard (using `ClipboardItem` with `text/html` + `text/plain`) so pasting into Gmail/WhatsApp Web preserves formatting.
+  - Build a small reusable `RichTextEditor` component at `src/components/shared/RichTextEditor.tsx` so it can be reused later (e.g. ticket replies, notes).
+- **Edit existing template.** Add an "Edit" button on the selected article view that reopens the same dialog pre-filled (title, bucket, body, tags). Saving runs an `UPDATE` on `kb_articles`.
+- **Delete template.** Add a "Delete" button next to Edit, with a confirm prompt.
+- **Reuse one dialog** for both create and edit (track `editingArticleId`); keep the existing fields and tag-CSV input.
 
-| # | Doc says | Code actually does | Fix |
-|---|---|---|---|
-| 1 | `GET /seat-capacity` returns fields named `plan_name`, `billing_cycle`, `subscription_status`, `next_renewal_at`, `requested_pending`, `as_of` | Returns `plan`, `cycle`, `status`, no `next_renewal_at`, field is `requested` (not `_pending`), timestamp is `last_crm_sync_at` (not `as_of`) | Update D1 sample response to match `seat-capacity/index.ts` exactly, or rename the function fields to match the doc — pick one. |
-| 2 | `POST /seat-usage` 200 body lists `allocated/reserved/consumed/available/over_capacity` | Code also returns `account_id` | Add `account_id` to the D4 example. |
-| 3 | `POST /seat-request` returns 200 | Code returns **201 Created** on insert; idempotent-return-of-existing-PENDING is **not** implemented (DB has no unique constraint on `(account_id, status='PENDING')`) | Either (a) implement the idempotency the doc promises, or (b) remove the "same row is returned" sentence and document 201. |
-| 4 | `GET /seat-request/:id` exists for status polling (in code) | Not mentioned in the doc at all | Add as D5b — the CRM will want to poll request status without waiting for a `REQUEST_FULFILLED` event. |
-| 5 | `seat-usage` payload requires `external_id` | Code falls back to `email` as match key when `external_id` is missing | Mark `external_id` as "✅ recommended" with note: "if absent, Console matches on `email`; rows with neither are skipped." |
-| 6 | `CRM_SYNC_STALE` raised after 24h with no heartbeat | No cron is currently deployed that writes this notification — the threshold exists in spec only | Either ship the cron now or downgrade the wording to "planned" so the CRM team doesn't expect the alert in pilot. |
+### 2. Rename folders (Files tab) — admin only
 
----
+- Add a **rename action** (pencil icon) on each folder row in the sidebar tree, visible on hover next to the existing "new subfolder" button. Admin-only.
+- Also expose rename from each folder card in the main grid (small icon button).
+- Opens a small dialog with the current name pre-filled. On save:
+  - Validate non-empty and trim.
+  - Reject if a sibling folder under the same parent already has that name (case-insensitive), matching the existing move-folder rule.
+  - `UPDATE kb_folders SET name = $1 WHERE id = $2`, then reload.
+- The underlying storage paths use folder IDs (`${folderId}/...`), so renaming the folder does **not** require touching Storage. Safe.
 
-### Major gap — TRIAL accounts (shipped today)
+### 3. Rename files (Files tab) — admin only
 
-The doc assumes every account is `ACTIVE` from day one. Post-today, an account can open in `subscription_status = 'TRIAL'`, with the first paid invoice raised only after the trial-conversion link is paid. CRM behaviour during `TRIAL` is currently undefined for the integrator. Add a short section:
+- Add a **rename action** (pencil icon) in the file row action group, between Preview/Download and Delete. Admin-only.
+- Opens a dialog with the current filename pre-filled (extension included, editable).
+- On save:
+  - Validate non-empty.
+  - `UPDATE kb_files SET name = $1 WHERE id = $2`. The display name changes immediately.
+  - The Storage object is **not moved** (storage path stays the same to avoid signed-URL churn and copy/delete risk). Downloads already pass `{ download: f.name }` to `createSignedUrl`, so the downloaded file uses the new name automatically. Preview uses `name` for display too.
 
-- **`status` enum**: add `TRIAL` to D1 / D2 / E.
-- **Behaviour during TRIAL**: seats are still allocated (`seats_purchased` from billing settings); CRM should treat capacity exactly as it does for `ACTIVE`. No proration applies.
-- **Transition signal**: when the trial-conversion payment lands, the Console flips status `TRIAL → ACTIVE` and creates the first `CYCLE` invoice. Today this is **silent on `/seat-events`** (no event reason exists for it). Decide: either add a new event reason `TRIAL_CONVERTED`, or have the CRM detect it by polling `/account-profile` for the status change. Recommendation: add `TRIAL_CONVERTED` to the events stream — it's the cleanest signal and matches the existing pattern.
+### 4. Role gating summary
 
----
+| Action | Admin | Support agent |
+|---|---|---|
+| Browse folders, preview, download | yes | yes |
+| Create/upload/delete files & folders | yes | yes (existing behaviour kept) |
+| Rename folders | yes | no |
+| Rename files | yes | no |
+| Create / edit / delete articles | yes | no |
 
-### Minor copy/clarity tweaks
+## Files to add / edit
 
-- Section A: rename the stage-context table header so "Counts as" reads "Reserved (R) / Consumed (C) / Released at renewal" — current single-column form is ambiguous for `DELETION_REQUESTED`.
-- Section B row 2: `current_period_start/end` are nullable while in `TRIAL`; flag this.
-- Section C3: clarify that the 5-min keepalive is **in addition to** state-change pushes, not a replacement.
-- Section F "Rate limits": these are aspirational — no limiter is enforced server-side. Mark as "soft target, monitored, not enforced".
-- Section H: add "Trial-conversion payment collection — handled inside Console, CRM sees only the resulting status flip."
+- **New:** `src/components/shared/RichTextEditor.tsx` — TipTap-based editor with toolbar, controlled `value` (HTML string) + `onChange`.
+- **Edit:** `src/pages/Knowledge.tsx` — add:
+  - `isAdmin` from `useUser()`
+  - `editingArticleId` state and reuse of the article dialog for create + edit
+  - Swap article-body `Textarea` for `<RichTextEditor>`
+  - Render selected article body as HTML inside `prose` container
+  - Rich-aware Copy (HTML + plain-text fallback)
+  - `updateArticle` and `deleteArticle` handlers
+  - `renameFolder(folderId, newName)` handler with sibling-name guard
+  - `renameFile(fileId, newName)` handler
+  - Rename dialog state (`renameTarget: { kind: 'folder'|'file', id, name } | null`)
+  - Pencil icon buttons (lucide `Pencil`) on folder rows, folder cards, file rows
+  - Edit/Delete buttons in the article detail view
 
----
+## Dependencies
 
-### What stays as-is (no change needed)
+Add `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-link`, `@tiptap/extension-underline`. Tailwind `@tailwindcss/typography` is already commonly available; if not present I will add it for the `prose` class used in article rendering.
 
-- Five-state model, counter math, hard rules block (A).
-- Auth via `x-account-api-key` SHA-256 (D, F).
-- Event reasons `REQUEST_FULFILLED / RENEWAL / MANUAL_ADJUSTMENT / CANCELLATION / SUPERUSER_TRANSFER` (C6, D3) — all still emitted.
-- Member schema in E.
-- Test plan in G — scenarios all still execute correctly; just add a TRIAL → ACTIVE scenario.
-- Quick handover checklist (closing) — still the right pre-flight.
+No DB schema changes, no edge function changes, no migration needed. RLS already permits staff full access on `kb_folders`, `kb_files`, and `kb_articles`; the admin restriction is a UI gate.
 
----
+## Out of scope
 
-### Proposed action
-
-Re-issue as **v1.1** with: (a) the 6 field/return-code corrections, (b) the TRIAL section, (c) the `GET /seat-request/:id` addition, (d) decision on `TRIAL_CONVERTED` event, (e) the "soft / aspirational" hedging on rate-limit and stale-sync claims that aren't enforced yet. Roughly 15-20 line diff, no structural rewrite.
-
-If you want, I can produce the v1.1 markdown in one pass — say the word and I'll switch to default mode and write the updated file plus, if you choose, the `TRIAL_CONVERTED` event wiring in the webhook.
-
+- Image uploads inside the rich text editor (can be added later via a Storage-backed image extension).
+- Moving files between folders via UI (folder drag-move already exists for folders).
+- Renaming the underlying Storage object (not needed for correct UX).
