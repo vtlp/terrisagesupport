@@ -502,6 +502,22 @@ export default function Knowledge() {
               <TooltipContent side="right">New subfolder inside “{folder.name}”</TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          {isAdmin && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); openRename('folder', folder.id, folder.name); }}
+                    aria-label={`Rename ${folder.name}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Rename folder</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
         {isExpanded && children.map(c => <FolderTreeItem key={c.id} folder={c} depth={depth + 1} />)}
       </div>
