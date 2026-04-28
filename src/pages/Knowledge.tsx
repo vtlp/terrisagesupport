@@ -196,19 +196,83 @@ export default function Knowledge() {
     load();
   };
 
-  const createArticle = async () => {
-    if (!newArticle.title.trim()) return;
-    const { error } = await supabase.from('kb_articles').insert({
-      title: newArticle.title.trim(),
-      body: newArticle.body,
-      bucket_key: newArticle.bucket_key,
-      tags: newArticle.tags ? newArticle.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-      created_by: currentUser.user_id,
+  const openNewArticle = () => {
+    setEditingArticleId(null);
+    setArticleForm({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
+    setShowArticleDialog(true);
+  };
+
+  const openEditArticle = (a: Article) => {
+    setEditingArticleId(a.id);
+    setArticleForm({
+      title: a.title,
+      body: a.body ?? '',
+      bucket_key: a.bucket_key,
+      tags: (a.tags ?? []).join(', '),
     });
+    setShowArticleDialog(true);
+  };
+
+  const saveArticle = async () => {
+    if (!articleForm.title.trim()) return;
+    const payload = {
+      title: articleForm.title.trim(),
+      body: articleForm.body,
+      bucket_key: articleForm.bucket_key,
+      tags: articleForm.tags ? articleForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+    };
+    if (editingArticleId) {
+      const { error } = await supabase
+        .from('kb_articles')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', editingArticleId);
+      if (error) { toast.error(error.message); return; }
+      toast.success('Template updated');
+    } else {
+      const { error } = await supabase.from('kb_articles').insert({ ...payload, created_by: currentUser.user_id });
+      if (error) { toast.error(error.message); return; }
+      toast.success('Template created');
+    }
+    setShowArticleDialog(false);
+    setEditingArticleId(null);
+    load();
+  };
+
+  const deleteArticle = async (a: Article) => {
+    if (!confirm(`Delete template "${a.title}"?`)) return;
+    const { error } = await supabase.from('kb_articles').delete().eq('id', a.id);
     if (error) { toast.error(error.message); return; }
-    setNewArticle({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
-    setShowNewArticle(false);
-    toast.success('Article created');
+    if (selectedArticleId === a.id) setSelectedArticleId(null);
+    toast.success('Template deleted');
+    load();
+  };
+
+  // ---------- Rename folder / file ----------
+  const openRename = (kind: 'folder' | 'file', id: string, name: string) => {
+    setRenameTarget({ kind, id, name });
+    setRenameValue(name);
+  };
+
+  const saveRename = async () => {
+    if (!renameTarget) return;
+    const name = renameValue.trim();
+    if (!name) { toast.error('Name cannot be empty'); return; }
+    if (name === renameTarget.name) { setRenameTarget(null); return; }
+    if (renameTarget.kind === 'folder') {
+      const folder = folders.find(f => f.id === renameTarget.id);
+      if (!folder) return;
+      const clash = folders.some(f =>
+        f.parent_id === folder.parent_id && f.id !== folder.id && f.name.toLowerCase() === name.toLowerCase());
+      if (clash) { toast.error(`A folder named "${name}" already exists here.`); return; }
+      const { error } = await supabase.from('kb_folders').update({ name }).eq('id', folder.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success('Folder renamed');
+    } else {
+      const { error } = await supabase.from('kb_files').update({ name }).eq('id', renameTarget.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success('File renamed');
+    }
+    setRenameTarget(null);
     load();
   };
 
