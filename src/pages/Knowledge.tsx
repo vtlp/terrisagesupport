@@ -743,6 +743,18 @@ export default function Knowledge() {
                               <TooltipContent>Download</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
+                          {isAdmin && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openRename('file', file.id, file.name)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Rename</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => deleteFile(file)}>
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
