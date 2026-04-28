@@ -837,29 +837,69 @@ export default function Knowledge() {
         </DialogContent>
       </Dialog>
 
-      {/* New article dialog */}
-      <Dialog open={showNewArticle} onOpenChange={setShowNewArticle}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>New article</DialogTitle></DialogHeader>
+      {/* Article (template) dialog: create + edit */}
+      <Dialog open={showArticleDialog} onOpenChange={(o) => { setShowArticleDialog(o); if (!o) setEditingArticleId(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editingArticleId ? 'Edit template' : 'New template'}</DialogTitle>
+            <DialogDescription>
+              Rich text is preserved when staff copy this template into emails or chat.
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1"><Label>Title</Label>
-              <Input value={newArticle.title} onChange={e => setNewArticle(a => ({ ...a, title: e.target.value }))} />
+              <Input value={articleForm.title} onChange={e => setArticleForm(a => ({ ...a, title: e.target.value }))} />
             </div>
             <div className="space-y-1"><Label>Bucket</Label>
-              <Select value={newArticle.bucket_key} onValueChange={v => setNewArticle(a => ({ ...a, bucket_key: v }))}>
+              <Select value={articleForm.bucket_key} onValueChange={v => setArticleForm(a => ({ ...a, bucket_key: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{buckets.map(b => <SelectItem key={b.v} value={b.v}>{b.l}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1"><Label>Body</Label>
-              <Textarea rows={8} value={newArticle.body} onChange={e => setNewArticle(a => ({ ...a, body: e.target.value }))} />
+              <RichTextEditor
+                value={articleForm.body}
+                onChange={(html) => setArticleForm(a => ({ ...a, body: html }))}
+                placeholder="Write the template content here…"
+                minHeight={240}
+              />
             </div>
             <div className="space-y-1"><Label>Tags (comma separated)</Label>
-              <Input value={newArticle.tags} onChange={e => setNewArticle(a => ({ ...a, tags: e.target.value }))} placeholder="onboarding, demo, pricing" />
+              <Input value={articleForm.tags} onChange={e => setArticleForm(a => ({ ...a, tags: e.target.value }))} placeholder="onboarding, demo, pricing" />
             </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowNewArticle(false)}>Cancel</Button>
-              <Button onClick={createArticle} disabled={!newArticle.title.trim()}>Create</Button>
+              <Button variant="ghost" onClick={() => { setShowArticleDialog(false); setEditingArticleId(null); }}>Cancel</Button>
+              <Button onClick={saveArticle} disabled={!articleForm.title.trim()}>
+                {editingArticleId ? 'Save changes' : 'Create'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename dialog (folder or file) */}
+      <Dialog open={!!renameTarget} onOpenChange={(o) => { if (!o) setRenameTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename {renameTarget?.kind === 'folder' ? 'folder' : 'file'}</DialogTitle>
+            <DialogDescription>
+              {renameTarget?.kind === 'folder'
+                ? 'Renaming a folder does not move any of its files.'
+                : 'Renaming a file changes the display name and the name used when downloading.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label>New name</Label>
+              <Input
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && renameValue.trim()) saveRename(); }}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setRenameTarget(null)}>Cancel</Button>
+              <Button onClick={saveRename} disabled={!renameValue.trim() || renameValue.trim() === renameTarget?.name}>Rename</Button>
             </div>
           </div>
         </DialogContent>
