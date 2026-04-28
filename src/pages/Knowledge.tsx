@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, BookOpen, Copy, Folder, FolderOpen, File as FileIcon, Upload, Plus, FolderPlus, ChevronRight, ChevronDown, Download, FileText, Image as ImageIcon, Table2, Loader2, Trash2, Eye } from 'lucide-react';
+import { Search, BookOpen, Copy, Folder, FolderOpen, File as FileIcon, Upload, Plus, FolderPlus, ChevronRight, ChevronDown, Download, FileText, Image as ImageIcon, Table2, Loader2, Trash2, Eye, Pencil } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -14,6 +13,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { FilePreviewDialog } from '@/components/shared/FilePreviewDialog';
+import { RichTextEditor } from '@/components/shared/RichTextEditor';
 
 const buckets = [
   { v: 'SALES_CONTENT', l: 'Sales Content' },
@@ -46,7 +46,7 @@ const fmtSize = (b?: number | null) => {
 };
 
 export default function Knowledge() {
-  const { currentUser } = useUser();
+  const { currentUser, isAdmin } = useUser();
   const [activeTab, setActiveTab] = useState<'articles' | 'files'>('files');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBucket, setSelectedBucket] = useState<string>('all');
@@ -61,8 +61,11 @@ export default function Knowledge() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderTarget, setNewFolderTarget] = useState<{ parentId: string | null; parentName: string | null }>({ parentId: null, parentName: null });
   const [newFolderName, setNewFolderName] = useState('');
-  const [showNewArticle, setShowNewArticle] = useState(false);
-  const [newArticle, setNewArticle] = useState({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
+  const [showArticleDialog, setShowArticleDialog] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+  const [articleForm, setArticleForm] = useState({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
+  const [renameTarget, setRenameTarget] = useState<{ kind: 'folder' | 'file'; id: string; name: string } | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -193,19 +196,83 @@ export default function Knowledge() {
     load();
   };
 
-  const createArticle = async () => {
-    if (!newArticle.title.trim()) return;
-    const { error } = await supabase.from('kb_articles').insert({
-      title: newArticle.title.trim(),
-      body: newArticle.body,
-      bucket_key: newArticle.bucket_key,
-      tags: newArticle.tags ? newArticle.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-      created_by: currentUser.user_id,
+  const openNewArticle = () => {
+    setEditingArticleId(null);
+    setArticleForm({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
+    setShowArticleDialog(true);
+  };
+
+  const openEditArticle = (a: Article) => {
+    setEditingArticleId(a.id);
+    setArticleForm({
+      title: a.title,
+      body: a.body ?? '',
+      bucket_key: a.bucket_key,
+      tags: (a.tags ?? []).join(', '),
     });
+    setShowArticleDialog(true);
+  };
+
+  const saveArticle = async () => {
+    if (!articleForm.title.trim()) return;
+    const payload = {
+      title: articleForm.title.trim(),
+      body: articleForm.body,
+      bucket_key: articleForm.bucket_key,
+      tags: articleForm.tags ? articleForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+    };
+    if (editingArticleId) {
+      const { error } = await supabase
+        .from('kb_articles')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', editingArticleId);
+      if (error) { toast.error(error.message); return; }
+      toast.success('Template updated');
+    } else {
+      const { error } = await supabase.from('kb_articles').insert({ ...payload, created_by: currentUser.user_id });
+      if (error) { toast.error(error.message); return; }
+      toast.success('Template created');
+    }
+    setShowArticleDialog(false);
+    setEditingArticleId(null);
+    load();
+  };
+
+  const deleteArticle = async (a: Article) => {
+    if (!confirm(`Delete template "${a.title}"?`)) return;
+    const { error } = await supabase.from('kb_articles').delete().eq('id', a.id);
     if (error) { toast.error(error.message); return; }
-    setNewArticle({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
-    setShowNewArticle(false);
-    toast.success('Article created');
+    if (selectedArticleId === a.id) setSelectedArticleId(null);
+    toast.success('Template deleted');
+    load();
+  };
+
+  // ---------- Rename folder / file ----------
+  const openRename = (kind: 'folder' | 'file', id: string, name: string) => {
+    setRenameTarget({ kind, id, name });
+    setRenameValue(name);
+  };
+
+  const saveRename = async () => {
+    if (!renameTarget) return;
+    const name = renameValue.trim();
+    if (!name) { toast.error('Name cannot be empty'); return; }
+    if (name === renameTarget.name) { setRenameTarget(null); return; }
+    if (renameTarget.kind === 'folder') {
+      const folder = folders.find(f => f.id === renameTarget.id);
+      if (!folder) return;
+      const clash = folders.some(f =>
+        f.parent_id === folder.parent_id && f.id !== folder.id && f.name.toLowerCase() === name.toLowerCase());
+      if (clash) { toast.error(`A folder named "${name}" already exists here.`); return; }
+      const { error } = await supabase.from('kb_folders').update({ name }).eq('id', folder.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success('Folder renamed');
+    } else {
+      const { error } = await supabase.from('kb_files').update({ name }).eq('id', renameTarget.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success('File renamed');
+    }
+    setRenameTarget(null);
     load();
   };
 
@@ -435,6 +502,22 @@ export default function Knowledge() {
               <TooltipContent side="right">New subfolder inside “{folder.name}”</TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          {isAdmin && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); openRename('folder', folder.id, folder.name); }}
+                    aria-label={`Rename ${folder.name}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Rename folder</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
         {isExpanded && children.map(c => <FolderTreeItem key={c.id} folder={c} depth={depth + 1} />)}
       </div>
@@ -504,7 +587,9 @@ export default function Knowledge() {
                 {b.l} ({articles.filter(a => a.bucket_key === b.v).length})
               </Button>
             ))}
-            <Button size="sm" className="mt-2" onClick={() => setShowNewArticle(true)}><Plus className="h-3 w-3 mr-1" /> New article</Button>
+            {isAdmin && (
+              <Button size="sm" className="mt-2" onClick={openNewArticle}><Plus className="h-3 w-3 mr-1" /> New template</Button>
+            )}
           </>
         )}
       </div>
@@ -590,13 +675,24 @@ export default function Knowledge() {
             {!searchQuery && childFolders.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {childFolders.map(f => (
-                  <Card key={f.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setCurrentFolderId(f.id)}>
+                  <Card key={f.id} className="group cursor-pointer hover:bg-muted/50 relative" onClick={() => setCurrentFolderId(f.id)}>
                     <CardContent className="p-3 flex items-center gap-3">
                       <Folder className="h-8 w-8 text-primary flex-shrink-0" />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{f.name}</p>
                         <p className="text-xs text-muted-foreground">{getFilesInFolder(f.id).length} files</p>
                       </div>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100"
+                          onClick={(e) => { e.stopPropagation(); openRename('folder', f.id, f.name); }}
+                          aria-label={`Rename ${f.name}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -647,6 +743,18 @@ export default function Knowledge() {
                               <TooltipContent>Download</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
+                          {isAdmin && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openRename('file', file.id, file.name)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Rename</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => deleteFile(file)}>
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
@@ -682,11 +790,50 @@ export default function Knowledge() {
                 <div className="p-6 max-w-3xl">
                   <Badge className="mb-2">{buckets.find(b => b.v === selectedArticle.bucket_key)?.l ?? selectedArticle.bucket_key}</Badge>
                   <h1 className="text-2xl font-bold mb-4">{selectedArticle.title}</h1>
-                  <Button size="sm" variant="outline" className="mb-4" onClick={() => { navigator.clipboard.writeText(selectedArticle.body); toast.success('Copied'); }}>
-                    <Copy className="h-4 w-4 mr-1" />Copy
-                  </Button>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      const html = selectedArticle.body ?? '';
+                      const tmp = document.createElement('div'); tmp.innerHTML = html;
+                      const plain = tmp.innerText;
+                      try {
+                        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+                          await navigator.clipboard.write([
+                            new ClipboardItem({
+                              'text/html': new Blob([html], { type: 'text/html' }),
+                              'text/plain': new Blob([plain], { type: 'text/plain' }),
+                            }),
+                          ]);
+                        } else {
+                          await navigator.clipboard.writeText(plain);
+                        }
+                        toast.success('Copied');
+                      } catch {
+                        await navigator.clipboard.writeText(plain);
+                        toast.success('Copied as plain text');
+                      }
+                    }}>
+                      <Copy className="h-4 w-4 mr-1" />Copy
+                    </Button>
+                    {isAdmin && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => openEditArticle(selectedArticle)}>
+                          <Pencil className="h-4 w-4 mr-1" />Edit
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => deleteArticle(selectedArticle)}>
+                          <Trash2 className="h-4 w-4 mr-1 text-destructive" />Delete
+                        </Button>
+                      </>
+                    )}
+                  </div>
                   <div className="bg-card border rounded-lg p-6">
-                    <p className="whitespace-pre-wrap text-sm">{selectedArticle.body}</p>
+                    {selectedArticle.body ? (
+                      <div
+                        className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary"
+                        dangerouslySetInnerHTML={{ __html: selectedArticle.body }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Empty template.</p>
+                    )}
                   </div>
                   <div className="mt-4 flex flex-wrap gap-1">
                     {(selectedArticle.tags ?? []).map(t => <Badge key={t} variant="outline">{t}</Badge>)}
@@ -694,7 +841,7 @@ export default function Knowledge() {
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground">Select an article to view</p>
+                  <p className="text-muted-foreground">Select a template to view</p>
                 </div>
               )}
             </div>
@@ -729,29 +876,69 @@ export default function Knowledge() {
         </DialogContent>
       </Dialog>
 
-      {/* New article dialog */}
-      <Dialog open={showNewArticle} onOpenChange={setShowNewArticle}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>New article</DialogTitle></DialogHeader>
+      {/* Article (template) dialog: create + edit */}
+      <Dialog open={showArticleDialog} onOpenChange={(o) => { setShowArticleDialog(o); if (!o) setEditingArticleId(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editingArticleId ? 'Edit template' : 'New template'}</DialogTitle>
+            <DialogDescription>
+              Rich text is preserved when staff copy this template into emails or chat.
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1"><Label>Title</Label>
-              <Input value={newArticle.title} onChange={e => setNewArticle(a => ({ ...a, title: e.target.value }))} />
+              <Input value={articleForm.title} onChange={e => setArticleForm(a => ({ ...a, title: e.target.value }))} />
             </div>
             <div className="space-y-1"><Label>Bucket</Label>
-              <Select value={newArticle.bucket_key} onValueChange={v => setNewArticle(a => ({ ...a, bucket_key: v }))}>
+              <Select value={articleForm.bucket_key} onValueChange={v => setArticleForm(a => ({ ...a, bucket_key: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{buckets.map(b => <SelectItem key={b.v} value={b.v}>{b.l}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1"><Label>Body</Label>
-              <Textarea rows={8} value={newArticle.body} onChange={e => setNewArticle(a => ({ ...a, body: e.target.value }))} />
+              <RichTextEditor
+                value={articleForm.body}
+                onChange={(html) => setArticleForm(a => ({ ...a, body: html }))}
+                placeholder="Write the template content here…"
+                minHeight={240}
+              />
             </div>
             <div className="space-y-1"><Label>Tags (comma separated)</Label>
-              <Input value={newArticle.tags} onChange={e => setNewArticle(a => ({ ...a, tags: e.target.value }))} placeholder="onboarding, demo, pricing" />
+              <Input value={articleForm.tags} onChange={e => setArticleForm(a => ({ ...a, tags: e.target.value }))} placeholder="onboarding, demo, pricing" />
             </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowNewArticle(false)}>Cancel</Button>
-              <Button onClick={createArticle} disabled={!newArticle.title.trim()}>Create</Button>
+              <Button variant="ghost" onClick={() => { setShowArticleDialog(false); setEditingArticleId(null); }}>Cancel</Button>
+              <Button onClick={saveArticle} disabled={!articleForm.title.trim()}>
+                {editingArticleId ? 'Save changes' : 'Create'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename dialog (folder or file) */}
+      <Dialog open={!!renameTarget} onOpenChange={(o) => { if (!o) setRenameTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename {renameTarget?.kind === 'folder' ? 'folder' : 'file'}</DialogTitle>
+            <DialogDescription>
+              {renameTarget?.kind === 'folder'
+                ? 'Renaming a folder does not move any of its files.'
+                : 'Renaming a file changes the display name and the name used when downloading.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label>New name</Label>
+              <Input
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && renameValue.trim()) saveRename(); }}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setRenameTarget(null)}>Cancel</Button>
+              <Button onClick={saveRename} disabled={!renameValue.trim() || renameValue.trim() === renameTarget?.name}>Rename</Button>
             </div>
           </div>
         </DialogContent>
