@@ -46,7 +46,7 @@ const fmtSize = (b?: number | null) => {
 };
 
 export default function Knowledge() {
-  const { currentUser } = useUser();
+  const { currentUser, isAdmin } = useUser();
   const [activeTab, setActiveTab] = useState<'articles' | 'files'>('files');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBucket, setSelectedBucket] = useState<string>('all');
@@ -61,8 +61,11 @@ export default function Knowledge() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderTarget, setNewFolderTarget] = useState<{ parentId: string | null; parentName: string | null }>({ parentId: null, parentName: null });
   const [newFolderName, setNewFolderName] = useState('');
-  const [showNewArticle, setShowNewArticle] = useState(false);
-  const [newArticle, setNewArticle] = useState({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
+  const [showArticleDialog, setShowArticleDialog] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+  const [articleForm, setArticleForm] = useState({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
+  const [renameTarget, setRenameTarget] = useState<{ kind: 'folder' | 'file'; id: string; name: string } | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
