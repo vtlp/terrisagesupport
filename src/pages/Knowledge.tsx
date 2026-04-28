@@ -571,7 +571,9 @@ export default function Knowledge() {
                 {b.l} ({articles.filter(a => a.bucket_key === b.v).length})
               </Button>
             ))}
-            <Button size="sm" className="mt-2" onClick={() => setShowNewArticle(true)}><Plus className="h-3 w-3 mr-1" /> New article</Button>
+            {isAdmin && (
+              <Button size="sm" className="mt-2" onClick={openNewArticle}><Plus className="h-3 w-3 mr-1" /> New template</Button>
+            )}
           </>
         )}
       </div>
