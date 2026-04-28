@@ -751,11 +751,50 @@ export default function Knowledge() {
                 <div className="p-6 max-w-3xl">
                   <Badge className="mb-2">{buckets.find(b => b.v === selectedArticle.bucket_key)?.l ?? selectedArticle.bucket_key}</Badge>
                   <h1 className="text-2xl font-bold mb-4">{selectedArticle.title}</h1>
-                  <Button size="sm" variant="outline" className="mb-4" onClick={() => { navigator.clipboard.writeText(selectedArticle.body); toast.success('Copied'); }}>
-                    <Copy className="h-4 w-4 mr-1" />Copy
-                  </Button>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      const html = selectedArticle.body ?? '';
+                      const tmp = document.createElement('div'); tmp.innerHTML = html;
+                      const plain = tmp.innerText;
+                      try {
+                        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+                          await navigator.clipboard.write([
+                            new ClipboardItem({
+                              'text/html': new Blob([html], { type: 'text/html' }),
+                              'text/plain': new Blob([plain], { type: 'text/plain' }),
+                            }),
+                          ]);
+                        } else {
+                          await navigator.clipboard.writeText(plain);
+                        }
+                        toast.success('Copied');
+                      } catch {
+                        await navigator.clipboard.writeText(plain);
+                        toast.success('Copied as plain text');
+                      }
+                    }}>
+                      <Copy className="h-4 w-4 mr-1" />Copy
+                    </Button>
+                    {isAdmin && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => openEditArticle(selectedArticle)}>
+                          <Pencil className="h-4 w-4 mr-1" />Edit
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => deleteArticle(selectedArticle)}>
+                          <Trash2 className="h-4 w-4 mr-1 text-destructive" />Delete
+                        </Button>
+                      </>
+                    )}
+                  </div>
                   <div className="bg-card border rounded-lg p-6">
-                    <p className="whitespace-pre-wrap text-sm">{selectedArticle.body}</p>
+                    {selectedArticle.body ? (
+                      <div
+                        className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary"
+                        dangerouslySetInnerHTML={{ __html: selectedArticle.body }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Empty template.</p>
+                    )}
                   </div>
                   <div className="mt-4 flex flex-wrap gap-1">
                     {(selectedArticle.tags ?? []).map(t => <Badge key={t} variant="outline">{t}</Badge>)}
@@ -763,7 +802,7 @@ export default function Knowledge() {
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground">Select an article to view</p>
+                  <p className="text-muted-foreground">Select a template to view</p>
                 </div>
               )}
             </div>
