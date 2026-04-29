@@ -193,7 +193,7 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           )}
-          {!loading && signedUrl && loadError && (
+          {!isInline && !loading && signedUrl && loadError && (
             <div className="h-full flex items-center justify-center p-6 text-center">
               <div>
                 <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -206,7 +206,7 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
               </div>
             </div>
           )}
-          {!loading && signedUrl && !loadError && (
+          {!isInline && !loading && signedUrl && !loadError && (
             <>
               {kind === 'image' && (
                 <div className="h-full flex items-center justify-center p-4">
