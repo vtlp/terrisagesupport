@@ -28,8 +28,10 @@ interface KFile {
 const isInlineDoc = (f: Pick<KFile, 'mime_type' | 'storage_path'>) =>
   f.mime_type === 'text/html' && f.storage_path.startsWith('inline://');
 
-const fileIcon = (mime?: string | null, name?: string) => {
-  const ext = name?.split('.').pop()?.toLowerCase() ?? '';
+const fileIcon = (file: Pick<KFile, 'mime_type' | 'name' | 'storage_path'>) => {
+  if (isInlineDoc(file)) return <FileText className="h-4 w-4 text-primary" />;
+  const mime = file.mime_type;
+  const ext = file.name?.split('.').pop()?.toLowerCase() ?? '';
   if (mime?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) return <ImageIcon className="h-4 w-4 text-info" />;
   if (mime?.includes('sheet') || ['xlsx', 'xls', 'csv'].includes(ext)) return <Table2 className="h-4 w-4 text-success" />;
   if (mime === 'application/pdf' || ['pdf', 'doc', 'docx'].includes(ext)) return <FileText className="h-4 w-4 text-destructive" />;
@@ -44,13 +46,9 @@ const fmtSize = (b?: number | null) => {
 
 export default function Knowledge() {
   const { currentUser, isAdmin } = useUser();
-  const [activeTab, setActiveTab] = useState<'articles' | 'files'>('files');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBucket, setSelectedBucket] = useState<string>('all');
-  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
-  const [articles, setArticles] = useState<Article[]>([]);
   const [folders, setFolders] = useState<KFolder[]>([]);
   const [files, setFiles] = useState<KFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,11 +56,20 @@ export default function Knowledge() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderTarget, setNewFolderTarget] = useState<{ parentId: string | null; parentName: string | null }>({ parentId: null, parentName: null });
   const [newFolderName, setNewFolderName] = useState('');
-  const [showArticleDialog, setShowArticleDialog] = useState(false);
-  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
-  const [articleForm, setArticleForm] = useState({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
+
+  // Inline rich-text document authoring
+  const [showDocDialog, setShowDocDialog] = useState(false);
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [docForm, setDocForm] = useState<{ name: string; content_html: string }>({ name: '', content_html: '' });
+  const [docFolderId, setDocFolderId] = useState<string | null>(null);
+
   const [renameTarget, setRenameTarget] = useState<{ kind: 'folder' | 'file'; id: string; name: string } | null>(null);
   const [renameValue, setRenameValue] = useState('');
+
+  // Move file dialog
+  const [moveTarget, setMoveTarget] = useState<KFile | null>(null);
+  const [moveSelectedId, setMoveSelectedId] = useState<string | null>(null);
+
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -79,12 +86,10 @@ export default function Knowledge() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: a }, { data: f }, { data: fi }] = await Promise.all([
-      supabase.from('kb_articles').select('id, title, body, bucket_key, tags, updated_at').order('updated_at', { ascending: false }),
+    const [{ data: f }, { data: fi }] = await Promise.all([
       supabase.from('kb_folders').select('id, name, parent_id'),
-      supabase.from('kb_files').select('id, folder_id, name, size_bytes, mime_type, storage_path, created_at').order('created_at', { ascending: false }),
+      supabase.from('kb_files').select('id, folder_id, name, size_bytes, mime_type, storage_path, content_html, created_at').order('created_at', { ascending: false }),
     ]);
-    setArticles((a ?? []) as Article[]);
     setFolders((f ?? []) as KFolder[]);
     setFiles((fi ?? []) as KFile[]);
     setLoading(false);
