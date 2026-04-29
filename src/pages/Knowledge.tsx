@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, BookOpen, Copy, Folder, FolderOpen, File as FileIcon, Upload, Plus, FolderPlus, ChevronRight, ChevronDown, Download, FileText, Image as ImageIcon, Table2, Loader2, Trash2, Eye, Pencil } from 'lucide-react';
+import { Search, BookOpen, Copy, Folder, FolderOpen, File as FileIcon, Upload, Plus, FolderPlus, ChevronRight, ChevronDown, Download, FileText, Image as ImageIcon, Table2, Loader2, Trash2, Eye, Pencil, FolderInput } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -15,24 +13,25 @@ import { useUser } from '@/context/UserContext';
 import { FilePreviewDialog } from '@/components/shared/FilePreviewDialog';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
 
-const buckets = [
-  { v: 'SALES_CONTENT', l: 'Sales Content' },
-  { v: 'CHECKLISTS', l: 'Checklists' },
-  { v: 'SUPPORT_UI_GUIDE', l: 'Support UI Guide' },
-  { v: 'PLATFORM_GUIDES', l: 'Platform Guides' },
-  { v: 'BUILDER_WORKSHEETS', l: 'Builder Worksheets' },
-  { v: 'CRM_TEMPLATES', l: 'CRM Templates' },
-  { v: 'BULK_IMPORT_TEMPLATES', l: 'Bulk Import Templates' },
-  { v: 'DEMO_TIPS', l: 'Demo Tips & Pitches' },
-  { v: 'ONBOARDING_PACKS', l: 'Onboarding Packs' },
-];
-
-interface Article { id: string; title: string; body: string; bucket_key: string; tags: string[] | null; updated_at: string; }
 interface KFolder { id: string; name: string; parent_id: string | null; }
-interface KFile { id: string; folder_id: string | null; name: string; size_bytes: number | null; mime_type: string | null; storage_path: string; created_at: string; }
+interface KFile {
+  id: string;
+  folder_id: string | null;
+  name: string;
+  size_bytes: number | null;
+  mime_type: string | null;
+  storage_path: string;
+  content_html: string | null;
+  created_at: string;
+}
 
-const fileIcon = (mime?: string | null, name?: string) => {
-  const ext = name?.split('.').pop()?.toLowerCase() ?? '';
+const isInlineDoc = (f: Pick<KFile, 'mime_type' | 'storage_path'>) =>
+  f.mime_type === 'text/html' && f.storage_path.startsWith('inline://');
+
+const fileIcon = (file: Pick<KFile, 'mime_type' | 'name' | 'storage_path'>) => {
+  if (isInlineDoc(file)) return <FileText className="h-4 w-4 text-primary" />;
+  const mime = file.mime_type;
+  const ext = file.name?.split('.').pop()?.toLowerCase() ?? '';
   if (mime?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) return <ImageIcon className="h-4 w-4 text-info" />;
   if (mime?.includes('sheet') || ['xlsx', 'xls', 'csv'].includes(ext)) return <Table2 className="h-4 w-4 text-success" />;
   if (mime === 'application/pdf' || ['pdf', 'doc', 'docx'].includes(ext)) return <FileText className="h-4 w-4 text-destructive" />;
@@ -47,13 +46,9 @@ const fmtSize = (b?: number | null) => {
 
 export default function Knowledge() {
   const { currentUser, isAdmin } = useUser();
-  const [activeTab, setActiveTab] = useState<'articles' | 'files'>('files');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBucket, setSelectedBucket] = useState<string>('all');
-  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
-  const [articles, setArticles] = useState<Article[]>([]);
   const [folders, setFolders] = useState<KFolder[]>([]);
   const [files, setFiles] = useState<KFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,11 +56,20 @@ export default function Knowledge() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderTarget, setNewFolderTarget] = useState<{ parentId: string | null; parentName: string | null }>({ parentId: null, parentName: null });
   const [newFolderName, setNewFolderName] = useState('');
-  const [showArticleDialog, setShowArticleDialog] = useState(false);
-  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
-  const [articleForm, setArticleForm] = useState({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
+
+  // Inline rich-text document authoring
+  const [showDocDialog, setShowDocDialog] = useState(false);
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [docForm, setDocForm] = useState<{ name: string; content_html: string }>({ name: '', content_html: '' });
+  const [docFolderId, setDocFolderId] = useState<string | null>(null);
+
   const [renameTarget, setRenameTarget] = useState<{ kind: 'folder' | 'file'; id: string; name: string } | null>(null);
   const [renameValue, setRenameValue] = useState('');
+
+  // Move file dialog
+  const [moveTarget, setMoveTarget] = useState<KFile | null>(null);
+  const [moveSelectedId, setMoveSelectedId] = useState<string | null>(null);
+
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -82,12 +86,10 @@ export default function Knowledge() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: a }, { data: f }, { data: fi }] = await Promise.all([
-      supabase.from('kb_articles').select('id, title, body, bucket_key, tags, updated_at').order('updated_at', { ascending: false }),
+    const [{ data: f }, { data: fi }] = await Promise.all([
       supabase.from('kb_folders').select('id, name, parent_id'),
-      supabase.from('kb_files').select('id, folder_id, name, size_bytes, mime_type, storage_path, created_at').order('created_at', { ascending: false }),
+      supabase.from('kb_files').select('id, folder_id, name, size_bytes, mime_type, storage_path, content_html, created_at').order('created_at', { ascending: false }),
     ]);
-    setArticles((a ?? []) as Article[]);
     setFolders((f ?? []) as KFolder[]);
     setFiles((fi ?? []) as KFile[]);
     setLoading(false);
@@ -159,13 +161,6 @@ export default function Knowledge() {
     load();
   };
 
-  const filteredArticles = articles.filter(a => {
-    const q = searchQuery.toLowerCase();
-    const matchSearch = !q || a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q) || (a.tags ?? []).some(t => t.toLowerCase().includes(q));
-    const matchBucket = selectedBucket === 'all' || a.bucket_key === selectedBucket;
-    return matchSearch && matchBucket;
-  });
-
   // Files: when searching, search globally across ALL files; otherwise show current folder
   const filteredFiles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -175,7 +170,6 @@ export default function Knowledge() {
     return getFilesInFolder(currentFolderId);
   }, [files, searchQuery, currentFolderId]);
 
-  const selectedArticle = selectedArticleId ? articles.find(a => a.id === selectedArticleId) : null;
   const childFolders = getChildren(currentFolderId);
 
   // ---------- Folder creation (explicit parent) ----------
@@ -196,54 +190,49 @@ export default function Knowledge() {
     load();
   };
 
-  const openNewArticle = () => {
-    setEditingArticleId(null);
-    setArticleForm({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
-    setShowArticleDialog(true);
+  // ---------- Inline rich-text documents ----------
+  const openNewDoc = () => {
+    if (!currentFolderId) { toast.error('Open a folder first'); return; }
+    setEditingDocId(null);
+    setDocFolderId(currentFolderId);
+    setDocForm({ name: '', content_html: '' });
+    setShowDocDialog(true);
   };
 
-  const openEditArticle = (a: Article) => {
-    setEditingArticleId(a.id);
-    setArticleForm({
-      title: a.title,
-      body: a.body ?? '',
-      bucket_key: a.bucket_key,
-      tags: (a.tags ?? []).join(', '),
-    });
-    setShowArticleDialog(true);
+  const openEditDoc = (f: KFile) => {
+    setEditingDocId(f.id);
+    setDocFolderId(f.folder_id);
+    setDocForm({ name: f.name, content_html: f.content_html ?? '' });
+    setShowDocDialog(true);
   };
 
-  const saveArticle = async () => {
-    if (!articleForm.title.trim()) return;
-    const payload = {
-      title: articleForm.title.trim(),
-      body: articleForm.body,
-      bucket_key: articleForm.bucket_key,
-      tags: articleForm.tags ? articleForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-    };
-    if (editingArticleId) {
+  const saveDoc = async () => {
+    const name = docForm.name.trim();
+    if (!name) { toast.error('Name is required'); return; }
+    if (editingDocId) {
       const { error } = await supabase
-        .from('kb_articles')
-        .update({ ...payload, updated_at: new Date().toISOString() })
-        .eq('id', editingArticleId);
+        .from('kb_files')
+        .update({ name, content_html: docForm.content_html })
+        .eq('id', editingDocId);
       if (error) { toast.error(error.message); return; }
-      toast.success('Template updated');
+      toast.success('Document updated');
     } else {
-      const { error } = await supabase.from('kb_articles').insert({ ...payload, created_by: currentUser.user_id });
+      if (!docFolderId) { toast.error('Open a folder first'); return; }
+      const id = crypto.randomUUID();
+      const { error } = await supabase.from('kb_files').insert({
+        folder_id: docFolderId,
+        name,
+        mime_type: 'text/html',
+        storage_path: `inline://${id}`,
+        content_html: docForm.content_html,
+        size_bytes: new Blob([docForm.content_html ?? '']).size,
+        uploaded_by: currentUser.user_id,
+      });
       if (error) { toast.error(error.message); return; }
-      toast.success('Template created');
+      toast.success('Document created');
     }
-    setShowArticleDialog(false);
-    setEditingArticleId(null);
-    load();
-  };
-
-  const deleteArticle = async (a: Article) => {
-    if (!confirm(`Delete template "${a.title}"?`)) return;
-    const { error } = await supabase.from('kb_articles').delete().eq('id', a.id);
-    if (error) { toast.error(error.message); return; }
-    if (selectedArticleId === a.id) setSelectedArticleId(null);
-    toast.success('Template deleted');
+    setShowDocDialog(false);
+    setEditingDocId(null);
     load();
   };
 
@@ -482,7 +471,7 @@ export default function Knowledge() {
           </button>
           <button
             className="flex items-center gap-2 flex-1 min-w-0 text-left py-1.5 pr-1"
-            onClick={() => { setCurrentFolderId(folder.id); setActiveTab('files'); if (hasChildren && !isExpanded) toggleExpanded(folder.id); }}
+            onClick={() => { setCurrentFolderId(folder.id); if (hasChildren && !isExpanded) toggleExpanded(folder.id); }}
           >
             {isActive ? <FolderOpen className="h-4 w-4 flex-shrink-0" /> : <Folder className="h-4 w-4 flex-shrink-0" />}
             <span className="truncate flex-1">{folder.name}</span>
@@ -533,195 +522,183 @@ export default function Knowledge() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder={activeTab === 'files' ? 'Search files (all folders)…' : 'Search articles…'}
+            placeholder="Search files (all folders)…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-8 h-8 text-sm"
           />
         </div>
-        <div className="flex gap-1 bg-muted rounded-md p-0.5">
-          <button className={`flex-1 text-xs py-1.5 rounded ${activeTab === 'files' ? 'bg-card shadow-sm font-medium' : 'text-muted-foreground'}`} onClick={() => setActiveTab('files')}>Files</button>
-          <button className={`flex-1 text-xs py-1.5 rounded ${activeTab === 'articles' ? 'bg-card shadow-sm font-medium' : 'text-muted-foreground'}`} onClick={() => setActiveTab('articles')}>Articles</button>
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-medium text-muted-foreground uppercase">Folders</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-1" onClick={() => openNewFolder(null)} aria-label="New root folder">
+                  <FolderPlus className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">New folder at root level</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
-        {activeTab === 'files' ? (
-          <>
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase">Folders</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 px-1" onClick={() => openNewFolder(null)} aria-label="New root folder">
-                      <FolderPlus className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">New folder at root level</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <button
-              className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted/50 ${currentFolderId === null ? 'bg-primary/10 text-primary font-medium' : ''} ${dragOverFolderId === 'root' ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}`}
-              onClick={() => setCurrentFolderId(null)}
-              onDragOver={(e) => { if (!draggedFolderId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId('root'); }}
-              onDragLeave={() => { if (dragOverFolderId === 'root') setDragOverFolderId(null); }}
-              onDrop={(e) => {
-                if (!draggedFolderId) return;
-                e.preventDefault();
-                const id = draggedFolderId;
-                setDraggedFolderId(null); setDragOverFolderId(null);
-                moveFolder(id, null);
-              }}
-              title={draggedFolderId ? 'Drop here to move folder to root' : undefined}
-            >
-              <BookOpen className="h-4 w-4" /> All Files
-              {draggedFolderId && <span className="ml-auto text-xs text-muted-foreground">drop to root</span>}
-            </button>
-            {getChildren(null).map(f => <FolderTreeItem key={f.id} folder={f} />)}
-          </>
-        ) : (
-          <>
-            <Button variant={selectedBucket === 'all' ? 'secondary' : 'ghost'} className="w-full justify-start text-sm h-8" onClick={() => setSelectedBucket('all')}>
-              <BookOpen className="h-4 w-4 mr-2" />All ({articles.length})
-            </Button>
-            {buckets.map(b => (
-              <Button key={b.v} variant={selectedBucket === b.v ? 'secondary' : 'ghost'} className="w-full justify-start text-xs h-7" onClick={() => setSelectedBucket(b.v)}>
-                {b.l} ({articles.filter(a => a.bucket_key === b.v).length})
-              </Button>
-            ))}
-            {isAdmin && (
-              <Button size="sm" className="mt-2" onClick={openNewArticle}><Plus className="h-3 w-3 mr-1" /> New template</Button>
-            )}
-          </>
-        )}
+        <button
+          className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted/50 ${currentFolderId === null ? 'bg-primary/10 text-primary font-medium' : ''} ${dragOverFolderId === 'root' ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}`}
+          onClick={() => setCurrentFolderId(null)}
+          onDragOver={(e) => { if (!draggedFolderId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId('root'); }}
+          onDragLeave={() => { if (dragOverFolderId === 'root') setDragOverFolderId(null); }}
+          onDrop={(e) => {
+            if (!draggedFolderId) return;
+            e.preventDefault();
+            const id = draggedFolderId;
+            setDraggedFolderId(null); setDragOverFolderId(null);
+            moveFolder(id, null);
+          }}
+          title={draggedFolderId ? 'Drop here to move folder to root' : undefined}
+        >
+          <BookOpen className="h-4 w-4" /> All Files
+          {draggedFolderId && <span className="ml-auto text-xs text-muted-foreground">drop to root</span>}
+        </button>
+        {getChildren(null).map(f => <FolderTreeItem key={f.id} folder={f} />)}
       </div>
 
       <div className="flex-1 overflow-auto">
-        {activeTab === 'files' ? (
-          <div
-            className={`p-4 md:p-6 space-y-4 min-h-full relative ${isDragging ? 'bg-primary/5' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); if (currentFolderId) setIsDragging(true); }}
-            onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-            onDrop={handleDrop}
-          >
-            {isDragging && (
-              <div className="absolute inset-4 border-2 border-dashed border-primary rounded-lg bg-primary/5 flex items-center justify-center pointer-events-none z-10">
-                <div className="text-center">
-                  <Upload className="h-10 w-10 mx-auto text-primary mb-2" />
-                  <p className="text-sm font-medium">Drop files or folders to upload to “{currentFolder?.name ?? 'Root'}”</p>
-                  <p className="text-xs text-muted-foreground mt-1">Folder structure will be preserved.</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-1 text-sm flex-wrap">
-                <button className="text-primary hover:underline" onClick={() => setCurrentFolderId(null)}>Root</button>
-                {breadcrumb.map(f => (
-                  <span key={f.id} className="flex items-center gap-1">
-                    <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                    <button className="text-primary hover:underline" onClick={() => setCurrentFolderId(f.id)}>{f.name}</button>
-                  </span>
-                ))}
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="sm" variant="outline" onClick={() => openNewFolder(currentFolderId)}>
-                        <FolderPlus className="h-3.5 w-3.5 mr-1" />
-                        {currentFolderId ? 'New subfolder' : 'New folder'}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Creates a folder inside “{currentFolder?.name ?? 'Root'}”
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                {currentFolderId && (
-                  <>
-                    <input
-                      ref={folderInputRef}
-                      type="file"
-                      className="hidden"
-                      // @ts-expect-error - non-standard but supported in Chromium / WebKit
-                      webkitdirectory=""
-                      directory=""
-                      multiple
-                      onChange={handleFolderPick}
-                    />
-                    <Button size="sm" variant="outline" disabled={uploading} onClick={() => folderInputRef.current?.click()}>
-                      <FolderOpen className="h-3.5 w-3.5 mr-1" /> Upload folder
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      multiple
-                      onChange={handleFilePick}
-                    />
-                    <Button size="sm" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="h-3.5 w-3.5 mr-1" /> {uploading ? 'Uploading…' : 'Upload files'}
-                    </Button>
-                  </>
-                )}
+        <div
+          className={`p-4 md:p-6 space-y-4 min-h-full relative ${isDragging ? 'bg-primary/5' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); if (currentFolderId) setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+          onDrop={handleDrop}
+        >
+          {isDragging && (
+            <div className="absolute inset-4 border-2 border-dashed border-primary rounded-lg bg-primary/5 flex items-center justify-center pointer-events-none z-10">
+              <div className="text-center">
+                <Upload className="h-10 w-10 mx-auto text-primary mb-2" />
+                <p className="text-sm font-medium">Drop files or folders to upload to “{currentFolder?.name ?? 'Root'}”</p>
+                <p className="text-xs text-muted-foreground mt-1">Folder structure will be preserved.</p>
               </div>
             </div>
+          )}
 
-            {currentFolderId && (
-              <p className="text-xs text-muted-foreground">
-                Tip: drag a folder from your computer onto this area — its structure (subfolders included) will be recreated here.
-              </p>
-            )}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-1 text-sm flex-wrap">
+              <button className="text-primary hover:underline" onClick={() => setCurrentFolderId(null)}>Root</button>
+              {breadcrumb.map(f => (
+                <span key={f.id} className="flex items-center gap-1">
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                  <button className="text-primary hover:underline" onClick={() => setCurrentFolderId(f.id)}>{f.name}</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="sm" variant="outline" onClick={() => openNewFolder(currentFolderId)}>
+                      <FolderPlus className="h-3.5 w-3.5 mr-1" />
+                      {currentFolderId ? 'New subfolder' : 'New folder'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Creates a folder inside “{currentFolder?.name ?? 'Root'}”
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {currentFolderId && (
+                <>
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    className="hidden"
+                    // @ts-expect-error - non-standard but supported in Chromium / WebKit
+                    webkitdirectory=""
+                    directory=""
+                    multiple
+                    onChange={handleFolderPick}
+                  />
+                  <Button size="sm" variant="outline" disabled={uploading} onClick={() => folderInputRef.current?.click()}>
+                    <FolderOpen className="h-3.5 w-3.5 mr-1" /> Upload folder
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={handleFilePick}
+                  />
+                  <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="h-3.5 w-3.5 mr-1" /> {uploading ? 'Uploading…' : 'Upload files'}
+                  </Button>
+                  {isAdmin && (
+                    <Button size="sm" onClick={openNewDoc}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> New document
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
 
-            {!searchQuery && childFolders.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {childFolders.map(f => (
-                  <Card key={f.id} className="group cursor-pointer hover:bg-muted/50 relative" onClick={() => setCurrentFolderId(f.id)}>
-                    <CardContent className="p-3 flex items-center gap-3">
-                      <Folder className="h-8 w-8 text-primary flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{f.name}</p>
-                        <p className="text-xs text-muted-foreground">{getFilesInFolder(f.id).length} files</p>
-                      </div>
-                      {isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100"
-                          onClick={(e) => { e.stopPropagation(); openRename('folder', f.id, f.name); }}
-                          aria-label={`Rename ${f.name}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+          {currentFolderId && (
+            <p className="text-xs text-muted-foreground">
+              Tip: drag a folder from your computer onto this area, or click New document to write a rich-text document in this folder.
+            </p>
+          )}
 
-            <Card>
-              <CardContent className="p-0">
-                {filteredFiles.length === 0 ? (
-                  <p className="p-6 text-center text-sm text-muted-foreground">
-                    {searchQuery
-                      ? 'No files match your search.'
-                      : currentFolderId
-                        ? 'No files in this folder. Drop files here or click Upload.'
-                        : 'Select a folder from the sidebar, or use the search bar above to find files across all folders.'}
-                  </p>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {filteredFiles.map(file => (
+          {!searchQuery && childFolders.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {childFolders.map(f => (
+                <Card key={f.id} className="group cursor-pointer hover:bg-muted/50 relative" onClick={() => setCurrentFolderId(f.id)}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <Folder className="h-8 w-8 text-primary flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{f.name}</p>
+                      <p className="text-xs text-muted-foreground">{getFilesInFolder(f.id).length} files</p>
+                    </div>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100"
+                        onClick={(e) => { e.stopPropagation(); openRename('folder', f.id, f.name); }}
+                        aria-label={`Rename ${f.name}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Card>
+            <CardContent className="p-0">
+              {filteredFiles.length === 0 ? (
+                <p className="p-6 text-center text-sm text-muted-foreground">
+                  {searchQuery
+                    ? 'No files match your search.'
+                    : currentFolderId
+                      ? 'No files in this folder. Drop files here, click Upload, or create a new document.'
+                      : 'Select a folder from the sidebar, or use the search bar above to find files across all folders.'}
+                </p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {filteredFiles.map(file => {
+                    const inline = isInlineDoc(file);
+                    return (
                       <div key={file.id} className="flex items-center gap-3 p-3 hover:bg-muted/30">
-                        {fileIcon(file.mime_type, file.name)}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{file.name}</p>
+                        {fileIcon(file)}
+                        <button
+                          className="flex-1 min-w-0 text-left"
+                          onClick={() => openPreview(file)}
+                        >
+                          <p className="text-sm font-medium truncate hover:underline">{file.name}</p>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                            <span>{fmtSize(file.size_bytes)}</span><span>•</span>
+                            {inline ? <span>Document</span> : <span>{fmtSize(file.size_bytes)}</span>}
+                            <span>•</span>
                             <span>{format(new Date(file.created_at), 'dd MMM yyyy')}</span>
                             {searchQuery && (<><span>•</span><span className="truncate">{folderPath(file.folder_id)}</span></>)}
                           </div>
-                        </div>
+                        </button>
                         <div className="flex gap-1">
                           <TooltipProvider>
                             <Tooltip>
@@ -730,20 +707,34 @@ export default function Knowledge() {
                                   <Eye className="h-3.5 w-3.5" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Preview</TooltipContent>
+                              <TooltipContent>{inline ? 'Open' : 'Preview'}</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => downloadFile(file)}>
-                                  <Download className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Download</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                          {isAdmin && (
+                          {!inline && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => downloadFile(file)}>
+                                    <Download className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Download</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {isAdmin && inline && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEditDoc(file)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit document</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {isAdmin && !inline && (
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -755,98 +746,30 @@ export default function Knowledge() {
                               </Tooltip>
                             </TooltipProvider>
                           )}
+                          {isAdmin && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openMove(file)}>
+                                    <FolderInput className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Move to folder</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => deleteFile(file)}>
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          <div className="flex flex-col md:flex-row h-full">
-            <div className="w-full md:w-80 border-r border-border overflow-auto">
-              <div className="p-3 space-y-2">
-                {filteredArticles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">No articles.</p>
-                ) : filteredArticles.map(item => (
-                  <div key={item.id}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedArticleId === item.id ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50'}`}
-                    onClick={() => setSelectedArticleId(item.id)}>
-                    <h4 className="text-sm font-medium">{item.title}</h4>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.body}</p>
-                    <div className="flex gap-1 mt-2 flex-wrap">
-                      {(item.tags ?? []).slice(0, 3).map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto">
-              {selectedArticle ? (
-                <div className="p-6 max-w-3xl">
-                  <Badge className="mb-2">{buckets.find(b => b.v === selectedArticle.bucket_key)?.l ?? selectedArticle.bucket_key}</Badge>
-                  <h1 className="text-2xl font-bold mb-4">{selectedArticle.title}</h1>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Button size="sm" variant="outline" onClick={async () => {
-                      const html = selectedArticle.body ?? '';
-                      const tmp = document.createElement('div'); tmp.innerHTML = html;
-                      const plain = tmp.innerText;
-                      try {
-                        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-                          await navigator.clipboard.write([
-                            new ClipboardItem({
-                              'text/html': new Blob([html], { type: 'text/html' }),
-                              'text/plain': new Blob([plain], { type: 'text/plain' }),
-                            }),
-                          ]);
-                        } else {
-                          await navigator.clipboard.writeText(plain);
-                        }
-                        toast.success('Copied');
-                      } catch {
-                        await navigator.clipboard.writeText(plain);
-                        toast.success('Copied as plain text');
-                      }
-                    }}>
-                      <Copy className="h-4 w-4 mr-1" />Copy
-                    </Button>
-                    {isAdmin && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => openEditArticle(selectedArticle)}>
-                          <Pencil className="h-4 w-4 mr-1" />Edit
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => deleteArticle(selectedArticle)}>
-                          <Trash2 className="h-4 w-4 mr-1 text-destructive" />Delete
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  <div className="bg-card border rounded-lg p-6">
-                    {selectedArticle.body ? (
-                      <div
-                        className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary"
-                        dangerouslySetInnerHTML={{ __html: selectedArticle.body }}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">Empty template.</p>
-                    )}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-1">
-                    {(selectedArticle.tags ?? []).map(t => <Badge key={t} variant="outline">{t}</Badge>)}
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground">Select a template to view</p>
+                    );
+                  })}
                 </div>
               )}
-            </div>
-          </div>
-        )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* New folder dialog */}

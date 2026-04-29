@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Download, FileText, Image as ImageIcon, Table2, File as FileIcon, FileType } from 'lucide-react';
+import { Loader2, Download, FileText, Image as ImageIcon, Table2, File as FileIcon, FileType, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -33,16 +33,18 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   /** Storage bucket id, e.g. 'contact-attachments', 'kb-files' */
   bucket: string;
-  /** Object path in the bucket */
+  /** Object path in the bucket. Pass null for inline HTML documents. */
   path: string | null;
   /** Display name */
   name: string | null;
   /** Optional MIME type */
   mime?: string | null;
+  /** If provided, renders this HTML inline (no Storage fetch). Used for in-app rich-text documents. */
+  inlineHtml?: string | null;
 }
 
-/** Reusable file preview dialog: images, PDFs, video/audio, text, and Office docs (via Office Online). */
-export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime }: Props) {
+/** Reusable file preview dialog: images, PDFs, video/audio, text, Office docs, and inline rich-text documents. */
+export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime, inlineHtml }: Props) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
@@ -51,8 +53,10 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
 
   const kind = detectPreviewKind(mime, name);
 
+  const isInline = inlineHtml != null;
+
   useEffect(() => {
-    if (!open || !path) return;
+    if (!open || !path || isInline) return;
     let revokedUrl: string | null = null;
     let cancelled = false;
 
@@ -106,13 +110,35 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
       cancelled = true;
       if (revokedUrl) URL.revokeObjectURL(revokedUrl);
     };
-  }, [open, bucket, path, kind]);
+  }, [open, bucket, path, kind, isInline]);
 
   const download = async () => {
     if (!path || !name) return;
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60, { download: name });
     if (error || !data) { toast.error('Could not generate link'); return; }
     window.open(data.signedUrl, '_blank');
+  };
+
+  const copyInline = async () => {
+    const html = inlineHtml ?? '';
+    const tmp = document.createElement('div'); tmp.innerHTML = html;
+    const plain = tmp.innerText;
+    try {
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([plain], { type: 'text/plain' }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plain);
+      }
+      toast.success('Copied');
+    } catch {
+      try { await navigator.clipboard.writeText(plain); toast.success('Copied as plain text'); }
+      catch { toast.error('Copy failed'); }
+    }
   };
 
   const officeUrl = kind === 'office' && signedUrl
@@ -127,27 +153,47 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
             {previewIcon(mime, name)}
             <div className="min-w-0">
               <DialogTitle className="text-base truncate">{name ?? 'Preview'}</DialogTitle>
-              <DialogDescription className="text-xs">In-app file preview</DialogDescription>
+              <DialogDescription className="text-xs">{isInline ? 'In-app rich-text document' : 'In-app file preview'}</DialogDescription>
             </div>
           </div>
           <div className="flex gap-2 mr-6 flex-shrink-0">
-            {signedUrl && (
+            {isInline && (
+              <Button size="sm" variant="outline" onClick={copyInline}>
+                <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+              </Button>
+            )}
+            {!isInline && signedUrl && (
               <Button size="sm" variant="outline" onClick={() => window.open(blobUrl ?? signedUrl, '_blank')}>
                 Open in new tab
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={download}>
-              <Download className="h-3.5 w-3.5 mr-1" /> Download
-            </Button>
+            {!isInline && (
+              <Button size="sm" variant="outline" onClick={download}>
+                <Download className="h-3.5 w-3.5 mr-1" /> Download
+              </Button>
+            )}
           </div>
         </div>
         <div className="flex-1 min-h-0 overflow-auto bg-muted/30">
-          {loading && (
+          {isInline && (
+            <div className="bg-background p-6 min-h-full">
+              {inlineHtml
+                ? (
+                  <div
+                    className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary"
+                    dangerouslySetInnerHTML={{ __html: inlineHtml }}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Empty document.</p>
+                )}
+            </div>
+          )}
+          {!isInline && loading && (
             <div className="h-full flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           )}
-          {!loading && signedUrl && loadError && (
+          {!isInline && !loading && signedUrl && loadError && (
             <div className="h-full flex items-center justify-center p-6 text-center">
               <div>
                 <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -160,7 +206,7 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
               </div>
             </div>
           )}
-          {!loading && signedUrl && !loadError && (
+          {!isInline && !loading && signedUrl && !loadError && (
             <>
               {kind === 'image' && (
                 <div className="h-full flex items-center justify-center p-4">
