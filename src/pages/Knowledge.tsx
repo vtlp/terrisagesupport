@@ -928,9 +928,10 @@ export default function Knowledge() {
           if (!open) setPreviewFile(null);
         }}
         bucket="kb-files"
-        path={previewFile?.storage_path ?? null}
+        path={previewFile && !isInlineDoc(previewFile) ? previewFile.storage_path : null}
         name={previewFile?.name ?? null}
         mime={previewFile?.mime_type ?? null}
+        inlineHtml={previewFile && isInlineDoc(previewFile) ? (previewFile.content_html ?? '') : null}
       />
     </div>
   );
