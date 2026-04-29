@@ -562,133 +562,143 @@ export default function Knowledge() {
       </div>
 
       <div className="flex-1 overflow-auto">
-        {activeTab === 'files' ? (
-          <div
-            className={`p-4 md:p-6 space-y-4 min-h-full relative ${isDragging ? 'bg-primary/5' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); if (currentFolderId) setIsDragging(true); }}
-            onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-            onDrop={handleDrop}
-          >
-            {isDragging && (
-              <div className="absolute inset-4 border-2 border-dashed border-primary rounded-lg bg-primary/5 flex items-center justify-center pointer-events-none z-10">
-                <div className="text-center">
-                  <Upload className="h-10 w-10 mx-auto text-primary mb-2" />
-                  <p className="text-sm font-medium">Drop files or folders to upload to “{currentFolder?.name ?? 'Root'}”</p>
-                  <p className="text-xs text-muted-foreground mt-1">Folder structure will be preserved.</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-1 text-sm flex-wrap">
-                <button className="text-primary hover:underline" onClick={() => setCurrentFolderId(null)}>Root</button>
-                {breadcrumb.map(f => (
-                  <span key={f.id} className="flex items-center gap-1">
-                    <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                    <button className="text-primary hover:underline" onClick={() => setCurrentFolderId(f.id)}>{f.name}</button>
-                  </span>
-                ))}
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="sm" variant="outline" onClick={() => openNewFolder(currentFolderId)}>
-                        <FolderPlus className="h-3.5 w-3.5 mr-1" />
-                        {currentFolderId ? 'New subfolder' : 'New folder'}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Creates a folder inside “{currentFolder?.name ?? 'Root'}”
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                {currentFolderId && (
-                  <>
-                    <input
-                      ref={folderInputRef}
-                      type="file"
-                      className="hidden"
-                      // @ts-expect-error - non-standard but supported in Chromium / WebKit
-                      webkitdirectory=""
-                      directory=""
-                      multiple
-                      onChange={handleFolderPick}
-                    />
-                    <Button size="sm" variant="outline" disabled={uploading} onClick={() => folderInputRef.current?.click()}>
-                      <FolderOpen className="h-3.5 w-3.5 mr-1" /> Upload folder
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      multiple
-                      onChange={handleFilePick}
-                    />
-                    <Button size="sm" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="h-3.5 w-3.5 mr-1" /> {uploading ? 'Uploading…' : 'Upload files'}
-                    </Button>
-                  </>
-                )}
+        <div
+          className={`p-4 md:p-6 space-y-4 min-h-full relative ${isDragging ? 'bg-primary/5' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); if (currentFolderId) setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+          onDrop={handleDrop}
+        >
+          {isDragging && (
+            <div className="absolute inset-4 border-2 border-dashed border-primary rounded-lg bg-primary/5 flex items-center justify-center pointer-events-none z-10">
+              <div className="text-center">
+                <Upload className="h-10 w-10 mx-auto text-primary mb-2" />
+                <p className="text-sm font-medium">Drop files or folders to upload to “{currentFolder?.name ?? 'Root'}”</p>
+                <p className="text-xs text-muted-foreground mt-1">Folder structure will be preserved.</p>
               </div>
             </div>
+          )}
 
-            {currentFolderId && (
-              <p className="text-xs text-muted-foreground">
-                Tip: drag a folder from your computer onto this area — its structure (subfolders included) will be recreated here.
-              </p>
-            )}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-1 text-sm flex-wrap">
+              <button className="text-primary hover:underline" onClick={() => setCurrentFolderId(null)}>Root</button>
+              {breadcrumb.map(f => (
+                <span key={f.id} className="flex items-center gap-1">
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                  <button className="text-primary hover:underline" onClick={() => setCurrentFolderId(f.id)}>{f.name}</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="sm" variant="outline" onClick={() => openNewFolder(currentFolderId)}>
+                      <FolderPlus className="h-3.5 w-3.5 mr-1" />
+                      {currentFolderId ? 'New subfolder' : 'New folder'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Creates a folder inside “{currentFolder?.name ?? 'Root'}”
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {currentFolderId && (
+                <>
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    className="hidden"
+                    // @ts-expect-error - non-standard but supported in Chromium / WebKit
+                    webkitdirectory=""
+                    directory=""
+                    multiple
+                    onChange={handleFolderPick}
+                  />
+                  <Button size="sm" variant="outline" disabled={uploading} onClick={() => folderInputRef.current?.click()}>
+                    <FolderOpen className="h-3.5 w-3.5 mr-1" /> Upload folder
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={handleFilePick}
+                  />
+                  <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="h-3.5 w-3.5 mr-1" /> {uploading ? 'Uploading…' : 'Upload files'}
+                  </Button>
+                  {isAdmin && (
+                    <Button size="sm" onClick={openNewDoc}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> New document
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
 
-            {!searchQuery && childFolders.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {childFolders.map(f => (
-                  <Card key={f.id} className="group cursor-pointer hover:bg-muted/50 relative" onClick={() => setCurrentFolderId(f.id)}>
-                    <CardContent className="p-3 flex items-center gap-3">
-                      <Folder className="h-8 w-8 text-primary flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{f.name}</p>
-                        <p className="text-xs text-muted-foreground">{getFilesInFolder(f.id).length} files</p>
-                      </div>
-                      {isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100"
-                          onClick={(e) => { e.stopPropagation(); openRename('folder', f.id, f.name); }}
-                          aria-label={`Rename ${f.name}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+          {currentFolderId && (
+            <p className="text-xs text-muted-foreground">
+              Tip: drag a folder from your computer onto this area, or click New document to write a rich-text document in this folder.
+            </p>
+          )}
 
-            <Card>
-              <CardContent className="p-0">
-                {filteredFiles.length === 0 ? (
-                  <p className="p-6 text-center text-sm text-muted-foreground">
-                    {searchQuery
-                      ? 'No files match your search.'
-                      : currentFolderId
-                        ? 'No files in this folder. Drop files here or click Upload.'
-                        : 'Select a folder from the sidebar, or use the search bar above to find files across all folders.'}
-                  </p>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {filteredFiles.map(file => (
+          {!searchQuery && childFolders.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {childFolders.map(f => (
+                <Card key={f.id} className="group cursor-pointer hover:bg-muted/50 relative" onClick={() => setCurrentFolderId(f.id)}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <Folder className="h-8 w-8 text-primary flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{f.name}</p>
+                      <p className="text-xs text-muted-foreground">{getFilesInFolder(f.id).length} files</p>
+                    </div>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100"
+                        onClick={(e) => { e.stopPropagation(); openRename('folder', f.id, f.name); }}
+                        aria-label={`Rename ${f.name}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Card>
+            <CardContent className="p-0">
+              {filteredFiles.length === 0 ? (
+                <p className="p-6 text-center text-sm text-muted-foreground">
+                  {searchQuery
+                    ? 'No files match your search.'
+                    : currentFolderId
+                      ? 'No files in this folder. Drop files here, click Upload, or create a new document.'
+                      : 'Select a folder from the sidebar, or use the search bar above to find files across all folders.'}
+                </p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {filteredFiles.map(file => {
+                    const inline = isInlineDoc(file);
+                    return (
                       <div key={file.id} className="flex items-center gap-3 p-3 hover:bg-muted/30">
-                        {fileIcon(file.mime_type, file.name)}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{file.name}</p>
+                        {fileIcon(file)}
+                        <button
+                          className="flex-1 min-w-0 text-left"
+                          onClick={() => openPreview(file)}
+                        >
+                          <p className="text-sm font-medium truncate hover:underline">{file.name}</p>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                            <span>{fmtSize(file.size_bytes)}</span><span>•</span>
+                            {inline ? <span>Document</span> : <span>{fmtSize(file.size_bytes)}</span>}
+                            <span>•</span>
                             <span>{format(new Date(file.created_at), 'dd MMM yyyy')}</span>
                             {searchQuery && (<><span>•</span><span className="truncate">{folderPath(file.folder_id)}</span></>)}
                           </div>
-                        </div>
+                        </button>
                         <div className="flex gap-1">
                           <TooltipProvider>
                             <Tooltip>
@@ -697,20 +707,34 @@ export default function Knowledge() {
                                   <Eye className="h-3.5 w-3.5" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Preview</TooltipContent>
+                              <TooltipContent>{inline ? 'Open' : 'Preview'}</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => downloadFile(file)}>
-                                  <Download className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Download</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                          {isAdmin && (
+                          {!inline && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => downloadFile(file)}>
+                                    <Download className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Download</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {isAdmin && inline && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEditDoc(file)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit document</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {isAdmin && !inline && (
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -722,98 +746,30 @@ export default function Knowledge() {
                               </Tooltip>
                             </TooltipProvider>
                           )}
+                          {isAdmin && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openMove(file)}>
+                                    <FolderInput className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Move to folder</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => deleteFile(file)}>
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          <div className="flex flex-col md:flex-row h-full">
-            <div className="w-full md:w-80 border-r border-border overflow-auto">
-              <div className="p-3 space-y-2">
-                {filteredArticles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">No articles.</p>
-                ) : filteredArticles.map(item => (
-                  <div key={item.id}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedArticleId === item.id ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50'}`}
-                    onClick={() => setSelectedArticleId(item.id)}>
-                    <h4 className="text-sm font-medium">{item.title}</h4>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.body}</p>
-                    <div className="flex gap-1 mt-2 flex-wrap">
-                      {(item.tags ?? []).slice(0, 3).map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto">
-              {selectedArticle ? (
-                <div className="p-6 max-w-3xl">
-                  <Badge className="mb-2">{buckets.find(b => b.v === selectedArticle.bucket_key)?.l ?? selectedArticle.bucket_key}</Badge>
-                  <h1 className="text-2xl font-bold mb-4">{selectedArticle.title}</h1>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Button size="sm" variant="outline" onClick={async () => {
-                      const html = selectedArticle.body ?? '';
-                      const tmp = document.createElement('div'); tmp.innerHTML = html;
-                      const plain = tmp.innerText;
-                      try {
-                        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-                          await navigator.clipboard.write([
-                            new ClipboardItem({
-                              'text/html': new Blob([html], { type: 'text/html' }),
-                              'text/plain': new Blob([plain], { type: 'text/plain' }),
-                            }),
-                          ]);
-                        } else {
-                          await navigator.clipboard.writeText(plain);
-                        }
-                        toast.success('Copied');
-                      } catch {
-                        await navigator.clipboard.writeText(plain);
-                        toast.success('Copied as plain text');
-                      }
-                    }}>
-                      <Copy className="h-4 w-4 mr-1" />Copy
-                    </Button>
-                    {isAdmin && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => openEditArticle(selectedArticle)}>
-                          <Pencil className="h-4 w-4 mr-1" />Edit
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => deleteArticle(selectedArticle)}>
-                          <Trash2 className="h-4 w-4 mr-1 text-destructive" />Delete
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  <div className="bg-card border rounded-lg p-6">
-                    {selectedArticle.body ? (
-                      <div
-                        className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary"
-                        dangerouslySetInnerHTML={{ __html: selectedArticle.body }}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">Empty template.</p>
-                    )}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-1">
-                    {(selectedArticle.tags ?? []).map(t => <Badge key={t} variant="outline">{t}</Badge>)}
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground">Select a template to view</p>
+                    );
+                  })}
                 </div>
               )}
-            </div>
-          </div>
-        )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* New folder dialog */}
