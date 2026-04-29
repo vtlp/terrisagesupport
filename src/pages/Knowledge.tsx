@@ -522,65 +522,43 @@ export default function Knowledge() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder={activeTab === 'files' ? 'Search files (all folders)…' : 'Search articles…'}
+            placeholder="Search files (all folders)…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-8 h-8 text-sm"
           />
         </div>
-        <div className="flex gap-1 bg-muted rounded-md p-0.5">
-          <button className={`flex-1 text-xs py-1.5 rounded ${activeTab === 'files' ? 'bg-card shadow-sm font-medium' : 'text-muted-foreground'}`} onClick={() => setActiveTab('files')}>Files</button>
-          <button className={`flex-1 text-xs py-1.5 rounded ${activeTab === 'articles' ? 'bg-card shadow-sm font-medium' : 'text-muted-foreground'}`} onClick={() => setActiveTab('articles')}>Articles</button>
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-medium text-muted-foreground uppercase">Folders</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-1" onClick={() => openNewFolder(null)} aria-label="New root folder">
+                  <FolderPlus className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">New folder at root level</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
-        {activeTab === 'files' ? (
-          <>
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase">Folders</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 px-1" onClick={() => openNewFolder(null)} aria-label="New root folder">
-                      <FolderPlus className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">New folder at root level</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <button
-              className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted/50 ${currentFolderId === null ? 'bg-primary/10 text-primary font-medium' : ''} ${dragOverFolderId === 'root' ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}`}
-              onClick={() => setCurrentFolderId(null)}
-              onDragOver={(e) => { if (!draggedFolderId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId('root'); }}
-              onDragLeave={() => { if (dragOverFolderId === 'root') setDragOverFolderId(null); }}
-              onDrop={(e) => {
-                if (!draggedFolderId) return;
-                e.preventDefault();
-                const id = draggedFolderId;
-                setDraggedFolderId(null); setDragOverFolderId(null);
-                moveFolder(id, null);
-              }}
-              title={draggedFolderId ? 'Drop here to move folder to root' : undefined}
-            >
-              <BookOpen className="h-4 w-4" /> All Files
-              {draggedFolderId && <span className="ml-auto text-xs text-muted-foreground">drop to root</span>}
-            </button>
-            {getChildren(null).map(f => <FolderTreeItem key={f.id} folder={f} />)}
-          </>
-        ) : (
-          <>
-            <Button variant={selectedBucket === 'all' ? 'secondary' : 'ghost'} className="w-full justify-start text-sm h-8" onClick={() => setSelectedBucket('all')}>
-              <BookOpen className="h-4 w-4 mr-2" />All ({articles.length})
-            </Button>
-            {buckets.map(b => (
-              <Button key={b.v} variant={selectedBucket === b.v ? 'secondary' : 'ghost'} className="w-full justify-start text-xs h-7" onClick={() => setSelectedBucket(b.v)}>
-                {b.l} ({articles.filter(a => a.bucket_key === b.v).length})
-              </Button>
-            ))}
-            {isAdmin && (
-              <Button size="sm" className="mt-2" onClick={openNewArticle}><Plus className="h-3 w-3 mr-1" /> New template</Button>
-            )}
-          </>
-        )}
+        <button
+          className={`flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-muted/50 ${currentFolderId === null ? 'bg-primary/10 text-primary font-medium' : ''} ${dragOverFolderId === 'root' ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''}`}
+          onClick={() => setCurrentFolderId(null)}
+          onDragOver={(e) => { if (!draggedFolderId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId('root'); }}
+          onDragLeave={() => { if (dragOverFolderId === 'root') setDragOverFolderId(null); }}
+          onDrop={(e) => {
+            if (!draggedFolderId) return;
+            e.preventDefault();
+            const id = draggedFolderId;
+            setDraggedFolderId(null); setDragOverFolderId(null);
+            moveFolder(id, null);
+          }}
+          title={draggedFolderId ? 'Drop here to move folder to root' : undefined}
+        >
+          <BookOpen className="h-4 w-4" /> All Files
+          {draggedFolderId && <span className="ml-auto text-xs text-muted-foreground">drop to root</span>}
+        </button>
+        {getChildren(null).map(f => <FolderTreeItem key={f.id} folder={f} />)}
       </div>
 
       <div className="flex-1 overflow-auto">
