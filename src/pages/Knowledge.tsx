@@ -471,7 +471,7 @@ export default function Knowledge() {
           </button>
           <button
             className="flex items-center gap-2 flex-1 min-w-0 text-left py-1.5 pr-1"
-            onClick={() => { setCurrentFolderId(folder.id); setActiveTab('files'); if (hasChildren && !isExpanded) toggleExpanded(folder.id); }}
+            onClick={() => { setCurrentFolderId(folder.id); if (hasChildren && !isExpanded) toggleExpanded(folder.id); }}
           >
             {isActive ? <FolderOpen className="h-4 w-4 flex-shrink-0" /> : <Folder className="h-4 w-4 flex-shrink-0" />}
             <span className="truncate flex-1">{folder.name}</span>
