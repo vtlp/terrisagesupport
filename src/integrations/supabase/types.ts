@@ -1252,6 +1252,7 @@ export type Database = {
       }
       kb_files: {
         Row: {
+          content_html: string | null
           created_at: string
           folder_id: string | null
           id: string
@@ -1262,6 +1263,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          content_html?: string | null
           created_at?: string
           folder_id?: string | null
           id?: string
@@ -1272,6 +1274,7 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          content_html?: string | null
           created_at?: string
           folder_id?: string | null
           id?: string

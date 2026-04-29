@@ -1,0 +1,1 @@
+ALTER TABLE public.kb_files ADD COLUMN IF NOT EXISTS content_html text;
