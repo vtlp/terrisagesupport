@@ -80,12 +80,13 @@ export const guessFileCategory = (mime: string | null, name: string): FileCatego
   return 'DOCUMENT';
 };
 
+import type { supabase as SupabaseClient } from '@/integrations/supabase/client';
 export async function logActivity(
-  supabase: { from: (t: string) => { insert: (v: Record<string, unknown>) => Promise<unknown> } },
+  client: typeof SupabaseClient,
   jobId: string,
   event: string,
   detail: Record<string, unknown> = {},
   actorId?: string | null,
 ) {
-  await supabase.from('import_activity').insert({ job_id: jobId, event, detail, actor_id: actorId ?? null });
+  await client.from('import_activity').insert({ job_id: jobId, event, detail, actor_id: actorId ?? null });
 }
