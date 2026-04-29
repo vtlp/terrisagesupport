@@ -799,40 +799,35 @@ export default function Knowledge() {
         </DialogContent>
       </Dialog>
 
-      {/* Article (template) dialog: create + edit */}
-      <Dialog open={showArticleDialog} onOpenChange={(o) => { setShowArticleDialog(o); if (!o) setEditingArticleId(null); }}>
+      {/* Document dialog: create + edit inline rich-text documents */}
+      <Dialog open={showDocDialog} onOpenChange={(o) => { setShowDocDialog(o); if (!o) setEditingDocId(null); }}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editingArticleId ? 'Edit template' : 'New template'}</DialogTitle>
+            <DialogTitle>{editingDocId ? 'Edit document' : 'New document'}</DialogTitle>
             <DialogDescription>
-              Rich text is preserved when staff copy this template into emails or chat.
+              Rich text is preserved when staff copy this document into emails or chat.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1"><Label>Title</Label>
-              <Input value={articleForm.title} onChange={e => setArticleForm(a => ({ ...a, title: e.target.value }))} />
+            <div className="space-y-1"><Label>Name</Label>
+              <Input
+                value={docForm.name}
+                onChange={e => setDocForm(d => ({ ...d, name: e.target.value }))}
+                placeholder="e.g. Welcome email template"
+              />
             </div>
-            <div className="space-y-1"><Label>Bucket</Label>
-              <Select value={articleForm.bucket_key} onValueChange={v => setArticleForm(a => ({ ...a, bucket_key: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{buckets.map(b => <SelectItem key={b.v} value={b.v}>{b.l}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1"><Label>Body</Label>
+            <div className="space-y-1"><Label>Content</Label>
               <RichTextEditor
-                value={articleForm.body}
-                onChange={(html) => setArticleForm(a => ({ ...a, body: html }))}
-                placeholder="Write the template content here…"
+                value={docForm.content_html}
+                onChange={(html) => setDocForm(d => ({ ...d, content_html: html }))}
+                placeholder="Write the document content here…"
                 minHeight={240}
               />
             </div>
-            <div className="space-y-1"><Label>Tags (comma separated)</Label>
-              <Input value={articleForm.tags} onChange={e => setArticleForm(a => ({ ...a, tags: e.target.value }))} placeholder="onboarding, demo, pricing" />
-            </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => { setShowArticleDialog(false); setEditingArticleId(null); }}>Cancel</Button>
-              <Button onClick={saveArticle} disabled={!articleForm.title.trim()}>
-                {editingArticleId ? 'Save changes' : 'Create'}
+              <Button variant="ghost" onClick={() => { setShowDocDialog(false); setEditingDocId(null); }}>Cancel</Button>
+              <Button onClick={saveDoc} disabled={!docForm.name.trim()}>
+                {editingDocId ? 'Save changes' : 'Create'}
               </Button>
             </div>
           </div>
