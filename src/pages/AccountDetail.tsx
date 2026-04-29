@@ -66,6 +66,34 @@ const statusLabels: Record<Status, string> = {
 const NONE = '__none__';
 const ROLES = ['Admin', 'Manager', 'Agent'];
 
+// Canonical onboarding checklist template (sequential, grouped).
+// Items are stored in account_checklist_items keyed by exact label.
+type ChecklistTemplateItem = {
+  label: string;
+  section: string;
+  // Visibility rule given account context
+  show: (ctx: { tenancy: Tenancy; projectsEnabled: boolean }) => boolean;
+};
+const ONBOARDING_TEMPLATE: ChecklistTemplateItem[] = [
+  { section: 'Commercial setup', label: 'Payment received / trial approved', show: () => true },
+  { section: 'Commercial setup', label: 'Contract signed', show: () => true },
+  { section: 'Verification', label: 'ID / business verification completed', show: () => true },
+  { section: 'Workspace setup', label: 'Owner login credentials sent', show: () => true },
+  { section: 'Workspace setup', label: 'Team users reviewed and invited', show: () => true },
+  { section: 'Workspace setup', label: 'Branding details added', show: () => true },
+  { section: 'Workspace setup', label: 'Required integrations configured', show: () => true },
+  { section: 'Data setup', label: 'Project data imported',
+    show: ({ tenancy, projectsEnabled }) => tenancy === 'BUILDER_DEVELOPER' || projectsEnabled },
+  { section: 'Data setup', label: 'Lead data imported', show: () => true },
+  { section: 'Data setup', label: 'Secondary market properties imported',
+    show: ({ tenancy }) => tenancy === 'AGENCY_BROKERAGE_CONSULTANCY' },
+  { section: 'Testing and go-live', label: 'Imported data preview checked', show: () => true },
+  { section: 'Testing and go-live', label: 'Share links tested', show: () => true },
+  { section: 'Testing and go-live', label: 'Enquiry forms tested', show: () => true },
+  { section: 'Testing and go-live', label: 'Account marked live', show: () => true },
+];
+const GO_LIVE_LABEL = 'Account marked live';
+
 export default function AccountDetail() {
   const { accountId } = useParams<{ accountId: string }>();
   const navigate = useNavigate();
