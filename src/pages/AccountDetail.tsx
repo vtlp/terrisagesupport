@@ -342,7 +342,7 @@ export default function AccountDetail() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="seats">Seats &amp; requests ({seats.filter(s => s.is_active).length})</TabsTrigger>
-          <TabsTrigger value="checklist">Onboarding ({doneCount}/{checklist.length})</TabsTrigger>
+          <TabsTrigger value="checklist">Onboarding ({doneCount}/{visibleTotal})</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="projects">Projects ({Array.isArray((acc.payload as any)?.projects) ? (acc.payload as any).projects.length : 0})</TabsTrigger>
