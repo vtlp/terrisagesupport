@@ -987,6 +987,209 @@ export type Database = {
           },
         ]
       }
+      crm_leads: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          data: Json
+          id: string
+          phone: string | null
+          source_job_id: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          phone?: string | null
+          source_job_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          phone?: string | null
+          source_job_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_leads_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_project_configs: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          project_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          project_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          project_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_project_configs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "crm_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_project_media: {
+        Row: {
+          caption: string | null
+          category: Database["public"]["Enums"]["import_media_category"]
+          config_id: string | null
+          created_at: string
+          external_url: string | null
+          id: string
+          meta: Json
+          project_id: string
+          storage_path: string | null
+        }
+        Insert: {
+          caption?: string | null
+          category?: Database["public"]["Enums"]["import_media_category"]
+          config_id?: string | null
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          meta?: Json
+          project_id: string
+          storage_path?: string | null
+        }
+        Update: {
+          caption?: string | null
+          category?: Database["public"]["Enums"]["import_media_category"]
+          config_id?: string | null
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          meta?: Json
+          project_id?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_project_media_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "crm_project_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_project_media_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "crm_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_projects: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          data: Json
+          id: string
+          property_type:
+            | Database["public"]["Enums"]["import_property_type"]
+            | null
+          source_job_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          property_type?:
+            | Database["public"]["Enums"]["import_property_type"]
+            | null
+          source_job_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          property_type?:
+            | Database["public"]["Enums"]["import_property_type"]
+            | null
+          source_job_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_projects_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_secondary_properties: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          data: Json
+          id: string
+          source_job_id: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          source_job_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          source_job_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_secondary_properties_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_imports: {
         Row: {
           account_id: string
@@ -1168,6 +1371,320 @@ export type Database = {
             columns: ["enquiry_id"]
             isOneToOne: false
             referencedRelation: "enquiries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_activity: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          detail: Json
+          event: string
+          id: string
+          job_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          detail?: Json
+          event: string
+          id?: string
+          job_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          detail?: Json
+          event?: string
+          id?: string
+          job_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_activity_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_files: {
+        Row: {
+          category: Database["public"]["Enums"]["import_file_category"]
+          created_at: string
+          error: string | null
+          id: string
+          job_id: string
+          mime_type: string | null
+          name: string
+          size_bytes: number | null
+          state: Database["public"]["Enums"]["import_file_state"]
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["import_file_category"]
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id: string
+          mime_type?: string | null
+          name: string
+          size_bytes?: number | null
+          state?: Database["public"]["Enums"]["import_file_state"]
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["import_file_category"]
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id?: string
+          mime_type?: string | null
+          name?: string
+          size_bytes?: number | null
+          state?: Database["public"]["Enums"]["import_file_state"]
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_files_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_jobs: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          extracted_data: Json
+          extraction_finished_at: string | null
+          extraction_started_at: string | null
+          id: string
+          imported_at: string | null
+          kind: Database["public"]["Enums"]["import_kind"]
+          label: string | null
+          mapping: Json
+          notes: string | null
+          property_type:
+            | Database["public"]["Enums"]["import_property_type"]
+            | null
+          records_failed: number
+          records_imported: number
+          records_total: number
+          representative_input: Json
+          source_files_count: number
+          status: Database["public"]["Enums"]["import_job_status"]
+          summary: Json
+          updated_at: string
+          validation: Json
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          extracted_data?: Json
+          extraction_finished_at?: string | null
+          extraction_started_at?: string | null
+          id?: string
+          imported_at?: string | null
+          kind: Database["public"]["Enums"]["import_kind"]
+          label?: string | null
+          mapping?: Json
+          notes?: string | null
+          property_type?:
+            | Database["public"]["Enums"]["import_property_type"]
+            | null
+          records_failed?: number
+          records_imported?: number
+          records_total?: number
+          representative_input?: Json
+          source_files_count?: number
+          status?: Database["public"]["Enums"]["import_job_status"]
+          summary?: Json
+          updated_at?: string
+          validation?: Json
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          extracted_data?: Json
+          extraction_finished_at?: string | null
+          extraction_started_at?: string | null
+          id?: string
+          imported_at?: string | null
+          kind?: Database["public"]["Enums"]["import_kind"]
+          label?: string | null
+          mapping?: Json
+          notes?: string | null
+          property_type?:
+            | Database["public"]["Enums"]["import_property_type"]
+            | null
+          records_failed?: number
+          records_imported?: number
+          records_total?: number
+          representative_input?: Json
+          source_files_count?: number
+          status?: Database["public"]["Enums"]["import_job_status"]
+          summary?: Json
+          updated_at?: string
+          validation?: Json
+        }
+        Relationships: []
+      }
+      import_project_configs: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          data: Json
+          id: string
+          job_id: string
+          sort_order: number
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          data?: Json
+          id?: string
+          job_id: string
+          sort_order?: number
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          data?: Json
+          id?: string
+          job_id?: string
+          sort_order?: number
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_project_configs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_project_media: {
+        Row: {
+          caption: string | null
+          category: Database["public"]["Enums"]["import_media_category"]
+          confidence: number | null
+          config_id: string | null
+          created_at: string
+          external_url: string | null
+          id: string
+          job_id: string
+          meta: Json
+          review_state: Database["public"]["Enums"]["import_media_review"]
+          source: string
+          storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          category?: Database["public"]["Enums"]["import_media_category"]
+          confidence?: number | null
+          config_id?: string | null
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          job_id: string
+          meta?: Json
+          review_state?: Database["public"]["Enums"]["import_media_review"]
+          source?: string
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          category?: Database["public"]["Enums"]["import_media_category"]
+          confidence?: number | null
+          config_id?: string | null
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          job_id?: string
+          meta?: Json
+          review_state?: Database["public"]["Enums"]["import_media_review"]
+          source?: string
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_project_media_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "import_project_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_project_media_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_record_rows: {
+        Row: {
+          created_at: string
+          data: Json
+          errors: Json
+          id: string
+          imported_record_id: string | null
+          job_id: string
+          row_index: number
+          state: Database["public"]["Enums"]["import_row_state"]
+          warnings: Json
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          errors?: Json
+          id?: string
+          imported_record_id?: string | null
+          job_id: string
+          row_index: number
+          state?: Database["public"]["Enums"]["import_row_state"]
+          warnings?: Json
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          errors?: Json
+          id?: string
+          imported_record_id?: string | null
+          job_id?: string
+          row_index?: number
+          state?: Database["public"]["Enums"]["import_row_state"]
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_record_rows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -2906,6 +3423,54 @@ export type Database = {
         | "APPROVED"
         | "CHANGES_REQUESTED"
         | "REJECTED"
+      import_file_category:
+        | "BROCHURE"
+        | "IMAGE"
+        | "VIDEO"
+        | "DOCUMENT"
+        | "CSV"
+        | "FLOOR_PLAN"
+        | "LOGO"
+        | "OTHER"
+      import_file_state: "UPLOADED" | "PROCESSING" | "PROCESSED" | "FAILED"
+      import_job_status:
+        | "DRAFT"
+        | "FILES_UPLOADING"
+        | "EXTRACTION_QUEUED"
+        | "EXTRACTING"
+        | "EXTRACTION_FAILED"
+        | "NEEDS_REVIEW"
+        | "VALIDATION_FAILED"
+        | "READY_TO_IMPORT"
+        | "IMPORTING"
+        | "IMPORTED"
+        | "PARTIALLY_IMPORTED"
+        | "FAILED"
+        | "ARCHIVED"
+      import_kind: "PROJECT" | "SECONDARY_PROPERTY" | "LEAD"
+      import_media_category:
+        | "LOGO"
+        | "GALLERY"
+        | "FLOOR_PLAN"
+        | "BROCHURE"
+        | "VIDEO"
+        | "DOCUMENT"
+        | "OTHER"
+      import_media_review:
+        | "PENDING"
+        | "CORRECT"
+        | "INCORRECT"
+        | "DUPLICATE"
+        | "NEEDS_RECROP"
+      import_property_type: "APARTMENT" | "VILLA" | "PLOT"
+      import_row_state:
+        | "PENDING"
+        | "VALID"
+        | "WARNING"
+        | "INVALID"
+        | "IMPORTED"
+        | "FAILED"
+        | "SKIPPED"
       import_status:
         | "UPLOADED"
         | "MAPPING"
@@ -3184,6 +3749,59 @@ export const Constants = {
         "APPROVED",
         "CHANGES_REQUESTED",
         "REJECTED",
+      ],
+      import_file_category: [
+        "BROCHURE",
+        "IMAGE",
+        "VIDEO",
+        "DOCUMENT",
+        "CSV",
+        "FLOOR_PLAN",
+        "LOGO",
+        "OTHER",
+      ],
+      import_file_state: ["UPLOADED", "PROCESSING", "PROCESSED", "FAILED"],
+      import_job_status: [
+        "DRAFT",
+        "FILES_UPLOADING",
+        "EXTRACTION_QUEUED",
+        "EXTRACTING",
+        "EXTRACTION_FAILED",
+        "NEEDS_REVIEW",
+        "VALIDATION_FAILED",
+        "READY_TO_IMPORT",
+        "IMPORTING",
+        "IMPORTED",
+        "PARTIALLY_IMPORTED",
+        "FAILED",
+        "ARCHIVED",
+      ],
+      import_kind: ["PROJECT", "SECONDARY_PROPERTY", "LEAD"],
+      import_media_category: [
+        "LOGO",
+        "GALLERY",
+        "FLOOR_PLAN",
+        "BROCHURE",
+        "VIDEO",
+        "DOCUMENT",
+        "OTHER",
+      ],
+      import_media_review: [
+        "PENDING",
+        "CORRECT",
+        "INCORRECT",
+        "DUPLICATE",
+        "NEEDS_RECROP",
+      ],
+      import_property_type: ["APARTMENT", "VILLA", "PLOT"],
+      import_row_state: [
+        "PENDING",
+        "VALID",
+        "WARNING",
+        "INVALID",
+        "IMPORTED",
+        "FAILED",
+        "SKIPPED",
       ],
       import_status: [
         "UPLOADED",

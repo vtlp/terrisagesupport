@@ -1,166 +1,283 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Upload, FileText, Loader2, Trash2, CheckCircle2, Plus } from 'lucide-react';
+import { Loader2, Plus, Building2, Home, UserPlus, Search, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useUser } from '@/context/UserContext';
+import {
+  ImportJob, ImportKind, ImportStatus, KIND_LABEL, STATUS_LABEL, STATUS_TONE,
+  PROPERTY_TYPE_LABEL, PropertyType, logActivity,
+} from './imports/shared';
+import { ProjectImportWorkspace } from './imports/ProjectImportWorkspace';
+import { LeadImportWorkspace } from './imports/LeadImportWorkspace';
+import { SecondaryImportWorkspace } from './imports/SecondaryImportWorkspace';
 
-type Type = 'LISTINGS' | 'LEADS' | 'CONTACTS' | 'OTHER';
-type Status = 'UPLOADED' | 'MAPPING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+type Tenancy = 'AGENCY_BROKERAGE_CONSULTANCY' | 'BUILDER_DEVELOPER';
 
-interface ImportRow {
-  id: string; import_type: Type; file_name: string; storage_path: string;
-  size_bytes: number | null; row_count: number | null; status: Status;
-  error_log: string | null; created_at: string;
+interface Props {
+  accountId: string;
+  tenancyType?: Tenancy;
 }
 
-const TYPE_LABELS: Record<Type, string> = { LISTINGS: 'Listings', LEADS: 'Leads', CONTACTS: 'Contacts', OTHER: 'Other' };
-const STATUS_COLORS: Record<Status, string> = {
-  UPLOADED: 'bg-muted text-muted-foreground',
-  MAPPING: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  PROCESSING: 'bg-primary/15 text-primary',
-  COMPLETED: 'bg-success/15 text-success',
-  FAILED: 'bg-destructive/15 text-destructive',
-};
+const KIND_TILES: Array<{ kind: ImportKind; icon: typeof Building2; title: string; blurb: string }> = [
+  { kind: 'PROJECT', icon: Building2, title: 'Project import', blurb: 'Upload brochures and project details. Run extraction, review, then import to CRM.' },
+  { kind: 'SECONDARY_PROPERTY', icon: Home, title: 'Secondary market property import', blurb: 'Bulk import resale and rental property listings from CSV or XLSX.' },
+  { kind: 'LEAD', icon: UserPlus, title: 'Lead import', blurb: 'Import leads with phone-based deduplication and quick validation.' },
+];
 
-const fmtBytes = (n: number | null) => {
-  if (!n) return '—';
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-};
-
-export function ImportsTab({ accountId }: { accountId: string }) {
-  const [rows, setRows] = useState<ImportRow[]>([]);
+export function ImportsTab({ accountId, tenancyType }: Props) {
+  const { currentUser } = useUser();
+  const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createKind, setCreateKind] = useState<ImportKind>('PROJECT');
+  const [createPropType, setCreatePropType] = useState<PropertyType>('APARTMENT');
+  const [createLabel, setCreateLabel] = useState('');
+  const [createNotes, setCreateNotes] = useState('');
   const [busy, setBusy] = useState(false);
-  const [type, setType] = useState<Type>('LISTINGS');
-  const [file, setFile] = useState<File | null>(null);
+
+  // Filters
+  const [q, setQ] = useState('');
+  const [kindFilter, setKindFilter] = useState<'ALL' | ImportKind>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | ImportStatus>('ALL');
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('data_imports').select('*').eq('account_id', accountId).order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('import_jobs')
+      .select('*')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false });
     if (error) toast.error(error.message);
-    setRows((data ?? []) as ImportRow[]);
+    setJobs((data ?? []) as ImportJob[]);
     setLoading(false);
   }, [accountId]);
 
   useEffect(() => { load(); }, [load]);
 
-  const upload = async () => {
-    if (!file) { toast.error('Please choose a file'); return; }
+  const allowedKinds = useMemo<ImportKind[]>(() => {
+    if (tenancyType === 'AGENCY_BROKERAGE_CONSULTANCY') return ['PROJECT', 'SECONDARY_PROPERTY', 'LEAD'];
+    if (tenancyType === 'BUILDER_DEVELOPER') return ['PROJECT', 'LEAD'];
+    return ['PROJECT', 'SECONDARY_PROPERTY', 'LEAD'];
+  }, [tenancyType]);
+
+  const filtered = useMemo(() => jobs.filter(j => {
+    if (kindFilter !== 'ALL' && j.kind !== kindFilter) return false;
+    if (statusFilter !== 'ALL' && j.status !== statusFilter) return false;
+    if (q && !(j.label?.toLowerCase().includes(q.toLowerCase()) || j.id.startsWith(q))) return false;
+    return true;
+  }), [jobs, kindFilter, statusFilter, q]);
+
+  const startCreate = (kind: ImportKind) => {
+    setCreateKind(kind);
+    setCreatePropType('APARTMENT');
+    setCreateLabel('');
+    setCreateNotes('');
+    setCreateOpen(true);
+  };
+
+  const createJob = async () => {
     setBusy(true);
-    const ext = file.name.split('.').pop();
-    const path = `imports/${accountId}/${type}-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('kb-files').upload(path, file);
-    if (upErr) { setBusy(false); toast.error(upErr.message); return; }
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('data_imports').insert({
-      account_id: accountId, import_type: type, file_name: file.name,
-      storage_path: path, size_bytes: file.size, status: 'UPLOADED', created_by: user?.id ?? null,
-    });
+    const { data, error } = await supabase.from('import_jobs').insert({
+      account_id: accountId,
+      kind: createKind,
+      property_type: createKind === 'PROJECT' ? createPropType : null,
+      label: createLabel || null,
+      notes: createNotes || null,
+      status: 'DRAFT',
+      created_by: currentUser?.user_id ?? null,
+    }).select('*').single();
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success('File uploaded. Mapping queued.');
-    setOpen(false); setFile(null); setType('LISTINGS');
+    await logActivity(supabase, data.id, 'job_created', { kind: createKind, property_type: createPropType }, currentUser?.user_id);
+    toast.success('Import created');
+    setCreateOpen(false);
+    setOpenId(data.id);
     load();
   };
 
-  const markComplete = async (r: ImportRow) => {
-    const rowCount = prompt('Enter number of rows imported:', r.row_count?.toString() ?? '0');
-    if (rowCount === null) return;
-    const n = Number(rowCount);
-    if (isNaN(n)) { toast.error('Invalid number'); return; }
-    const { error } = await supabase.from('data_imports').update({ status: 'COMPLETED', row_count: n }).eq('id', r.id);
-    if (error) toast.error(error.message); else { toast.success('Marked complete'); load(); }
-  };
-
-  const remove = async (r: ImportRow) => {
-    if (!confirm(`Delete import "${r.file_name}"?`)) return;
-    await supabase.storage.from('kb-files').remove([r.storage_path]);
-    const { error } = await supabase.from('data_imports').delete().eq('id', r.id);
-    if (error) toast.error(error.message); else { toast.success('Deleted'); load(); }
-  };
-
-  const download = async (path: string) => {
-    const { data, error } = await supabase.storage.from('kb-files').createSignedUrl(path, 60);
-    if (error) { toast.error(error.message); return; }
-    window.open(data.signedUrl, '_blank');
-  };
+  const openJob = jobs.find(j => j.id === openId);
+  if (openId && openJob) {
+    return (
+      <div className="space-y-3">
+        <Button variant="ghost" size="sm" onClick={() => { setOpenId(null); load(); }} className="-ml-2">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to imports
+        </Button>
+        {openJob.kind === 'PROJECT' && (
+          <ProjectImportWorkspace job={openJob} onChange={load} />
+        )}
+        {openJob.kind === 'LEAD' && (
+          <LeadImportWorkspace job={openJob} onChange={load} />
+        )}
+        {openJob.kind === 'SECONDARY_PROPERTY' && (
+          <SecondaryImportWorkspace job={openJob} onChange={load} />
+        )}
+      </div>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2"><Upload className="h-4 w-4" /> Bulk imports</CardTitle>
-          <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" /> Upload</Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">No imports yet. Upload a CSV or XLSX file to begin.</p>
-        ) : (
-          <div className="space-y-2">
-            {rows.map(r => (
-              <div key={r.id} className="flex items-center justify-between border rounded p-3 gap-2 flex-wrap">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm truncate">{r.file_name}</span>
-                    <Badge className={`text-[10px] ${STATUS_COLORS[r.status]}`}>{r.status}</Badge>
-                    <Badge variant="outline" className="text-[10px]">{TYPE_LABELS[r.import_type]}</Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {fmtBytes(r.size_bytes)} {r.row_count !== null && `· ${r.row_count} rows`} · {format(new Date(r.created_at), 'dd MMM yyyy, HH:mm')}
-                  </div>
-                  {r.error_log && <p className="text-xs text-destructive mt-1">{r.error_log}</p>}
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Imports</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Upload files, review extracted or mapped data, validate it, and import it into CRM entities.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>
+          ) : jobs.length === 0 ? (
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {KIND_TILES.filter(t => allowedKinds.includes(t.kind)).map(t => {
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.kind}
+                    onClick={() => startCreate(t.kind)}
+                    className="text-left rounded-lg border p-4 hover:border-primary hover:shadow-sm transition-all bg-card"
+                  >
+                    <Icon className="h-6 w-6 text-primary mb-2" />
+                    <div className="font-medium text-sm">{t.title}</div>
+                    <p className="text-xs text-muted-foreground mt-1 mb-3">{t.blurb}</p>
+                    <span className="text-xs text-primary font-medium">Start import →</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <div className="relative flex-1 min-w-[180px]">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input className="pl-8 h-9" placeholder="Search label or ID" value={q} onChange={e => setQ(e.target.value)} />
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => download(r.storage_path)}>Download</Button>
-                  {r.status !== 'COMPLETED' && (
-                    <Button variant="ghost" size="sm" onClick={() => markComplete(r)}><CheckCircle2 className="h-4 w-4 text-success" /></Button>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={() => remove(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                <Select value={kindFilter} onValueChange={v => setKindFilter(v as 'ALL' | ImportKind)}>
+                  <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All types</SelectItem>
+                    {allowedKinds.map(k => <SelectItem key={k} value={k}>{KIND_LABEL[k]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={v => setStatusFilter(v as 'ALL' | ImportStatus)}>
+                  <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All statuses</SelectItem>
+                    {(Object.keys(STATUS_LABEL) as ImportStatus[]).map(s => (
+                      <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="ml-auto flex gap-2">
+                  {allowedKinds.map(k => (
+                    <Button key={k} size="sm" variant={k === 'PROJECT' ? 'default' : 'outline'} onClick={() => startCreate(k)}>
+                      <Plus className="h-4 w-4 mr-1" /> {KIND_LABEL[k]}
+                    </Button>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+              <div className="rounded-md border overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="text-left px-3 py-2">ID</th>
+                      <th className="text-left px-3 py-2">Type</th>
+                      <th className="text-left px-3 py-2">Label</th>
+                      <th className="text-left px-3 py-2">Status</th>
+                      <th className="text-left px-3 py-2">Files</th>
+                      <th className="text-left px-3 py-2">Records</th>
+                      <th className="text-left px-3 py-2">Created</th>
+                      <th className="text-left px-3 py-2">Updated</th>
+                      <th className="text-left px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(j => (
+                      <tr key={j.id} className="border-t hover:bg-muted/30">
+                        <td className="px-3 py-2 font-mono text-xs">{j.id.slice(0, 8)}</td>
+                        <td className="px-3 py-2">
+                          {KIND_LABEL[j.kind as ImportKind]}
+                          {j.property_type && <span className="text-xs text-muted-foreground ml-1">({PROPERTY_TYPE_LABEL[j.property_type as PropertyType]})</span>}
+                        </td>
+                        <td className="px-3 py-2">{j.label ?? <span className="text-muted-foreground">—</span>}</td>
+                        <td className="px-3 py-2">
+                          <Badge className={`text-[10px] ${STATUS_TONE[j.status as ImportStatus]}`}>{STATUS_LABEL[j.status as ImportStatus]}</Badge>
+                        </td>
+                        <td className="px-3 py-2">{j.source_files_count}</td>
+                        <td className="px-3 py-2">
+                          {j.records_imported}/{j.records_total}
+                          {j.records_failed > 0 && <span className="text-destructive ml-1">({j.records_failed} failed)</span>}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{format(new Date(j.created_at), 'dd MMM, HH:mm')}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{format(new Date(j.updated_at), 'dd MMM, HH:mm')}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Button size="sm" variant="ghost" onClick={() => setOpenId(j.id)}>Open</Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {filtered.length === 0 && (
+                      <tr><td colSpan={9} className="text-center text-sm text-muted-foreground py-6">No imports match your filters.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Upload data file</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>New {KIND_LABEL[createKind].toLowerCase()} import</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Import type</Label>
-              <Select value={type} onValueChange={v => setType(v as Type)}>
+              <Select value={createKind} onValueChange={v => setCreateKind(v as ImportKind)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(TYPE_LABELS) as Type[]).map(t => <SelectItem key={t} value={t}>{TYPE_LABELS[t]}</SelectItem>)}
+                  {allowedKinds.map(k => <SelectItem key={k} value={k}>{KIND_LABEL[k]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            {createKind === 'PROJECT' && (
+              <div className="space-y-1.5">
+                <Label>Property type</Label>
+                <Select value={createPropType} onValueChange={v => setCreatePropType(v as PropertyType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="APARTMENT">Apartment</SelectItem>
+                    <SelectItem value="VILLA">Villa</SelectItem>
+                    <SelectItem value="PLOT">Plot</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
-              <Label>File (CSV or XLSX)</Label>
-              <Input type="file" accept=".csv,.xlsx,.xls" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+              <Label>Label (optional)</Label>
+              <Input value={createLabel} onChange={e => setCreateLabel(e.target.value)} placeholder="e.g. Sample Greens batch 1" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes (optional)</Label>
+              <Textarea value={createNotes} onChange={e => setCreateNotes(e.target.value)} rows={2} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={upload} disabled={busy || !file}>{busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Upload</Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button onClick={createJob} disabled={busy}>{busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 }

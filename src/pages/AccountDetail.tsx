@@ -696,7 +696,7 @@ export default function AccountDetail() {
         </TabsContent>
 
         <TabsContent value="imports" className="space-y-4">
-          <ImportsTab accountId={acc.id} />
+          <ImportsTab accountId={acc.id} tenancyType={acc.tenancy_type} />
         </TabsContent>
 
         <TabsContent value="calendar" className="space-y-4">

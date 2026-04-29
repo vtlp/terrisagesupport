@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.seat-request]
 verify_jwt = false
+
+[functions.extraction-callback]
+verify_jwt = false
