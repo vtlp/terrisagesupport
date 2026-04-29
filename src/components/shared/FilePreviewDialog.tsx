@@ -33,16 +33,18 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   /** Storage bucket id, e.g. 'contact-attachments', 'kb-files' */
   bucket: string;
-  /** Object path in the bucket */
+  /** Object path in the bucket. Pass null for inline HTML documents. */
   path: string | null;
   /** Display name */
   name: string | null;
   /** Optional MIME type */
   mime?: string | null;
+  /** If provided, renders this HTML inline (no Storage fetch). Used for in-app rich-text documents. */
+  inlineHtml?: string | null;
 }
 
-/** Reusable file preview dialog: images, PDFs, video/audio, text, and Office docs (via Office Online). */
-export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime }: Props) {
+/** Reusable file preview dialog: images, PDFs, video/audio, text, Office docs, and inline rich-text documents. */
+export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime, inlineHtml }: Props) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
