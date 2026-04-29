@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, BookOpen, Copy, Folder, FolderOpen, File as FileIcon, Upload, Plus, FolderPlus, ChevronRight, ChevronDown, Download, FileText, Image as ImageIcon, Table2, Loader2, Trash2, Eye, Pencil } from 'lucide-react';
+import { Search, BookOpen, Copy, Folder, FolderOpen, File as FileIcon, Upload, Plus, FolderPlus, ChevronRight, ChevronDown, Download, FileText, Image as ImageIcon, Table2, Loader2, Trash2, Eye, Pencil, FolderInput } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -15,21 +13,20 @@ import { useUser } from '@/context/UserContext';
 import { FilePreviewDialog } from '@/components/shared/FilePreviewDialog';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
 
-const buckets = [
-  { v: 'SALES_CONTENT', l: 'Sales Content' },
-  { v: 'CHECKLISTS', l: 'Checklists' },
-  { v: 'SUPPORT_UI_GUIDE', l: 'Support UI Guide' },
-  { v: 'PLATFORM_GUIDES', l: 'Platform Guides' },
-  { v: 'BUILDER_WORKSHEETS', l: 'Builder Worksheets' },
-  { v: 'CRM_TEMPLATES', l: 'CRM Templates' },
-  { v: 'BULK_IMPORT_TEMPLATES', l: 'Bulk Import Templates' },
-  { v: 'DEMO_TIPS', l: 'Demo Tips & Pitches' },
-  { v: 'ONBOARDING_PACKS', l: 'Onboarding Packs' },
-];
-
-interface Article { id: string; title: string; body: string; bucket_key: string; tags: string[] | null; updated_at: string; }
 interface KFolder { id: string; name: string; parent_id: string | null; }
-interface KFile { id: string; folder_id: string | null; name: string; size_bytes: number | null; mime_type: string | null; storage_path: string; created_at: string; }
+interface KFile {
+  id: string;
+  folder_id: string | null;
+  name: string;
+  size_bytes: number | null;
+  mime_type: string | null;
+  storage_path: string;
+  content_html: string | null;
+  created_at: string;
+}
+
+const isInlineDoc = (f: Pick<KFile, 'mime_type' | 'storage_path'>) =>
+  f.mime_type === 'text/html' && f.storage_path.startsWith('inline://');
 
 const fileIcon = (mime?: string | null, name?: string) => {
   const ext = name?.split('.').pop()?.toLowerCase() ?? '';
