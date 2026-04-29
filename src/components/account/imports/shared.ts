@@ -88,5 +88,5 @@ export async function logActivity(
   detail: Record<string, unknown> = {},
   actorId?: string | null,
 ) {
-  await client.from('import_activity').insert({ job_id: jobId, event, detail, actor_id: actorId ?? null });
+  await client.from('import_activity').insert([{ job_id: jobId, event, detail: detail as never, actor_id: actorId ?? null }]);
 }
