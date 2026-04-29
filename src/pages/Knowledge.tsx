@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { FilePreviewDialog } from '@/components/shared/FilePreviewDialog';
-import { RichTextEditor } from '@/components/shared/RichTextEditor';
+import { RichTextEditor, countWords, MAX_WORDS } from '@/components/shared/RichTextEditor';
 
 interface KFolder { id: string; name: string; parent_id: string | null; }
 interface KFile {
@@ -210,6 +210,10 @@ export default function Knowledge() {
   const saveDoc = async () => {
     const name = docForm.name.trim();
     if (!name) { toast.error('Name is required'); return; }
+    if (countWords(docForm.content_html) > MAX_WORDS) {
+      toast.error(`Document exceeds the ${MAX_WORDS.toLocaleString()}-word limit`);
+      return;
+    }
     if (editingDocId) {
       const { error } = await supabase
         .from('kb_files')

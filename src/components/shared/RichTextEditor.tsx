@@ -2,7 +2,7 @@ import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   Heading1, Heading2, Heading3, List, ListOrdered, Quote,
@@ -12,12 +12,27 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
+export const MAX_WORDS = 20_000;
+
+export function countWords(html: string): number {
+  if (!html) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const text = (tmp.innerText || tmp.textContent || '').trim();
+  if (!text) return 0;
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
 interface RichTextEditorProps {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
   className?: string;
   minHeight?: number;
+  /** Max visible height before the editor scrolls internally. Defaults to 360px. */
+  maxHeight?: number;
+  /** Word limit. Defaults to 20,000. */
+  maxWords?: number;
 }
 
 const ToolbarBtn = ({
@@ -51,7 +66,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-input bg-muted/30 px-1 py-1 rounded-t-md">
+    <div className="flex flex-wrap items-center gap-0.5 border-b border-input bg-muted/30 px-1 py-1 rounded-t-md sticky top-0 z-10">
       <ToolbarBtn label="Bold" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><Bold className="h-3.5 w-3.5" /></ToolbarBtn>
       <ToolbarBtn label="Italic" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic className="h-3.5 w-3.5" /></ToolbarBtn>
       <ToolbarBtn label="Underline" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}><UnderlineIcon className="h-3.5 w-3.5" /></ToolbarBtn>
@@ -76,10 +91,15 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
-export function RichTextEditor({ value, onChange, placeholder, className, minHeight = 200 }: RichTextEditorProps) {
+export function RichTextEditor({
+  value, onChange, placeholder, className,
+  minHeight = 200, maxHeight = 360, maxWords = MAX_WORDS,
+}: RichTextEditorProps) {
   const editor = useEditor({
+    // StarterKit (v3+) already includes Underline; disable it to avoid the duplicate-extension warning,
+    // then add our own Underline so older StarterKit versions (without it) still work.
     extensions: [
-      StarterKit.configure({ link: false }),
+      StarterKit.configure({ link: false, underline: false }),
       Underline,
       Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' } }),
     ],
@@ -90,7 +110,6 @@ export function RichTextEditor({ value, onChange, placeholder, className, minHei
           'prose prose-sm dark:prose-invert max-w-none focus:outline-none px-3 py-2',
           'prose-headings:font-semibold prose-a:text-primary',
         ),
-        style: `min-height: ${minHeight}px`,
         'data-placeholder': placeholder ?? '',
       },
     },
@@ -101,7 +120,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, minHei
     },
   });
 
-  // Sync external value changes (e.g. when opening dialog for a different article)
+  // Sync external value changes (e.g. when opening dialog for a different document)
   useEffect(() => {
     if (!editor) return;
     const current = editor.getHTML();
@@ -111,12 +130,29 @@ export function RichTextEditor({ value, onChange, placeholder, className, minHei
     }
   }, [value, editor]);
 
+  const words = useMemo(() => countWords(value || ''), [value]);
+  const overLimit = words > maxWords;
+
   if (!editor) return null;
 
   return (
-    <div className={cn('rounded-md border border-input bg-background', className)}>
+    <div className={cn('rounded-md border border-input bg-background flex flex-col', className)}>
       <Toolbar editor={editor} />
-      <EditorContent editor={editor} />
+      <div
+        className="overflow-auto"
+        style={{ minHeight, maxHeight }}
+      >
+        <EditorContent editor={editor} />
+      </div>
+      <div className={cn(
+        'flex items-center justify-between gap-2 border-t border-input px-3 py-1.5 text-xs',
+        overLimit ? 'text-destructive' : 'text-muted-foreground',
+      )}>
+        <span>
+          {words.toLocaleString()} / {maxWords.toLocaleString()} words
+        </span>
+        {overLimit && <span>Over the {maxWords.toLocaleString()}-word limit</span>}
+      </div>
     </div>
   );
 }
