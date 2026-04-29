@@ -161,13 +161,6 @@ export default function Knowledge() {
     load();
   };
 
-  const filteredArticles = articles.filter(a => {
-    const q = searchQuery.toLowerCase();
-    const matchSearch = !q || a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q) || (a.tags ?? []).some(t => t.toLowerCase().includes(q));
-    const matchBucket = selectedBucket === 'all' || a.bucket_key === selectedBucket;
-    return matchSearch && matchBucket;
-  });
-
   // Files: when searching, search globally across ALL files; otherwise show current folder
   const filteredFiles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -177,7 +170,6 @@ export default function Knowledge() {
     return getFilesInFolder(currentFolderId);
   }, [files, searchQuery, currentFolderId]);
 
-  const selectedArticle = selectedArticleId ? articles.find(a => a.id === selectedArticleId) : null;
   const childFolders = getChildren(currentFolderId);
 
   // ---------- Folder creation (explicit parent) ----------
@@ -198,54 +190,49 @@ export default function Knowledge() {
     load();
   };
 
-  const openNewArticle = () => {
-    setEditingArticleId(null);
-    setArticleForm({ title: '', body: '', bucket_key: 'SALES_CONTENT', tags: '' });
-    setShowArticleDialog(true);
+  // ---------- Inline rich-text documents ----------
+  const openNewDoc = () => {
+    if (!currentFolderId) { toast.error('Open a folder first'); return; }
+    setEditingDocId(null);
+    setDocFolderId(currentFolderId);
+    setDocForm({ name: '', content_html: '' });
+    setShowDocDialog(true);
   };
 
-  const openEditArticle = (a: Article) => {
-    setEditingArticleId(a.id);
-    setArticleForm({
-      title: a.title,
-      body: a.body ?? '',
-      bucket_key: a.bucket_key,
-      tags: (a.tags ?? []).join(', '),
-    });
-    setShowArticleDialog(true);
+  const openEditDoc = (f: KFile) => {
+    setEditingDocId(f.id);
+    setDocFolderId(f.folder_id);
+    setDocForm({ name: f.name, content_html: f.content_html ?? '' });
+    setShowDocDialog(true);
   };
 
-  const saveArticle = async () => {
-    if (!articleForm.title.trim()) return;
-    const payload = {
-      title: articleForm.title.trim(),
-      body: articleForm.body,
-      bucket_key: articleForm.bucket_key,
-      tags: articleForm.tags ? articleForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-    };
-    if (editingArticleId) {
+  const saveDoc = async () => {
+    const name = docForm.name.trim();
+    if (!name) { toast.error('Name is required'); return; }
+    if (editingDocId) {
       const { error } = await supabase
-        .from('kb_articles')
-        .update({ ...payload, updated_at: new Date().toISOString() })
-        .eq('id', editingArticleId);
+        .from('kb_files')
+        .update({ name, content_html: docForm.content_html })
+        .eq('id', editingDocId);
       if (error) { toast.error(error.message); return; }
-      toast.success('Template updated');
+      toast.success('Document updated');
     } else {
-      const { error } = await supabase.from('kb_articles').insert({ ...payload, created_by: currentUser.user_id });
+      if (!docFolderId) { toast.error('Open a folder first'); return; }
+      const id = crypto.randomUUID();
+      const { error } = await supabase.from('kb_files').insert({
+        folder_id: docFolderId,
+        name,
+        mime_type: 'text/html',
+        storage_path: `inline://${id}`,
+        content_html: docForm.content_html,
+        size_bytes: new Blob([docForm.content_html ?? '']).size,
+        uploaded_by: currentUser.user_id,
+      });
       if (error) { toast.error(error.message); return; }
-      toast.success('Template created');
+      toast.success('Document created');
     }
-    setShowArticleDialog(false);
-    setEditingArticleId(null);
-    load();
-  };
-
-  const deleteArticle = async (a: Article) => {
-    if (!confirm(`Delete template "${a.title}"?`)) return;
-    const { error } = await supabase.from('kb_articles').delete().eq('id', a.id);
-    if (error) { toast.error(error.message); return; }
-    if (selectedArticleId === a.id) setSelectedArticleId(null);
-    toast.success('Template deleted');
+    setShowDocDialog(false);
+    setEditingDocId(null);
     load();
   };
 
