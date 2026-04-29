@@ -53,8 +53,10 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
 
   const kind = detectPreviewKind(mime, name);
 
+  const isInline = inlineHtml != null;
+
   useEffect(() => {
-    if (!open || !path) return;
+    if (!open || !path || isInline) return;
     let revokedUrl: string | null = null;
     let cancelled = false;
 
