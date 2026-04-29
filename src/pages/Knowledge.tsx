@@ -266,6 +266,25 @@ export default function Knowledge() {
     load();
   };
 
+  // ---------- Move file between folders ----------
+  const openMove = (f: KFile) => {
+    setMoveTarget(f);
+    setMoveSelectedId(f.folder_id);
+  };
+
+  const saveMove = async () => {
+    if (!moveTarget) return;
+    if (moveSelectedId === moveTarget.folder_id) { setMoveTarget(null); return; }
+    const { error } = await supabase
+      .from('kb_files')
+      .update({ folder_id: moveSelectedId })
+      .eq('id', moveTarget.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('File moved');
+    setMoveTarget(null);
+    load();
+  };
+
   // ---------- Single file upload ----------
   const uploadFile = async (file: File, targetFolderId: string | null) => {
     if (!targetFolderId) { toast.error('Open a folder first'); return; }
