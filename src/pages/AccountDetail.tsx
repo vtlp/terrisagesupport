@@ -638,14 +638,21 @@ export default function AccountDetail() {
                             <div key={row.id}>
                               <button
                                 onClick={() => toggleChecklist(row)}
-                                className="flex items-center gap-3 w-full text-left px-2 py-2 rounded hover:bg-muted/50 transition-colors"
+                                className="flex items-start gap-3 w-full text-left px-2 py-2 rounded hover:bg-muted/50 transition-colors"
                               >
                                 {row.is_done
-                                  ? <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
-                                  : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />}
-                                <span className={`text-sm leading-snug ${row.is_done ? 'line-through text-muted-foreground' : ''}`}>
-                                  {tpl.label}
-                                </span>
+                                  ? <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                                  : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />}
+                                <div className="flex-1 min-w-0">
+                                  <span className={`block text-sm leading-snug ${row.is_done ? 'line-through text-muted-foreground' : ''}`}>
+                                    {tpl.label}
+                                  </span>
+                                  {row.is_done && row.done_at && (
+                                    <span className="block text-[11px] text-muted-foreground mt-0.5">
+                                      Completed {format(new Date(row.done_at), 'dd MMM')}
+                                    </span>
+                                  )}
+                                </div>
                               </button>
                               {isGoLive && !row.is_done && preGoLiveIncomplete && (
                                 <p className="text-xs text-muted-foreground pl-10 -mt-1 pb-1">
