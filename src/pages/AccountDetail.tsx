@@ -292,7 +292,32 @@ export default function AccountDetail() {
   }
 
   const phoneSplit = splitPhone(draft.owner_phone ?? '');
-  const doneCount = checklist.filter(c => c.is_done).length;
+
+  // Build grouped, filtered checklist from the canonical template, joined to DB rows by label.
+  const projectsEnabledNow =
+    (Array.isArray((acc.payload as Record<string, unknown>)?.projects) &&
+      ((acc.payload as { projects?: unknown[] }).projects?.length ?? 0) > 0)
+    || (acc.payload as { projects_enabled?: boolean })?.projects_enabled === true;
+  const checklistByLabel = new Map(checklist.map(c => [c.label, c]));
+  const visibleTemplate = ONBOARDING_TEMPLATE.filter(t =>
+    t.show({ tenancy: acc.tenancy_type, projectsEnabled: projectsEnabledNow }));
+  const visibleRows = visibleTemplate
+    .map(t => ({ tpl: t, row: checklistByLabel.get(t.label) }))
+    .filter((x): x is { tpl: ChecklistTemplateItem; row: ChecklistRow } => !!x.row);
+  const visibleTotal = visibleTemplate.length;
+  const doneCount = visibleRows.filter(x => x.row.is_done).length;
+  const goLiveRow = checklistByLabel.get(GO_LIVE_LABEL);
+  const preGoLiveIncomplete = visibleRows
+    .filter(x => x.tpl.label !== GO_LIVE_LABEL)
+    .some(x => !x.row.is_done);
+
+  // Group by section preserving template order
+  const groupedSections: { section: string; items: { tpl: ChecklistTemplateItem; row: ChecklistRow }[] }[] = [];
+  for (const item of visibleRows) {
+    const last = groupedSections[groupedSections.length - 1];
+    if (last && last.section === item.tpl.section) last.items.push(item);
+    else groupedSections.push({ section: item.tpl.section, items: [item] });
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
