@@ -1,0 +1,128 @@
+"""Render PDF pages to images and extract text per page (with OCR fallback).
+
+Returns a flat list of page dicts:
+  {
+    "file_id": str,
+    "file_name": str,
+    "file_type": str,           # BROCHURE / LAYOUT / IMAGE / ...
+    "page_no": int,             # 1-based; for image files always 1
+    "text": str,
+    "image_path": str,          # rendered/source PNG path on disk
+    "is_scanned": bool,
+    "width": int,
+    "height": int,
+  }
+"""
+from __future__ import annotations
+
+import logging
+import os
+import tempfile
+from typing import Any, Dict, List
+
+from PIL import Image
+
+log = logging.getLogger("extraction-worker.preprocess")
+
+OCR_DPI = int(os.getenv("OCR_DPI", "200"))
+MIN_TEXT_CHARS_PER_PAGE = 40  # below this we treat the page as scanned and run OCR
+
+
+def preprocess_files(files: List[Dict[str, Any]], *, max_pages: int = 80) -> List[Dict[str, Any]]:
+    pages: List[Dict[str, Any]] = []
+    page_budget = max_pages
+
+    for f in files:
+        if page_budget <= 0:
+            break
+        local = f["local_path"]
+        mime = (f.get("mime_type") or "").lower()
+        ftype = (f.get("fileType") or "OTHER").upper()
+
+        try:
+            if mime == "application/pdf" or local.lower().endswith(".pdf"):
+                rendered = _process_pdf(f, local, page_budget)
+            elif mime.startswith("image/"):
+                rendered = _process_image(f, local)
+            else:
+                # videos, docs etc — we still record them but don't extract text
+                continue
+
+            for p in rendered:
+                pages.append(p)
+                page_budget -= 1
+                if page_budget <= 0:
+                    break
+        except Exception as exc:
+            log.exception("preprocess failed for %s: %s", f.get("fileName"), exc)
+
+    return pages
+
+
+def _process_pdf(file_meta: Dict[str, Any], path: str, budget: int) -> List[Dict[str, Any]]:
+    import pdfplumber
+    from pdf2image import convert_from_path
+
+    out: List[Dict[str, Any]] = []
+    text_per_page: List[str] = []
+    with pdfplumber.open(path) as pdf:
+        n = min(len(pdf.pages), budget)
+        for i in range(n):
+            try:
+                text_per_page.append(pdf.pages[i].extract_text() or "")
+            except Exception:
+                text_per_page.append("")
+
+    n = len(text_per_page)
+    if n == 0:
+        return out
+
+    # Render every page to PNG for floor-plan carving + OCR fallback.
+    images = convert_from_path(path, dpi=OCR_DPI, first_page=1, last_page=n)
+    tmpdir = tempfile.mkdtemp(prefix="pages-")
+
+    for idx, img in enumerate(images):
+        page_no = idx + 1
+        img_path = os.path.join(tmpdir, f"{file_meta.get('id','f')}-p{page_no}.png")
+        img.save(img_path, "PNG")
+        text = text_per_page[idx] if idx < len(text_per_page) else ""
+        is_scanned = len(text.strip()) < MIN_TEXT_CHARS_PER_PAGE
+        if is_scanned:
+            text = _ocr(img_path)
+        out.append({
+            "file_id": file_meta.get("id"),
+            "file_name": file_meta.get("fileName"),
+            "file_type": file_meta.get("fileType", "OTHER"),
+            "page_no": page_no,
+            "text": text,
+            "image_path": img_path,
+            "is_scanned": is_scanned,
+            "width": img.width,
+            "height": img.height,
+        })
+    return out
+
+
+def _process_image(file_meta: Dict[str, Any], path: str) -> List[Dict[str, Any]]:
+    img = Image.open(path).convert("RGB")
+    text = _ocr(path)
+    return [{
+        "file_id": file_meta.get("id"),
+        "file_name": file_meta.get("fileName"),
+        "file_type": file_meta.get("fileType", "IMAGE"),
+        "page_no": 1,
+        "text": text,
+        "image_path": path,
+        "is_scanned": True,
+        "width": img.width,
+        "height": img.height,
+    }]
+
+
+def _ocr(image_path: str) -> str:
+    try:
+        import pytesseract
+        return pytesseract.image_to_string(Image.open(image_path)) or ""
+    except Exception as exc:
+        log.warning("OCR failed for %s: %s", image_path, exc)
+        return ""
