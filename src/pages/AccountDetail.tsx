@@ -66,6 +66,34 @@ const statusLabels: Record<Status, string> = {
 const NONE = '__none__';
 const ROLES = ['Admin', 'Manager', 'Agent'];
 
+// Canonical onboarding checklist template (sequential, grouped).
+// Items are stored in account_checklist_items keyed by exact label.
+type ChecklistTemplateItem = {
+  label: string;
+  section: string;
+  // Visibility rule given account context
+  show: (ctx: { tenancy: Tenancy; projectsEnabled: boolean }) => boolean;
+};
+const ONBOARDING_TEMPLATE: ChecklistTemplateItem[] = [
+  { section: 'Commercial setup', label: 'Payment received / trial approved', show: () => true },
+  { section: 'Commercial setup', label: 'Contract signed', show: () => true },
+  { section: 'Verification', label: 'ID / business verification completed', show: () => true },
+  { section: 'Workspace setup', label: 'Owner login credentials sent', show: () => true },
+  { section: 'Workspace setup', label: 'Team users reviewed and invited', show: () => true },
+  { section: 'Workspace setup', label: 'Branding details added', show: () => true },
+  { section: 'Workspace setup', label: 'Required integrations configured', show: () => true },
+  { section: 'Data setup', label: 'Project data imported',
+    show: ({ tenancy, projectsEnabled }) => tenancy === 'BUILDER_DEVELOPER' || projectsEnabled },
+  { section: 'Data setup', label: 'Lead data imported', show: () => true },
+  { section: 'Data setup', label: 'Secondary market properties imported',
+    show: ({ tenancy }) => tenancy === 'AGENCY_BROKERAGE_CONSULTANCY' },
+  { section: 'Testing and go-live', label: 'Imported data preview checked', show: () => true },
+  { section: 'Testing and go-live', label: 'Share links tested', show: () => true },
+  { section: 'Testing and go-live', label: 'Enquiry forms tested', show: () => true },
+  { section: 'Testing and go-live', label: 'Account marked live', show: () => true },
+];
+const GO_LIVE_LABEL = 'Account marked live';
+
 export default function AccountDetail() {
   const { accountId } = useParams<{ accountId: string }>();
   const navigate = useNavigate();
@@ -115,7 +143,29 @@ export default function AccountDetail() {
     setDraft(acct);
     setSeats((s.data ?? []) as Seat[]);
     setNotes((n.data ?? []) as NoteRow[]);
-    setChecklist((c.data ?? []) as ChecklistRow[]);
+
+    // Sync canonical checklist template: insert any missing visible items so
+    // every account exposes the same sequential onboarding checklist.
+    const projectsEnabled =
+      Array.isArray((acct.payload as Record<string, unknown>)?.projects) &&
+      ((acct.payload as { projects?: unknown[] }).projects?.length ?? 0) > 0
+      || (acct.payload as { projects_enabled?: boolean })?.projects_enabled === true;
+    const ctx = { tenancy: acct.tenancy_type, projectsEnabled };
+    const existing = (c.data ?? []) as ChecklistRow[];
+    const existingLabels = new Set(existing.map(r => r.label));
+    const toInsert = ONBOARDING_TEMPLATE
+      .map((t, idx) => ({ t, idx }))
+      .filter(({ t }) => t.show(ctx) && !existingLabels.has(t.label))
+      .map(({ t, idx }) => ({ account_id: accountId, label: t.label, sort_order: idx }));
+    if (toInsert.length > 0) {
+      const { data: inserted } = await supabase
+        .from('account_checklist_items')
+        .insert(toInsert)
+        .select('id, label, is_done, sort_order, done_at');
+      setChecklist([...existing, ...((inserted ?? []) as ChecklistRow[])]);
+    } else {
+      setChecklist(existing);
+    }
     setEvents((ev.data ?? []) as EventRow[]);
     setLoading(false);
   }, [accountId, navigate]);
@@ -144,10 +194,11 @@ export default function AccountDetail() {
     });
   };
 
-  const allChecklistDone = useMemo(
-    () => checklist.length > 0 && checklist.every(c => c.is_done),
-    [checklist]
-  );
+  const allChecklistDone = useMemo(() => {
+    const templateLabels = new Set(ONBOARDING_TEMPLATE.map(t => t.label));
+    const relevant = checklist.filter(c => templateLabels.has(c.label));
+    return relevant.length > 0 && relevant.every(c => c.is_done);
+  }, [checklist]);
 
   const save = async () => {
     if (!draft || !acc) return;
@@ -242,7 +293,31 @@ export default function AccountDetail() {
   }
 
   const phoneSplit = splitPhone(draft.owner_phone ?? '');
-  const doneCount = checklist.filter(c => c.is_done).length;
+
+  // Build grouped, filtered checklist from the canonical template, joined to DB rows by label.
+  const projectsEnabledNow =
+    (Array.isArray((acc.payload as Record<string, unknown>)?.projects) &&
+      ((acc.payload as { projects?: unknown[] }).projects?.length ?? 0) > 0)
+    || (acc.payload as { projects_enabled?: boolean })?.projects_enabled === true;
+  const checklistByLabel = new Map(checklist.map(c => [c.label, c]));
+  const visibleTemplate = ONBOARDING_TEMPLATE.filter(t =>
+    t.show({ tenancy: acc.tenancy_type, projectsEnabled: projectsEnabledNow }));
+  const visibleRows = visibleTemplate
+    .map(t => ({ tpl: t, row: checklistByLabel.get(t.label) }))
+    .filter((x): x is { tpl: ChecklistTemplateItem; row: ChecklistRow } => !!x.row);
+  const visibleTotal = visibleTemplate.length;
+  const doneCount = visibleRows.filter(x => x.row.is_done).length;
+  const preGoLiveIncomplete = visibleRows
+    .filter(x => x.tpl.label !== GO_LIVE_LABEL)
+    .some(x => !x.row.is_done);
+
+  // Group by section preserving template order
+  const groupedSections: { section: string; items: { tpl: ChecklistTemplateItem; row: ChecklistRow }[] }[] = [];
+  for (const item of visibleRows) {
+    const last = groupedSections[groupedSections.length - 1];
+    if (last && last.section === item.tpl.section) last.items.push(item);
+    else groupedSections.push({ section: item.tpl.section, items: [item] });
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
@@ -267,7 +342,7 @@ export default function AccountDetail() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="seats">Seats &amp; requests ({seats.filter(s => s.is_active).length})</TabsTrigger>
-          <TabsTrigger value="checklist">Onboarding ({doneCount}/{checklist.length})</TabsTrigger>
+          <TabsTrigger value="checklist">Onboarding ({doneCount}/{visibleTotal})</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="projects">Projects ({Array.isArray((acc.payload as any)?.projects) ? (acc.payload as any).projects.length : 0})</TabsTrigger>
@@ -542,23 +617,46 @@ export default function AccountDetail() {
 
         <TabsContent value="checklist" className="space-y-4">
           <Card>
-            <CardHeader><CardTitle className="text-base">Onboarding checklist</CardTitle></CardHeader>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Onboarding checklist</CardTitle>
+              <p className="text-xs text-muted-foreground">{doneCount}/{visibleTotal} completed</p>
+            </CardHeader>
             <CardContent>
-              {checklist.length === 0 ? (
+              {visibleRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">No checklist items.</p>
               ) : (
-                <div className="space-y-2">
-                  {checklist.map(c => (
-                    <button key={c.id} onClick={() => toggleChecklist(c)}
-                      className="flex items-start gap-3 w-full text-left p-2 rounded hover:bg-muted/50 transition-colors">
-                      {c.is_done
-                        ? <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
-                        : <Circle className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />}
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-sm ${c.is_done ? 'line-through text-muted-foreground' : ''}`}>{c.label}</p>
-                        {c.done_at && <p className="text-xs text-muted-foreground">Done {format(new Date(c.done_at), 'dd MMM, HH:mm')}</p>}
+                <div className="space-y-4">
+                  {groupedSections.map(group => (
+                    <div key={group.section} className="space-y-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground px-2">
+                        {group.section}
+                      </p>
+                      <div className="space-y-0.5">
+                        {group.items.map(({ tpl, row }) => {
+                          const isGoLive = tpl.label === GO_LIVE_LABEL;
+                          return (
+                            <div key={row.id}>
+                              <button
+                                onClick={() => toggleChecklist(row)}
+                                className="flex items-center gap-3 w-full text-left px-2 py-2 rounded hover:bg-muted/50 transition-colors"
+                              >
+                                {row.is_done
+                                  ? <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+                                  : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />}
+                                <span className={`text-sm leading-snug ${row.is_done ? 'line-through text-muted-foreground' : ''}`}>
+                                  {tpl.label}
+                                </span>
+                              </button>
+                              {isGoLive && !row.is_done && preGoLiveIncomplete && (
+                                <p className="text-xs text-muted-foreground pl-10 -mt-1 pb-1">
+                                  Some onboarding steps are still incomplete.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
