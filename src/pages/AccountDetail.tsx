@@ -194,10 +194,11 @@ export default function AccountDetail() {
     });
   };
 
-  const allChecklistDone = useMemo(
-    () => checklist.length > 0 && checklist.every(c => c.is_done),
-    [checklist]
-  );
+  const allChecklistDone = useMemo(() => {
+    const templateLabels = new Set(ONBOARDING_TEMPLATE.map(t => t.label));
+    const relevant = checklist.filter(c => templateLabels.has(c.label));
+    return relevant.length > 0 && relevant.every(c => c.is_done);
+  }, [checklist]);
 
   const save = async () => {
     if (!draft || !acc) return;
