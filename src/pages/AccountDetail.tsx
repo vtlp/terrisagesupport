@@ -617,23 +617,46 @@ export default function AccountDetail() {
 
         <TabsContent value="checklist" className="space-y-4">
           <Card>
-            <CardHeader><CardTitle className="text-base">Onboarding checklist</CardTitle></CardHeader>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Onboarding checklist</CardTitle>
+              <p className="text-xs text-muted-foreground">{doneCount}/{visibleTotal} completed</p>
+            </CardHeader>
             <CardContent>
-              {checklist.length === 0 ? (
+              {visibleRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">No checklist items.</p>
               ) : (
-                <div className="space-y-2">
-                  {checklist.map(c => (
-                    <button key={c.id} onClick={() => toggleChecklist(c)}
-                      className="flex items-start gap-3 w-full text-left p-2 rounded hover:bg-muted/50 transition-colors">
-                      {c.is_done
-                        ? <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
-                        : <Circle className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />}
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-sm ${c.is_done ? 'line-through text-muted-foreground' : ''}`}>{c.label}</p>
-                        {c.done_at && <p className="text-xs text-muted-foreground">Done {format(new Date(c.done_at), 'dd MMM, HH:mm')}</p>}
+                <div className="space-y-4">
+                  {groupedSections.map(group => (
+                    <div key={group.section} className="space-y-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground px-2">
+                        {group.section}
+                      </p>
+                      <div className="space-y-0.5">
+                        {group.items.map(({ tpl, row }) => {
+                          const isGoLive = tpl.label === GO_LIVE_LABEL;
+                          return (
+                            <div key={row.id}>
+                              <button
+                                onClick={() => toggleChecklist(row)}
+                                className="flex items-center gap-3 w-full text-left px-2 py-2 rounded hover:bg-muted/50 transition-colors"
+                              >
+                                {row.is_done
+                                  ? <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+                                  : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />}
+                                <span className={`text-sm leading-snug ${row.is_done ? 'line-through text-muted-foreground' : ''}`}>
+                                  {tpl.label}
+                                </span>
+                              </button>
+                              {isGoLive && !row.is_done && preGoLiveIncomplete && (
+                                <p className="text-xs text-muted-foreground pl-10 -mt-1 pb-1">
+                                  Some onboarding steps are still incomplete.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
