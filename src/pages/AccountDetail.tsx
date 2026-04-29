@@ -307,7 +307,6 @@ export default function AccountDetail() {
     .filter((x): x is { tpl: ChecklistTemplateItem; row: ChecklistRow } => !!x.row);
   const visibleTotal = visibleTemplate.length;
   const doneCount = visibleRows.filter(x => x.row.is_done).length;
-  const goLiveRow = checklistByLabel.get(GO_LIVE_LABEL);
   const preGoLiveIncomplete = visibleRows
     .filter(x => x.tpl.label !== GO_LIVE_LABEL)
     .some(x => !x.row.is_done);
