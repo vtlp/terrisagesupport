@@ -110,13 +110,35 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
       cancelled = true;
       if (revokedUrl) URL.revokeObjectURL(revokedUrl);
     };
-  }, [open, bucket, path, kind]);
+  }, [open, bucket, path, kind, isInline]);
 
   const download = async () => {
     if (!path || !name) return;
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60, { download: name });
     if (error || !data) { toast.error('Could not generate link'); return; }
     window.open(data.signedUrl, '_blank');
+  };
+
+  const copyInline = async () => {
+    const html = inlineHtml ?? '';
+    const tmp = document.createElement('div'); tmp.innerHTML = html;
+    const plain = tmp.innerText;
+    try {
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([plain], { type: 'text/plain' }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plain);
+      }
+      toast.success('Copied');
+    } catch {
+      try { await navigator.clipboard.writeText(plain); toast.success('Copied as plain text'); }
+      catch { toast.error('Copy failed'); }
+    }
   };
 
   const officeUrl = kind === 'office' && signedUrl
@@ -131,22 +153,42 @@ export function FilePreviewDialog({ open, onOpenChange, bucket, path, name, mime
             {previewIcon(mime, name)}
             <div className="min-w-0">
               <DialogTitle className="text-base truncate">{name ?? 'Preview'}</DialogTitle>
-              <DialogDescription className="text-xs">In-app file preview</DialogDescription>
+              <DialogDescription className="text-xs">{isInline ? 'In-app rich-text document' : 'In-app file preview'}</DialogDescription>
             </div>
           </div>
           <div className="flex gap-2 mr-6 flex-shrink-0">
-            {signedUrl && (
+            {isInline && (
+              <Button size="sm" variant="outline" onClick={copyInline}>
+                <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+              </Button>
+            )}
+            {!isInline && signedUrl && (
               <Button size="sm" variant="outline" onClick={() => window.open(blobUrl ?? signedUrl, '_blank')}>
                 Open in new tab
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={download}>
-              <Download className="h-3.5 w-3.5 mr-1" /> Download
-            </Button>
+            {!isInline && (
+              <Button size="sm" variant="outline" onClick={download}>
+                <Download className="h-3.5 w-3.5 mr-1" /> Download
+              </Button>
+            )}
           </div>
         </div>
         <div className="flex-1 min-h-0 overflow-auto bg-muted/30">
-          {loading && (
+          {isInline && (
+            <div className="bg-background p-6 min-h-full">
+              {inlineHtml
+                ? (
+                  <div
+                    className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-primary"
+                    dangerouslySetInnerHTML={{ __html: inlineHtml }}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Empty document.</p>
+                )}
+            </div>
+          )}
+          {!isInline && loading && (
             <div className="h-full flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
