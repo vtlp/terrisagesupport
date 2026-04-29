@@ -1375,6 +1375,237 @@ export type Database = {
           },
         ]
       }
+      extraction_activity_log: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_message: string | null
+          event_type: string
+          id: string
+          job_id: string
+          metadata: Json
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_message?: string | null
+          event_type: string
+          id?: string
+          job_id: string
+          metadata?: Json
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_message?: string | null
+          event_type?: string
+          id?: string
+          job_id?: string
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extraction_activity_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "extraction_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extraction_files: {
+        Row: {
+          file_name: string
+          file_type: Database["public"]["Enums"]["extraction_file_type"]
+          id: string
+          job_id: string
+          mime_type: string | null
+          page_count: number | null
+          size_bytes: number | null
+          storage_path: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          file_name: string
+          file_type?: Database["public"]["Enums"]["extraction_file_type"]
+          id?: string
+          job_id: string
+          mime_type?: string | null
+          page_count?: number | null
+          size_bytes?: number | null
+          storage_path: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          file_name?: string
+          file_type?: Database["public"]["Enums"]["extraction_file_type"]
+          id?: string
+          job_id?: string
+          mime_type?: string | null
+          page_count?: number | null
+          size_bytes?: number | null
+          storage_path?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extraction_files_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "extraction_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extraction_jobs: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          errors_count: number
+          finished_at: string | null
+          floorplans_detected: number
+          id: string
+          import_type: string
+          last_error: string | null
+          pages_processed: number
+          property_type:
+            | Database["public"]["Enums"]["extraction_property_type"]
+            | null
+          result_summary: Json
+          retry_count: number
+          simulate_mode: boolean
+          started_at: string | null
+          status: Database["public"]["Enums"]["extraction_job_status"]
+          tenancy_type: string | null
+          updated_at: string
+          warnings_count: number
+          worker_job_ref: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          errors_count?: number
+          finished_at?: string | null
+          floorplans_detected?: number
+          id?: string
+          import_type?: string
+          last_error?: string | null
+          pages_processed?: number
+          property_type?:
+            | Database["public"]["Enums"]["extraction_property_type"]
+            | null
+          result_summary?: Json
+          retry_count?: number
+          simulate_mode?: boolean
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["extraction_job_status"]
+          tenancy_type?: string | null
+          updated_at?: string
+          warnings_count?: number
+          worker_job_ref?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          errors_count?: number
+          finished_at?: string | null
+          floorplans_detected?: number
+          id?: string
+          import_type?: string
+          last_error?: string | null
+          pages_processed?: number
+          property_type?:
+            | Database["public"]["Enums"]["extraction_property_type"]
+            | null
+          result_summary?: Json
+          retry_count?: number
+          simulate_mode?: boolean
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["extraction_job_status"]
+          tenancy_type?: string | null
+          updated_at?: string
+          warnings_count?: number
+          worker_job_ref?: string | null
+        }
+        Relationships: []
+      }
+      extraction_results: {
+        Row: {
+          amenities: Json
+          approved_banks: Json
+          assumptions: Json
+          confidence_warnings: Json
+          configuration_data: Json
+          created_at: string
+          documents: Json
+          errors: Json
+          floorplans: Json
+          job_id: string
+          media_assets: Json
+          missing_fields: Json
+          plot_config_suggestions: Json
+          project_data: Json
+          proximity_matrix: Json
+          raw_ocr: Json | null
+          summary: Json
+          updated_at: string
+        }
+        Insert: {
+          amenities?: Json
+          approved_banks?: Json
+          assumptions?: Json
+          confidence_warnings?: Json
+          configuration_data?: Json
+          created_at?: string
+          documents?: Json
+          errors?: Json
+          floorplans?: Json
+          job_id: string
+          media_assets?: Json
+          missing_fields?: Json
+          plot_config_suggestions?: Json
+          project_data?: Json
+          proximity_matrix?: Json
+          raw_ocr?: Json | null
+          summary?: Json
+          updated_at?: string
+        }
+        Update: {
+          amenities?: Json
+          approved_banks?: Json
+          assumptions?: Json
+          confidence_warnings?: Json
+          configuration_data?: Json
+          created_at?: string
+          documents?: Json
+          errors?: Json
+          floorplans?: Json
+          job_id?: string
+          media_assets?: Json
+          missing_fields?: Json
+          plot_config_suggestions?: Json
+          project_data?: Json
+          proximity_matrix?: Json
+          raw_ocr?: Json | null
+          summary?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extraction_results_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "extraction_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_activity: {
         Row: {
           actor_id: string | null
@@ -3418,6 +3649,24 @@ export type Database = {
         | "ONBOARDING_PACK_SENT"
         | "ACCOUNT_CREATED"
         | "LOST"
+      extraction_file_type:
+        | "BROCHURE"
+        | "LAYOUT"
+        | "IMAGE"
+        | "VIDEO"
+        | "ADDITIONAL_DOCUMENT"
+        | "OTHER"
+      extraction_job_status:
+        | "DRAFT"
+        | "QUEUED"
+        | "PREPROCESSING"
+        | "EXTRACTING"
+        | "NEEDS_REVIEW"
+        | "FAILED"
+        | "READY_TO_IMPORT"
+        | "IMPORTED"
+        | "PARTIALLY_IMPORTED"
+      extraction_property_type: "APARTMENT" | "VILLA" | "PLOT"
       governance_decision:
         | "PENDING"
         | "APPROVED"
@@ -3744,6 +3993,26 @@ export const Constants = {
         "ACCOUNT_CREATED",
         "LOST",
       ],
+      extraction_file_type: [
+        "BROCHURE",
+        "LAYOUT",
+        "IMAGE",
+        "VIDEO",
+        "ADDITIONAL_DOCUMENT",
+        "OTHER",
+      ],
+      extraction_job_status: [
+        "DRAFT",
+        "QUEUED",
+        "PREPROCESSING",
+        "EXTRACTING",
+        "NEEDS_REVIEW",
+        "FAILED",
+        "READY_TO_IMPORT",
+        "IMPORTED",
+        "PARTIALLY_IMPORTED",
+      ],
+      extraction_property_type: ["APARTMENT", "VILLA", "PLOT"],
       governance_decision: [
         "PENDING",
         "APPROVED",

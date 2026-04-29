@@ -1,96 +1,113 @@
-// Webhook endpoint for the external extraction service to POST results to.
-// Expected payload shape:
-// { jobId, projectData, configurationData[], floorPlans[], mediaAssets[], documents[],
-//   amenities[], proximityMatrix[], approvedBanks[], missingFields[], assumptions[], confidenceWarnings[], errors[] }
+// HMAC-verified webhook from the external Python extraction worker.
+// Replaces the previous token-only version. Persists to the new
+// extraction_results table and advances the job state machine.
+//
+// Headers: x-extraction-timestamp, x-extraction-signature (hex HMAC-SHA256)
+// Signature = HMAC_SHA256(EXTRACTION_HMAC_SECRET, `${timestamp}.${rawBody}`)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-extraction-token',
-};
+import { corsHeaders, jsonResponse, errorResponse, verifySignature } from '../_shared/extraction.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const CALLBACK_TOKEN = Deno.env.get('EXTRACTION_CALLBACK_TOKEN');
+const SIGNING_SECRET = Deno.env.get('EXTRACTION_HMAC_SECRET') || '';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return errorResponse('POST required', 405);
 
-  // Optional shared-secret check
-  if (CALLBACK_TOKEN) {
-    const header = req.headers.get('x-extraction-token');
-    if (header !== CALLBACK_TOKEN) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+  const rawBody = await req.text();
+
+  // Verify HMAC signature (skip only if no secret configured, which is dev mode)
+  if (SIGNING_SECRET) {
+    const ts = req.headers.get('x-extraction-timestamp') || '';
+    const sig = req.headers.get('x-extraction-signature') || '';
+    const v = await verifySignature(SIGNING_SECRET, ts, rawBody, sig);
+    if (!v.ok) return errorResponse(`signature invalid: ${v.reason}`, 401);
   }
 
-  try {
-    const body = await req.json();
-    const { jobId } = body || {};
-    if (!jobId) return new Response(JSON.stringify({ error: 'jobId required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  let body: Record<string, unknown> = {};
+  try { body = JSON.parse(rawBody); } catch { return errorResponse('invalid JSON'); }
 
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: job } = await admin.from('import_jobs').select('id, kind').eq('id', jobId).maybeSingle();
-    if (!job) return new Response(JSON.stringify({ error: 'Job not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const jobId = body.jobId as string | undefined;
+  if (!jobId) return errorResponse('jobId required');
 
-    const hasErrors = Array.isArray(body.errors) && body.errors.length > 0 && !body.projectData;
-    if (hasErrors) {
-      await admin.from('import_jobs').update({
-        status: 'EXTRACTION_FAILED',
-        extracted_data: body,
-        extraction_finished_at: new Date().toISOString(),
-      }).eq('id', jobId);
-      await admin.from('import_activity').insert({ job_id: jobId, event: 'extraction_failed', detail: { errors: body.errors } });
-      return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+  const { data: job } = await admin.from('extraction_jobs').select('*').eq('id', jobId).maybeSingle();
+  if (!job) return errorResponse('job not found', 404);
 
-    await admin.from('import_jobs').update({ extracted_data: body }).eq('id', jobId);
-
-    // Replace any prior staging rows
-    await admin.from('import_project_configs').delete().eq('job_id', jobId);
-    await admin.from('import_project_media').delete().eq('job_id', jobId);
-
-    const configRows = (body.configurationData || []).map((d: Record<string, unknown>, i: number) => ({
-      job_id: jobId, sort_order: i, data: d, source: 'EXTRACTED',
-    }));
-    let createdConfigs: Array<{ id: string; sort_order: number }> = [];
-    if (configRows.length) {
-      const { data } = await admin.from('import_project_configs').insert(configRows).select('id, sort_order');
-      createdConfigs = data || [];
-    }
-
-    const mediaRows: Array<Record<string, unknown>> = [];
-    (body.floorPlans || []).forEach((fp: Record<string, unknown>) => {
-      const idx = (fp.config_index as number) ?? -1;
-      const cfg = createdConfigs.find((c) => c.sort_order === idx);
-      mediaRows.push({
-        job_id: jobId, category: 'FLOOR_PLAN', caption: fp.caption,
-        storage_path: fp.storage_path, external_url: fp.url,
-        config_id: cfg?.id ?? null, confidence: fp.confidence, source: 'EXTRACTED',
-      });
-    });
-    (body.mediaAssets || []).forEach((m: Record<string, unknown>) => {
-      mediaRows.push({
-        job_id: jobId, category: m.category || 'GALLERY', caption: m.caption,
-        storage_path: m.storage_path, external_url: m.url, source: 'EXTRACTED',
-      });
-    });
-    (body.documents || []).forEach((d: Record<string, unknown>) => {
-      mediaRows.push({
-        job_id: jobId, category: 'DOCUMENT', caption: d.caption,
-        storage_path: d.storage_path, external_url: d.url, source: 'EXTRACTED',
-      });
-    });
-    if (mediaRows.length) await admin.from('import_project_media').insert(mediaRows);
-
-    await admin.from('import_jobs').update({
-      status: 'NEEDS_REVIEW',
-      extraction_finished_at: new Date().toISOString(),
+  // ----- Failure path -----
+  const errors = (body.errors as unknown[]) || [];
+  const projectData = (body.projectData as Record<string, unknown>) || null;
+  const fatalFailure = !!body.failed || (Array.isArray(errors) && errors.length > 0 && !projectData);
+  if (fatalFailure) {
+    await admin.from('extraction_jobs').update({
+      status: 'FAILED',
+      finished_at: new Date().toISOString(),
+      errors_count: Array.isArray(errors) ? errors.length : 1,
+      last_error: typeof body.errorMessage === 'string' ? body.errorMessage : 'Worker reported failure',
+      result_summary: { failed: true },
     }).eq('id', jobId);
-    await admin.from('import_activity').insert({ job_id: jobId, event: 'extraction_completed', detail: { source: 'callback' } });
-
-    return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    await admin.from('extraction_activity_log').insert({
+      job_id: jobId, event_type: 'failed', event_message: 'Worker reported failure',
+      metadata: { errors, message: body.errorMessage ?? null },
+    });
+    return jsonResponse({ ok: true, status: 'FAILED' });
   }
+
+  // ----- Success path: persist normalized result -----
+  const configurations = (body.configurationData as unknown[]) || [];
+  const floorPlans = (body.floorPlans as unknown[]) || [];
+  const mediaAssets = (body.mediaAssets as unknown[]) || [];
+  const documents = (body.documents as unknown[]) || [];
+  const amenities = (body.amenities as unknown[]) || [];
+  const proximity = (body.proximityMatrix as unknown[]) || [];
+  const banks = (body.approvedBanks as unknown[]) || [];
+  const missing = (body.missingFields as unknown[]) || [];
+  const assumptions = (body.assumptions as unknown[]) || [];
+  const warnings = (body.confidenceWarnings as unknown[]) || [];
+  const plotSuggestions = (body.plotConfigSuggestions as unknown[]) || [];
+  const summary = (body.summary as Record<string, unknown>) || {
+    propertyType: job.property_type,
+    configCount: configurations.length,
+    floorPlanCount: floorPlans.length,
+    mediaCount: mediaAssets.length,
+    documentCount: documents.length,
+  };
+
+  await admin.from('extraction_results').upsert({
+    job_id: jobId,
+    project_data: projectData ?? {},
+    configuration_data: configurations,
+    floorplans: floorPlans,
+    media_assets: mediaAssets,
+    documents,
+    amenities,
+    proximity_matrix: proximity,
+    approved_banks: banks,
+    missing_fields: missing,
+    assumptions,
+    confidence_warnings: warnings,
+    errors,
+    plot_config_suggestions: plotSuggestions,
+    raw_ocr: (body.rawOcr as Record<string, unknown>) ?? null,
+    summary,
+  });
+
+  await admin.from('extraction_jobs').update({
+    status: 'NEEDS_REVIEW',
+    finished_at: new Date().toISOString(),
+    pages_processed: (body.pagesProcessed as number) ?? job.pages_processed ?? 0,
+    floorplans_detected: floorPlans.length,
+    warnings_count: warnings.length + missing.length,
+    errors_count: Array.isArray(errors) ? errors.length : 0,
+    result_summary: summary,
+  }).eq('id', jobId);
+
+  await admin.from('extraction_activity_log').insert({
+    job_id: jobId, event_type: 'needs_review',
+    event_message: `Extraction complete: ${configurations.length} configs, ${floorPlans.length} floor plans`,
+    metadata: summary,
+  });
+
+  return jsonResponse({ ok: true, status: 'NEEDS_REVIEW' });
 });
