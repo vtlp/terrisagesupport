@@ -882,6 +882,42 @@ export default function Knowledge() {
         </DialogContent>
       </Dialog>
 
+      {/* Move file dialog */}
+      <Dialog open={!!moveTarget} onOpenChange={(o) => { if (!o) setMoveTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move file</DialogTitle>
+            <DialogDescription>
+              Choose the destination folder for “{moveTarget?.name}”.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label>Destination folder</Label>
+              <Select
+                value={moveSelectedId ?? '__root__'}
+                onValueChange={(v) => setMoveSelectedId(v === '__root__' ? null : v)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__root__">Root (no folder)</SelectItem>
+                  {[...folders]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(f => (
+                      <SelectItem key={f.id} value={f.id} disabled={f.id === moveTarget?.folder_id}>
+                        {f.name}{f.id === moveTarget?.folder_id ? ' (current)' : ''}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setMoveTarget(null)}>Cancel</Button>
+              <Button onClick={saveMove} disabled={moveSelectedId === (moveTarget?.folder_id ?? null)}>Move</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <FilePreviewDialog
         open={!!previewFile}
         onOpenChange={(open) => {
