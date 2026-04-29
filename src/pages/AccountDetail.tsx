@@ -143,7 +143,29 @@ export default function AccountDetail() {
     setDraft(acct);
     setSeats((s.data ?? []) as Seat[]);
     setNotes((n.data ?? []) as NoteRow[]);
-    setChecklist((c.data ?? []) as ChecklistRow[]);
+
+    // Sync canonical checklist template: insert any missing visible items so
+    // every account exposes the same sequential onboarding checklist.
+    const projectsEnabled =
+      Array.isArray((acct.payload as Record<string, unknown>)?.projects) &&
+      ((acct.payload as { projects?: unknown[] }).projects?.length ?? 0) > 0
+      || (acct.payload as { projects_enabled?: boolean })?.projects_enabled === true;
+    const ctx = { tenancy: acct.tenancy_type, projectsEnabled };
+    const existing = (c.data ?? []) as ChecklistRow[];
+    const existingLabels = new Set(existing.map(r => r.label));
+    const toInsert = ONBOARDING_TEMPLATE
+      .map((t, idx) => ({ t, idx }))
+      .filter(({ t }) => t.show(ctx) && !existingLabels.has(t.label))
+      .map(({ t, idx }) => ({ account_id: accountId, label: t.label, sort_order: idx }));
+    if (toInsert.length > 0) {
+      const { data: inserted } = await supabase
+        .from('account_checklist_items')
+        .insert(toInsert)
+        .select('id, label, is_done, sort_order, done_at');
+      setChecklist([...existing, ...((inserted ?? []) as ChecklistRow[])]);
+    } else {
+      setChecklist(existing);
+    }
     setEvents((ev.data ?? []) as EventRow[]);
     setLoading(false);
   }, [accountId, navigate]);
