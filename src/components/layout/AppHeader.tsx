@@ -22,6 +22,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useUser } from '@/context/UserContext';
 import { CreateEnquiryDialog } from '@/components/shared/CreateEnquiryDialog';
 import { CreateTicketDialog } from '@/components/shared/CreateTicketDialog';
+import { GlobalSearch } from '@/components/layout/GlobalSearch';
 
 
 type NotifType =
@@ -138,14 +139,7 @@ export function AppHeader() {
 
       {/* Centre — Search */}
       <div className="flex-1 max-w-xl mx-4 hidden md:block">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search enquiries, accounts, tickets..."
-            className="pl-9 bg-sidebar-muted border-sidebar-border text-secondary-foreground placeholder:text-muted-foreground focus:ring-accent"
-          />
-        </div>
+        <GlobalSearch />
       </div>
 
       {/* Right */}
