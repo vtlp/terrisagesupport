@@ -2811,6 +2811,84 @@ export type Database = {
         }
         Relationships: []
       }
+      project_requests: {
+        Row: {
+          account_id: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          city: string | null
+          created_at: string
+          crm_project_id: string | null
+          external_request_id: string | null
+          id: string
+          import_job_id: string | null
+          live_at: string | null
+          location: string | null
+          notes: string | null
+          payload: Json
+          project_name: string
+          rejection_reason: string | null
+          representative_email: string | null
+          representative_name: string | null
+          representative_phone: string | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["project_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          city?: string | null
+          created_at?: string
+          crm_project_id?: string | null
+          external_request_id?: string | null
+          id?: string
+          import_job_id?: string | null
+          live_at?: string | null
+          location?: string | null
+          notes?: string | null
+          payload?: Json
+          project_name: string
+          rejection_reason?: string | null
+          representative_email?: string | null
+          representative_name?: string | null
+          representative_phone?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["project_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          city?: string | null
+          created_at?: string
+          crm_project_id?: string | null
+          external_request_id?: string | null
+          id?: string
+          import_job_id?: string | null
+          live_at?: string | null
+          location?: string | null
+          notes?: string | null
+          payload?: Json
+          project_name?: string
+          rejection_reason?: string | null
+          representative_email?: string | null
+          representative_name?: string | null
+          representative_phone?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["project_request_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       seat_change_events: {
         Row: {
           account_id: string
@@ -3758,6 +3836,13 @@ export type Database = {
         | "TICKET_UPDATED"
         | "EXTERNAL"
         | "GENERAL"
+      project_request_status:
+        | "PENDING_REVIEW"
+        | "APPROVED"
+        | "REJECTED"
+        | "IMPORT_IN_PROGRESS"
+        | "LIVE"
+        | "CANCELLED"
       referral_status:
         | "Closed"
         | "In Process"
@@ -4113,6 +4198,14 @@ export const Constants = {
         "TICKET_UPDATED",
         "EXTERNAL",
         "GENERAL",
+      ],
+      project_request_status: [
+        "PENDING_REVIEW",
+        "APPROVED",
+        "REJECTED",
+        "IMPORT_IN_PROGRESS",
+        "LIVE",
+        "CANCELLED",
       ],
       referral_status: [
         "Closed",
