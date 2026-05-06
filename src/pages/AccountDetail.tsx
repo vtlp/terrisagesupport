@@ -27,6 +27,7 @@ import { ImportsTab } from '@/components/account/ImportsTab';
 import { SeatsAndRequestsTab } from '@/components/account/SeatsAndRequestsTab';
 
 import { ProjectsTab } from '@/components/account/ProjectsTab';
+import { ProjectRequestsTab } from '@/components/account/ProjectRequestsTab';
 import { DocumentsTab } from '@/components/account/DocumentsTab';
 
 import { CategorizedNotes } from '@/components/account/CategorizedNotes';
@@ -346,6 +347,7 @@ export default function AccountDetail() {
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="projects">Projects ({Array.isArray((acc.payload as any)?.projects) ? (acc.payload as any).projects.length : 0})</TabsTrigger>
+          <TabsTrigger value="project-requests">Project requests</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="imports">Imports</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
@@ -689,6 +691,10 @@ export default function AccountDetail() {
 
         <TabsContent value="projects" className="space-y-4">
           <ProjectsTab payload={acc.payload} />
+        </TabsContent>
+
+        <TabsContent value="project-requests" className="space-y-4">
+          <ProjectRequestsTab accountId={acc.id} />
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-4">
