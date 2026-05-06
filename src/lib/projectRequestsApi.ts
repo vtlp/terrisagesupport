@@ -34,7 +34,7 @@ async function notifyCrm(requestId: string) {
 async function logActivity(accountId: string, summary: string, details: Record<string, unknown>) {
   await supabase.from('activity_log').insert({
     entity_type: 'account', entity_id: accountId,
-    event_type: 'STATUS_CHANGE', summary, details: details as never,
+    event_type: 'IMPORT', summary, details: details as never,
   });
 }
 

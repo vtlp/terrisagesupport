@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     // Nothing to call — record and return.
     await supabase.from('activity_log').insert({
       entity_type: 'account', entity_id: pr.account_id,
-      event_type: 'STATUS_CHANGE',
+      event_type: 'IMPORT',
       summary: `Project request "${pr.project_name}" status: ${pr.status} (CRM sync skipped: missing config)`,
       details: { kind: 'PROJECT_REQUEST_CALLBACK_SKIPPED', request_id: pr.id } as never,
     });
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
 
   await supabase.from('activity_log').insert({
     entity_type: 'account', entity_id: pr.account_id,
-    event_type: 'STATUS_CHANGE',
+    event_type: 'IMPORT',
     summary: success
       ? `CRM notified: project request "${pr.project_name}" → ${pr.status}`
       : `CRM sync FAILED for "${pr.project_name}" → ${pr.status}: ${lastErr}`,

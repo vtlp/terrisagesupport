@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
   await supabase.from('activity_log').insert({
     entity_type: 'account',
     entity_id: acct.id,
-    event_type: 'STATUS_CHANGE',
+    event_type: 'IMPORT',
     summary: `New project request: ${projectName} (${location})`,
     details: { kind: 'PROJECT_REQUEST_CREATED', request_id: inserted.id, project_name: projectName } as never,
   });
