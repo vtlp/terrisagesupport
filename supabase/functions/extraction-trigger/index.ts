@@ -150,7 +150,9 @@ Deno.serve(async (req) => {
 
     // Live mode: forward to external service. Service is expected to call our callback when done.
     const callbackUrl = `${SUPABASE_URL}/functions/v1/extraction-callback`;
-    const res = await fetch(SERVICE_URL!, {
+    const base = SERVICE_URL!.replace(/\/+$/, '');
+    const extractUrl = /\/extract(\?|$)/.test(base) ? base : `${base}/extract`;
+    const res = await fetch(extractUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(SERVICE_TOKEN ? { Authorization: `Bearer ${SERVICE_TOKEN}` } : {}) },
       body: JSON.stringify({ jobId, accountId: job.account_id, propertyType: job.property_type, callbackUrl }),
