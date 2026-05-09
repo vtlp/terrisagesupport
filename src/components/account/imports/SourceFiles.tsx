@@ -9,7 +9,7 @@ import { useUser } from '@/context/UserContext';
 
 interface Props {
   jobId: string;
-  accountId: string;
+  accountId: string | null;
   accept?: string;
   allowedCategories?: FileCategory[];
   onChange?: () => void;
@@ -50,7 +50,7 @@ export function SourceFiles({ jobId, accountId, accept, allowedCategories, onCha
         toast.error(`${file.name}: file type not allowed here`);
         continue;
       }
-      const path = `${accountId}/${jobId}/${Date.now()}-${file.name}`;
+      const path = `${accountId ?? 'global'}/${jobId}/${Date.now()}-${file.name}`;
       const { error: upErr } = await supabase.storage.from('import-files').upload(path, file);
       if (upErr) { toast.error(`${file.name}: ${upErr.message}`); continue; }
       const { error } = await supabase.from('import_files').insert([{

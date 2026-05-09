@@ -192,57 +192,79 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     return { missing, warnings, configsCount: configs.length };
   }, [project, media, configs, job.extracted_data]);
 
+  const isGlobal = !job.account_id;
   const canImport = validation.missing.length === 0 && configs.length > 0 &&
     !['IMPORTED', 'IMPORTING'].includes(job.status as string);
 
   const finalImport = async () => {
-    if (!confirm('Confirm final import to CRM?')) return;
+    const confirmMsg = isGlobal
+      ? 'Push this project directly to Terrisage as an independent project?'
+      : 'Confirm final import to CRM?';
+    if (!confirm(confirmMsg)) return;
     setImporting(true);
     await supabase.from('import_jobs').update({ status: 'IMPORTING' }).eq('id', job.id);
     try {
-      const fullProject = {
-        ...project,
-        amenities: amenities.split(',').map(s => s.trim()).filter(Boolean),
-        proximityMatrix: proximity,
-        approvedBanks: banks.split(',').map(s => s.trim()).filter(Boolean),
-        representative: rep,
-      };
-      const { data: cp, error: pErr } = await supabase.from('crm_projects').insert([{
-        account_id: job.account_id, source_job_id: job.id, property_type: propertyType,
-        data: fullProject as never, created_by: currentUser?.user_id ?? null,
-      }]).select('id').single();
-      if (pErr) throw pErr;
+      if (isGlobal) {
+        // Save the latest review payload first so the edge function reads fresh data.
+        const merged = {
+          ...((job.extracted_data as object) || {}),
+          projectData: project,
+          amenities: amenities.split(',').map(s => s.trim()).filter(Boolean),
+          proximityMatrix: proximity,
+          approvedBanks: banks.split(',').map(s => s.trim()).filter(Boolean),
+        };
+        await supabase.from('import_jobs').update({ extracted_data: merged as never }).eq('id', job.id);
 
-      const configIdMap: Record<string, string> = {};
-      for (const c of configs) {
-        const { data: ic, error: cErr } = await supabase.from('crm_project_configs').insert([{
-          project_id: cp.id, sort_order: c.sort_order, data: c.data as never,
+        const { data, error } = await supabase.functions.invoke('terrisage-project-push', { body: { jobId: job.id } });
+        if (error) throw error;
+        const res = data as { ok?: boolean; terrisageProjectId?: string; error?: string } | null;
+        if (!res?.ok) throw new Error(res?.error || 'Push failed');
+        toast.success(`Pushed to Terrisage${res.terrisageProjectId ? ` (id: ${res.terrisageProjectId})` : ''}`);
+      } else {
+        const fullProject = {
+          ...project,
+          amenities: amenities.split(',').map(s => s.trim()).filter(Boolean),
+          proximityMatrix: proximity,
+          approvedBanks: banks.split(',').map(s => s.trim()).filter(Boolean),
+          representative: rep,
+        };
+        const { data: cp, error: pErr } = await supabase.from('crm_projects').insert([{
+          account_id: job.account_id, source_job_id: job.id, property_type: propertyType,
+          data: fullProject as never, created_by: currentUser?.user_id ?? null,
         }]).select('id').single();
-        if (cErr) throw cErr;
-        configIdMap[c.id] = ic.id;
-      }
+        if (pErr) throw pErr;
 
-      const mediaToImport = media.filter(m => m.review_state !== 'INCORRECT' && m.review_state !== 'DUPLICATE');
-      for (const m of mediaToImport) {
-        await supabase.from('crm_project_media').insert([{
-          project_id: cp.id,
-          config_id: m.config_id ? (configIdMap[m.config_id] ?? null) : null,
-          category: m.category, storage_path: m.storage_path, external_url: m.external_url,
-          caption: m.caption, meta: m.meta as never,
-        }]);
-      }
+        const configIdMap: Record<string, string> = {};
+        for (const c of configs) {
+          const { data: ic, error: cErr } = await supabase.from('crm_project_configs').insert([{
+            project_id: cp.id, sort_order: c.sort_order, data: c.data as never,
+          }]).select('id').single();
+          if (cErr) throw cErr;
+          configIdMap[c.id] = ic.id;
+        }
 
-      await supabase.from('import_jobs').update({
-        status: 'IMPORTED', imported_at: new Date().toISOString(),
-        records_imported: 1 + configs.length + mediaToImport.length, records_total: 1 + configs.length + mediaToImport.length,
-        summary: { project_id: cp.id, configs: configs.length, media: mediaToImport.length } as never,
-      }).eq('id', job.id);
-      await logActivity(supabase, job.id, 'import_completed', { project_id: cp.id }, currentUser?.user_id);
-      toast.success('Project imported to CRM');
+        const mediaToImport = media.filter(m => m.review_state !== 'INCORRECT' && m.review_state !== 'DUPLICATE');
+        for (const m of mediaToImport) {
+          await supabase.from('crm_project_media').insert([{
+            project_id: cp.id,
+            config_id: m.config_id ? (configIdMap[m.config_id] ?? null) : null,
+            category: m.category, storage_path: m.storage_path, external_url: m.external_url,
+            caption: m.caption, meta: m.meta as never,
+          }]);
+        }
+
+        await supabase.from('import_jobs').update({
+          status: 'IMPORTED', imported_at: new Date().toISOString(),
+          records_imported: 1 + configs.length + mediaToImport.length, records_total: 1 + configs.length + mediaToImport.length,
+          summary: { project_id: cp.id, configs: configs.length, media: mediaToImport.length } as never,
+        }).eq('id', job.id);
+        await logActivity(supabase, job.id, 'import_completed', { project_id: cp.id }, currentUser?.user_id);
+        toast.success('Project imported to CRM');
+      }
     } catch (e) {
       const msg = (e as Error).message;
       await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
-      await logActivity(supabase, job.id, 'import_failed', { error: msg }, currentUser?.user_id);
+      await logActivity(supabase, job.id, isGlobal ? 'push_to_terrisage_failed' : 'import_failed', { error: msg }, currentUser?.user_id);
       toast.error(msg);
     } finally {
       setImporting(false);
@@ -606,7 +628,8 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               </div>
               <div className="border-t pt-3">
                 <Button onClick={finalImport} disabled={!canImport || importing}>
-                  {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Confirm and import to CRM
+                  {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {isGlobal ? 'Push to Terrisage' : 'Confirm and import to CRM'}
                 </Button>
                 {!canImport && validation.missing.length === 0 && configs.length === 0 && (
                   <p className="text-xs text-muted-foreground mt-2">Add at least one configuration before import.</p>

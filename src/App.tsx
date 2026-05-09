@@ -31,6 +31,7 @@ import AdminQueues from "@/pages/admin/AdminQueues";
 import AdminLookups from "@/pages/admin/AdminLookups";
 import AdminIntegrations from "@/pages/admin/AdminIntegrations";
 import AdminCrmSyncContract from "@/pages/admin/AdminCrmSyncContract";
+import AdminData from "@/pages/admin/AdminData";
 import Profile from "@/pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -88,6 +89,7 @@ const App = () => {
                 <Route path="/admin/lookups" element={<ProtectedRoute adminOnly><AdminLookups /></ProtectedRoute>} />
                 <Route path="/admin/integrations" element={<ProtectedRoute adminOnly><AdminIntegrations /></ProtectedRoute>} />
                 <Route path="/admin/crm-sync-contract" element={<ProtectedRoute adminOnly><AdminCrmSyncContract /></ProtectedRoute>} />
+                <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
