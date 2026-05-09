@@ -690,12 +690,22 @@ export default function AccountDetail() {
         </TabsContent>
 
 
-        <TabsContent value="projects" className="space-y-4">
-          <ProjectsTab payload={acc.payload} />
-        </TabsContent>
+        <TabsContent value="projects" className="space-y-6">
+          <section className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">Projects from onboarding</h3>
+              <p className="text-xs text-muted-foreground">Captured during the account's onboarding submission.</p>
+            </div>
+            <ProjectsTab payload={acc.payload} />
+          </section>
 
-        <TabsContent value="project-requests" className="space-y-4">
-          <ProjectRequestsTab accountId={acc.id} />
+          <section className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">Project requests from Terrisage</h3>
+              <p className="text-xs text-muted-foreground">New projects requested by the client from their Terrisage app after go-live.</p>
+            </div>
+            <ProjectRequestsTab accountId={acc.id} />
+          </section>
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-4">
