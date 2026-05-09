@@ -154,10 +154,17 @@ Deno.serve(async (req) => {
     const callbackUrl = `${SUPABASE_URL}/functions/v1/extraction-callback`;
     const base = SERVICE_URL!.replace(/\/+$/, '');
     const extractUrl = /\/extract(\?|$)/.test(base) ? base : `${base}/extract`;
+    const rawBody = JSON.stringify({ jobId, accountId: job.account_id, propertyType: job.property_type, callbackUrl, files: [] });
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = HMAC_SECRET ? await signPayload(HMAC_SECRET, timestamp, rawBody) : '';
     const res = await fetch(extractUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(SERVICE_TOKEN ? { Authorization: `Bearer ${SERVICE_TOKEN}` } : {}) },
-      body: JSON.stringify({ jobId, accountId: job.account_id, propertyType: job.property_type, callbackUrl }),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(SERVICE_TOKEN ? { Authorization: `Bearer ${SERVICE_TOKEN}` } : {}),
+        ...(HMAC_SECRET ? { 'x-extraction-timestamp': timestamp, 'x-extraction-signature': signature } : {}),
+      },
+      body: rawBody,
     });
     if (!res.ok) {
       const txt = await res.text();
