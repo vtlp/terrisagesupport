@@ -2,6 +2,7 @@
 // - If EXTRACTION_SERVICE_URL secret is set, POSTs job context to it (real service).
 // - Otherwise (or when ?mock=1), generates a synthetic payload and writes it directly.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { signPayload } from '../_shared/extraction.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,7 @@ const corsHeaders = {
 
 const SERVICE_URL = Deno.env.get('EXTRACTION_SERVICE_URL');
 const SERVICE_TOKEN = Deno.env.get('EXTRACTION_SERVICE_TOKEN');
+const HMAC_SECRET = Deno.env.get('EXTRACTION_HMAC_SECRET') || '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -150,10 +152,19 @@ Deno.serve(async (req) => {
 
     // Live mode: forward to external service. Service is expected to call our callback when done.
     const callbackUrl = `${SUPABASE_URL}/functions/v1/extraction-callback`;
-    const res = await fetch(SERVICE_URL!, {
+    const base = SERVICE_URL!.replace(/\/+$/, '');
+    const extractUrl = /\/extract(\?|$)/.test(base) ? base : `${base}/extract`;
+    const rawBody = JSON.stringify({ jobId, accountId: job.account_id, propertyType: job.property_type, callbackUrl, files: [] });
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = HMAC_SECRET ? await signPayload(HMAC_SECRET, timestamp, rawBody) : '';
+    const res = await fetch(extractUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(SERVICE_TOKEN ? { Authorization: `Bearer ${SERVICE_TOKEN}` } : {}) },
-      body: JSON.stringify({ jobId, accountId: job.account_id, propertyType: job.property_type, callbackUrl }),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(SERVICE_TOKEN ? { Authorization: `Bearer ${SERVICE_TOKEN}` } : {}),
+        ...(HMAC_SECRET ? { 'x-extraction-timestamp': timestamp, 'x-extraction-signature': signature } : {}),
+      },
+      body: rawBody,
     });
     if (!res.ok) {
       const txt = await res.text();
