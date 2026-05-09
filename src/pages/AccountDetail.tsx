@@ -348,7 +348,7 @@ export default function AccountDetail() {
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="projects">Projects ({Array.isArray((acc.payload as any)?.projects) ? (acc.payload as any).projects.length : 0})</TabsTrigger>
-          <TabsTrigger value="project-requests">Project requests</TabsTrigger>
+          
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="imports">Imports</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
