@@ -628,7 +628,8 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               </div>
               <div className="border-t pt-3">
                 <Button onClick={finalImport} disabled={!canImport || importing}>
-                  {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Confirm and import to CRM
+                  {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {isGlobal ? 'Push to Terrisage' : 'Confirm and import to CRM'}
                 </Button>
                 {!canImport && validation.missing.length === 0 && configs.length === 0 && (
                   <p className="text-xs text-muted-foreground mt-2">Add at least one configuration before import.</p>
