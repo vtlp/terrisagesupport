@@ -100,6 +100,7 @@ export default function AccountDetail() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const VALID_TABS = ['overview','seats','checklist','verification','billing','projects','documents','imports','notes','calendar','activity'];
+  // Note: legacy 'project-requests' tab merged into 'projects'.
   const tabParam = searchParams.get('tab');
   const activeTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'overview';
   const handleTabChange = (v: string) => {
