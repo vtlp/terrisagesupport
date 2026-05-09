@@ -2,6 +2,7 @@
 // - If EXTRACTION_SERVICE_URL secret is set, POSTs job context to it (real service).
 // - Otherwise (or when ?mock=1), generates a synthetic payload and writes it directly.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { signPayload } from '../_shared/extraction.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,7 @@ const corsHeaders = {
 
 const SERVICE_URL = Deno.env.get('EXTRACTION_SERVICE_URL');
 const SERVICE_TOKEN = Deno.env.get('EXTRACTION_SERVICE_TOKEN');
+const HMAC_SECRET = Deno.env.get('EXTRACTION_HMAC_SECRET') || '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
