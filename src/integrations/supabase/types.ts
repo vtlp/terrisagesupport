@@ -1693,7 +1693,7 @@ export type Database = {
       }
       import_jobs: {
         Row: {
-          account_id: string
+          account_id: string | null
           created_at: string
           created_by: string | null
           extracted_data: Json
@@ -1719,7 +1719,7 @@ export type Database = {
           validation: Json
         }
         Insert: {
-          account_id: string
+          account_id?: string | null
           created_at?: string
           created_by?: string | null
           extracted_data?: Json
@@ -1745,7 +1745,7 @@ export type Database = {
           validation?: Json
         }
         Update: {
-          account_id?: string
+          account_id?: string | null
           created_at?: string
           created_by?: string | null
           extracted_data?: Json

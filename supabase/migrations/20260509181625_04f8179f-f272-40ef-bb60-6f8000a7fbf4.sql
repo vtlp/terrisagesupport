@@ -1,0 +1,1 @@
+ALTER TABLE public.import_jobs ALTER COLUMN account_id DROP NOT NULL;
