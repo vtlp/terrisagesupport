@@ -258,7 +258,15 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                         <td className="px-3 py-2 text-xs text-muted-foreground">{format(new Date(j.created_at), 'dd MMM, HH:mm')}</td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{format(new Date(j.updated_at), 'dd MMM, HH:mm')}</td>
                         <td className="px-3 py-2 text-right">
-                          <Button size="sm" variant="ghost" onClick={() => setOpenId(j.id)}>Open</Button>
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => setOpenId(j.id)}>Open</Button>
+                            {isAdmin && (
+                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                                onClick={() => setDeleteId(j.id)} title="Delete import">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
