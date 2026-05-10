@@ -13,6 +13,7 @@ interface Props {
   accept?: string;
   allowedCategories?: FileCategory[];
   onChange?: () => void;
+  onAfterUpload?: (uploadedCount: number) => void | Promise<void>;
 }
 
 const CATEGORY_ICON: Record<FileCategory, typeof FileText> = {
@@ -24,7 +25,7 @@ const CATEGORY_LABEL: Record<FileCategory, string> = {
   CSV: 'Spreadsheets', FLOOR_PLAN: 'Floor plans', LOGO: 'Logos', OTHER: 'Other',
 };
 
-export function SourceFiles({ jobId, accountId, accept, allowedCategories, onChange }: Props) {
+export function SourceFiles({ jobId, accountId, accept, allowedCategories, onChange, onAfterUpload }: Props) {
   const { currentUser } = useUser();
   const [files, setFiles] = useState<ImportFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +69,7 @@ export function SourceFiles({ jobId, accountId, accept, allowedCategories, onCha
       await supabase.from('import_jobs').update({ source_files_count: count ?? 0 }).eq('id', jobId);
       await logActivity(supabase, jobId, 'files_uploaded', { count: uploaded });
       toast.success(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
+      try { await onAfterUpload?.(uploaded); } catch { /* non-fatal */ }
       onChange?.();
     }
     setBusy(false);
