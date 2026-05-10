@@ -154,7 +154,42 @@ Deno.serve(async (req) => {
     const callbackUrl = `${SUPABASE_URL}/functions/v1/extraction-callback`;
     const base = SERVICE_URL!.replace(/\/+$/, '');
     const extractUrl = /\/extract(\?|$)/.test(base) ? base : `${base}/extract`;
-    const rawBody = JSON.stringify({ jobId, accountId: job.account_id, propertyType: job.property_type, callbackUrl, files: [] });
+
+    // Fetch uploaded files for this job and sign URLs so the worker can download them.
+    const { data: files, error: filesErr } = await admin
+      .from('import_files')
+      .select('id, name, storage_path, mime_type, size_bytes, category, state')
+      .eq('job_id', jobId)
+      .eq('state', 'UPLOADED');
+    if (filesErr) {
+      console.error('[extraction-trigger] failed to load import_files', filesErr);
+    }
+    const fileList: Array<Record<string, unknown>> = [];
+    for (const f of files || []) {
+      const { data: signed, error: signErr } = await admin
+        .storage.from('import-files').createSignedUrl(f.storage_path, 60 * 60);
+      if (signErr || !signed?.signedUrl) {
+        console.error('[extraction-trigger] sign failed', { fileId: f.id, path: f.storage_path, signErr });
+        continue;
+      }
+      fileList.push({
+        fileId: f.id,
+        fileName: f.name,
+        category: f.category,
+        mimeType: f.mime_type,
+        sizeBytes: f.size_bytes,
+        storagePath: f.storage_path,
+        signedUrl: signed.signedUrl,
+      });
+    }
+    console.log('[extraction-trigger] dispatching', { jobId, fileCount: fileList.length, extractUrl });
+    if (fileList.length === 0) {
+      await admin.from('import_jobs').update({ status: 'EXTRACTION_FAILED' }).eq('id', jobId);
+      await admin.from('import_activity').insert({ job_id: jobId, event: 'extraction_failed', detail: { error: 'No uploaded files found for job', filesQueried: (files || []).length } });
+      return new Response(JSON.stringify({ error: 'No uploaded files for this job' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const rawBody = JSON.stringify({ jobId, accountId: job.account_id, propertyType: job.property_type, callbackUrl, files: fileList });
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const signature = HMAC_SECRET ? await signPayload(HMAC_SECRET, timestamp, rawBody) : '';
     const res = await fetch(extractUrl, {
