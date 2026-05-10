@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
   const root = baseUrl.replace(/\/$/, '');
 
   // Resolve tenant
-  const { data: account } = await supabase.from('accounts').select('id, tenant_id, name').eq('id', accountId).maybeSingle();
+  const { data: account } = await supabase.from('accounts').select('id, tenant_id').eq('id', accountId).maybeSingle();
   if (!account) return json({ ok: false, error: 'ACCOUNT_NOT_FOUND' }, 404);
   if (!account.tenant_id) return json({ ok: false, error: 'NO_TENANT' });
 
