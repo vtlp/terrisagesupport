@@ -785,11 +785,17 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
 
   const prevAmenities = ((job.extracted_data as { amenities?: string[] })?.amenities) || [];
   const mergedAmenities = Array.from(new Set([...prevAmenities, ...amenitiesAcc].map(s => s.trim()).filter(Boolean)));
-  const prevProximity = ((job.extracted_data as { proximityMatrix?: Array<{ name: string; distance_km: number | string }> })?.proximityMatrix) || [];
-  const proxKey = (p: { name: string }) => norm(p.name);
-  const mergedProximity = [...prevProximity];
+  // Re-running auto-map should REPLACE the proximity matrix (not accumulate),
+  // otherwise repeated runs balloon the list. De-dupe within the new run.
+  const proxKey = (p: { name: string; distance_km: number | string }) => `${norm(p.name)}|${String(p.distance_km).trim()}`;
+  const seenProx = new Set<string>();
+  const mergedProximity: Array<{ name: string; distance_km: number | string }> = [];
   for (const p of proximityAcc) {
-    if (p.name && !mergedProximity.some(x => proxKey(x) === proxKey(p))) mergedProximity.push(p);
+    if (!p.name) continue;
+    const k = proxKey(p);
+    if (seenProx.has(k)) continue;
+    seenProx.add(k);
+    mergedProximity.push(p);
   }
 
   const merged = {
