@@ -354,7 +354,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           <TabsTrigger value="files">Source files</TabsTrigger>
           <TabsTrigger value="rep">Representative input</TabsTrigger>
           <TabsTrigger value="extract">Extraction</TabsTrigger>
-          <TabsTrigger value="overview">Review · Overview</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="configs">Configurations</TabsTrigger>
           <TabsTrigger value="media">Media & Floor Plans</TabsTrigger>
           <TabsTrigger value="extra">Amenities & Proximity</TabsTrigger>
