@@ -69,6 +69,7 @@ export function SourceFiles({ jobId, accountId, accept, allowedCategories, onCha
       await supabase.from('import_jobs').update({ source_files_count: count ?? 0 }).eq('id', jobId);
       await logActivity(supabase, jobId, 'files_uploaded', { count: uploaded });
       toast.success(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
+      try { await onAfterUpload?.(uploaded); } catch { /* non-fatal */ }
       onChange?.();
     }
     setBusy(false);
