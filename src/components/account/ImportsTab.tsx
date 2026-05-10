@@ -8,7 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, Plus, Building2, Home, UserPlus, Search, ArrowLeft } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, Plus, Building2, Home, UserPlus, Search, ArrowLeft, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useUser } from '@/context/UserContext';
@@ -34,7 +38,39 @@ const KIND_TILES: Array<{ kind: ImportKind; icon: typeof Building2; title: strin
 ];
 
 export function ImportsTab({ accountId, tenancyType }: Props) {
-  const { currentUser } = useUser();
+  const { currentUser, isAdmin } = useUser();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteJob = async (jobId: string) => {
+    setDeleting(true);
+    try {
+      // Remove uploaded files from storage first
+      const { data: files } = await supabase.from('import_files').select('storage_path').eq('job_id', jobId);
+      if (files && files.length) {
+        const paths = files.map(f => f.storage_path).filter(Boolean) as string[];
+        if (paths.length) await supabase.storage.from('import-files').remove(paths);
+      }
+      // Delete dependent rows then the job (no FK cascade in schema)
+      await Promise.all([
+        supabase.from('import_record_rows').delete().eq('job_id', jobId),
+        supabase.from('import_files').delete().eq('job_id', jobId),
+        supabase.from('import_activity').delete().eq('job_id', jobId),
+        supabase.from('import_project_configs').delete().eq('job_id', jobId),
+        supabase.from('import_project_media').delete().eq('job_id', jobId),
+      ]);
+      const { error } = await supabase.from('import_jobs').delete().eq('id', jobId);
+      if (error) throw error;
+      toast.success('Import deleted');
+      setDeleteId(null);
+      load();
+    } catch (e) {
+      toast.error(`Delete failed: ${(e as Error).message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -222,7 +258,15 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                         <td className="px-3 py-2 text-xs text-muted-foreground">{format(new Date(j.created_at), 'dd MMM, HH:mm')}</td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{format(new Date(j.updated_at), 'dd MMM, HH:mm')}</td>
                         <td className="px-3 py-2 text-right">
-                          <Button size="sm" variant="ghost" onClick={() => setOpenId(j.id)}>Open</Button>
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => setOpenId(j.id)}>Open</Button>
+                            {isAdmin && (
+                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                                onClick={() => setDeleteId(j.id)} title="Delete import">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -278,6 +322,29 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this import?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the import job, its uploaded files, parsed rows, and activity log.
+              Records already pushed to UpYard or your CRM are not removed. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); if (deleteId) deleteJob(deleteId); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete import
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
