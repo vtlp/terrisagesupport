@@ -523,67 +523,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           </Card>
         </TabsContent>
 
-        {/* EXTRACTION */}
-        <TabsContent value="extract">
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Extraction</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Send uploaded brochures and source files to the extraction service. Use the simulate option for testing the review flow without a live service.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => runExtraction()} disabled={extracting || job.source_files_count === 0}>
-                  {extracting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
-                  Run extraction
-                </Button>
-                <Button variant="outline" onClick={() => runExtraction('mock')} disabled={extracting}>
-                  <PlayCircle className="h-4 w-4 mr-1" /> Simulate response (testing)
-                </Button>
-              </div>
-              {job.extraction_started_at && (
-                <p className="text-xs text-muted-foreground">
-                  Last triggered {new Date(job.extraction_started_at).toLocaleString()}
-                  {job.extraction_finished_at && <> · finished {new Date(job.extraction_finished_at).toLocaleString()}</>}
-                </p>
-              )}
-              {(job.extracted_data as { missingFields?: unknown[] })?.missingFields?.length ? (
-                <div className="rounded-md border p-3">
-                  <div className="text-xs font-medium uppercase text-amber-700 dark:text-amber-400 mb-1">Missing fields reported</div>
-                  <ul className="text-xs text-muted-foreground list-disc pl-4">
-                    {(job.extracted_data as { missingFields?: unknown[] }).missingFields!.map((m, i) => {
-                      const text = typeof m === 'string'
-                        ? m
-                        : (() => {
-                            const o = (m ?? {}) as Record<string, unknown>;
-                            const name = o.field_name ?? o.field ?? o.entity_type ?? 'field';
-                            const reason = o.reason ? ` — ${o.reason}` : '';
-                            return `${name}${reason}`;
-                          })();
-                      return <li key={i}>{text}</li>;
-                    })}
-                  </ul>
-                </div>
-              ) : null}
-              {(job.extracted_data as { assumptions?: unknown[] })?.assumptions?.length ? (
-                <div className="rounded-md border p-3">
-                  <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Assumptions</div>
-                  <ul className="text-xs text-muted-foreground list-disc pl-4">
-                    {(job.extracted_data as { assumptions?: unknown[] }).assumptions!.map((m, i) => {
-                      const text = typeof m === 'string'
-                        ? m
-                        : (() => {
-                            const o = (m ?? {}) as Record<string, unknown>;
-                            return String(o.note ?? o.reason ?? o.field_name ?? JSON.stringify(o));
-                          })();
-                      return <li key={i}>{text}</li>;
-                    })}
-                  </ul>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        </TabsContent>
+
 
         {/* OVERVIEW */}
         <TabsContent value="overview">
