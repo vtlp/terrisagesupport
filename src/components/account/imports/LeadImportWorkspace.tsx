@@ -293,7 +293,6 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
               onTerminal={handleTerminal}
             />
           )}
-          <div>
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
