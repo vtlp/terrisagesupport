@@ -17,6 +17,25 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import type { ImportJob, ImportFile, PropertyType } from './shared';
 import { logActivity } from './shared';
+import { defaultMarkets } from '@/data/lookupData';
+
+// Derive an Indian city from a free-text location string by matching against
+// the known city list. Strips parenthetical aliases (e.g. "Bangalore (Bengaluru)" → "Bangalore").
+export function deriveCityFromLocation(location: string): string | null {
+  if (!location) return null;
+  const text = ` ${location.toLowerCase()} `;
+  // Sort by name length descending so multi-word cities match before substrings.
+  const names = defaultMarkets
+    .map(m => ({ full: m.value, base: m.value.replace(/\s*\(.*?\)\s*/g, '').trim() }))
+    .sort((a, b) => b.base.length - a.base.length);
+  for (const n of names) {
+    const needle = n.base.toLowerCase();
+    if (needle.length < 3) continue;
+    const re = new RegExp(`(^|[^a-z])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`, 'i');
+    if (re.test(text)) return n.full;
+  }
+  return null;
+}
 
 // ---------- Field synonyms ----------
 
