@@ -116,6 +116,7 @@ export default function AccountDetail() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncingTenant, setSyncingTenant] = useState(false);
   const [busy, setBusy] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [openEvent, setOpenEvent] = useState<EventRow | null>(null);
