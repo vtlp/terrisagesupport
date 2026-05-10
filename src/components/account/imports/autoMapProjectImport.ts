@@ -476,6 +476,16 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
             missingFields.push(...parseMissingFieldsCsv(s.aoa));
             continue;
           }
+          // amenities file
+          if (hints.isAmenities) {
+            amenitiesAcc.push(...parseAmenitiesCsv(s.aoa));
+            continue;
+          }
+          // proximity file
+          if (hints.isProximity) {
+            proximityAcc.push(...parseProximityCsv(s.aoa));
+            continue;
+          }
           // configurations file
           if (hints.isConfigurations) {
             const { rows, unmappedColumns: u } = parseConfigSheet(s.aoa, pt);
