@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Search, Phone, Mail, ExternalLink, MapPin, User, Inbox } from 'lucide-react';
+import { Loader2, Search, Phone, Mail, ExternalLink, MapPin, User, Inbox, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useUser } from '@/context/UserContext';
@@ -26,6 +26,7 @@ export function ProjectRequestsTab({ accountId }: Props) {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | ProjectRequestStatus>('ALL');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [rejectFor, setRejectFor] = useState<ProjectRequest | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -101,6 +102,18 @@ export function ProjectRequestsTab({ accountId }: Props) {
     finally { setBusyId(null); }
   };
 
+  const onSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('terrisage-project-requests-pull');
+      if (error) throw error;
+      const d = (data ?? {}) as { fetched?: number; upserted?: number; skipped?: number };
+      toast.success(`Synced from Terrisage: ${d.upserted ?? 0} updated, ${d.skipped ?? 0} skipped`);
+      await load();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSyncing(false); }
+  };
+
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;
 
   return (
@@ -115,6 +128,10 @@ export function ProjectRequestsTab({ accountId }: Props) {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={onSync} disabled={syncing} className="h-8">
+                {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                Sync from Terrisage
+              </Button>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input className="pl-7 h-8 w-56" placeholder="Search project, location, rep" value={q} onChange={e => setQ(e.target.value)} />
@@ -204,9 +221,20 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel }: {
               <a href={`mailto:${r.representative_email}`} className="flex items-center gap-1 hover:text-primary"><Mail className="h-3 w-3" />{r.representative_email}</a>
             )}
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            Requested {format(new Date(r.requested_at), 'dd MMM yyyy, HH:mm')}
-            {r.external_request_id ? ` · CRM ref ${r.external_request_id.slice(0, 12)}` : ''}
+          <div className="text-[11px] text-muted-foreground flex items-center gap-2 flex-wrap">
+            <span>Requested {format(new Date(r.requested_at), 'dd MMM yyyy, HH:mm')}</span>
+            {r.external_request_id && (
+              <span title={r.external_request_id}>· CRM ref {r.external_request_id.slice(0, 12)}</span>
+            )}
+            {r.requested_by_tenant_id && (
+              <span title={r.requested_by_tenant_id}>· Tenant {r.requested_by_tenant_id.slice(0, 8)}</span>
+            )}
+            {r.terrisage_status && r.terrisage_status !== r.status?.replace('_REVIEW','') && (
+              <Badge variant="outline" className="h-4 px-1.5 text-[10px]">CRM: {r.terrisage_status}</Badge>
+            )}
+            {r.last_synced_at && (
+              <span>· Synced {format(new Date(r.last_synced_at), 'dd MMM HH:mm')}</span>
+            )}
           </div>
           {r.rejection_reason && r.status === 'REJECTED' && (
             <div className="text-xs text-destructive mt-1">Reason: {r.rejection_reason}</div>
