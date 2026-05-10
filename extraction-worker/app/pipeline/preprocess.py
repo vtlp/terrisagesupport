@@ -71,21 +71,37 @@ def _process_pdf(file_meta: Dict[str, Any], path: str, budget: int) -> List[Dict
 
     out: List[Dict[str, Any]] = []
     text_per_page: List[str] = []
-    with pdfplumber.open(path) as pdf:
-        n = min(len(pdf.pages), budget)
-        for i in range(n):
-            try:
-                text_per_page.append(pdf.pages[i].extract_text() or "")
-            except Exception:
-                text_per_page.append("")
+    log.info("pdf.open path=%s budget=%d dpi=%d", path, budget, OCR_DPI)
+    try:
+        with pdfplumber.open(path) as pdf:
+            total_pages = len(pdf.pages)
+            n = min(total_pages, budget)
+            log.info("pdf.opened path=%s total_pages=%d will_process=%d", path, total_pages, n)
+            for i in range(n):
+                try:
+                    txt = pdf.pages[i].extract_text() or ""
+                    text_per_page.append(txt)
+                    log.debug("pdf.text page=%d chars=%d", i + 1, len(txt))
+                except Exception as exc:
+                    log.warning("pdf.text.page_failed page=%d err=%s", i + 1, exc)
+                    text_per_page.append("")
+    except Exception as exc:
+        log.exception("pdf.open.failed path=%s err=%s", path, exc)
+        raise
 
     n = len(text_per_page)
     if n == 0:
+        log.warning("pdf.empty path=%s — pdfplumber found 0 pages", path)
         return out
 
-    # Render every page to PNG for floor-plan carving + OCR fallback.
-    images = convert_from_path(path, dpi=OCR_DPI, first_page=1, last_page=n)
+    log.info("pdf.rasterise path=%s pages=%d dpi=%d", path, n, OCR_DPI)
+    try:
+        images = convert_from_path(path, dpi=OCR_DPI, first_page=1, last_page=n)
+    except Exception as exc:
+        log.exception("pdf.rasterise.failed path=%s err=%s (is poppler installed?)", path, exc)
+        raise
     tmpdir = tempfile.mkdtemp(prefix="pages-")
+    log.info("pdf.rasterised path=%s images=%d tmpdir=%s", path, len(images), tmpdir)
 
     for idx, img in enumerate(images):
         page_no = idx + 1
@@ -94,7 +110,12 @@ def _process_pdf(file_meta: Dict[str, Any], path: str, budget: int) -> List[Dict
         text = text_per_page[idx] if idx < len(text_per_page) else ""
         is_scanned = len(text.strip()) < MIN_TEXT_CHARS_PER_PAGE
         if is_scanned:
+            log.info("pdf.page.ocr page=%d text_chars=%d (below threshold %d)",
+                     page_no, len(text.strip()), MIN_TEXT_CHARS_PER_PAGE)
             text = _ocr(img_path)
+            log.info("pdf.page.ocr.done page=%d ocr_chars=%d", page_no, len(text))
+        else:
+            log.debug("pdf.page.text page=%d chars=%d (no OCR needed)", page_no, len(text))
         out.append({
             "file_id": file_meta.get("id"),
             "file_name": file_meta.get("fileName"),
@@ -106,6 +127,7 @@ def _process_pdf(file_meta: Dict[str, Any], path: str, budget: int) -> List[Dict
             "width": img.width,
             "height": img.height,
         })
+    log.info("pdf.done path=%s pages_out=%d", path, len(out))
     return out
 
 
