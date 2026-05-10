@@ -527,13 +527,13 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
   const mediaInserts = imageFiles
     .filter(f => !existingPaths.has(f.storage_path))
     .map(f => {
-      const c = classifyImageFor(f.name, configFloorplanFiles);
+      const c = classifyImageFor(f.name, configFloorplanFiles, imageManifest);
       return {
         job_id: job.id,
         category: c.category,
         config_id: c.configId ?? null,
         storage_path: f.storage_path,
-        caption: f.name,
+        caption: c.caption || f.name,
         review_state: 'PENDING' as const,
         source: 'AUTOMAP',
       };
