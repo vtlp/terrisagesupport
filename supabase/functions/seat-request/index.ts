@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
   if (!acct) {
     return json({ ok: false, error: "TENANT_NOT_FOUND" }, 404);
   }
-  if (acct.status === "CANCELLED" || acct.status === "STALLED_ONBOARDING") {
+  if (acct.status === "CANCELLED") {
     return json(
       {
         ok: false,
