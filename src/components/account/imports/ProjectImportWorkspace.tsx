@@ -86,6 +86,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
 
   const [configs, setConfigs] = useState<ImportConfig[]>([]);
   const [media, setMedia] = useState<ImportMedia[]>([]);
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   
   const [importing, setImporting] = useState(false);
   const [savingRep, setSavingRep] = useState(false);
@@ -100,6 +101,27 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     setMedia((m ?? []) as ImportMedia[]);
   }, [job.id]);
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Generate signed URLs for media items so thumbnails actually render.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const needs = media.filter(m => m.storage_path && !mediaUrls[m.id]);
+      if (needs.length === 0) return;
+      const entries = await Promise.all(needs.map(async m => {
+        if (m.external_url) return [m.id, m.external_url] as const;
+        const { data } = await supabase.storage.from('import-files').createSignedUrl(m.storage_path!, 60 * 60);
+        return [m.id, data?.signedUrl ?? ''] as const;
+      }));
+      if (cancelled) return;
+      setMediaUrls(prev => {
+        const next = { ...prev };
+        for (const [id, url] of entries) if (url) next[id] = url;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [media, mediaUrls]);
 
   // Re-sync local edit state when job changes (e.g. after extraction).
   // For Representative input we MERGE: any rep field still empty inherits from
@@ -401,28 +423,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       </div>
                     </div>
                   )}
-                  {(am.missingFields?.length ?? 0) > 0 && (() => {
-                    const seen = new Set<string>();
-                    const unique = am.missingFields.filter(m => {
-                      const k = `${(m.field || '').toLowerCase()}::${(m.status || '').toLowerCase()}`;
-                      if (seen.has(k)) return false;
-                      seen.add(k);
-                      return true;
-                    });
-                    return (
-                      <div>
-                        <div className="text-xs font-medium uppercase text-muted-foreground mb-2">Flagged missing in source</div>
-                        <div className="grid gap-1.5 sm:grid-cols-2">
-                          {unique.map((m, i) => (
-                            <div key={`${m.field}-${i}`} className="flex items-center justify-between gap-2 rounded-md border bg-background/50 px-2.5 py-1.5">
-                              <span className="text-xs font-medium truncate">{PROJECT_LABELS[m.field] || m.field.replace(/_/g, ' ')}</span>
-                              <Badge variant="outline" className="text-[10px] capitalize whitespace-nowrap">{(m.status || 'missing').replace(/_/g, ' ').toLowerCase()}</Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {/* Flagged-missing-in-source section intentionally hidden — surfaced via Validate tab instead. */}
                   {am.unmappedColumns.length > 0 && (
                     <div>
                       <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
@@ -614,12 +615,19 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {towers.map(t => (
-                      <div key={t} className="rounded-md border px-2.5 py-1.5 flex items-center gap-2">
-                        <span className="text-sm font-medium">{t}</span>
-                        <Badge variant="secondary" className="text-[10px]">{configsLinkedTo(t)} config(s)</Badge>
-                      </div>
-                    ))}
+                    {towers.map(t => {
+                      const n = configsLinkedTo(t);
+                      return (
+                        <div key={t} className="rounded-md border px-2.5 py-1.5 flex items-center gap-2">
+                          <span className="text-sm font-medium">{t}</span>
+                          {n > 0 ? (
+                            <Badge variant="secondary" className="text-[10px]">{n} config(s)</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-500/40">Needs mapping</Badge>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -684,11 +692,23 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {media.map(m => {
                     const isImg = m.category === 'GALLERY' || m.category === 'FLOOR_PLAN' || m.category === 'LOGO';
+                    const url = mediaUrls[m.id] || m.external_url || '';
+                    const linkedConfig = m.config_id ? configs.find(c => c.id === m.config_id) : null;
+                    const linkedName = linkedConfig ? ((linkedConfig.data as Record<string, unknown>)?.name as string) : '';
                     return (
                       <div key={m.id} className="rounded-md border p-3 space-y-2">
-                        <div className="aspect-video bg-muted rounded flex items-center justify-center text-muted-foreground">
-                          {isImg ? <ImageIcon className="h-8 w-8" /> : <FileText className="h-8 w-8" />}
+                        <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center text-muted-foreground">
+                          {isImg && url ? (
+                            <img src={url} alt={m.caption ?? 'media'} className="w-full h-full object-contain" loading="lazy" />
+                          ) : isImg ? (
+                            <ImageIcon className="h-8 w-8" />
+                          ) : (
+                            <FileText className="h-8 w-8" />
+                          )}
                         </div>
+                        {linkedName && (
+                          <Badge variant="secondary" className="text-[10px]">Linked: {linkedName}</Badge>
+                        )}
                         <Input className="h-8 text-sm" placeholder="Caption" value={m.caption ?? ''} onChange={e => updateMedia(m.id, { caption: e.target.value })} />
                         <div className="grid grid-cols-2 gap-2">
                           <Select value={m.category} onValueChange={v => updateMedia(m.id, { category: v as MediaCategory })}>

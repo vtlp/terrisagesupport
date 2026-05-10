@@ -578,12 +578,21 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
   }
 
   // Compute total_units as the sum of units_planned across configurations.
-  if (dedupedConfigRows.length > 0) {
-    const sum = dedupedConfigRows.reduce((acc, r) => {
-      const n = Number(String(r.units_planned ?? '').replace(/[^\d.\-]/g, ''));
-      return acc + (Number.isFinite(n) ? n : 0);
-    }, 0);
-    if (sum > 0) project.total_units = sum;
+  // Fallback: estimate from towers_count × floors_per_tower × ~4 units/floor when
+  // the brochure does not list explicit unit counts per configuration.
+  const sumFromConfigs = dedupedConfigRows.reduce((acc, r) => {
+    const n = Number(String(r.units_planned ?? '').replace(/[^\d.\-]/g, ''));
+    return acc + (Number.isFinite(n) ? n : 0);
+  }, 0);
+  if (sumFromConfigs > 0) {
+    project.total_units = sumFromConfigs;
+  } else if (project.total_units == null || project.total_units === '') {
+    const towersN = Number(String(project.towers_count ?? towers.length ?? '').replace(/[^\d.\-]/g, ''));
+    const floorsMatch = String(project.floors_each_tower ?? '').match(/\d+/);
+    const floorsN = floorsMatch ? Number(floorsMatch[0]) : 0;
+    if (towersN > 0 && floorsN > 0) {
+      project.total_units = towersN * floorsN * 4; // 4 units/floor heuristic
+    }
   }
 
   // Insert configurations (only first AUTOMAP run; never duplicate).
@@ -621,12 +630,21 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
     .filter(f => !existingPaths.has(f.storage_path))
     .map(f => {
       const c = classifyImageFor(f.name, configFloorplanFiles, imageManifest);
+      // If linked to a config, prefix the caption with the config name so the
+      // tile is immediately identifiable in the Media tab.
+      let caption = c.caption || f.name;
+      if (c.configId) {
+        const cfg = (existingAutoConfigs ?? []).find(x => x.id === c.configId)
+          ?? null;
+        const cfgName = cfg ? ((cfg.data as Record<string, unknown> | null)?.name as string | undefined) : undefined;
+        if (cfgName) caption = `${cfgName} · ${caption}`;
+      }
       return {
         job_id: job.id,
         category: c.category,
         config_id: c.configId ?? null,
         storage_path: f.storage_path,
-        caption: c.caption || f.name,
+        caption,
         review_state: 'PENDING' as const,
         source: 'AUTOMAP',
       };
