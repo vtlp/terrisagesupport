@@ -105,10 +105,17 @@ export function ProjectRequestsTab({ accountId }: Props) {
   const onSync = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('terrisage-project-requests-pull');
+      const { data, error } = await supabase.functions.invoke('terrisage-project-requests-pull', {
+        body: { accountId },
+      });
       if (error) throw error;
-      const d = (data ?? {}) as { fetched?: number; upserted?: number; skipped?: number };
-      toast.success(`Synced from Terrisage: ${d.upserted ?? 0} updated, ${d.skipped ?? 0} skipped`);
+      const d = (data ?? {}) as { fetched?: number; upserted?: number };
+      const fetched = d.fetched ?? 0;
+      if (fetched === 0) {
+        toast.success('No project requests from Terrisage for this account');
+      } else {
+        toast.success(`Synced from Terrisage: ${d.upserted ?? 0} updated for this account`);
+      }
       await load();
     } catch (e) { toast.error((e as Error).message); }
     finally { setSyncing(false); }
