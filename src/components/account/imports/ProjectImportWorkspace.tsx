@@ -197,24 +197,27 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
 
   // Derive status from possession date and mirror possession_date / status
   // from Representative input into the Overview project data so the user does
-  // not have to fill them twice.
+  // not have to fill them twice. Uses toDateInput so quirky formats like
+  // "Dec 2026" or "31/12/2026" still resolve.
   useEffect(() => {
-    const pd = (rep.possession_date || '').trim();
-    let derivedStatus = (rep.status || '').trim();
-    if (!derivedStatus && pd) {
-      const t = Date.parse(pd);
+    const pdRaw = (rep.possession_date || '').trim();
+    const pdIso = toDateInput(pdRaw);
+    let derivedStatus = '';
+    if (pdIso) {
+      const t = Date.parse(pdIso);
       if (!Number.isNaN(t)) {
         const today = new Date(); today.setHours(0, 0, 0, 0);
         derivedStatus = t >= today.getTime() ? 'Under Construction' : 'Completed';
       }
     }
-    if (derivedStatus && derivedStatus !== (rep.status || '')) {
+    if (derivedStatus && derivedStatus !== (rep.status || '').trim()) {
       setRep(s => ({ ...s, status: derivedStatus }));
     }
     setProject(prev => {
       const next = { ...prev };
       let changed = false;
-      if (pd && (prev.possession_date || '') !== pd) { next.possession_date = pd; changed = true; }
+      const pdToWrite = pdIso || pdRaw;
+      if (pdToWrite && (prev.possession_date || '') !== pdToWrite) { next.possession_date = pdToWrite; changed = true; }
       if (derivedStatus && (prev.status || '') !== derivedStatus) { next.status = derivedStatus; changed = true; }
       return changed ? next : prev;
     });
