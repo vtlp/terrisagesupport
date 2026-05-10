@@ -692,11 +692,23 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {media.map(m => {
                     const isImg = m.category === 'GALLERY' || m.category === 'FLOOR_PLAN' || m.category === 'LOGO';
+                    const url = mediaUrls[m.id] || m.external_url || '';
+                    const linkedConfig = m.config_id ? configs.find(c => c.id === m.config_id) : null;
+                    const linkedName = linkedConfig ? ((linkedConfig.data as Record<string, unknown>)?.name as string) : '';
                     return (
                       <div key={m.id} className="rounded-md border p-3 space-y-2">
-                        <div className="aspect-video bg-muted rounded flex items-center justify-center text-muted-foreground">
-                          {isImg ? <ImageIcon className="h-8 w-8" /> : <FileText className="h-8 w-8" />}
+                        <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center text-muted-foreground">
+                          {isImg && url ? (
+                            <img src={url} alt={m.caption ?? 'media'} className="w-full h-full object-contain" loading="lazy" />
+                          ) : isImg ? (
+                            <ImageIcon className="h-8 w-8" />
+                          ) : (
+                            <FileText className="h-8 w-8" />
+                          )}
                         </div>
+                        {linkedName && (
+                          <Badge variant="secondary" className="text-[10px]">Linked: {linkedName}</Badge>
+                        )}
                         <Input className="h-8 text-sm" placeholder="Caption" value={m.caption ?? ''} onChange={e => updateMedia(m.id, { caption: e.target.value })} />
                         <div className="grid grid-cols-2 gap-2">
                           <Select value={m.category} onValueChange={v => updateMedia(m.id, { category: v as MediaCategory })}>
