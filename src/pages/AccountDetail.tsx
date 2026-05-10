@@ -552,6 +552,33 @@ export default function AccountDetail() {
                   <Button
                     size="sm"
                     variant="outline"
+                    disabled={syncingTenant || !acc.owner_email}
+                    title={acc.owner_email ? `Look up using ${acc.owner_email}` : 'Add an owner email first'}
+                    onClick={async () => {
+                      setSyncingTenant(true);
+                      try {
+                        const { data, error } = await supabase.functions.invoke('terrisage-tenant-lookup', {
+                          body: { accountId: acc.id },
+                        });
+                        if (error) throw error;
+                        const d = (data ?? {}) as { ok?: boolean; tenantId?: string; error?: string };
+                        if (!d.ok || !d.tenantId) throw new Error(d.error ?? 'Tenant not found');
+                        setAcc(a => a ? { ...a, tenant_id: d.tenantId! } : a);
+                        setDraft(dr => dr ? { ...dr, tenant_id: d.tenantId! } : dr);
+                        toast.success('Tenant ID synced from Terrisage');
+                      } catch (e) {
+                        toast.error((e as Error).message);
+                      } finally {
+                        setSyncingTenant(false);
+                      }
+                    }}
+                  >
+                    {syncingTenant ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                    Sync
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     disabled={saving || (draft?.tenant_id ?? '') === (acc.tenant_id ?? '')}
                     onClick={async () => {
                       const newVal = (draft?.tenant_id ?? '').trim() || null;
@@ -566,7 +593,9 @@ export default function AccountDetail() {
                     Save
                   </Button>
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-1">Editable for now. Will be auto-linked once Terrisage provisioning is wired in.</div>
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  Click Sync to look up the tenant on Terrisage using the owner email{acc.owner_email ? ` (${acc.owner_email})` : ''}.
+                </div>
               </div>
             </CardContent>
           </Card>
