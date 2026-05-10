@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.terrisage-tenant-lookup]
 verify_jwt = false
+
+[functions.terrisage-onboarding-import]
+verify_jwt = false
