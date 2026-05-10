@@ -323,7 +323,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   if (res.mediaCreated) parts.push(`${res.mediaCreated} media`);
                   toast.success(`Auto-mapped: ${parts.join(', ') || 'no recognised data'}`);
                   if (res.unmappedFields.length) {
-                    toast.info(`${res.unmappedFields.length} field(s) still unmapped — see Review · Overview`);
+                    toast.info(`${res.unmappedFields.length} field(s) still unmapped. See Review · Overview.`);
                   }
                   await refresh();
                   onChange?.();
