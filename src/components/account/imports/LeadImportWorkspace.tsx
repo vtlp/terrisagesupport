@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, ImportRow, RowState, logActivity } from './shared';
+import { ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, ImportRow, RowState, logActivity, parseTabularFile } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
 import { UpyardJobProgress, UpyardSnapshot } from './UpyardJobProgress';
@@ -82,7 +82,7 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
 
   useEffect(() => { loadRows(); }, [loadRows]);
 
-  // Pull headers from first uploaded CSV file
+  // Pull headers from first uploaded tabular file (CSV or XLSX)
   useEffect(() => {
     (async () => {
       const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).eq('category', 'CSV').limit(1);
@@ -90,9 +90,7 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
       const { data: signed } = await supabase.storage.from('import-files').createSignedUrl(files[0].storage_path, 60);
       if (!signed) return;
       try {
-        const res = await fetch(signed.signedUrl);
-        const text = await res.text();
-        const { headers: hs } = parseCSV(text);
+        const { headers: hs } = await parseTabularFile(signed.signedUrl, files[0].name);
         setHeaders(hs);
       } catch (e) {
         // ignore
@@ -103,11 +101,9 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
   const parseFile = async () => {
     setParsing(true);
     const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).eq('category', 'CSV').limit(1);
-    if (!files || files.length === 0) { toast.error('Upload a CSV first'); setParsing(false); return; }
+    if (!files || files.length === 0) { toast.error('Upload a file first'); setParsing(false); return; }
     const { data: signed } = await supabase.storage.from('import-files').createSignedUrl(files[0].storage_path, 60);
-    const res = await fetch(signed!.signedUrl);
-    const text = await res.text();
-    const { headers: hs, rows: parsed } = parseCSV(text);
+    const { headers: hs, rows: parsed } = await parseTabularFile(signed!.signedUrl, files[0].name);
     setHeaders(hs);
 
     // Validate per-row

@@ -80,7 +80,56 @@ export const guessFileCategory = (mime: string | null, name: string): FileCatego
   return 'DOCUMENT';
 };
 
+import * as XLSX from 'xlsx';
 import type { supabase as SupabaseClient } from '@/integrations/supabase/client';
+
+function parseCSVText(text: string) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+  if (!lines.length) return { headers: [] as string[], rows: [] as Record<string, string>[] };
+  const split = (l: string) => {
+    const out: string[] = []; let cur = ''; let q = false;
+    for (let i = 0; i < l.length; i++) {
+      const c = l[i];
+      if (c === '"') { if (q && l[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (c === ',' && !q) { out.push(cur); cur = ''; }
+      else cur += c;
+    }
+    out.push(cur); return out;
+  };
+  const headers = split(lines[0]).map(h => h.trim());
+  const rows = lines.slice(1).map(l => {
+    const cells = split(l); const obj: Record<string, string> = {};
+    headers.forEach((h, i) => { obj[h] = (cells[i] ?? '').trim(); });
+    return obj;
+  });
+  return { headers, rows };
+}
+
+/** Parse CSV or XLSX/XLS file at a signed URL into headers + row objects. */
+export async function parseTabularFile(signedUrl: string, fileName: string): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const res = await fetch(signedUrl);
+  if (ext === 'xlsx' || ext === 'xls') {
+    const buf = await res.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    if (!sheet) return { headers: [], rows: [] };
+    const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '', raw: false });
+    if (!aoa.length) return { headers: [], rows: [] };
+    const headers = (aoa[0] as unknown[]).map(h => String(h ?? '').trim()).filter(h => h !== '');
+    const rows = aoa.slice(1)
+      .filter(r => Array.isArray(r) && r.some(c => String(c ?? '').trim() !== ''))
+      .map(r => {
+        const obj: Record<string, string> = {};
+        headers.forEach((h, i) => { obj[h] = String((r as unknown[])[i] ?? '').trim(); });
+        return obj;
+      });
+    return { headers, rows };
+  }
+  const text = await res.text();
+  return parseCSVText(text);
+}
+
 export async function logActivity(
   client: typeof SupabaseClient,
   jobId: string,
