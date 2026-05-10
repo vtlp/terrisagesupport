@@ -102,7 +102,17 @@ export function ProjectRequestsTab({ accountId }: Props) {
     finally { setBusyId(null); }
   };
 
-  if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  const onSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('terrisage-project-requests-pull');
+      if (error) throw error;
+      const d = (data ?? {}) as { fetched?: number; upserted?: number; skipped?: number };
+      toast.success(`Synced from Terrisage: ${d.upserted ?? 0} updated, ${d.skipped ?? 0} skipped`);
+      await load();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSyncing(false); }
+  };
 
   return (
     <div className="space-y-4">
