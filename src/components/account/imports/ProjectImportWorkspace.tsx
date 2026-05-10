@@ -428,17 +428,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 )}
                 <div className="mt-1 text-muted-foreground">Mapped {new Date(am.mappedAt).toLocaleString()}</div>
               </div>
-              {am.unmappedColumns.length > 0 && (
-                <div className="rounded-md border p-3">
-                  <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {am.unmappedColumns.map(c => (
-                      <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">Rename these headers in the source file, or map manually, if they should populate a known field.</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         );

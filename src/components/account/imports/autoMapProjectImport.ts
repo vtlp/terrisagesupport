@@ -75,7 +75,64 @@ const PROJECT_SYNONYMS: Record<FieldKey, string[]> = {
   contact_phone: ['contactphone', 'phone', 'mobile', 'contactnumber'],
   contact_email: ['contactemail', 'email', 'enquiryemail'],
   office_address: ['officeaddress', 'salesoffice', 'siteoffice'],
+  starting_price: ['startingprice', 'startprice', 'priceonwards', 'onwards'],
+  price_range: ['pricerange', 'pricing', 'pricebracket'],
 };
+
+// Keys to silently ignore (not reported as unmapped).
+const IGNORED_PROJECT_KEYS = new Set(['fieldreviewnote', 'reviewnote']);
+
+// Proximity-style keys embedded in the project summary CSV.
+const PROXIMITY_KEY_LABELS: Record<string, string> = {
+  nearestschool: 'Nearest school',
+  nearesthospital: 'Nearest hospital',
+  orraccess: 'ORR access',
+  metrostation: 'Metro station',
+  airport: 'Airport',
+  keybusinessdistrict: 'Key business district',
+  nearestleisurelandmark: 'Nearest leisure landmark',
+};
+const PROXIMITY_TIME_TO_BASE: Record<string, string> = {
+  nearestschooltraveltime: 'nearestschool',
+  nearesthospitaltraveltime: 'nearesthospital',
+  metrotraveltime: 'metrostation',
+  airporttraveltime: 'airport',
+  keybusinessdistricttraveltime: 'keybusinessdistrict',
+  nearestleisurelandmarktraveltime: 'nearestleisurelandmark',
+};
+
+function extractProximityFromKV(entries: Array<[string, string]>): Array<{ name: string; distance_km: number | string }> {
+  const map = new Map<string, string>();
+  for (const [k, v] of entries) map.set(norm(k), v);
+  const out: Array<{ name: string; distance_km: number | string }> = [];
+  const splitList = (s: string) => s.split(/[;\n]/).map(x => x.trim()).filter(Boolean);
+  const fromList = (s: string) => splitList(s).map(item => {
+    const m = item.match(/^(.*?)\s*[-–:]\s*(.+)$/);
+    return m ? { name: m[1].trim(), distance_km: m[2].trim() } : { name: item, distance_km: '' };
+  });
+  const hl = map.get('proximityhighlights'); if (hl) out.push(...fromList(hl));
+  const pm = map.get('proximitymatrix'); if (pm) out.push(...fromList(pm));
+  for (const [base, label] of Object.entries(PROXIMITY_KEY_LABELS)) {
+    const place = (map.get(base) || '').trim();
+    const timeKey = Object.entries(PROXIMITY_TIME_TO_BASE).find(([, b]) => b === base)?.[0];
+    const time = timeKey ? (map.get(timeKey) || '').trim() : '';
+    if (!place && !time) continue;
+    const name = place ? `${label}: ${place}` : label;
+    out.push({ name, distance_km: time });
+  }
+  const seen = new Set<string>();
+  return out.filter(p => {
+    const k = `${p.name}|${p.distance_km}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function isProximityRelatedKey(normKey: string): boolean {
+  return normKey === 'proximityhighlights' || normKey === 'proximitymatrix'
+    || normKey in PROXIMITY_KEY_LABELS || normKey in PROXIMITY_TIME_TO_BASE;
+}
 
 // Map "loose" config headers from spreadsheets/JSON to canonical fields.
 // Includes Hi-Tech / Moonglade-style headers.
@@ -229,36 +286,44 @@ function assignProject(project: ProjectExtract, field: string, val: unknown) {
   }
 }
 
-function parseProjectKV(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[] } {
+function parseProjectKV(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[]; proximity: Array<{ name: string; distance_km: number | string }> } {
   const project: ProjectExtract = {};
   const unmapped: string[] = [];
+  const kvEntries: Array<[string, string]> = [];
   for (const row of aoa) {
     if (!Array.isArray(row)) continue;
     const key = String(row[0] ?? '').trim();
     const val = String(row[1] ?? '').trim();
     if (!key || !val) continue;
+    kvEntries.push([key, val]);
+    const nk = norm(key);
+    if (isProximityRelatedKey(nk) || IGNORED_PROJECT_KEYS.has(nk)) continue;
     const field = matchField(key, PROJECT_SYNONYMS);
     if (field) assignProject(project, field, val);
     else unmapped.push(key);
   }
-  return { project, unmappedColumns: unmapped };
+  return { project, unmappedColumns: unmapped, proximity: extractProximityFromKV(kvEntries) };
 }
 
-function parseProjectWide(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[] } {
+function parseProjectWide(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[]; proximity: Array<{ name: string; distance_km: number | string }> } {
   const project: ProjectExtract = {};
   const unmapped: string[] = [];
-  if (aoa.length < 2) return { project, unmappedColumns: unmapped };
+  if (aoa.length < 2) return { project, unmappedColumns: unmapped, proximity: [] };
   const headers = (aoa[0] as unknown[]).map(h => String(h ?? '').trim());
   const firstData = aoa[1] as unknown[];
+  const kvEntries: Array<[string, string]> = [];
   headers.forEach((h, i) => {
     if (!h) return;
     const val = String(firstData?.[i] ?? '').trim();
     if (!val) return;
+    kvEntries.push([h, val]);
+    const nk = norm(h);
+    if (isProximityRelatedKey(nk) || IGNORED_PROJECT_KEYS.has(nk)) return;
     const field = matchField(h, PROJECT_SYNONYMS);
     if (field) assignProject(project, field, val);
     else unmapped.push(h);
   });
-  return { project, unmappedColumns: unmapped };
+  return { project, unmappedColumns: unmapped, proximity: extractProximityFromKV(kvEntries) };
 }
 
 function parseConfigSheet(aoa: unknown[][], pt: PropertyType): { rows: Record<string, unknown>[]; unmappedColumns: string[] } {
@@ -515,12 +580,14 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
           // project summary
           if (hints.isProjectSummary) {
             if (looksLikeKeyValue(s.aoa)) {
-              const { project: p, unmappedColumns: u } = parseProjectKV(s.aoa);
+              const { project: p, unmappedColumns: u, proximity: px } = parseProjectKV(s.aoa);
               project = { ...project, ...p };
+              proximityAcc.push(...px);
               u.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
             } else {
-              const { project: p, unmappedColumns: u } = parseProjectWide(s.aoa);
+              const { project: p, unmappedColumns: u, proximity: px } = parseProjectWide(s.aoa);
               project = { ...project, ...p };
+              proximityAcc.push(...px);
               u.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
             }
             continue;
@@ -529,10 +596,12 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
           const wide = parseProjectWide(s.aoa);
           if (Object.keys(wide.project).length >= 3) {
             project = { ...project, ...wide.project };
+            proximityAcc.push(...wide.proximity);
             wide.unmappedColumns.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
           } else if (looksLikeKeyValue(s.aoa)) {
             const kv = parseProjectKV(s.aoa);
             project = { ...project, ...kv.project };
+            proximityAcc.push(...kv.proximity);
             kv.unmappedColumns.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
           } else {
             const { rows, unmappedColumns: u } = parseConfigSheet(s.aoa, pt);
