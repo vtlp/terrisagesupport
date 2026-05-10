@@ -444,30 +444,28 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
 
         {/* SOURCE FILES */}
         <TabsContent value="files">
-          <Card><CardContent className="pt-4">
-            <SourceFiles
-              jobId={job.id}
-              accountId={job.account_id}
-              onChange={onChange}
-              onAfterUpload={async () => {
-                try {
-                  const res = await autoMapProjectImport(job, currentUser?.user_id ?? null);
-                  const parts: string[] = [];
-                  if (res.projectFieldsMapped.length) parts.push(`${res.projectFieldsMapped.length} field(s)`);
-                  if (res.configsCreated) parts.push(`${res.configsCreated} config(s)`);
-                  if (res.mediaCreated) parts.push(`${res.mediaCreated} media`);
-                  toast.success(`Auto-mapped: ${parts.join(', ') || 'no recognised data'}`);
-                  if (res.unmappedFields.length) {
-                    toast.info(`${res.unmappedFields.length} field(s) still unmapped. See Review · Overview.`);
-                  }
-                  await refresh();
-                  onChange?.();
-                } catch (e) {
-                  toast.error(`Auto-map failed: ${(e as Error).message}`);
-                }
-              }}
-            />
-          </CardContent></Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-sm">Source files & mapping</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">Upload spreadsheets, JSON manifests, brochures, and images. Mapping runs automatically after each upload. If you add files later, click Re-run mapping to update the review.</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={runMapping} disabled={mapping || job.source_files_count === 0}>
+                  {mapping ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                  Re-run mapping
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <SourceFiles
+                jobId={job.id}
+                accountId={job.account_id}
+                onChange={onChange}
+                onAfterUpload={runMapping}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* REP INPUT */}
