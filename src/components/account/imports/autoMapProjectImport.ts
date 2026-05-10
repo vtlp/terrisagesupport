@@ -436,6 +436,8 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
   const missingFields: Array<{ field: string; status: string }> = [];
   const sheetsParsed: string[] = [];
   const imageManifest = new Map<string, ManifestEntry>();
+  const amenitiesAcc: string[] = [];
+  const proximityAcc: Array<{ name: string; distance_km: number | string }> = [];
 
   for (const f of files) {
     const ext = (f.name.split('.').pop() || '').toLowerCase();
