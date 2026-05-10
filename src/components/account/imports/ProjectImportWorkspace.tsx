@@ -487,12 +487,38 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   ['expected_completion_date', 'Expected completion date'],
                   ['possession_date', 'Possession date'],
                   ['banks', 'Approved banks'],
-                ].map(([k, l]) => (
-                  <div key={k} className="space-y-1">
-                    <Label>{l}</Label>
-                    <Input value={(rep as Record<string, string>)[k] ?? ''} onChange={e => setRep(s => ({ ...s, [k]: e.target.value }))} />
-                  </div>
-                ))}
+                ].map(([k, l]) => {
+                  const val = (rep as Record<string, string>)[k] ?? '';
+                  if (k === 'status') {
+                    return (
+                      <div key={k} className="space-y-1">
+                        <Label>{l}</Label>
+                        <Select value={val || '__none__'} onValueChange={v => setRep(s => ({ ...s, status: v === '__none__' ? '' : v }))}>
+                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">—</SelectItem>
+                            <SelectItem value="Under Construction">Under Construction</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  }
+                  if (k === 'expected_completion_date' || k === 'possession_date') {
+                    return (
+                      <div key={k} className="space-y-1">
+                        <Label>{l}</Label>
+                        <Input type="date" value={toDateInput(val)} onChange={e => setRep(s => ({ ...s, [k]: e.target.value }))} />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={k} className="space-y-1">
+                      <Label>{l}</Label>
+                      <Input value={val} onChange={e => setRep(s => ({ ...s, [k]: e.target.value }))} />
+                    </div>
+                  );
+                })}
               </div>
               <div className="space-y-1">
                 <Label>Address</Label>
