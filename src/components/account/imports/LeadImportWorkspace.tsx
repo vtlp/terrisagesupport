@@ -72,13 +72,11 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
 
       const inserted = count ?? records.length;
       await supabase.from('import_jobs').update({
-        status: 'IMPORTED',
         records_imported: inserted,
         records_failed: 0,
-        imported_at: new Date().toISOString(),
       }).eq('id', job.id);
-      await logActivity(supabase, job.id, 'import_completed', { inserted }, currentUser?.user_id);
-      toast.success(`Imported ${inserted} leads locally. Pushing to Terrisage…`);
+      await logActivity(supabase, job.id, 'rows_parsed', { inserted, stage: 'local_insert' }, currentUser?.user_id);
+      toast.message(`${inserted} leads staged locally. Awaiting Terrisage confirmation…`);
       onChange?.();
       pushToUpstream('leads', job.id, job.account_id, onChange);
     } finally {
