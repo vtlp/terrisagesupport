@@ -561,15 +561,49 @@ export default function AccountDetail() {
                         const { data, error } = await supabase.functions.invoke('terrisage-tenant-lookup', {
                           body: { accountId: acc.id },
                         });
-                        if (error) throw error;
-                        const d = (data ?? {}) as { ok?: boolean; tenantId?: string; tenantDisplayName?: string; error?: string };
-                        if (!d.ok || !d.tenantId) throw new Error(d.error ?? 'Tenant not found');
-                        setAcc(a => a ? { ...a, tenant_id: d.tenantId! } : a);
-                        setDraft(dr => dr ? { ...dr, tenant_id: d.tenantId! } : dr);
-                        const display = d.tenantDisplayName ?? d.tenantId;
-                        toast.success(`Tenant "${display}" synced from Terrisage`);
+                        // Edge function returns non-2xx for failures; read the JSON body either way.
+                        let d: { ok?: boolean; tenantId?: string; tenantDisplayName?: string; error?: string; email?: string; detail?: string } = {};
+                        if (error && (error as { context?: Response }).context) {
+                          try { d = await (error as { context: Response }).context.clone().json(); } catch { /* ignore */ }
+                        } else {
+                          d = (data ?? {}) as typeof d;
+                        }
+                        if (d.ok && d.tenantId) {
+                          setAcc(a => a ? { ...a, tenant_id: d.tenantId! } : a);
+                          setDraft(dr => dr ? { ...dr, tenant_id: d.tenantId! } : dr);
+                          toast.success(`Tenant "${d.tenantDisplayName ?? d.tenantId}" synced from Terrisage`);
+                        } else {
+                          const code = d.error ?? (error as Error | undefined)?.message ?? 'UNKNOWN';
+                          const email = d.email ?? acc.owner_email ?? '';
+                          let title = 'Tenant sync failed';
+                          let description = code;
+                          switch (code) {
+                            case 'TENANT_NOT_FOUND':
+                              title = 'No matching Terrisage account';
+                              description = `No active super user found in Terrisage for ${email}. Confirm the owner email here matches the email the customer uses to log in to Terrisage, or ask them to complete signup first.`;
+                              break;
+                            case 'NO_OWNER_EMAIL':
+                              title = 'Owner email missing';
+                              description = 'Add an owner email to this account before syncing.';
+                              break;
+                            case 'ACCOUNT_NOT_FOUND':
+                              description = 'This account no longer exists.';
+                              break;
+                            case 'INTEGRATION_NOT_CONFIGURED':
+                              title = 'Integration not configured';
+                              description = 'Terrisage API base URL or key is missing. Contact an administrator.';
+                              break;
+                            case 'MISSING_TENANT_ID':
+                            case 'INVALID_RESPONSE':
+                              description = 'Terrisage returned an unexpected response. Try again or contact support.';
+                              break;
+                            default:
+                              description = d.detail ? `${code}: ${d.detail.slice(0, 160)}` : code;
+                          }
+                          toast.error(title, { description });
+                        }
                       } catch (e) {
-                        toast.error((e as Error).message);
+                        toast.error('Tenant sync failed', { description: (e as Error).message });
                       } finally {
                         setSyncingTenant(false);
                       }
