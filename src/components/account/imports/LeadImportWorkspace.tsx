@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, ImportRow, RowState, logActivity } from './shared';
+import { ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, ImportRow, RowState, logActivity, parseTabularFile } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
 import { UpyardJobProgress, UpyardSnapshot } from './UpyardJobProgress';
