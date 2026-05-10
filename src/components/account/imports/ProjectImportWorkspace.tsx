@@ -799,7 +799,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Amenities, proximity & approved banks</CardTitle>
+                <CardTitle className="text-sm">Amenities & Proximity</CardTitle>
                 <Button size="sm" onClick={saveReview} disabled={savingReview}>
                   {savingReview && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
                 </Button>
