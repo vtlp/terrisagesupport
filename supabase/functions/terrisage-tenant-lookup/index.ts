@@ -41,52 +41,36 @@ Deno.serve(async (req) => {
     const email = (emailOverride ?? acct.owner_email ?? "").trim().toLowerCase();
     if (!email) return json({ ok: false, error: "NO_OWNER_EMAIL" }, 400);
 
-    // Try a few likely Terrisage endpoints; first that returns a tenantId wins.
     const base = BASE_URL.replace(/\/$/, "");
-    const candidates = [
-      { method: "GET", url: `${base}/api/integrations/tenants/lookup?email=${encodeURIComponent(email)}` },
-      { method: "GET", url: `${base}/api/integrations/tenant-by-email?email=${encodeURIComponent(email)}` },
-      { method: "POST", url: `${base}/api/integrations/tenants/lookup`, body: JSON.stringify({ email }) },
-    ];
+    const lookupUrl = `${base}/api/integrations/tenant-by-superuser`;
 
-    const attempts: Array<{ url: string; status: number; detail?: string }> = [];
-    let tenantId: string | null = null;
-    let raw: unknown = null;
-
-    for (const c of candidates) {
-      try {
-        const r = await fetch(c.url, {
-          method: c.method,
-          headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
-          body: c.method === "POST" ? c.body : undefined,
-        });
-        const text = await r.text();
-        attempts.push({ url: c.url, status: r.status, detail: text.slice(0, 200) });
-        if (!r.ok) continue;
-        let parsed: Record<string, unknown> = {};
-        try { parsed = text ? JSON.parse(text) : {}; } catch { continue; }
-        const t = (parsed.tenantId ?? parsed.tenant_id
-          ?? (parsed.tenant as Record<string, unknown> | undefined)?.id) as string | undefined;
-        if (typeof t === "string" && t.trim()) {
-          tenantId = t.trim();
-          raw = parsed;
-          break;
-        }
-      } catch (_e) {
-        attempts.push({ url: c.url, status: 0, detail: "fetch_failed" });
-      }
+    const r = await fetch(lookupUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+      body: JSON.stringify({ email }),
+    });
+    const text = await r.text();
+    if (!r.ok) {
+      return json({ ok: false, error: "TENANT_NOT_FOUND", email, status: r.status, detail: text.slice(0, 200) }, 404);
     }
-
+    let parsed: Record<string, unknown> = {};
+    try { parsed = text ? JSON.parse(text) : {}; } catch (e) {
+      return json({ ok: false, error: "INVALID_RESPONSE", detail: text.slice(0, 200) }, 502);
+    }
+    const tenantId = (parsed.tenantId as string | undefined)?.trim();
     if (!tenantId) {
-      return json({ ok: false, error: "TENANT_NOT_FOUND", email, attempts }, 404);
+      return json({ ok: false, error: "MISSING_TENANT_ID", raw: parsed }, 502);
     }
 
-    // Persist on the account
+    const tenantDisplayName = (parsed.tenantDisplayName as string | undefined) ?? null;
+    const superUserAgentId = (parsed.superUserAgentId as string | undefined) ?? null;
+    const superUserEmail = (parsed.superUserEmail as string | undefined) ?? null;
+
     const { error: uErr } = await supabase
       .from("accounts").update({ tenant_id: tenantId }).eq("id", accountId);
     if (uErr) return json({ ok: false, error: uErr.message }, 500);
 
-    return json({ ok: true, tenantId, email, raw });
+    return json({ ok: true, tenantId, tenantDisplayName, superUserAgentId, superUserEmail, email });
   } catch (e) {
     return json({ ok: false, error: String(e) }, 500);
   }
