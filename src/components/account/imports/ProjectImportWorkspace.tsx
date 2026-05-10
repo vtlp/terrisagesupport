@@ -180,9 +180,13 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const validation = useMemo(() => {
     const missing: string[] = [];
     REQUIRED_FIELDS.forEach(k => { if (!project[k]) missing.push(k); });
-    const warnings: Array<{ field: string; note: string }> = ((job.extracted_data as { confidenceWarnings?: Array<{ field: string; note: string; confidence: number }> })?.confidenceWarnings || []).map(w => ({
-      field: w.field, note: `${w.note} (confidence ${(w.confidence * 100).toFixed(0)}%)`,
-    }));
+    const rawWarnings = (job.extracted_data as { confidenceWarnings?: Array<Record<string, unknown>> })?.confidenceWarnings || [];
+    const warnings: Array<{ field: string; note: string }> = rawWarnings.map(w => {
+      const field = String((w.field ?? w.field_name ?? w.entity_type) ?? 'field');
+      const note = String(w.note ?? w.reason ?? '');
+      const conf = typeof w.confidence === 'number' ? ` (confidence ${(w.confidence * 100).toFixed(0)}%)` : '';
+      return { field, note: `${note}${conf}` };
+    });
     const fpWithoutConfig = media.filter(m => m.category === 'FLOOR_PLAN' && !m.config_id).length;
     if (fpWithoutConfig > 0) warnings.push({ field: 'floor_plans', note: `${fpWithoutConfig} floor plan(s) not yet mapped to a configuration` });
     const needsRecrop = media.filter(m => m.review_state === 'NEEDS_RECROP').length;
