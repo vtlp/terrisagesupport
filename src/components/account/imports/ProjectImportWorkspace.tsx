@@ -495,7 +495,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                                 <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
                               ))}
                             </div>
-                            <p className="text-[11px] text-muted-foreground mt-1">Rename these headers in the source file (or map manually) if they should populate a known field.</p>
+                            <p className="text-[11px] text-muted-foreground mt-1">Rename these headers in the source file, or map manually, if they should populate a known field.</p>
                           </div>
                         )}
                       </div>
