@@ -70,6 +70,23 @@ const PLOT_FIELDS = [
   ['cluster', 'Cluster / Zone'], ['premium_marker', 'Premium marker'],
 ];
 
+/** Convert any string date (ISO, dd/mm/yyyy, "Dec 2026", etc.) into yyyy-mm-dd for <input type="date">. Returns '' when not parseable. */
+function toDateInput(v: string | null | undefined): string {
+  if (!v) return '';
+  const s = String(v).trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const yyyy = y.length === 2 ? `20${y}` : y;
+    return `${yyyy}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  const t = Date.parse(s);
+  if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
+  return '';
+}
+
 function fieldsFor(pt: PropertyType): string[][] {
   return pt === 'VILLA' ? VILLA_FIELDS : pt === 'PLOT' ? PLOT_FIELDS : APARTMENT_FIELDS;
 }
@@ -411,30 +428,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 )}
                 <div className="mt-1 text-muted-foreground">Mapped {new Date(am.mappedAt).toLocaleString()}</div>
               </div>
-              {(am.unmappedFields.length > 0 || am.unmappedColumns.length > 0 || (am.missingFields?.length ?? 0) > 0) && (
-                <div className="rounded-md border p-3 space-y-3">
-                  {am.unmappedFields.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Unmapped target fields</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {am.unmappedFields.map(f => (
-                          <Badge key={f} variant="outline" className="text-[10px]">{PROJECT_LABELS[f] || f}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Flagged-missing-in-source section intentionally hidden — surfaced via Validate tab instead. */}
-                  {am.unmappedColumns.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {am.unmappedColumns.map(c => (
-                          <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-1">Rename these headers in the source file, or map manually, if they should populate a known field.</p>
-                    </div>
-                  )}
+              {am.unmappedColumns.length > 0 && (
+                <div className="rounded-md border p-3">
+                  <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {am.unmappedColumns.map(c => (
+                      <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">Rename these headers in the source file, or map manually, if they should populate a known field.</p>
                 </div>
               )}
             </CardContent>
@@ -502,12 +504,38 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   ['expected_completion_date', 'Expected completion date'],
                   ['possession_date', 'Possession date'],
                   ['banks', 'Approved banks'],
-                ].map(([k, l]) => (
-                  <div key={k} className="space-y-1">
-                    <Label>{l}</Label>
-                    <Input value={(rep as Record<string, string>)[k] ?? ''} onChange={e => setRep(s => ({ ...s, [k]: e.target.value }))} />
-                  </div>
-                ))}
+                ].map(([k, l]) => {
+                  const val = (rep as Record<string, string>)[k] ?? '';
+                  if (k === 'status') {
+                    return (
+                      <div key={k} className="space-y-1">
+                        <Label>{l}</Label>
+                        <Select value={val || '__none__'} onValueChange={v => setRep(s => ({ ...s, status: v === '__none__' ? '' : v }))}>
+                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">—</SelectItem>
+                            <SelectItem value="Under Construction">Under Construction</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  }
+                  if (k === 'expected_completion_date' || k === 'possession_date') {
+                    return (
+                      <div key={k} className="space-y-1">
+                        <Label>{l}</Label>
+                        <Input type="date" value={toDateInput(val)} onChange={e => setRep(s => ({ ...s, [k]: e.target.value }))} />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={k} className="space-y-1">
+                      <Label>{l}</Label>
+                      <Input value={val} onChange={e => setRep(s => ({ ...s, [k]: e.target.value }))} />
+                    </div>
+                  );
+                })}
               </div>
               <div className="space-y-1">
                 <Label>Address</Label>
@@ -553,15 +581,39 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   ['contact_phone', 'Contact phone'], ['contact_email', 'Contact email'],
                   ['expected_completion_date', 'Expected completion'], ['possession_date', 'Possession date'],
                   ['website', 'Website'], ['open_space_pct', 'Open space %'],
-                ].map(([k, l]) => (
-                  <div key={k} className="space-y-1">
-                    <Label>{l}</Label>
-                    <Input
-                      value={(project as Record<string, unknown>)[k] != null ? String((project as Record<string, unknown>)[k]) : ''}
-                      onChange={e => setProject(p => ({ ...p, [k]: e.target.value }))}
-                    />
-                  </div>
-                ))}
+                ].map(([k, l]) => {
+                  const raw = (project as Record<string, unknown>)[k];
+                  const val = raw != null ? String(raw) : '';
+                  if (k === 'status') {
+                    return (
+                      <div key={k} className="space-y-1">
+                        <Label>{l}</Label>
+                        <Select value={val || '__none__'} onValueChange={v => setProject(p => ({ ...p, status: v === '__none__' ? '' : v }))}>
+                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">—</SelectItem>
+                            <SelectItem value="Under Construction">Under Construction</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  }
+                  if (k === 'expected_completion_date' || k === 'possession_date') {
+                    return (
+                      <div key={k} className="space-y-1">
+                        <Label>{l}</Label>
+                        <Input type="date" value={toDateInput(val)} onChange={e => setProject(p => ({ ...p, [k]: e.target.value }))} />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={k} className="space-y-1">
+                      <Label>{l}</Label>
+                      <Input value={val} onChange={e => setProject(p => ({ ...p, [k]: e.target.value }))} />
+                    </div>
+                  );
+                })}
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
@@ -747,7 +799,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Amenities, proximity & approved banks</CardTitle>
+                <CardTitle className="text-sm">Amenities & Proximity</CardTitle>
                 <Button size="sm" onClick={saveReview} disabled={savingReview}>
                   {savingReview && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
                 </Button>
@@ -757,10 +809,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="space-y-1">
                 <Label>Amenities (comma separated)</Label>
                 <Textarea rows={2} value={amenities} onChange={e => setAmenities(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>Approved banks (comma separated)</Label>
-                <Input value={banks} onChange={e => setBanks(e.target.value)} />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
