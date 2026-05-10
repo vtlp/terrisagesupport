@@ -411,6 +411,14 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
 
       if (ext === 'json' && signed?.signedUrl) {
         const j = await readJson(signed.signedUrl);
+        // Manifest array: classify uploaded images
+        if (Array.isArray(j)) {
+          const m = parseImageManifest(j);
+          m.forEach((v, k) => imageManifest.set(k, v));
+          sheetsParsed.push(`${f.name}:manifest(${m.size})`);
+          filesProcessed.push({ name: f.name, kind: 'json' });
+          continue;
+        }
         const r = parseExtractionJson(j, pt);
         project = { ...project, ...r.project };
         configRows.push(...r.configRows);
