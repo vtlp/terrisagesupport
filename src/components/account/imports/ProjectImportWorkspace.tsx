@@ -310,7 +310,28 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         {/* SOURCE FILES */}
         <TabsContent value="files">
           <Card><CardContent className="pt-4">
-            <SourceFiles jobId={job.id} accountId={job.account_id} onChange={onChange} />
+            <SourceFiles
+              jobId={job.id}
+              accountId={job.account_id}
+              onChange={onChange}
+              onAfterUpload={async () => {
+                try {
+                  const res = await autoMapProjectImport(job, currentUser?.user_id ?? null);
+                  const parts: string[] = [];
+                  if (res.projectFieldsMapped.length) parts.push(`${res.projectFieldsMapped.length} field(s)`);
+                  if (res.configsCreated) parts.push(`${res.configsCreated} config(s)`);
+                  if (res.mediaCreated) parts.push(`${res.mediaCreated} media`);
+                  toast.success(`Auto-mapped: ${parts.join(', ') || 'no recognised data'}`);
+                  if (res.unmappedFields.length) {
+                    toast.info(`${res.unmappedFields.length} field(s) still unmapped — see Review · Overview`);
+                  }
+                  await refresh();
+                  onChange?.();
+                } catch (e) {
+                  toast.error(`Auto-map failed: ${(e as Error).message}`);
+                }
+              }}
+            />
           </CardContent></Card>
         </TabsContent>
 
