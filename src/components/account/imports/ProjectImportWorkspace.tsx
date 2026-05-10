@@ -86,6 +86,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
 
   const [configs, setConfigs] = useState<ImportConfig[]>([]);
   const [media, setMedia] = useState<ImportMedia[]>([]);
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   
   const [importing, setImporting] = useState(false);
   const [savingRep, setSavingRep] = useState(false);
