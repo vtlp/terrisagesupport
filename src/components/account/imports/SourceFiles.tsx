@@ -102,19 +102,41 @@ export function SourceFiles({ jobId, accountId, accept, allowedCategories, onCha
 
   return (
     <div className="space-y-3">
-      <label className="block">
-        <input type="file" multiple accept={accept} className="hidden"
-          onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} />
-        <div className="border-2 border-dashed rounded-md p-5 text-center hover:border-primary cursor-pointer transition-colors">
-          {busy ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : (
-            <>
-              <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
-              <div className="text-sm">Click to upload or drop files here</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{accept || 'Any file type'}</div>
-            </>
-          )}
-        </div>
-      </label>
+      <div className="grid gap-2 md:grid-cols-2">
+        <label className="block">
+          <input type="file" multiple accept={accept} className="hidden"
+            onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} />
+          <div className="border-2 border-dashed rounded-md p-5 text-center hover:border-primary cursor-pointer transition-colors h-full">
+            {busy ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : (
+              <>
+                <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+                <div className="text-sm">Upload files</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Click or drop {accept || 'any file type'}</div>
+              </>
+            )}
+          </div>
+        </label>
+        <label className="block">
+          <input
+            type="file"
+            multiple
+            className="hidden"
+            // @ts-expect-error non-standard but widely supported
+            webkitdirectory=""
+            directory=""
+            onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}
+          />
+          <div className="border-2 border-dashed rounded-md p-5 text-center hover:border-primary cursor-pointer transition-colors h-full">
+            {busy ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : (
+              <>
+                <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+                <div className="text-sm">Upload folder</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Bulk import images and assets from a folder</div>
+              </>
+            )}
+          </div>
+        </label>
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
