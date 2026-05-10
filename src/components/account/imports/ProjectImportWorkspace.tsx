@@ -19,7 +19,7 @@ import {
 } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
-import { autoMapProjectImport, type AutoMapResult } from './autoMapProjectImport';
+import { autoMapProjectImport, deriveCityFromLocation, type AutoMapResult } from './autoMapProjectImport';
 import { useUser } from '@/context/UserContext';
 
 type Rep = {
