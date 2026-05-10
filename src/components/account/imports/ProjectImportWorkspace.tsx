@@ -553,9 +553,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   </div>
                 ))}
               </div>
-              <div className="space-y-1">
-                <Label>Address</Label>
-                <Textarea rows={2} value={project.address ?? ''} onChange={e => setProject(p => ({ ...p, address: e.target.value }))} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Address</Label>
+                  <Textarea rows={2} value={project.address ?? ''} onChange={e => setProject(p => ({ ...p, address: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Office address</Label>
+                  <Textarea rows={2} value={project.office_address ?? ''} onChange={e => setProject(p => ({ ...p, office_address: e.target.value }))} />
+                </div>
               </div>
               <div className="space-y-1">
                 <Label>Overview</Label>
