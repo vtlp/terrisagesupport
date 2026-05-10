@@ -157,32 +157,56 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
 
   const runImport = async () => {
     setImporting(true);
-    const validRows = rows.filter(r => r.state === 'VALID' || r.state === 'WARNING');
-    let imported = 0; let failed = 0;
-    for (const r of validRows) {
-      const data = r.data as Record<string, string>;
-      const { data: ins, error } = await supabase.from('crm_leads').insert([{
-        account_id: job.account_id, source_job_id: job.id, data: data as never,
-        phone: data.phone ?? null, created_by: currentUser?.user_id ?? null,
-      }]).select('id').single();
-      if (error) {
-        failed++;
-        await supabase.from('import_record_rows').update({ state: 'FAILED', errors: [error.message] as never }).eq('id', r.id);
-      } else {
-        imported++;
-        await supabase.from('import_record_rows').update({ state: 'IMPORTED', imported_record_id: ins.id }).eq('id', r.id);
+    try {
+      const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).limit(1);
+      if (!files?.length) { toast.error('Upload a file first'); setImporting(false); return; }
+      const filePath = files[0].storage_path;
+
+      await supabase.from('import_jobs').update({ status: 'IMPORTING' }).eq('id', job.id);
+
+      const { data, error } = await supabase.functions.invoke('terrisage-onboarding-import', {
+        body: { jobId: job.id, accountId: job.account_id, kind: 'LEAD', filePath },
+      });
+      if (error || !data?.ok) {
+        const msg = (data && (data.detail?.error?.message || data.error)) || error?.message || 'Upstream error';
+        toast.error(`Import failed: ${msg}`);
+        await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
+        await logActivity(supabase, job.id, 'import_failed', { error: msg, response: data }, currentUser?.user_id);
+        setImporting(false); onChange?.(); return;
       }
+
+      const { tenantId, upyardJobId } = data as { tenantId: string; upyardJobId: string };
+      await logActivity(supabase, job.id, 'upyard_import_queued', { tenantId, upyardJobId }, currentUser?.user_id);
+      toast.success(`Queued at UpYard (job ${upyardJobId.slice(0, 8)})`);
+
+      // Poll status
+      let final: { status?: string; inserted?: number; totalRows?: number; failureCode?: string; reportJson?: unknown } | null = null;
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const { data: st } = await supabase.functions.invoke('terrisage-onboarding-import?action=status', {
+          body: { tenantId, upyardJobId },
+        });
+        const p = (st?.payload ?? {}) as { status?: string };
+        if (p.status === 'SUCCEEDED' || p.status === 'FAILED') { final = p as never; break; }
+      }
+      if (!final) {
+        toast.message('Still processing at UpYard. Refresh later for final status.');
+        await logActivity(supabase, job.id, 'upyard_import_pending', { upyardJobId }, currentUser?.user_id);
+      } else if (final.status === 'SUCCEEDED') {
+        await supabase.from('import_jobs').update({
+          records_imported: final.inserted ?? 0, records_total: final.totalRows ?? rows.length, records_failed: 0,
+          status: 'IMPORTED', imported_at: new Date().toISOString(),
+        }).eq('id', job.id);
+        await logActivity(supabase, job.id, 'import_completed', { upyardJobId, inserted: final.inserted, report: final.reportJson }, currentUser?.user_id);
+        toast.success(`Imported ${final.inserted ?? 0} leads via UpYard`);
+      } else {
+        await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
+        await logActivity(supabase, job.id, 'import_failed', { upyardJobId, failureCode: final.failureCode, report: final.reportJson }, currentUser?.user_id);
+        toast.error(`UpYard import failed: ${final.failureCode ?? 'unknown'}`);
+      }
+    } finally {
+      setImporting(false); onChange?.(); loadRows();
     }
-    await supabase.from('import_jobs').update({
-      records_imported: imported, records_failed: failed,
-      status: failed === 0 ? 'IMPORTED' : imported === 0 ? 'FAILED' : 'PARTIALLY_IMPORTED',
-      imported_at: new Date().toISOString(),
-    }).eq('id', job.id);
-    await logActivity(supabase, job.id, failed === 0 ? 'import_completed' : imported === 0 ? 'import_failed' : 'import_partially_completed', { imported, failed }, currentUser?.user_id);
-    toast.success(`Imported ${imported} of ${validRows.length} leads`);
-    setImporting(false);
-    onChange?.();
-    loadRows();
   };
 
   const summary = useMemo(() => ({
