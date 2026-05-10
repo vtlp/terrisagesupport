@@ -329,7 +329,7 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
             <AlertDialogTitle>Delete this import?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently removes the import job, its uploaded files, parsed rows, and activity log.
-              Records already pushed to UpYard or your CRM are not removed. This action cannot be undone.
+              Records already pushed to Terrisage or your CRM are not removed. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
