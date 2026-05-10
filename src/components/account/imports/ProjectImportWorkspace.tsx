@@ -19,7 +19,7 @@ import {
 } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
-import { autoMapProjectImport, type AutoMapResult } from './autoMapProjectImport';
+import { autoMapProjectImport, deriveCityFromLocation, type AutoMapResult } from './autoMapProjectImport';
 import { useUser } from '@/context/UserContext';
 
 type Rep = {
@@ -101,14 +101,60 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   }, [job.id]);
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Re-sync local edit state when job changes (e.g. after extraction)
+  // Re-sync local edit state when job changes (e.g. after extraction).
+  // For Representative input we MERGE: any rep field still empty inherits from
+  // the auto-mapped project data so the user does not retype shared values.
   useEffect(() => {
-    setRep((job.representative_input as Rep) || {});
-    setProject((job.extracted_data as { projectData?: ProjectExtract })?.projectData || {});
+    const incomingRep = (job.representative_input as Rep) || {};
+    const proj = (job.extracted_data as { projectData?: ProjectExtract })?.projectData || {};
+    const repFromProject: Rep = {
+      builder_name: proj.builder_name,
+      project_name: proj.project_name,
+      city: proj.city,
+      address: proj.address,
+      representative_phone: proj.contact_phone,
+      representative_email: proj.contact_email,
+      website: proj.website,
+      rera_id: proj.rera_id,
+      status: proj.status,
+      expected_completion_date: proj.expected_completion_date,
+      possession_date: proj.possession_date,
+    };
+    const merged: Rep = { ...repFromProject };
+    (Object.keys(incomingRep) as (keyof Rep)[]).forEach(k => {
+      const v = incomingRep[k];
+      if (v != null && String(v).trim() !== '') (merged as Record<string, unknown>)[k] = v;
+    });
+    setRep(merged);
+    setProject(proj);
     setAmenities(((job.extracted_data as { amenities?: string[] })?.amenities || []).join(', '));
     setProximity((job.extracted_data as { proximityMatrix?: Array<{ name: string; distance_km: number | string }> })?.proximityMatrix || []);
     setBanks(((job.extracted_data as { approvedBanks?: string[] })?.approvedBanks || []).join(', '));
   }, [job.id, job.extracted_data, job.representative_input]);
+
+  // Live-derive total_units = sum of units_planned across configurations.
+  // Also infer city from location when blank. These keep the review pane in
+  // sync as the user edits configs without needing a full re-extract.
+  useEffect(() => {
+    const sum = configs.reduce((acc, c) => {
+      const v = (c.data as Record<string, unknown> | null)?.units_planned;
+      const n = Number(String(v ?? '').replace(/[^\d.\-]/g, ''));
+      return acc + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    setProject(prev => {
+      const next = { ...prev };
+      let changed = false;
+      if (sum > 0 && Number(prev.total_units ?? 0) !== sum) {
+        next.total_units = sum;
+        changed = true;
+      }
+      if ((!prev.city || String(prev.city).trim() === '') && prev.location) {
+        const inferred = deriveCityFromLocation(String(prev.location));
+        if (inferred) { next.city = inferred; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [configs]);
 
   const saveRep = async () => {
     setSavingRep(true);
@@ -303,12 +349,83 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         </CardHeader>
       </Card>
 
+      {(() => {
+        const am = (job.extracted_data as { autoMap?: AutoMapResult })?.autoMap;
+        if (!am) return null;
+        const PROJECT_LABELS: Record<string, string> = {
+          project_name: 'Project name', builder_name: 'Builder / Developer', city: 'City', address: 'Address',
+          rera_id: 'RERA / Approval IDs', status: 'Status', site_area: 'Site area', site_area_unit: 'Site area unit',
+          community_type: 'Community type', approach_road_width: 'Approach road width', total_units: 'Total units',
+          expected_completion_date: 'Expected completion', possession_date: 'Possession date', website: 'Website',
+          open_space_pct: 'Open space %', overview: 'Overview',
+          water_sources: 'Water sources', utilities: 'Utilities', key_features: 'Key features',
+          project_type: 'Project type', location: 'Location', towers_count: 'Towers count',
+          tower_names: 'Tower names', floors_each_tower: 'Floors per tower', config_range: 'Configuration range',
+          clubhouse: 'Clubhouse', parking: 'Parking', nearby_access: 'Nearby access',
+          contact_phone: 'Contact phone', contact_email: 'Contact email', office_address: 'Office address',
+        };
+        return (
+          <Card>
+            <CardContent className="pt-4 space-y-2">
+              <div className={`rounded-md border p-3 text-xs ${am.unmappedFields.length === 0 ? 'border-success/40 bg-success/5 text-success' : 'border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400'}`}>
+                <div className="font-medium flex items-center gap-2">
+                  {am.unmappedFields.length === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                  Review summary · auto-mapped from {am.sheetsParsed.length} sheet(s) · {am.projectFieldsMapped.length} field(s) · {am.configsCreated} config(s) · {am.mediaCreated} media{am.towersCreated ? ` · ${am.towersCreated} tower(s)` : ''}
+                </div>
+                {am.unmappedFields.length > 0 && (
+                  <div className="mt-1">{am.unmappedFields.length} field(s) could not be mapped. Fill them in manually under the relevant Review tab below.</div>
+                )}
+                <div className="mt-1 text-muted-foreground">Mapped {new Date(am.mappedAt).toLocaleString()}</div>
+              </div>
+              {(am.unmappedFields.length > 0 || am.unmappedColumns.length > 0 || (am.missingFields?.length ?? 0) > 0) && (
+                <div className="rounded-md border p-3 space-y-3">
+                  {am.unmappedFields.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Unmapped target fields</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {am.unmappedFields.map(f => (
+                          <Badge key={f} variant="outline" className="text-[10px]">{PROJECT_LABELS[f] || f}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(am.missingFields?.length ?? 0) > 0 && (
+                    <div>
+                      <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Flagged missing in source</div>
+                      <div className="space-y-1">
+                        {am.missingFields.map(m => (
+                          <div key={m.field} className="text-[11px] flex gap-2">
+                            <Badge variant="outline" className="text-[10px]">{m.field}</Badge>
+                            <span className="text-muted-foreground">{m.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {am.unmappedColumns.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {am.unmappedColumns.map(c => (
+                          <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">Rename these headers in the source file, or map manually, if they should populate a known field.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       <Tabs defaultValue="files">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="files">Source files</TabsTrigger>
           <TabsTrigger value="rep">Representative input</TabsTrigger>
           <TabsTrigger value="extract">Extraction</TabsTrigger>
-          <TabsTrigger value="overview">Review · Overview</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="configs">Configurations</TabsTrigger>
           <TabsTrigger value="media">Media & Floor Plans</TabsTrigger>
           <TabsTrigger value="extra">Amenities & Proximity</TabsTrigger>
@@ -461,74 +578,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {(() => {
-                const am = (job.extracted_data as { autoMap?: AutoMapResult })?.autoMap;
-                if (!am) return null;
-                const PROJECT_LABELS: Record<string, string> = {
-                  project_name: 'Project name', builder_name: 'Builder / Developer', city: 'City', address: 'Address',
-                  rera_id: 'RERA / Approval IDs', status: 'Status', site_area: 'Site area', site_area_unit: 'Site area unit',
-                  community_type: 'Community type', approach_road_width: 'Approach road width', total_units: 'Total units',
-                  expected_completion_date: 'Expected completion', possession_date: 'Possession date', website: 'Website',
-                  open_space_pct: 'Open space %', overview: 'Overview',
-                  water_sources: 'Water sources', utilities: 'Utilities', key_features: 'Key features',
-                  project_type: 'Project type', location: 'Location', towers_count: 'Towers count',
-                  tower_names: 'Tower names', floors_each_tower: 'Floors per tower', config_range: 'Configuration range',
-                  clubhouse: 'Clubhouse', parking: 'Parking', nearby_access: 'Nearby access',
-                  contact_phone: 'Contact phone', contact_email: 'Contact email', office_address: 'Office address',
-                };
-                return (
-                  <div className="space-y-2">
-                    <div className={`rounded-md border p-3 text-xs ${am.unmappedFields.length === 0 ? 'border-success/40 bg-success/5 text-success' : 'border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400'}`}>
-                      <div className="font-medium flex items-center gap-2">
-                        {am.unmappedFields.length === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-                        Auto-mapped from {am.sheetsParsed.length} sheet(s) · {am.projectFieldsMapped.length} field(s) · {am.configsCreated} config(s) · {am.mediaCreated} media{am.towersCreated ? ` · ${am.towersCreated} tower(s)` : ''}
-                      </div>
-                      {am.unmappedFields.length > 0 && (
-                        <div className="mt-1">{am.unmappedFields.length} field(s) could not be mapped from the source. Fill them in manually below.</div>
-                      )}
-                      <div className="mt-1 text-muted-foreground">Mapped {new Date(am.mappedAt).toLocaleString()}</div>
-                    </div>
-                    {(am.unmappedFields.length > 0 || am.unmappedColumns.length > 0 || (am.missingFields?.length ?? 0) > 0) && (
-                      <div className="rounded-md border p-3 space-y-3">
-                        {am.unmappedFields.length > 0 && (
-                          <div>
-                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Unmapped target fields</div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {am.unmappedFields.map(f => (
-                                <Badge key={f} variant="outline" className="text-[10px]">{PROJECT_LABELS[f] || f}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {(am.missingFields?.length ?? 0) > 0 && (
-                          <div>
-                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Flagged missing in source</div>
-                            <div className="space-y-1">
-                              {am.missingFields.map(m => (
-                                <div key={m.field} className="text-[11px] flex gap-2">
-                                  <Badge variant="outline" className="text-[10px]">{m.field}</Badge>
-                                  <span className="text-muted-foreground">{m.status}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {am.unmappedColumns.length > 0 && (
-                          <div>
-                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {am.unmappedColumns.map(c => (
-                                <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
-                              ))}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-1">Rename these headers in the source file, or map manually, if they should populate a known field.</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              {/* Auto-map summary now lives above the tabs as a global review banner. */}
               <div className="grid gap-3 md:grid-cols-2">
                 {[
                   ['project_name', 'Project name'], ['builder_name', 'Builder / Developer'],

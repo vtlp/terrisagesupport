@@ -17,6 +17,25 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import type { ImportJob, ImportFile, PropertyType } from './shared';
 import { logActivity } from './shared';
+import { defaultMarkets } from '@/data/lookupData';
+
+// Derive an Indian city from a free-text location string by matching against
+// the known city list. Strips parenthetical aliases (e.g. "Bangalore (Bengaluru)" → "Bangalore").
+export function deriveCityFromLocation(location: string): string | null {
+  if (!location) return null;
+  const text = ` ${location.toLowerCase()} `;
+  // Sort by name length descending so multi-word cities match before substrings.
+  const names = defaultMarkets
+    .map(m => ({ full: m.value, base: m.value.replace(/\s*\(.*?\)\s*/g, '').trim() }))
+    .sort((a, b) => b.base.length - a.base.length);
+  for (const n of names) {
+    const needle = n.base.toLowerCase();
+    if (needle.length < 3) continue;
+    const re = new RegExp(`(^|[^a-z])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`, 'i');
+    if (re.test(text)) return n.full;
+  }
+  return null;
+}
 
 // ---------- Field synonyms ----------
 
@@ -550,6 +569,21 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
   for (const row of configRows) {
     const k = dedupKey(row);
     if (k === '|||||' || !seen.has(k)) { dedupedConfigRows.push(row); seen.add(k); }
+  }
+
+  // Derive city from location if missing (uses Indian city lookup).
+  if ((!project.city || String(project.city).trim() === '') && project.location) {
+    const inferred = deriveCityFromLocation(String(project.location));
+    if (inferred) project.city = inferred;
+  }
+
+  // Compute total_units as the sum of units_planned across configurations.
+  if (dedupedConfigRows.length > 0) {
+    const sum = dedupedConfigRows.reduce((acc, r) => {
+      const n = Number(String(r.units_planned ?? '').replace(/[^\d.\-]/g, ''));
+      return acc + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    if (sum > 0) project.total_units = sum;
   }
 
   // Insert configurations (only first AUTOMAP run; never duplicate).
