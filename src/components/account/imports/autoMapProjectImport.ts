@@ -580,12 +580,14 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
           // project summary
           if (hints.isProjectSummary) {
             if (looksLikeKeyValue(s.aoa)) {
-              const { project: p, unmappedColumns: u } = parseProjectKV(s.aoa);
+              const { project: p, unmappedColumns: u, proximity: px } = parseProjectKV(s.aoa);
               project = { ...project, ...p };
+              proximityAcc.push(...px);
               u.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
             } else {
-              const { project: p, unmappedColumns: u } = parseProjectWide(s.aoa);
+              const { project: p, unmappedColumns: u, proximity: px } = parseProjectWide(s.aoa);
               project = { ...project, ...p };
+              proximityAcc.push(...px);
               u.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
             }
             continue;
@@ -594,10 +596,12 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
           const wide = parseProjectWide(s.aoa);
           if (Object.keys(wide.project).length >= 3) {
             project = { ...project, ...wide.project };
+            proximityAcc.push(...wide.proximity);
             wide.unmappedColumns.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
           } else if (looksLikeKeyValue(s.aoa)) {
             const kv = parseProjectKV(s.aoa);
             project = { ...project, ...kv.project };
+            proximityAcc.push(...kv.proximity);
             kv.unmappedColumns.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
           } else {
             const { rows, unmappedColumns: u } = parseConfigSheet(s.aoa, pt);
