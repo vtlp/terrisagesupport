@@ -399,6 +399,7 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
   const unmappedColumns = new Set<string>();
   const missingFields: Array<{ field: string; status: string }> = [];
   const sheetsParsed: string[] = [];
+  const imageManifest = new Map<string, ManifestEntry>();
 
   for (const f of files) {
     const ext = (f.name.split('.').pop() || '').toLowerCase();
