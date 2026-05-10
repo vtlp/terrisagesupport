@@ -551,7 +551,23 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
       }
     } catch {
       filesProcessed.push({ name: f.name, kind: 'skipped' });
-    }
+  }
+
+  // Derive city from location if missing.
+  if ((!project.city || String(project.city).trim() === '') && project.location) {
+    const inferred = deriveCityFromLocation(String(project.location));
+    if (inferred) project.city = inferred;
+  }
+
+  // Compute total_units as the sum of units_planned across configurations
+  // (deduped). Always recompute when configs are present so it stays accurate.
+  if (dedupedConfigRows.length > 0) {
+    const sum = dedupedConfigRows.reduce((acc, r) => {
+      const n = Number(String(r.units_planned ?? '').replace(/[^\d.\-]/g, ''));
+      return acc + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    if (sum > 0) project.total_units = sum;
+  }
   }
 
   // Derive towers list from project.tower_names (comma separated) — clean &-pairs.
