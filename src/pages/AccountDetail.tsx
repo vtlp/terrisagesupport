@@ -562,11 +562,12 @@ export default function AccountDetail() {
                           body: { accountId: acc.id },
                         });
                         if (error) throw error;
-                        const d = (data ?? {}) as { ok?: boolean; tenantId?: string; error?: string };
+                        const d = (data ?? {}) as { ok?: boolean; tenantId?: string; tenantDisplayName?: string; error?: string };
                         if (!d.ok || !d.tenantId) throw new Error(d.error ?? 'Tenant not found');
                         setAcc(a => a ? { ...a, tenant_id: d.tenantId! } : a);
                         setDraft(dr => dr ? { ...dr, tenant_id: d.tenantId! } : dr);
-                        toast.success('Tenant ID synced from Terrisage');
+                        const display = d.tenantDisplayName ?? d.tenantId;
+                        toast.success(`Tenant "${display}" synced from Terrisage`);
                       } catch (e) {
                         toast.error((e as Error).message);
                       } finally {
