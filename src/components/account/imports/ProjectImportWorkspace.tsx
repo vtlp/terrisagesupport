@@ -389,19 +389,28 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       </div>
                     </div>
                   )}
-                  {(am.missingFields?.length ?? 0) > 0 && (
-                    <div>
-                      <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Flagged missing in source</div>
-                      <div className="space-y-1">
-                        {am.missingFields.map(m => (
-                          <div key={m.field} className="text-[11px] flex gap-2">
-                            <Badge variant="outline" className="text-[10px]">{m.field}</Badge>
-                            <span className="text-muted-foreground">{m.status}</span>
-                          </div>
-                        ))}
+                  {(am.missingFields?.length ?? 0) > 0 && (() => {
+                    const seen = new Set<string>();
+                    const unique = am.missingFields.filter(m => {
+                      const k = `${(m.field || '').toLowerCase()}::${(m.status || '').toLowerCase()}`;
+                      if (seen.has(k)) return false;
+                      seen.add(k);
+                      return true;
+                    });
+                    return (
+                      <div>
+                        <div className="text-xs font-medium uppercase text-muted-foreground mb-2">Flagged missing in source</div>
+                        <div className="grid gap-1.5 sm:grid-cols-2">
+                          {unique.map((m, i) => (
+                            <div key={`${m.field}-${i}`} className="flex items-center justify-between gap-2 rounded-md border bg-background/50 px-2.5 py-1.5">
+                              <span className="text-xs font-medium truncate">{PROJECT_LABELS[m.field] || m.field.replace(/_/g, ' ')}</span>
+                              <Badge variant="outline" className="text-[10px] capitalize whitespace-nowrap">{(m.status || 'missing').replace(/_/g, ' ').toLowerCase()}</Badge>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {am.unmappedColumns.length > 0 && (
                     <div>
                       <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
