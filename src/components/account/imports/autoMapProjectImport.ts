@@ -595,6 +595,32 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
     }
   }
 
+  // Derive status from possession date when not already set.
+  function normDate(v: string | number | unknown): string {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+    if (dmy) {
+      const [, d, m, y] = dmy;
+      const yyyy = y.length === 2 ? `20${y}` : y;
+      return `${yyyy}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    const t = Date.parse(s);
+    if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
+    return '';
+  }
+
+  if (!project.status || String(project.status).trim() === '') {
+    const pdStr = normDate(project.possession_date);
+    const pd = pdStr ? new Date(pdStr) : null;
+    if (pd && !Number.isNaN(pd.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      project.status = pd >= today ? 'Under Construction' : 'Completed';
+    }
+  }
+
   // Insert configurations (only first AUTOMAP run; never duplicate).
   const { data: existingAutoConfigs } = await supabase.from('import_project_configs')
     .select('id, data').eq('job_id', job.id).eq('source', 'AUTOMAP');
