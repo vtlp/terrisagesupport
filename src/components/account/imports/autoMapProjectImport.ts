@@ -75,7 +75,64 @@ const PROJECT_SYNONYMS: Record<FieldKey, string[]> = {
   contact_phone: ['contactphone', 'phone', 'mobile', 'contactnumber'],
   contact_email: ['contactemail', 'email', 'enquiryemail'],
   office_address: ['officeaddress', 'salesoffice', 'siteoffice'],
+  starting_price: ['startingprice', 'startprice', 'priceonwards', 'onwards'],
+  price_range: ['pricerange', 'pricing', 'pricebracket'],
 };
+
+// Keys to silently ignore (not reported as unmapped).
+const IGNORED_PROJECT_KEYS = new Set(['fieldreviewnote', 'reviewnote']);
+
+// Proximity-style keys embedded in the project summary CSV.
+const PROXIMITY_KEY_LABELS: Record<string, string> = {
+  nearestschool: 'Nearest school',
+  nearesthospital: 'Nearest hospital',
+  orraccess: 'ORR access',
+  metrostation: 'Metro station',
+  airport: 'Airport',
+  keybusinessdistrict: 'Key business district',
+  nearestleisurelandmark: 'Nearest leisure landmark',
+};
+const PROXIMITY_TIME_TO_BASE: Record<string, string> = {
+  nearestschooltraveltime: 'nearestschool',
+  nearesthospitaltraveltime: 'nearesthospital',
+  metrotraveltime: 'metrostation',
+  airporttraveltime: 'airport',
+  keybusinessdistricttraveltime: 'keybusinessdistrict',
+  nearestleisurelandmarktraveltime: 'nearestleisurelandmark',
+};
+
+function extractProximityFromKV(entries: Array<[string, string]>): Array<{ name: string; distance_km: number | string }> {
+  const map = new Map<string, string>();
+  for (const [k, v] of entries) map.set(norm(k), v);
+  const out: Array<{ name: string; distance_km: number | string }> = [];
+  const splitList = (s: string) => s.split(/[;\n]/).map(x => x.trim()).filter(Boolean);
+  const fromList = (s: string) => splitList(s).map(item => {
+    const m = item.match(/^(.*?)\s*[-–:]\s*(.+)$/);
+    return m ? { name: m[1].trim(), distance_km: m[2].trim() } : { name: item, distance_km: '' };
+  });
+  const hl = map.get('proximityhighlights'); if (hl) out.push(...fromList(hl));
+  const pm = map.get('proximitymatrix'); if (pm) out.push(...fromList(pm));
+  for (const [base, label] of Object.entries(PROXIMITY_KEY_LABELS)) {
+    const place = (map.get(base) || '').trim();
+    const timeKey = Object.entries(PROXIMITY_TIME_TO_BASE).find(([, b]) => b === base)?.[0];
+    const time = timeKey ? (map.get(timeKey) || '').trim() : '';
+    if (!place && !time) continue;
+    const name = place ? `${label}: ${place}` : label;
+    out.push({ name, distance_km: time });
+  }
+  const seen = new Set<string>();
+  return out.filter(p => {
+    const k = `${p.name}|${p.distance_km}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function isProximityRelatedKey(normKey: string): boolean {
+  return normKey === 'proximityhighlights' || normKey === 'proximitymatrix'
+    || normKey in PROXIMITY_KEY_LABELS || normKey in PROXIMITY_TIME_TO_BASE;
+}
 
 // Map "loose" config headers from spreadsheets/JSON to canonical fields.
 // Includes Hi-Tech / Moonglade-style headers.
