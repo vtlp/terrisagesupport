@@ -105,11 +105,26 @@ function extractProximityFromKV(entries: Array<[string, string]>): Array<{ name:
   const map = new Map<string, string>();
   for (const [k, v] of entries) map.set(norm(k), v);
   const out: Array<{ name: string; distance_km: number | string }> = [];
-  const splitList = (s: string) => s.split(/[;\n]/).map(x => x.trim()).filter(Boolean);
+  // proximity_highlights / proximity_matrix can be lumpy free-text with `|`,
+  // `•`, `·`, `;`, or newline separators and category prefixes like
+  // "Hospitals: A (5 mins), B (10 mins)". We split aggressively and drop
+  // the category-only fragments so only real place rows survive.
+  const splitList = (s: string) => s
+    .split(/[;\n|•·]/)
+    .flatMap(x => x.split(/,(?![^()]*\))/))
+    .map(x => x.trim())
+    .filter(Boolean);
   const fromList = (s: string) => splitList(s).map(item => {
-    const m = item.match(/^(.*?)\s*[-–:]\s*(.+)$/);
-    return m ? { name: m[1].trim(), distance_km: m[2].trim() } : { name: item, distance_km: '' };
-  });
+    // Strip leading "Category:" prefix if present.
+    const cleaned = item.replace(/^[A-Za-z][A-Za-z\s/&-]{0,40}:\s*/, '').trim();
+    if (!cleaned) return null;
+    // Pattern: "Place Name (5 mins)" → name=Place Name, distance=5 mins
+    const paren = cleaned.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    if (paren) return { name: paren[1].trim(), distance_km: paren[2].trim() };
+    const dash = cleaned.match(/^(.*?)\s*[-–:]\s*(.+)$/);
+    if (dash) return { name: dash[1].trim(), distance_km: dash[2].trim() };
+    return { name: cleaned, distance_km: '' };
+  }).filter((p): p is { name: string; distance_km: string } => !!p && p.name.length > 1);
   const hl = map.get('proximityhighlights'); if (hl) out.push(...fromList(hl));
   const pm = map.get('proximitymatrix'); if (pm) out.push(...fromList(pm));
   for (const [base, label] of Object.entries(PROXIMITY_KEY_LABELS)) {
@@ -770,11 +785,17 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
 
   const prevAmenities = ((job.extracted_data as { amenities?: string[] })?.amenities) || [];
   const mergedAmenities = Array.from(new Set([...prevAmenities, ...amenitiesAcc].map(s => s.trim()).filter(Boolean)));
-  const prevProximity = ((job.extracted_data as { proximityMatrix?: Array<{ name: string; distance_km: number | string }> })?.proximityMatrix) || [];
-  const proxKey = (p: { name: string }) => norm(p.name);
-  const mergedProximity = [...prevProximity];
+  // Re-running auto-map should REPLACE the proximity matrix (not accumulate),
+  // otherwise repeated runs balloon the list. De-dupe within the new run.
+  const proxKey = (p: { name: string; distance_km: number | string }) => `${norm(p.name)}|${String(p.distance_km).trim()}`;
+  const seenProx = new Set<string>();
+  const mergedProximity: Array<{ name: string; distance_km: number | string }> = [];
   for (const p of proximityAcc) {
-    if (p.name && !mergedProximity.some(x => proxKey(x) === proxKey(p))) mergedProximity.push(p);
+    if (!p.name) continue;
+    const k = proxKey(p);
+    if (seenProx.has(k)) continue;
+    seenProx.add(k);
+    mergedProximity.push(p);
   }
 
   const merged = {
