@@ -105,13 +105,8 @@ function extractProximityFromKV(entries: Array<[string, string]>): Array<{ name:
   const map = new Map<string, string>();
   for (const [k, v] of entries) map.set(norm(k), v);
   const out: Array<{ name: string; distance_km: number | string }> = [];
-  // proximity_highlights / proximity_matrix can be lumpy free-text with `|`,
-  // `•`, `·`, `;`, or newline separators and category prefixes like
-  // "Hospitals: A (5 mins), B (10 mins)". We split aggressively and drop
-  // the category-only fragments so only real place rows survive.
   const splitList = (s: string) => s
-    .split(/[;\n|•·]/)
-    .flatMap(x => x.split(/,(?![^()]*\))/))
+    .split('|')
     .map(x => x.trim())
     .filter(Boolean);
   const fromList = (s: string) => splitList(s).map(item => {
