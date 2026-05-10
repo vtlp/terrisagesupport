@@ -148,13 +148,49 @@ function looksLikeKeyValue(aoa: unknown[][]): boolean {
   return kv / nonEmpty.length >= 0.6;
 }
 
-function fileNameHints(name: string): { isProjectSummary: boolean; isConfigurations: boolean; isMissingFields: boolean } {
+function fileNameHints(name: string): { isProjectSummary: boolean; isConfigurations: boolean; isMissingFields: boolean; isAmenities: boolean; isProximity: boolean } {
   const n = norm(name.replace(/\.[^.]+$/, ''));
+  const isAmenities = /(amenit)/.test(n);
+  const isProximity = /(proximit|nearby|connectivity|distance)/.test(n);
   return {
-    isProjectSummary: /(projectsummary|summary|project|overview|projectinfo|details)/.test(n),
-    isConfigurations: /(configurations?|units?|floorplans?|inventory|layout|types?|towerinfo|towers)/.test(n),
+    isProjectSummary: /(projectsummary|summary|project|overview|projectinfo|details)/.test(n) && !isAmenities && !isProximity,
+    isConfigurations: /(configurations?|units?|floorplans?|inventory|layout|types?|towerinfo|towers)/.test(n) && !isAmenities,
     isMissingFields: /(missing|gaps|todo)/.test(n),
+    isAmenities,
+    isProximity,
   };
+}
+
+function parseAmenitiesCsv(aoa: unknown[][]): string[] {
+  if (aoa.length < 2) return [];
+  const headers = (aoa[0] as unknown[]).map(h => norm(String(h ?? '')));
+  const nameIdx = headers.findIndex(h => h === 'amenityname' || h === 'name' || h === 'amenity');
+  if (nameIdx < 0) return [];
+  const out: string[] = [];
+  for (let i = 1; i < aoa.length; i++) {
+    const r = aoa[i] as unknown[];
+    if (!Array.isArray(r)) continue;
+    const v = String(r[nameIdx] ?? '').trim();
+    if (v) out.push(v);
+  }
+  return out;
+}
+
+function parseProximityCsv(aoa: unknown[][]): Array<{ name: string; distance_km: number | string }> {
+  if (aoa.length < 2) return [];
+  const headers = (aoa[0] as unknown[]).map(h => norm(String(h ?? '')));
+  const nIdx = headers.findIndex(h => h === 'name' || h === 'place' || h === 'placename' || h === 'landmark');
+  const dIdx = headers.findIndex(h => h.startsWith('distance') || h === 'km' || h === 'distancekm');
+  if (nIdx < 0) return [];
+  const out: Array<{ name: string; distance_km: number | string }> = [];
+  for (let i = 1; i < aoa.length; i++) {
+    const r = aoa[i] as unknown[];
+    if (!Array.isArray(r)) continue;
+    const name = String(r[nIdx] ?? '').trim();
+    const d = dIdx >= 0 ? String(r[dIdx] ?? '').trim() : '';
+    if (name) out.push({ name, distance_km: d });
+  }
+  return out;
 }
 
 // ---------- Parsers ----------
