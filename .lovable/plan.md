@@ -1,111 +1,111 @@
+
 ## Goal
 
-Let agencies (and builders) request projects to be onboarded **after going live**, via the CRM. Support Console receives these requests, tracks them through review and import, and pushes status changes (Pending → Approved → Live) back to the CRM so the agency sees the project's lifecycle in their app.
+Periodically fetch channel-partner project requests from Terrisage's
+`GET /api/integrations/project-requests` and surface each one under the
+matching account's **Project Requests** tab, with full project details
+(name, location, requester, timestamps, etc.).
 
-## Concept
+This complements the existing inbound webhook (which we keep), and
+guarantees nothing is lost if a webhook delivery is missed.
 
-Today, projects come in only at onboarding (captured in `accounts.payload.projects`) and via manual `import_jobs`. We add a **third channel**: an inbound CRM webhook that creates a `project_request` row on the account. A staff member triages it, then converts the approved request into a regular `import_jobs` row (kind = `PROJECT`) which already drives extraction → review → import → CRM. When the import lands as a `crm_projects` record, we mark the request **Live** and notify the CRM.
+## What we'll build
 
-```text
-   Agency CRM                Support Console                  Agency CRM
-─────────────────       ──────────────────────────       ──────────────────
- Submit project    ───►  POST /project-request    ───►   status: PENDING
- (name, location,        (creates project_requests)
-  rep contact)
-                          Staff triages on
-                          Account ► Project Requests tab
-                                │
-                          Approve  ──►  status: APPROVED  ───►  CRM updated
-                                │
-                          "Start import" creates
-                          import_jobs row (kind=PROJECT)
-                          and links request → job
-                                │
-                          Existing extraction →
-                          review → import flow runs
-                                │
-                          On import success
-                          (crm_projects created)  ───►   status: LIVE
-                                                         (CRM updated, project visible)
-```
+### 1. Schema extension (`project_requests`)
 
-## Scope
+Add nullable columns so Terrisage fields are queryable, not buried in `payload`:
 
-### 1. Data model (one new table + small additions)
+- `requested_by_tenant_id text` (CP tenant UUID from Terrisage)
+- `requested_by_agent_id text`
+- `requested_by_agent_name text`
+- `requested_by_agent_phone text`
+- `requested_by_agent_email text`
+- `approved_by_agent_id text`
+- `approved_by_agent_name text`
+- `approved_at timestamptz`
+- `terrisage_status text` (raw `PENDING` / `APPROVED` / `REJECTED` from Terrisage,
+  separate from our internal lifecycle status)
+- `last_synced_at timestamptz`
 
-New table `project_requests`:
-- `id`, `account_id`, `external_request_id` (CRM's id, unique per account for idempotency)
-- `project_name`, `location`, `city`, `representative_name`, `representative_phone`, `representative_email`
-- `notes`, `payload jsonb` (anything else CRM sends)
-- `status` enum: `PENDING_REVIEW | APPROVED | REJECTED | IMPORT_IN_PROGRESS | LIVE | CANCELLED`
-- `rejection_reason text`
-- `import_job_id` (nullable FK to `import_jobs.id`) — set when staff starts an import
-- `crm_project_id` (nullable FK to `crm_projects.id`) — set on go-live
-- `requested_at`, `reviewed_at`, `reviewed_by`, `live_at`
-- `cancelled_at`, `cancelled_by`
-- `created_at`, `updated_at`
-- RLS: `is_staff(auth.uid())` (matches existing pattern).
-- Activity captured in `activity_log` with a new `event_type` value `PROJECT_REQUEST` so it shows in the account's Activity Timeline.
-- Trigger: when an `import_jobs` row reaches status `IMPORTED` and was created from a request (`source = 'PROJECT_REQUEST'`, ref in `summary`), bump the linked `project_requests.status` to `LIVE` and capture `crm_project_id`.
+Unique index on `(account_id, external_request_id)` already exists; we'll rely
+on it for upserts.
 
-### 2. Inbound webhook (Edge Function)
+### 2. New edge function: `terrisage-project-requests-pull`
 
-New Edge Function `project-request` (mirrors the `seat-request` pattern):
-- Public endpoint, auth via `X-API-Key: SEAT_SUPPORT_INTEGRATION_API_KEY` (same shared secret already used by Terrisage; no new secret to provision).
-- `X-Idempotency-Key` honored; matched against `external_request_id`.
-- Resolves account by `accounts.tenant_id`.
-- Validates required fields (project name, location, representative name + phone OR email).
-- Inserts a `project_requests` row with status `PENDING_REVIEW`. Returns `{ ok, requestId, status }`.
-- Logs to `activity_log` so it appears in the account timeline.
+Public function (no JWT). Behaviour:
 
-### 3. Outbound status callback (Edge Function)
+1. Read `TERRISAGE_BASE_URL` and `SEAT_SUPPORT_INTEGRATION_API_KEY`.
+2. Call `GET {base}/api/integrations/project-requests` with `X-API-Key`.
+   No filters — fetch all, newest first.
+3. For each item:
+   - Look up `accounts.tenant_id = item.requestedByTenant.id`.
+     If no match → skip (per "Always require match"), log a single warning
+     row in `activity_log` with entity_type=`SYSTEM`.
+   - Upsert into `project_requests` keyed on
+     `(account_id, external_request_id)` with mapped fields:
+     - `project_name` ← `project.name`
+     - `location` ← `project.location`
+     - `city` ← `project.city`
+     - `notes` ← `project.notes`
+     - `representative_*` ← `requestedByAgent.*` (kept for back-compat)
+     - new columns from §1 populated from `requestedByAgent` /
+       `approvedByAgent` / Terrisage timestamps
+     - `terrisage_status` ← item.status
+     - `payload` ← full raw item (for forensics)
+     - `last_synced_at` ← now()
+   - Internal `status` mapping (only on insert; never overwrite a row already
+     past `PENDING_REVIEW`):
+     - `PENDING` → `PENDING_REVIEW`
+     - `APPROVED` → `APPROVED`
+     - `REJECTED` → `REJECTED` (also write `rejection_reason` if present)
+4. Return `{ ok, fetched, upserted, skipped_no_match }` and write one
+   `activity_log` summary entry.
 
-New Edge Function `project-request-status-callback` invoked internally whenever the request status changes (Approved / Rejected / Live / Cancelled):
-- POSTs to `${TERRISAGE_BASE_URL}/api/integrations/projects/request-status` with `{ tenantId, externalRequestId, status, projectName, liveProjectId?, rejectionReason? }`.
-- Auth header: `X-API-Key` (same shared secret).
-- Best-effort with one retry; failures recorded in `activity_log` and surfaced as a "CRM sync failed — retry" button in the UI.
+### 3. Schedule (pg_cron + pg_net)
 
-### 4. UI — new tab on Account Detail: **Project Requests**
+Run every 15 minutes via `cron.schedule` calling the new function over HTTPS
+with anon key + `Content-Type: application/json`. Inserted via the
+`supabase--insert` tool (not migration) since it embeds project-specific URL.
 
-Added to `src/pages/AccountDetail.tsx` between Projects and Imports tabs.
+### 4. Manual trigger from the UI
 
-`src/components/account/ProjectRequestsTab.tsx`:
-- List view: table grouped by status (Pending Review at top), columns: Project name, Location, Representative, Requested at, Status badge, Actions.
-- Filters: status, search by name/rep.
-- Status badges follow existing `STATUS_TONE` style (amber for pending, primary for approved, success for live, destructive for rejected, muted for cancelled).
-- Row actions per status:
-  - **Pending Review** → `Approve`, `Reject` (asks for reason in dialog).
-  - **Approved** → `Start import` (creates an `import_jobs` row with `kind=PROJECT`, prefills `label` with project name, stores `source: 'PROJECT_REQUEST'` and `project_request_id` in `summary`, links back, sets request status to `IMPORT_IN_PROGRESS`, then routes to the existing Project Import workspace).
-  - **Import in progress** → `Open import` (jumps to the linked job in the Imports tab).
-  - **Live** → `Open project` (jumps to `crm_projects`).
-  - **Any non-final** → `Cancel` (with confirm).
-- Detail drawer: full payload, representative contact (with WhatsApp/Call quick actions), brochures the CRM may have pre-attached, audit timeline of status changes (read from `activity_log`).
-- Pending count surfaced as a badge on the tab trigger.
+On `ProjectRequestsTab`, add a small **"Sync from Terrisage"** button next
+to the search/filter row. It calls
+`supabase.functions.invoke('terrisage-project-requests-pull')` and refreshes
+the list. This gives staff a way to force a sync without waiting 15 min.
 
-### 5. Imports tab integration
+### 5. Show Terrisage-specific fields in the row
 
-- `ImportsTab` already renders `import_jobs`. We add a small "Source" column / badge that shows **Project request** when `summary.source === 'PROJECT_REQUEST'`, with a link back to the originating request.
-- On import completion (existing flow), the trigger from §1 flips the request to **Live** and the outbound callback fires automatically. No new manual step required.
+Extend `RequestRow` in `ProjectRequestsTab.tsx` to display:
 
-### 6. Notifications & dashboard
+- The CP tenant id (short) and `requested_by_agent_name` (already partially
+  shown as `representative_name`)
+- A small badge for `terrisage_status` when it differs from internal status
+- Tooltip on "CRM ref" showing full `external_request_id`
 
-- Global notification (existing `notifications` mechanism in `AppHeader`) on each new request: "New project request from {Account} — {Project name}".
-- Dashboard "Attention" widget: add **Pending project requests** counter that links to a filtered Accounts view.
+Project name, location, requester phone/email, and requested-at are already
+rendered correctly.
 
-### 7. Docs
+## What we deliberately do NOT change
 
-New `docs/terrisage-project-request-webhook.md` documenting the inbound webhook (endpoint, auth, payload, idempotency, status callback contract, sample curl). Pattern mirrors the existing seat-request doc.
+- The existing inbound `project-request` webhook stays as-is. The pull is
+  reconciliation, not a replacement.
+- `project-request-status-callback` (outbound) keeps notifying Terrisage when
+  staff approve / reject / start import / go live.
+- Internal status lifecycle (`PENDING_REVIEW → APPROVED → IMPORT_IN_PROGRESS →
+  LIVE / REJECTED / CANCELLED`) is unchanged. We only auto-set it on first
+  insert; subsequent pulls never regress an in-progress request.
 
-## Out of scope
+## Open assumptions (calling out for confirmation, not blocking)
 
-- No new auth/tenant model — reuses `accounts.tenant_id` and the existing `SEAT_SUPPORT_INTEGRATION_API_KEY`.
-- No change to extraction worker — approved requests funnel into the **existing** Project Import workspace untouched.
-- No bulk-request UI for now (CRM sends one request per project; bulk handled by repeated calls).
+- Terrisage's response shape for `project` is `{ name, location, city?,
+  notes? }` and `requestedByAgent` is `{ id, name, phone, email }`. If actual
+  field names differ, we adjust the mapper in one place.
+- 15-minute cadence is acceptable. Easy to change later.
 
-## Technical notes
+## Answer to your question
 
-- Migration adds: enum `project_request_status`, table `project_requests` with indices on `(account_id, status)` and unique `(account_id, external_request_id)`, RLS policy `Staff full access project_requests`, and the import-completion trigger.
-- New Edge Functions: `project-request` (inbound), `project-request-status-callback` (outbound). Both use the existing shared API key; no `add_secret` step needed.
-- Status changes from the UI go through a small wrapper in `src/lib/projectRequestsApi.ts` that updates the row, writes an `activity_log` entry, and invokes the outbound callback.
-- The Project Requests tab uses Supabase realtime on `project_requests` filtered by `account_id` so multiple staff see updates instantly.
-- Tab visibility: shown for both `AGENCY_BROKERAGE_CONSULTANCY` and `BUILDER_DEVELOPER` accounts (builders may also request additional projects post go-live).
+Yes — with the schema extension above, every project name plus the requester's
+details, tenant, timestamps, and approval info will land in the Project
+Requests tab on the matching account, both via the live webhook and as a
+safety net via the scheduled pull.

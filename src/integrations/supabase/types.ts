@@ -2814,6 +2814,9 @@ export type Database = {
       project_requests: {
         Row: {
           account_id: string
+          approved_at: string | null
+          approved_by_agent_id: string | null
+          approved_by_agent_name: string | null
           cancelled_at: string | null
           cancelled_by: string | null
           city: string | null
@@ -2822,6 +2825,7 @@ export type Database = {
           external_request_id: string | null
           id: string
           import_job_id: string | null
+          last_synced_at: string | null
           live_at: string | null
           location: string | null
           notes: string | null
@@ -2832,13 +2836,22 @@ export type Database = {
           representative_name: string | null
           representative_phone: string | null
           requested_at: string
+          requested_by_agent_email: string | null
+          requested_by_agent_id: string | null
+          requested_by_agent_name: string | null
+          requested_by_agent_phone: string | null
+          requested_by_tenant_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["project_request_status"]
+          terrisage_status: string | null
           updated_at: string
         }
         Insert: {
           account_id: string
+          approved_at?: string | null
+          approved_by_agent_id?: string | null
+          approved_by_agent_name?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           city?: string | null
@@ -2847,6 +2860,7 @@ export type Database = {
           external_request_id?: string | null
           id?: string
           import_job_id?: string | null
+          last_synced_at?: string | null
           live_at?: string | null
           location?: string | null
           notes?: string | null
@@ -2857,13 +2871,22 @@ export type Database = {
           representative_name?: string | null
           representative_phone?: string | null
           requested_at?: string
+          requested_by_agent_email?: string | null
+          requested_by_agent_id?: string | null
+          requested_by_agent_name?: string | null
+          requested_by_agent_phone?: string | null
+          requested_by_tenant_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["project_request_status"]
+          terrisage_status?: string | null
           updated_at?: string
         }
         Update: {
           account_id?: string
+          approved_at?: string | null
+          approved_by_agent_id?: string | null
+          approved_by_agent_name?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           city?: string | null
@@ -2872,6 +2895,7 @@ export type Database = {
           external_request_id?: string | null
           id?: string
           import_job_id?: string | null
+          last_synced_at?: string | null
           live_at?: string | null
           location?: string | null
           notes?: string | null
@@ -2882,9 +2906,15 @@ export type Database = {
           representative_name?: string | null
           representative_phone?: string | null
           requested_at?: string
+          requested_by_agent_email?: string | null
+          requested_by_agent_id?: string | null
+          requested_by_agent_name?: string | null
+          requested_by_agent_phone?: string | null
+          requested_by_tenant_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["project_request_status"]
+          terrisage_status?: string | null
           updated_at?: string
         }
         Relationships: []
