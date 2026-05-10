@@ -471,7 +471,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                         Auto-mapped from {am.sheetsParsed.length} sheet(s) · {am.projectFieldsMapped.length} field(s) · {am.configsCreated} config(s) · {am.mediaCreated} media
                       </div>
                       {am.unmappedFields.length > 0 && (
-                        <div className="mt-1">{am.unmappedFields.length} field(s) could not be mapped from the spreadsheet — fill them manually below.</div>
+                        <div className="mt-1">{am.unmappedFields.length} field(s) could not be mapped from the spreadsheet. Fill them in manually below.</div>
                       )}
                       <div className="mt-1 text-muted-foreground">Mapped {new Date(am.mappedAt).toLocaleString()}</div>
                     </div>
