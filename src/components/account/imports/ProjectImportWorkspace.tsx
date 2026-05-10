@@ -180,9 +180,13 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const validation = useMemo(() => {
     const missing: string[] = [];
     REQUIRED_FIELDS.forEach(k => { if (!project[k]) missing.push(k); });
-    const warnings: Array<{ field: string; note: string }> = ((job.extracted_data as { confidenceWarnings?: Array<{ field: string; note: string; confidence: number }> })?.confidenceWarnings || []).map(w => ({
-      field: w.field, note: `${w.note} (confidence ${(w.confidence * 100).toFixed(0)}%)`,
-    }));
+    const rawWarnings = (job.extracted_data as { confidenceWarnings?: Array<Record<string, unknown>> })?.confidenceWarnings || [];
+    const warnings: Array<{ field: string; note: string }> = rawWarnings.map(w => {
+      const field = String((w.field ?? w.field_name ?? w.entity_type) ?? 'field');
+      const note = String(w.note ?? w.reason ?? '');
+      const conf = typeof w.confidence === 'number' ? ` (confidence ${(w.confidence * 100).toFixed(0)}%)` : '';
+      return { field, note: `${note}${conf}` };
+    });
     const fpWithoutConfig = media.filter(m => m.category === 'FLOOR_PLAN' && !m.config_id).length;
     if (fpWithoutConfig > 0) warnings.push({ field: 'floor_plans', note: `${fpWithoutConfig} floor plan(s) not yet mapped to a configuration` });
     const needsRecrop = media.filter(m => m.review_state === 'NEEDS_RECROP').length;
@@ -376,19 +380,37 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   {job.extraction_finished_at && <> · finished {new Date(job.extraction_finished_at).toLocaleString()}</>}
                 </p>
               )}
-              {(job.extracted_data as { missingFields?: string[] })?.missingFields?.length ? (
+              {(job.extracted_data as { missingFields?: unknown[] })?.missingFields?.length ? (
                 <div className="rounded-md border p-3">
                   <div className="text-xs font-medium uppercase text-amber-700 dark:text-amber-400 mb-1">Missing fields reported</div>
                   <ul className="text-xs text-muted-foreground list-disc pl-4">
-                    {(job.extracted_data as { missingFields?: string[] }).missingFields!.map((m, i) => <li key={i}>{m}</li>)}
+                    {(job.extracted_data as { missingFields?: unknown[] }).missingFields!.map((m, i) => {
+                      const text = typeof m === 'string'
+                        ? m
+                        : (() => {
+                            const o = (m ?? {}) as Record<string, unknown>;
+                            const name = o.field_name ?? o.field ?? o.entity_type ?? 'field';
+                            const reason = o.reason ? ` — ${o.reason}` : '';
+                            return `${name}${reason}`;
+                          })();
+                      return <li key={i}>{text}</li>;
+                    })}
                   </ul>
                 </div>
               ) : null}
-              {(job.extracted_data as { assumptions?: string[] })?.assumptions?.length ? (
+              {(job.extracted_data as { assumptions?: unknown[] })?.assumptions?.length ? (
                 <div className="rounded-md border p-3">
                   <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Assumptions</div>
                   <ul className="text-xs text-muted-foreground list-disc pl-4">
-                    {(job.extracted_data as { assumptions?: string[] }).assumptions!.map((m, i) => <li key={i}>{m}</li>)}
+                    {(job.extracted_data as { assumptions?: unknown[] }).assumptions!.map((m, i) => {
+                      const text = typeof m === 'string'
+                        ? m
+                        : (() => {
+                            const o = (m ?? {}) as Record<string, unknown>;
+                            return String(o.note ?? o.reason ?? o.field_name ?? JSON.stringify(o));
+                          })();
+                      return <li key={i}>{text}</li>;
+                    })}
                   </ul>
                 </div>
               ) : null}
