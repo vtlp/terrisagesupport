@@ -77,17 +77,16 @@ export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; on
       const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).eq('category', 'CSV').limit(1);
       if (!files?.length) return;
       const { data: signed } = await supabase.storage.from('import-files').createSignedUrl(files[0].storage_path, 60);
-      try { const text = await (await fetch(signed!.signedUrl)).text(); setHeaders(parseCSV(text).headers); } catch (_) { /* noop */ }
+      try { setHeaders((await parseTabularFile(signed!.signedUrl, files[0].name)).headers); } catch (_) { /* noop */ }
     })();
   }, [job.id]);
 
   const parseFile = async () => {
     setParsing(true);
     const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).eq('category', 'CSV').limit(1);
-    if (!files?.length) { toast.error('Upload a CSV first'); setParsing(false); return; }
+    if (!files?.length) { toast.error('Upload a file first'); setParsing(false); return; }
     const { data: signed } = await supabase.storage.from('import-files').createSignedUrl(files[0].storage_path, 60);
-    const text = await (await fetch(signed!.signedUrl)).text();
-    const { headers: hs, rows: parsed } = parseCSV(text);
+    const { headers: hs, rows: parsed } = await parseTabularFile(signed!.signedUrl, files[0].name);
     setHeaders(hs);
 
     const insertRows = parsed.map((r, idx) => {
