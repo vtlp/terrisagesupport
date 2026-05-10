@@ -166,15 +166,27 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     onChange?.();
   };
 
-  const runExtraction = async (mode?: 'mock' | 'live') => {
-    setExtracting(true);
-    const { error } = await supabase.functions.invoke('extraction-trigger', { body: { jobId: job.id, mode } });
-    setExtracting(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Extraction completed');
-    onChange?.();
-    refresh();
-  };
+  const [mapping, setMapping] = useState(false);
+  const runMapping = useCallback(async () => {
+    setMapping(true);
+    try {
+      const res = await autoMapProjectImport(job, currentUser?.user_id ?? null);
+      const parts: string[] = [];
+      if (res.projectFieldsMapped.length) parts.push(`${res.projectFieldsMapped.length} field(s)`);
+      if (res.configsCreated) parts.push(`${res.configsCreated} config(s)`);
+      if (res.mediaCreated) parts.push(`${res.mediaCreated} media`);
+      toast.success(`Mapped: ${parts.join(', ') || 'no recognised data'}`);
+      if (res.unmappedFields.length) {
+        toast.info(`${res.unmappedFields.length} field(s) still unmapped. See Overview.`);
+      }
+      await refresh();
+      onChange?.();
+    } catch (e) {
+      toast.error(`Mapping failed: ${(e as Error).message}`);
+    } finally {
+      setMapping(false);
+    }
+  }, [job, currentUser?.user_id, refresh, onChange]);
 
   const saveReview = async () => {
     setSavingReview(true);
