@@ -114,6 +114,8 @@ export function ProjectRequestsTab({ accountId }: Props) {
     finally { setSyncing(false); }
   };
 
+  if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+
   return (
     <div className="space-y-4">
       <Card>
@@ -126,6 +128,10 @@ export function ProjectRequestsTab({ accountId }: Props) {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={onSync} disabled={syncing} className="h-8">
+                {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                Sync from Terrisage
+              </Button>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input className="pl-7 h-8 w-56" placeholder="Search project, location, rep" value={q} onChange={e => setQ(e.target.value)} />
