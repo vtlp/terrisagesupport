@@ -69,6 +69,10 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
 
+  const validation = (job.validation || {}) as { upyardJobId?: string; tenantId?: string };
+  const [upyardJobId, setUpyardJobId] = useState<string | null>(validation.upyardJobId ?? null);
+  const [tenantId, setTenantId] = useState<string | null>(validation.tenantId ?? null);
+
   const loadRows = useCallback(async () => {
     setLoadingRows(true);
     const { data } = await supabase.from('import_record_rows').select('*').eq('job_id', job.id).order('row_index');
