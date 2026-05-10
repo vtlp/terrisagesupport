@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,9 +17,9 @@ import {
   approveRequest, rejectRequest, cancelRequest, startImportFromRequest,
 } from '@/lib/projectRequestsApi';
 
-interface Props { accountId: string; }
+interface Props { accountId: string; accountName?: string; }
 
-export function ProjectRequestsTab({ accountId }: Props) {
+export function ProjectRequestsTab({ accountId, accountName }: Props) {
   const { currentUser } = useUser();
   const [rows, setRows] = useState<ProjectRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +29,7 @@ export function ProjectRequestsTab({ accountId }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [rejectFor, setRejectFor] = useState<ProjectRequest | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const accountToastIds = useRef<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
