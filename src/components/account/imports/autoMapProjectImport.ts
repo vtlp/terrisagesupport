@@ -48,7 +48,7 @@ const PROJECT_SYNONYMS: Record<FieldKey, string[]> = {
   project_type: ['projecttype', 'type'],
   city: ['city', 'town'],
   location: ['location', 'area', 'locality'],
-  address: ['address', 'fulladdress', 'projectaddress', 'siteaddress', 'officeaddress'],
+  address: ['siteaddress', 'address', 'fulladdress', 'projectaddress'],
   rera_id: ['reraid', 'rera', 'reranumber', 'reraapproval', 'approval', 'approvalid'],
   status: ['status', 'projectstatus', 'constructionstatus'],
   site_area: ['sitearea', 'totalarea', 'landarea', 'plotarea'],
