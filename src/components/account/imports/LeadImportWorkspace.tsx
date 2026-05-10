@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, ImportRow, RowState, logActivity } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
+import { UpyardJobProgress, UpyardSnapshot } from './UpyardJobProgress';
 import { useUser } from '@/context/UserContext';
 
 const LEAD_FIELDS = [
