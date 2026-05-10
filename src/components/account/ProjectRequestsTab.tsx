@@ -158,12 +158,13 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
               <CardTitle className="text-base">Project requests</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
                 Project onboarding requests submitted by the client from their CRM after going live.
+                Auto-syncs from Terrisage every 2 minutes; new requests also trigger a bell notification.
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={onSync} disabled={syncing} className="h-8">
+              <Button size="sm" variant="ghost" onClick={onSync} disabled={syncing} className="h-8" title="Force a sync now">
                 {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
-                Sync from Terrisage
+                Sync now
               </Button>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
