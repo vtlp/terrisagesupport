@@ -286,36 +286,44 @@ function assignProject(project: ProjectExtract, field: string, val: unknown) {
   }
 }
 
-function parseProjectKV(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[] } {
+function parseProjectKV(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[]; proximity: Array<{ name: string; distance_km: number | string }> } {
   const project: ProjectExtract = {};
   const unmapped: string[] = [];
+  const kvEntries: Array<[string, string]> = [];
   for (const row of aoa) {
     if (!Array.isArray(row)) continue;
     const key = String(row[0] ?? '').trim();
     const val = String(row[1] ?? '').trim();
     if (!key || !val) continue;
+    kvEntries.push([key, val]);
+    const nk = norm(key);
+    if (isProximityRelatedKey(nk) || IGNORED_PROJECT_KEYS.has(nk)) continue;
     const field = matchField(key, PROJECT_SYNONYMS);
     if (field) assignProject(project, field, val);
     else unmapped.push(key);
   }
-  return { project, unmappedColumns: unmapped };
+  return { project, unmappedColumns: unmapped, proximity: extractProximityFromKV(kvEntries) };
 }
 
-function parseProjectWide(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[] } {
+function parseProjectWide(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[]; proximity: Array<{ name: string; distance_km: number | string }> } {
   const project: ProjectExtract = {};
   const unmapped: string[] = [];
-  if (aoa.length < 2) return { project, unmappedColumns: unmapped };
+  if (aoa.length < 2) return { project, unmappedColumns: unmapped, proximity: [] };
   const headers = (aoa[0] as unknown[]).map(h => String(h ?? '').trim());
   const firstData = aoa[1] as unknown[];
+  const kvEntries: Array<[string, string]> = [];
   headers.forEach((h, i) => {
     if (!h) return;
     const val = String(firstData?.[i] ?? '').trim();
     if (!val) return;
+    kvEntries.push([h, val]);
+    const nk = norm(h);
+    if (isProximityRelatedKey(nk) || IGNORED_PROJECT_KEYS.has(nk)) return;
     const field = matchField(h, PROJECT_SYNONYMS);
     if (field) assignProject(project, field, val);
     else unmapped.push(h);
   });
-  return { project, unmappedColumns: unmapped };
+  return { project, unmappedColumns: unmapped, proximity: extractProximityFromKV(kvEntries) };
 }
 
 function parseConfigSheet(aoa: unknown[][], pt: PropertyType): { rows: Record<string, unknown>[]; unmappedColumns: string[] } {
