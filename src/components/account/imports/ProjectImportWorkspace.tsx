@@ -411,20 +411,9 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 )}
                 <div className="mt-1 text-muted-foreground">Mapped {new Date(am.mappedAt).toLocaleString()}</div>
               </div>
-              {(am.unmappedFields.length > 0 || am.unmappedColumns.length > 0 || (am.missingFields?.length ?? 0) > 0) && (
+              {am.unmappedColumns.length > 0 && (
                 <div className="rounded-md border p-3 space-y-3">
-                  {am.unmappedFields.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Unmapped target fields</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {am.unmappedFields.map(f => (
-                          <Badge key={f} variant="outline" className="text-[10px]">{PROJECT_LABELS[f] || f}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Flagged-missing-in-source section intentionally hidden — surfaced via Validate tab instead. */}
-                  {am.unmappedColumns.length > 0 && (
+                  {(
                     <div>
                       <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
                       <div className="flex flex-wrap gap-1.5">
