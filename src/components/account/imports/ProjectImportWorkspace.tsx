@@ -101,10 +101,32 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   }, [job.id]);
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Re-sync local edit state when job changes (e.g. after extraction)
+  // Re-sync local edit state when job changes (e.g. after extraction).
+  // For Representative input we MERGE: any rep field still empty inherits from
+  // the auto-mapped project data so the user does not retype shared values.
   useEffect(() => {
-    setRep((job.representative_input as Rep) || {});
-    setProject((job.extracted_data as { projectData?: ProjectExtract })?.projectData || {});
+    const incomingRep = (job.representative_input as Rep) || {};
+    const proj = (job.extracted_data as { projectData?: ProjectExtract })?.projectData || {};
+    const repFromProject: Rep = {
+      builder_name: proj.builder_name,
+      project_name: proj.project_name,
+      city: proj.city,
+      address: proj.address,
+      representative_phone: proj.contact_phone,
+      representative_email: proj.contact_email,
+      website: proj.website,
+      rera_id: proj.rera_id,
+      status: proj.status,
+      expected_completion_date: proj.expected_completion_date,
+      possession_date: proj.possession_date,
+    };
+    const merged: Rep = { ...repFromProject };
+    (Object.keys(incomingRep) as (keyof Rep)[]).forEach(k => {
+      const v = incomingRep[k];
+      if (v != null && String(v).trim() !== '') (merged as Record<string, unknown>)[k] = v;
+    });
+    setRep(merged);
+    setProject(proj);
     setAmenities(((job.extracted_data as { amenities?: string[] })?.amenities || []).join(', '));
     setProximity((job.extracted_data as { proximityMatrix?: Array<{ name: string; distance_km: number | string }> })?.proximityMatrix || []);
     setBanks(((job.extracted_data as { approvedBanks?: string[] })?.approvedBanks || []).join(', '));
