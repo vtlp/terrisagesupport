@@ -25,7 +25,7 @@ const CATEGORY_LABEL: Record<FileCategory, string> = {
   CSV: 'Spreadsheets', FLOOR_PLAN: 'Floor plans', LOGO: 'Logos', OTHER: 'Other',
 };
 
-export function SourceFiles({ jobId, accountId, accept, allowedCategories, onChange }: Props) {
+export function SourceFiles({ jobId, accountId, accept, allowedCategories, onChange, onAfterUpload }: Props) {
   const { currentUser } = useUser();
   const [files, setFiles] = useState<ImportFile[]>([]);
   const [loading, setLoading] = useState(true);
