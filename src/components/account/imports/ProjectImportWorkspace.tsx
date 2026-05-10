@@ -564,15 +564,39 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   ['contact_phone', 'Contact phone'], ['contact_email', 'Contact email'],
                   ['expected_completion_date', 'Expected completion'], ['possession_date', 'Possession date'],
                   ['website', 'Website'], ['open_space_pct', 'Open space %'],
-                ].map(([k, l]) => (
-                  <div key={k} className="space-y-1">
-                    <Label>{l}</Label>
-                    <Input
-                      value={(project as Record<string, unknown>)[k] != null ? String((project as Record<string, unknown>)[k]) : ''}
-                      onChange={e => setProject(p => ({ ...p, [k]: e.target.value }))}
-                    />
-                  </div>
-                ))}
+                ].map(([k, l]) => {
+                  const raw = (project as Record<string, unknown>)[k];
+                  const val = raw != null ? String(raw) : '';
+                  if (k === 'status') {
+                    return (
+                      <div key={k} className="space-y-1">
+                        <Label>{l}</Label>
+                        <Select value={val || '__none__'} onValueChange={v => setProject(p => ({ ...p, status: v === '__none__' ? '' : v }))}>
+                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">—</SelectItem>
+                            <SelectItem value="Under Construction">Under Construction</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  }
+                  if (k === 'expected_completion_date' || k === 'possession_date') {
+                    return (
+                      <div key={k} className="space-y-1">
+                        <Label>{l}</Label>
+                        <Input type="date" value={toDateInput(val)} onChange={e => setProject(p => ({ ...p, [k]: e.target.value }))} />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={k} className="space-y-1">
+                      <Label>{l}</Label>
+                      <Input value={val} onChange={e => setProject(p => ({ ...p, [k]: e.target.value }))} />
+                    </div>
+                  );
+                })}
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
