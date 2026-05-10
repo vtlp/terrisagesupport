@@ -630,12 +630,21 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
     .filter(f => !existingPaths.has(f.storage_path))
     .map(f => {
       const c = classifyImageFor(f.name, configFloorplanFiles, imageManifest);
+      // If linked to a config, prefix the caption with the config name so the
+      // tile is immediately identifiable in the Media tab.
+      let caption = c.caption || f.name;
+      if (c.configId) {
+        const cfg = (existingAutoConfigs ?? []).find(x => x.id === c.configId)
+          ?? null;
+        const cfgName = cfg ? ((cfg.data as Record<string, unknown> | null)?.name as string | undefined) : undefined;
+        if (cfgName) caption = `${cfgName} · ${caption}`;
+      }
       return {
         job_id: job.id,
         category: c.category,
         config_id: c.configId ?? null,
         storage_path: f.storage_path,
-        caption: c.caption || f.name,
+        caption,
         review_state: 'PENDING' as const,
         source: 'AUTOMAP',
       };
