@@ -810,7 +810,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 <Label>Amenities (comma separated)</Label>
                 <Textarea rows={2} value={amenities} onChange={e => setAmenities(e.target.value)} />
               </div>
-              </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label>Proximity matrix</Label>
