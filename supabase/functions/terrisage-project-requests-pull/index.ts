@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
               body: `${acctName} requested ${projName}${loc ? ` in ${loc}` : ''}.`,
               entity_type: 'account',
               entity_id: acct.id,
-              link_path: `/accounts/${acct.id}?tab=project-requests`,
+              link_path: `/accounts/${acct.id}?tab=projects`,
               dedupe_key: `project_request:${created?.id ?? externalRequestId}`,
             });
           } catch (_) { /* non-fatal */ }
