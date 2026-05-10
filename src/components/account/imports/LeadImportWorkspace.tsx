@@ -284,7 +284,16 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
           </CardContent></Card>
         </TabsContent>
 
-        <TabsContent value="review">
+        <TabsContent value="review" className="space-y-3">
+          {tenantId && upyardJobId && (
+            <UpyardJobProgress
+              tenantId={tenantId}
+              upyardJobId={upyardJobId}
+              active={job.status !== 'IMPORTED' && job.status !== 'FAILED'}
+              onTerminal={handleTerminal}
+            />
+          )}
+          <div>
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
