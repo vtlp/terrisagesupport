@@ -595,6 +595,16 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
     }
   }
 
+  // Derive status from possession date when not already set.
+  if (!project.status || String(project.status).trim() === '') {
+    const pd = project.possession_date ? new Date(toDateInput(String(project.possession_date))) : null;
+    if (pd && !Number.isNaN(pd.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      project.status = pd >= today ? 'Under Construction' : 'Completed';
+    }
+  }
+
   // Insert configurations (only first AUTOMAP run; never duplicate).
   const { data: existingAutoConfigs } = await supabase.from('import_project_configs')
     .select('id, data').eq('job_id', job.id).eq('source', 'AUTOMAP');
