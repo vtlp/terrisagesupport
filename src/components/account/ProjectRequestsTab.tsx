@@ -221,9 +221,20 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel }: {
               <a href={`mailto:${r.representative_email}`} className="flex items-center gap-1 hover:text-primary"><Mail className="h-3 w-3" />{r.representative_email}</a>
             )}
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            Requested {format(new Date(r.requested_at), 'dd MMM yyyy, HH:mm')}
-            {r.external_request_id ? ` · CRM ref ${r.external_request_id.slice(0, 12)}` : ''}
+          <div className="text-[11px] text-muted-foreground flex items-center gap-2 flex-wrap">
+            <span>Requested {format(new Date(r.requested_at), 'dd MMM yyyy, HH:mm')}</span>
+            {r.external_request_id && (
+              <span title={r.external_request_id}>· CRM ref {r.external_request_id.slice(0, 12)}</span>
+            )}
+            {r.requested_by_tenant_id && (
+              <span title={r.requested_by_tenant_id}>· Tenant {r.requested_by_tenant_id.slice(0, 8)}</span>
+            )}
+            {r.terrisage_status && r.terrisage_status !== r.status?.replace('_REVIEW','') && (
+              <Badge variant="outline" className="h-4 px-1.5 text-[10px]">CRM: {r.terrisage_status}</Badge>
+            )}
+            {r.last_synced_at && (
+              <span>· Synced {format(new Date(r.last_synced_at), 'dd MMM HH:mm')}</span>
+            )}
           </div>
           {r.rejection_reason && r.status === 'REJECTED' && (
             <div className="text-xs text-destructive mt-1">Reason: {r.rejection_reason}</div>
