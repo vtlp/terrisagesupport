@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import { ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, logActivity, parseTabularFile } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
-import { UpyardJobProgress, UpyardSnapshot } from './UpyardJobProgress';
 import { useUser } from '@/context/UserContext';
 
 export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; onChange?: () => void }) {
@@ -18,10 +17,6 @@ export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; on
   const [previewRows, setPreviewRows] = useState<Record<string, string>[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [importing, setImporting] = useState(false);
-
-  const validation = (job.validation || {}) as { upyardJobId?: string; tenantId?: string };
-  const [upyardJobId, setUpyardJobId] = useState<string | null>(validation.upyardJobId ?? null);
-  const [tenantId, setTenantId] = useState<string | null>(validation.tenantId ?? null);
 
   const loadPreview = useCallback(async () => {
     setLoadingPreview(true);
@@ -39,57 +34,40 @@ export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; on
   useEffect(() => { loadPreview(); }, [loadPreview]);
 
   const runImport = async () => {
+    if (previewRows.length === 0) { toast.error('No rows to import'); return; }
     setImporting(true);
     try {
-      const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).limit(1);
-      if (!files?.length) { toast.error('Upload a file first'); return; }
-      const filePath = files[0].storage_path;
-
       await supabase.from('import_jobs').update({ status: 'IMPORTING', records_total: previewRows.length }).eq('id', job.id);
 
-      const { data, error } = await supabase.functions.invoke('terrisage-onboarding-import', {
-        body: { jobId: job.id, accountId: job.account_id, kind: 'SECONDARY_PROPERTY', filePath },
-      });
-      if (error || !data?.ok) {
-        const msg = (data && (data.detail?.error?.message || data.error)) || error?.message || 'Upstream error';
-        toast.error(`Import failed: ${msg}`);
+      const records = previewRows.map(r => ({
+        account_id: job.account_id,
+        source_job_id: job.id,
+        data: r as never,
+        created_by: currentUser?.user_id ?? null,
+      }));
+
+      const { error, count } = await supabase.from('crm_secondary_properties').insert(records, { count: 'exact' });
+      if (error) {
+        toast.error(`Import failed: ${error.message}`);
         await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
-        await logActivity(supabase, job.id, 'import_failed', { error: msg, response: data }, currentUser?.user_id);
+        await logActivity(supabase, job.id, 'import_failed', { error: error.message }, currentUser?.user_id);
         onChange?.();
         return;
       }
 
-      const { tenantId: tId, upyardJobId: uId } = data as { tenantId: string; upyardJobId: string };
-      setTenantId(tId);
-      setUpyardJobId(uId);
+      const inserted = count ?? records.length;
       await supabase.from('import_jobs').update({
-        validation: { ...(job.validation as object || {}), tenantId: tId, upyardJobId: uId } as never,
+        status: 'IMPORTED',
+        records_imported: inserted,
+        records_failed: 0,
+        imported_at: new Date().toISOString(),
       }).eq('id', job.id);
-      await logActivity(supabase, job.id, 'upyard_import_queued', { tenantId: tId, upyardJobId: uId }, currentUser?.user_id);
-      toast.success(`Queued at UpYard (${uId.slice(0, 8)})`);
+      await logActivity(supabase, job.id, 'import_completed', { inserted }, currentUser?.user_id);
+      toast.success(`Imported ${inserted} properties`);
       onChange?.();
     } finally {
       setImporting(false);
     }
-  };
-
-  const handleTerminal = async (snap: UpyardSnapshot) => {
-    if (snap.status === 'SUCCEEDED') {
-      await supabase.from('import_jobs').update({
-        records_imported: snap.inserted ?? 0,
-        records_total: snap.totalRows ?? previewRows.length,
-        records_failed: 0,
-        status: 'IMPORTED',
-        imported_at: new Date().toISOString(),
-      }).eq('id', job.id);
-      await logActivity(supabase, job.id, 'import_completed', { upyardJobId, inserted: snap.inserted, report: snap.reportJson }, currentUser?.user_id);
-      toast.success(`Imported ${snap.inserted ?? 0} properties via UpYard`);
-    } else if (snap.status === 'FAILED') {
-      await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
-      await logActivity(supabase, job.id, 'import_failed', { upyardJobId, failureCode: snap.failureCode, report: snap.reportJson }, currentUser?.user_id);
-      toast.error(`UpYard import failed: ${snap.failureCode ?? 'unknown'}`);
-    }
-    onChange?.();
   };
 
   const isTerminal = job.status === 'IMPORTED' || job.status === 'FAILED';
@@ -122,21 +100,14 @@ export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; on
         </TabsContent>
 
         <TabsContent value="review" className="space-y-3">
-          {tenantId && upyardJobId && (
-            <UpyardJobProgress
-              tenantId={tenantId}
-              upyardJobId={upyardJobId}
-              active={!isTerminal}
-              onTerminal={handleTerminal}
-            />
-          )}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-sm">
                   <span className="font-medium">{previewRows.length}</span> rows detected from {headers.length} columns
+                  {job.records_imported > 0 && <> · <span className="text-success font-medium">{job.records_imported} imported</span></>}
                 </div>
-                <Button onClick={runImport} disabled={importing || previewRows.length === 0 || isTerminal || job.status === 'IMPORTING'}>
+                <Button onClick={runImport} disabled={importing || previewRows.length === 0 || isTerminal}>
                   {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Confirm and import
                 </Button>
