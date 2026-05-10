@@ -31,13 +31,16 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
   const [rejectReason, setRejectReason] = useState('');
   const accountToastIds = useRef<string[]>([]);
 
+  const pushToast = (id: string | number) => {
+    accountToastIds.current.push(String(id));
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.from('project_requests')
       .select('*').eq('account_id', accountId).order('requested_at', { ascending: false });
     if (error) {
-      const id = toast.error(error.message);
-      accountToastIds.current.push(id);
+      pushToast(toast.error(error.message));
     }
     setRows((data ?? []) as ProjectRequest[]);
     setLoading(false);
@@ -81,12 +84,10 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
     setBusyId(r.id);
     try {
       await approveRequest(r, currentUser?.user_id ?? null);
-      const id = toast.success(`Request approved for ${accountName || 'account'}`);
-      accountToastIds.current.push(id);
+      pushToast(toast.success(`Request approved for ${accountName || 'account'}`));
       await load();
     } catch (e) {
-      const id = toast.error((e as Error).message);
-      accountToastIds.current.push(id);
+      pushToast(toast.error((e as Error).message));
     } finally { setBusyId(null); }
   };
 
@@ -95,12 +96,10 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
     setBusyId(rejectFor.id);
     try {
       await rejectRequest(rejectFor, rejectReason.trim() || 'No reason provided', currentUser?.user_id ?? null);
-      const id = toast.success(`Request rejected for ${accountName || 'account'}`);
-      accountToastIds.current.push(id);
+      pushToast(toast.success(`Request rejected for ${accountName || 'account'}`));
       setRejectFor(null); setRejectReason(''); await load();
     } catch (e) {
-      const id = toast.error((e as Error).message);
-      accountToastIds.current.push(id);
+      pushToast(toast.error((e as Error).message));
     } finally { setBusyId(null); }
   };
 
@@ -108,13 +107,11 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
     setBusyId(r.id);
     try {
       const jobId = await startImportFromRequest(r, currentUser?.user_id ?? null);
-      const id = toast.success(`Import job created for ${accountName || 'account'}. Open the Imports tab to continue.`);
-      accountToastIds.current.push(id);
+      pushToast(toast.success(`Import job created for ${accountName || 'account'}. Open the Imports tab to continue.`));
       await load();
       console.log('[ProjectRequests] Started import job', jobId);
     } catch (e) {
-      const id = toast.error((e as Error).message);
-      accountToastIds.current.push(id);
+      pushToast(toast.error((e as Error).message));
     } finally { setBusyId(null); }
   };
 
@@ -123,12 +120,10 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
     setBusyId(r.id);
     try {
       await cancelRequest(r, currentUser?.user_id ?? null);
-      const id = toast.success(`Request cancelled for ${accountName || 'account'}`);
-      accountToastIds.current.push(id);
+      pushToast(toast.success(`Request cancelled for ${accountName || 'account'}`));
       await load();
     } catch (e) {
-      const id = toast.error((e as Error).message);
-      accountToastIds.current.push(id);
+      pushToast(toast.error((e as Error).message));
     } finally { setBusyId(null); }
   };
 
@@ -142,16 +137,13 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
       const d = (data ?? {}) as { fetched?: number; upserted?: number };
       const fetched = d.fetched ?? 0;
       if (fetched === 0) {
-        const id = toast.success(`No project requests from Terrisage for ${accountName || 'this account'}`);
-        accountToastIds.current.push(id);
+        pushToast(toast.success(`No project requests from Terrisage for ${accountName || 'this account'}`));
       } else {
-        const id = toast.success(`Synced from Terrisage: ${d.upserted ?? 0} updated for ${accountName || 'this account'}`);
-        accountToastIds.current.push(id);
+        pushToast(toast.success(`Synced from Terrisage: ${d.upserted ?? 0} updated for ${accountName || 'this account'}`));
       }
       await load();
     } catch (e) {
-      const id = toast.error((e as Error).message);
-      accountToastIds.current.push(id);
+      pushToast(toast.error((e as Error).message));
     } finally { setSyncing(false); }
   };
 
