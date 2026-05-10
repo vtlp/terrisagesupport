@@ -78,7 +78,7 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
         imported_at: new Date().toISOString(),
       }).eq('id', job.id);
       await logActivity(supabase, job.id, 'import_completed', { inserted }, currentUser?.user_id);
-      toast.success(`Imported ${inserted} leads locally. Pushing to UpYard…`);
+      toast.success(`Imported ${inserted} leads locally. Pushing to Terrisage…`);
       onChange?.();
       pushToUpstream('leads', job.id, job.account_id, onChange);
     } finally {

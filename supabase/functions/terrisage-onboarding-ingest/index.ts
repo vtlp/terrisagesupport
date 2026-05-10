@@ -1,4 +1,4 @@
-// Push an import job's source file to UpYard's onboarding ingestion API.
+// Push an import job's source file to Terrisage's onboarding ingestion API.
 //
 // Body:
 //   { action: 'import' | 'poll', accountId, jobId, entityType?: 'leads' | 'properties' }
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
     // Convert CSV -> XLSX
     const csvText = await dl.text();
     const wb = XLSX.read(csvText, { type: 'string' });
-    // Ensure sheet name matches what UpYard expects for properties
+    // Ensure sheet name matches what Terrisage expects for properties
     const firstSheet = wb.SheetNames[0];
     if (entityType === 'properties' && firstSheet !== 'properties') {
       wb.SheetNames[0] = 'properties';
