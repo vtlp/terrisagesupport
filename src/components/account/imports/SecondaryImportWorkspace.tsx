@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, logActivity, parseTabularFile } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
+import { pushToUpstream } from './upstreamPush';
 import { useUser } from '@/context/UserContext';
 
 export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; onChange?: () => void }) {
