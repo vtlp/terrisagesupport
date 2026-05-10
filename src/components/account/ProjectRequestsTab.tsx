@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,9 +17,9 @@ import {
   approveRequest, rejectRequest, cancelRequest, startImportFromRequest,
 } from '@/lib/projectRequestsApi';
 
-interface Props { accountId: string; }
+interface Props { accountId: string; accountName?: string; }
 
-export function ProjectRequestsTab({ accountId }: Props) {
+export function ProjectRequestsTab({ accountId, accountName }: Props) {
   const { currentUser } = useUser();
   const [rows, setRows] = useState<ProjectRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,12 +29,19 @@ export function ProjectRequestsTab({ accountId }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [rejectFor, setRejectFor] = useState<ProjectRequest | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const accountToastIds = useRef<string[]>([]);
+
+  const pushToast = (id: string | number) => {
+    accountToastIds.current.push(String(id));
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.from('project_requests')
       .select('*').eq('account_id', accountId).order('requested_at', { ascending: false });
-    if (error) toast.error(error.message);
+    if (error) {
+      pushToast(toast.error(error.message));
+    }
     setRows((data ?? []) as ProjectRequest[]);
     setLoading(false);
   }, [accountId]);
@@ -48,6 +55,14 @@ export function ProjectRequestsTab({ accountId }: Props) {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [accountId, load]);
+
+  // Dismiss toasts tied to this account when the account changes or component unmounts
+  useEffect(() => {
+    return () => {
+      accountToastIds.current.forEach((id) => toast.dismiss(id));
+      accountToastIds.current = [];
+    };
+  }, [accountId]);
 
   const filtered = useMemo(() => rows.filter(r => {
     if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
@@ -67,9 +82,13 @@ export function ProjectRequestsTab({ accountId }: Props) {
 
   const onApprove = async (r: ProjectRequest) => {
     setBusyId(r.id);
-    try { await approveRequest(r, currentUser?.user_id ?? null); toast.success('Request approved'); await load(); }
-    catch (e) { toast.error((e as Error).message); }
-    finally { setBusyId(null); }
+    try {
+      await approveRequest(r, currentUser?.user_id ?? null);
+      pushToast(toast.success(`Request approved for ${accountName || 'account'}`));
+      await load();
+    } catch (e) {
+      pushToast(toast.error((e as Error).message));
+    } finally { setBusyId(null); }
   };
 
   const onConfirmReject = async () => {
@@ -77,29 +96,35 @@ export function ProjectRequestsTab({ accountId }: Props) {
     setBusyId(rejectFor.id);
     try {
       await rejectRequest(rejectFor, rejectReason.trim() || 'No reason provided', currentUser?.user_id ?? null);
-      toast.success('Request rejected'); setRejectFor(null); setRejectReason(''); await load();
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setBusyId(null); }
+      pushToast(toast.success(`Request rejected for ${accountName || 'account'}`));
+      setRejectFor(null); setRejectReason(''); await load();
+    } catch (e) {
+      pushToast(toast.error((e as Error).message));
+    } finally { setBusyId(null); }
   };
 
   const onStartImport = async (r: ProjectRequest) => {
     setBusyId(r.id);
     try {
       const jobId = await startImportFromRequest(r, currentUser?.user_id ?? null);
-      toast.success('Import job created. Open the Imports tab to continue.');
+      pushToast(toast.success(`Import job created for ${accountName || 'account'}. Open the Imports tab to continue.`));
       await load();
-      // Hint where to go
       console.log('[ProjectRequests] Started import job', jobId);
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setBusyId(null); }
+    } catch (e) {
+      pushToast(toast.error((e as Error).message));
+    } finally { setBusyId(null); }
   };
 
   const onCancel = async (r: ProjectRequest) => {
     if (!confirm('Cancel this project request?')) return;
     setBusyId(r.id);
-    try { await cancelRequest(r, currentUser?.user_id ?? null); toast.success('Request cancelled'); await load(); }
-    catch (e) { toast.error((e as Error).message); }
-    finally { setBusyId(null); }
+    try {
+      await cancelRequest(r, currentUser?.user_id ?? null);
+      pushToast(toast.success(`Request cancelled for ${accountName || 'account'}`));
+      await load();
+    } catch (e) {
+      pushToast(toast.error((e as Error).message));
+    } finally { setBusyId(null); }
   };
 
   const onSync = async () => {
@@ -112,13 +137,14 @@ export function ProjectRequestsTab({ accountId }: Props) {
       const d = (data ?? {}) as { fetched?: number; upserted?: number };
       const fetched = d.fetched ?? 0;
       if (fetched === 0) {
-        toast.success('No project requests from Terrisage for this account');
+        pushToast(toast.success(`No project requests from Terrisage for ${accountName || 'this account'}`));
       } else {
-        toast.success(`Synced from Terrisage: ${d.upserted ?? 0} updated for this account`);
+        pushToast(toast.success(`Synced from Terrisage: ${d.upserted ?? 0} updated for ${accountName || 'this account'}`));
       }
       await load();
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setSyncing(false); }
+    } catch (e) {
+      pushToast(toast.error((e as Error).message));
+    } finally { setSyncing(false); }
   };
 
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin" /></div>;

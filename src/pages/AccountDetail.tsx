@@ -769,7 +769,7 @@ export default function AccountDetail() {
               <h3 className="text-sm font-semibold">Project requests from Terrisage</h3>
               <p className="text-xs text-muted-foreground">New projects requested by the client from their Terrisage app after go-live.</p>
             </div>
-            <ProjectRequestsTab accountId={acc.id} />
+            <ProjectRequestsTab accountId={acc.id} accountName={acc.account_name} />
           </section>
         </TabsContent>
 
