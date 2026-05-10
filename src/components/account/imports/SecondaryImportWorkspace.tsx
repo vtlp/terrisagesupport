@@ -59,13 +59,11 @@ export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; on
 
       const inserted = count ?? records.length;
       await supabase.from('import_jobs').update({
-        status: 'IMPORTED',
         records_imported: inserted,
         records_failed: 0,
-        imported_at: new Date().toISOString(),
       }).eq('id', job.id);
-      await logActivity(supabase, job.id, 'import_completed', { inserted }, currentUser?.user_id);
-      toast.success(`Imported ${inserted} properties locally. Pushing to Terrisage…`);
+      await logActivity(supabase, job.id, 'rows_parsed', { inserted, stage: 'local_insert' }, currentUser?.user_id);
+      toast.message(`${inserted} properties staged locally. Awaiting Terrisage confirmation…`);
       onChange?.();
       pushToUpstream('properties', job.id, job.account_id, onChange);
     } finally {
