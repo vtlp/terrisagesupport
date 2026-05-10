@@ -316,17 +316,56 @@ function parseMissingFieldsCsv(aoa: unknown[][]): Array<{ field: string; status:
 
 // ---------- Image classification ----------
 
-function classifyImageFor(name: string, configFloorplanFiles: Map<string, string>): {
-  category: 'LOGO' | 'FLOOR_PLAN' | 'GALLERY';
-  configId?: string;
-} {
+export type ManifestEntry = { category: 'FLOOR_PLAN' | 'GALLERY' | 'LOGO'; caption?: string };
+
+// Parse a manifest array like:
+//  [{ source_page: 18, side: 'left', file: 'floorplan_crops/p18_left_fullsheet.png' },
+//   { source_page: 17, type: 'master_plan', file: 'project_images/p17_master_plan.png' }]
+// Returns a map keyed by lowercase basename.
+function parseImageManifest(j: unknown): Map<string, ManifestEntry> {
+  const out = new Map<string, ManifestEntry>();
+  if (!Array.isArray(j)) return out;
+  for (const raw of j) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const file = String(r.file ?? r.path ?? r.name ?? '').trim();
+    if (!file) continue;
+    const base = (file.split('/').pop() || file).toLowerCase();
+    const folder = file.includes('/') ? file.split('/').slice(0, -1).join('/').toLowerCase() : '';
+    const type = String(r.type ?? '').trim();
+    const side = String(r.side ?? '').trim();
+    const page = r.source_page != null ? String(r.source_page) : '';
+    let category: ManifestEntry['category'] = 'GALLERY';
+    if (folder.includes('floorplan') || /floorplan|floor_plan|fullsheet/.test(base)) category = 'FLOOR_PLAN';
+    else if (folder.includes('logo') || base.includes('logo')) category = 'LOGO';
+    else category = 'GALLERY';
+    const captionParts: string[] = [];
+    if (type) captionParts.push(type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+    if (page) captionParts.push(`Page ${page}`);
+    if (side) captionParts.push(`(${side})`);
+    out.set(base, { category, caption: captionParts.join(' · ') || undefined });
+  }
+  return out;
+}
+
+function classifyImageFor(
+  name: string,
+  configFloorplanFiles: Map<string, string>,
+  manifest: Map<string, ManifestEntry>,
+): { category: 'LOGO' | 'FLOOR_PLAN' | 'GALLERY'; configId?: string; caption?: string } {
   const lower = name.toLowerCase();
   const base = lower.split('/').pop() || lower;
+  // 1. Manifest wins
+  const m = manifest.get(base);
+  if (m) {
+    const configId = m.category === 'FLOOR_PLAN' ? configFloorplanFiles.get(base) : undefined;
+    return { category: m.category, configId, caption: m.caption };
+  }
   if (lower.includes('logo')) return { category: 'LOGO' };
   // Direct match on floorplan_crop_file references
   if (configFloorplanFiles.has(base)) return { category: 'FLOOR_PLAN', configId: configFloorplanFiles.get(base) };
   // Hi-Tech naming: anything containing project_image / projectimage → gallery
-  if (/(projectimage|project_image|elevation|render|gallery|amenity|amenities|clubhouse|view)/.test(lower)) return { category: 'GALLERY' };
+  if (/(projectimage|project_image|elevation|render|gallery|amenity|amenities|clubhouse|view|aerial|location|master_plan|masterplan)/.test(lower)) return { category: 'GALLERY' };
   // Generic floor-plan keywords
   if (/(floorplan|floor_plan|floor-plan|floor|plan|layout|fullsheet)/.test(lower)) return { category: 'FLOOR_PLAN' };
   return { category: 'GALLERY' };
