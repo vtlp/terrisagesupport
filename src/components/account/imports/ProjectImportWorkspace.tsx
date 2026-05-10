@@ -132,6 +132,30 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     setBanks(((job.extracted_data as { approvedBanks?: string[] })?.approvedBanks || []).join(', '));
   }, [job.id, job.extracted_data, job.representative_input]);
 
+  // Live-derive total_units = sum of units_planned across configurations.
+  // Also infer city from location when blank. These keep the review pane in
+  // sync as the user edits configs without needing a full re-extract.
+  useEffect(() => {
+    const sum = configs.reduce((acc, c) => {
+      const v = (c.data as Record<string, unknown> | null)?.units_planned;
+      const n = Number(String(v ?? '').replace(/[^\d.\-]/g, ''));
+      return acc + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    setProject(prev => {
+      const next = { ...prev };
+      let changed = false;
+      if (sum > 0 && Number(prev.total_units ?? 0) !== sum) {
+        next.total_units = sum;
+        changed = true;
+      }
+      if ((!prev.city || String(prev.city).trim() === '') && prev.location) {
+        const inferred = deriveCityFromLocation(String(prev.location));
+        if (inferred) { next.city = inferred; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [configs]);
+
   const saveRep = async () => {
     setSavingRep(true);
     const { error } = await supabase.from('import_jobs').update({ representative_input: rep as never }).eq('id', job.id);
