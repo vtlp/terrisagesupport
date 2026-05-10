@@ -70,6 +70,23 @@ const PLOT_FIELDS = [
   ['cluster', 'Cluster / Zone'], ['premium_marker', 'Premium marker'],
 ];
 
+/** Convert any string date (ISO, dd/mm/yyyy, "Dec 2026", etc.) into yyyy-mm-dd for <input type="date">. Returns '' when not parseable. */
+function toDateInput(v: string | null | undefined): string {
+  if (!v) return '';
+  const s = String(v).trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const yyyy = y.length === 2 ? `20${y}` : y;
+    return `${yyyy}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  const t = Date.parse(s);
+  if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
+  return '';
+}
+
 function fieldsFor(pt: PropertyType): string[][] {
   return pt === 'VILLA' ? VILLA_FIELDS : pt === 'PLOT' ? PLOT_FIELDS : APARTMENT_FIELDS;
 }
