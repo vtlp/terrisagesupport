@@ -589,7 +589,33 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         </TabsContent>
 
         {/* CONFIGS */}
-        <TabsContent value="configs">
+        <TabsContent value="configs" className="space-y-3">
+          {(() => {
+            const towers = ((job.extracted_data as { towers?: string[] })?.towers) || [];
+            if (towers.length === 0) return null;
+            const configsLinkedTo = (t: string) => configs.filter(c => {
+              const tv = String((c.data as Record<string, unknown> | null)?.tower ?? '');
+              return tv.toLowerCase().includes(t.toLowerCase());
+            }).length;
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Towers / Blocks · {towers.length}</CardTitle>
+                  <p className="text-xs text-muted-foreground">Detected from project summary. Each tower is linked to the configurations whose Tower field matches its name.</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {towers.map(t => (
+                      <div key={t} className="rounded-md border px-2.5 py-1.5 flex items-center gap-2">
+                        <span className="text-sm font-medium">{t}</span>
+                        <Badge variant="secondary" className="text-[10px]">{configsLinkedTo(t)} config(s)</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
