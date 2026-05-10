@@ -541,13 +541,24 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
     ? Array.from(new Set(towerNamesRaw.split(/[,;]/).flatMap(s => s.split(/\s*&\s*/)).map(s => s.trim()).filter(Boolean)))
     : [];
 
+  // Dedup configRows: same config can arrive via JSON + CSV. Key by type_no/name + bhk + areas + tower.
+  const dedupKey = (r: Record<string, unknown>) => [
+    r.type_no, r.name, r.bhk, r.carpet_area, r.super_built_up_area, r.built_up_area, r.tower,
+  ].map(v => norm(String(v ?? ''))).join('|');
+  const seen = new Set<string>();
+  const dedupedConfigRows: Record<string, unknown>[] = [];
+  for (const row of configRows) {
+    const k = dedupKey(row);
+    if (k === '|||||' || !seen.has(k)) { dedupedConfigRows.push(row); seen.add(k); }
+  }
+
   // Insert configurations (only first AUTOMAP run; never duplicate).
   const { data: existingAutoConfigs } = await supabase.from('import_project_configs')
     .select('id, data').eq('job_id', job.id).eq('source', 'AUTOMAP');
   let configsCreated = 0;
   const configFloorplanFiles = new Map<string, string>(); // filename(lower) -> config_id
-  if ((existingAutoConfigs?.length ?? 0) === 0 && configRows.length > 0) {
-    const inserts = configRows.map((data, idx) => ({
+  if ((existingAutoConfigs?.length ?? 0) === 0 && dedupedConfigRows.length > 0) {
+    const inserts = dedupedConfigRows.map((data, idx) => ({
       job_id: job.id, sort_order: idx, data: data as never, source: 'AUTOMAP',
     }));
     const { data: inserted } = await supabase.from('import_project_configs').insert(inserts).select('id, data');
