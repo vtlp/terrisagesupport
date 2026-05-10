@@ -103,5 +103,19 @@ Deno.serve(async (req) => {
     details: { kind: 'PROJECT_REQUEST_CREATED', request_id: inserted.id, project_name: projectName } as never,
   });
 
+  // Bell notification (broadcast)
+  try {
+    await supabase.from('notifications').insert({
+      type: 'PROJECT_REQUEST',
+      severity: 'INFO',
+      title: `New project request: ${projectName}`,
+      body: `${acct.account_name ?? 'Account'} requested ${projectName}${location ? ` in ${location}` : ''}.`,
+      entity_type: 'account',
+      entity_id: acct.id,
+      link_path: `/accounts/${acct.id}?tab=project-requests`,
+      dedupe_key: `project_request:${inserted.id}`,
+    });
+  } catch (_) { /* non-fatal */ }
+
   return json({ ok: true, requestId: inserted.id, status: inserted.status });
 });
