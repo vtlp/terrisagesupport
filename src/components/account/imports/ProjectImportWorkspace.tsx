@@ -102,6 +102,27 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   }, [job.id]);
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Generate signed URLs for media items so thumbnails actually render.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const needs = media.filter(m => m.storage_path && !mediaUrls[m.id]);
+      if (needs.length === 0) return;
+      const entries = await Promise.all(needs.map(async m => {
+        if (m.external_url) return [m.id, m.external_url] as const;
+        const { data } = await supabase.storage.from('import-files').createSignedUrl(m.storage_path!, 60 * 60);
+        return [m.id, data?.signedUrl ?? ''] as const;
+      }));
+      if (cancelled) return;
+      setMediaUrls(prev => {
+        const next = { ...prev };
+        for (const [id, url] of entries) if (url) next[id] = url;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [media, mediaUrls]);
+
   // Re-sync local edit state when job changes (e.g. after extraction).
   // For Representative input we MERGE: any rep field still empty inherits from
   // the auto-mapped project data so the user does not retype shared values.
