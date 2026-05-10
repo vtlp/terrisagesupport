@@ -21,11 +21,12 @@ export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; on
   const loadPreview = useCallback(async () => {
     setLoadingPreview(true);
     try {
-      const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).eq('category', 'CSV').limit(1);
+      const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).eq('category', 'CSV').order('created_at', { ascending: false }).limit(1);
       if (!files?.length) { setHeaders([]); setPreviewRows([]); return; }
       const { data: signed } = await supabase.storage.from('import-files').createSignedUrl(files[0].storage_path, 60);
       if (!signed) return;
-      const { headers: hs, rows } = await parseTabularFile(signed.signedUrl, files[0].name);
+      const bust = `${signed.signedUrl}${signed.signedUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+      const { headers: hs, rows } = await parseTabularFile(bust, files[0].name);
       setHeaders(hs);
       setPreviewRows(rows);
     } catch (_) { /* noop */ } finally { setLoadingPreview(false); }
