@@ -532,10 +532,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="grid gap-3 md:grid-cols-2">
                 {[
                   ['project_name', 'Project name'], ['builder_name', 'Builder / Developer'],
+                  ['project_type', 'Project type'], ['location', 'Location'],
                   ['city', 'City'], ['rera_id', 'RERA / Approval IDs'],
                   ['status', 'Status'], ['site_area', 'Site area'],
                   ['site_area_unit', 'Site area unit'], ['community_type', 'Community type'],
                   ['approach_road_width', 'Approach road width'], ['total_units', 'Total units planned'],
+                  ['towers_count', 'Towers count'], ['floors_each_tower', 'Floors per tower'],
+                  ['config_range', 'Configuration range'], ['clubhouse', 'Clubhouse'],
+                  ['parking', 'Parking'], ['nearby_access', 'Nearby access'],
+                  ['contact_phone', 'Contact phone'], ['contact_email', 'Contact email'],
                   ['expected_completion_date', 'Expected completion'], ['possession_date', 'Possession date'],
                   ['website', 'Website'], ['open_space_pct', 'Open space %'],
                 ].map(([k, l]) => (
