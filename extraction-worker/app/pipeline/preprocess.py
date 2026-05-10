@@ -31,13 +31,17 @@ MIN_TEXT_CHARS_PER_PAGE = 40  # below this we treat the page as scanned and run 
 def preprocess_files(files: List[Dict[str, Any]], *, max_pages: int = 80) -> List[Dict[str, Any]]:
     pages: List[Dict[str, Any]] = []
     page_budget = max_pages
+    log.info("preprocess.start files=%d max_pages=%d", len(files), max_pages)
 
     for f in files:
         if page_budget <= 0:
+            log.warning("preprocess.budget_exhausted skipping remaining files")
             break
         local = f["local_path"]
         mime = (f.get("mime_type") or "").lower()
         ftype = (f.get("fileType") or "OTHER").upper()
+        log.info("preprocess.file.start name=%s mime=%s type=%s size=%s path=%s",
+                 f.get("fileName"), mime, ftype, f.get("size_bytes"), local)
 
         try:
             if mime == "application/pdf" or local.lower().endswith(".pdf"):
@@ -45,17 +49,19 @@ def preprocess_files(files: List[Dict[str, Any]], *, max_pages: int = 80) -> Lis
             elif mime.startswith("image/"):
                 rendered = _process_image(f, local)
             else:
-                # videos, docs etc — we still record them but don't extract text
+                log.info("preprocess.file.skipped_unsupported name=%s mime=%s", f.get("fileName"), mime)
                 continue
 
+            log.info("preprocess.file.done name=%s pages_rendered=%d", f.get("fileName"), len(rendered))
             for p in rendered:
                 pages.append(p)
                 page_budget -= 1
                 if page_budget <= 0:
                     break
         except Exception as exc:
-            log.exception("preprocess failed for %s: %s", f.get("fileName"), exc)
+            log.exception("preprocess.file.failed name=%s err=%s", f.get("fileName"), exc)
 
+    log.info("preprocess.complete total_pages=%d remaining_budget=%d", len(pages), page_budget)
     return pages
 
 
