@@ -86,7 +86,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
 
   const [configs, setConfigs] = useState<ImportConfig[]>([]);
   const [media, setMedia] = useState<ImportMedia[]>([]);
-  const [extracting, setExtracting] = useState(false);
+  
   const [importing, setImporting] = useState(false);
   const [savingRep, setSavingRep] = useState(false);
   const [savingReview, setSavingReview] = useState(false);
@@ -166,15 +166,27 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     onChange?.();
   };
 
-  const runExtraction = async (mode?: 'mock' | 'live') => {
-    setExtracting(true);
-    const { error } = await supabase.functions.invoke('extraction-trigger', { body: { jobId: job.id, mode } });
-    setExtracting(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Extraction completed');
-    onChange?.();
-    refresh();
-  };
+  const [mapping, setMapping] = useState(false);
+  const runMapping = useCallback(async () => {
+    setMapping(true);
+    try {
+      const res = await autoMapProjectImport(job, currentUser?.user_id ?? null);
+      const parts: string[] = [];
+      if (res.projectFieldsMapped.length) parts.push(`${res.projectFieldsMapped.length} field(s)`);
+      if (res.configsCreated) parts.push(`${res.configsCreated} config(s)`);
+      if (res.mediaCreated) parts.push(`${res.mediaCreated} media`);
+      toast.success(`Mapped: ${parts.join(', ') || 'no recognised data'}`);
+      if (res.unmappedFields.length) {
+        toast.info(`${res.unmappedFields.length} field(s) still unmapped. See Overview.`);
+      }
+      await refresh();
+      onChange?.();
+    } catch (e) {
+      toast.error(`Mapping failed: ${(e as Error).message}`);
+    } finally {
+      setMapping(false);
+    }
+  }, [job, currentUser?.user_id, refresh, onChange]);
 
   const saveReview = async () => {
     setSavingReview(true);
@@ -389,19 +401,28 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       </div>
                     </div>
                   )}
-                  {(am.missingFields?.length ?? 0) > 0 && (
-                    <div>
-                      <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Flagged missing in source</div>
-                      <div className="space-y-1">
-                        {am.missingFields.map(m => (
-                          <div key={m.field} className="text-[11px] flex gap-2">
-                            <Badge variant="outline" className="text-[10px]">{m.field}</Badge>
-                            <span className="text-muted-foreground">{m.status}</span>
-                          </div>
-                        ))}
+                  {(am.missingFields?.length ?? 0) > 0 && (() => {
+                    const seen = new Set<string>();
+                    const unique = am.missingFields.filter(m => {
+                      const k = `${(m.field || '').toLowerCase()}::${(m.status || '').toLowerCase()}`;
+                      if (seen.has(k)) return false;
+                      seen.add(k);
+                      return true;
+                    });
+                    return (
+                      <div>
+                        <div className="text-xs font-medium uppercase text-muted-foreground mb-2">Flagged missing in source</div>
+                        <div className="grid gap-1.5 sm:grid-cols-2">
+                          {unique.map((m, i) => (
+                            <div key={`${m.field}-${i}`} className="flex items-center justify-between gap-2 rounded-md border bg-background/50 px-2.5 py-1.5">
+                              <span className="text-xs font-medium truncate">{PROJECT_LABELS[m.field] || m.field.replace(/_/g, ' ')}</span>
+                              <Badge variant="outline" className="text-[10px] capitalize whitespace-nowrap">{(m.status || 'missing').replace(/_/g, ' ').toLowerCase()}</Badge>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {am.unmappedColumns.length > 0 && (
                     <div>
                       <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
@@ -424,7 +445,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="files">Source files</TabsTrigger>
           <TabsTrigger value="rep">Representative input</TabsTrigger>
-          <TabsTrigger value="extract">Extraction</TabsTrigger>
+          
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="configs">Configurations</TabsTrigger>
           <TabsTrigger value="media">Media & Floor Plans</TabsTrigger>
@@ -435,30 +456,28 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
 
         {/* SOURCE FILES */}
         <TabsContent value="files">
-          <Card><CardContent className="pt-4">
-            <SourceFiles
-              jobId={job.id}
-              accountId={job.account_id}
-              onChange={onChange}
-              onAfterUpload={async () => {
-                try {
-                  const res = await autoMapProjectImport(job, currentUser?.user_id ?? null);
-                  const parts: string[] = [];
-                  if (res.projectFieldsMapped.length) parts.push(`${res.projectFieldsMapped.length} field(s)`);
-                  if (res.configsCreated) parts.push(`${res.configsCreated} config(s)`);
-                  if (res.mediaCreated) parts.push(`${res.mediaCreated} media`);
-                  toast.success(`Auto-mapped: ${parts.join(', ') || 'no recognised data'}`);
-                  if (res.unmappedFields.length) {
-                    toast.info(`${res.unmappedFields.length} field(s) still unmapped. See Review · Overview.`);
-                  }
-                  await refresh();
-                  onChange?.();
-                } catch (e) {
-                  toast.error(`Auto-map failed: ${(e as Error).message}`);
-                }
-              }}
-            />
-          </CardContent></Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-sm">Source files & mapping</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">Upload spreadsheets, JSON manifests, brochures, and images. Mapping runs automatically after each upload. If you add files later, click Re-run mapping to update the review.</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={runMapping} disabled={mapping || job.source_files_count === 0}>
+                  {mapping ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                  Re-run mapping
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <SourceFiles
+                jobId={job.id}
+                accountId={job.account_id}
+                onChange={onChange}
+                onAfterUpload={runMapping}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* REP INPUT */}
@@ -504,67 +523,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           </Card>
         </TabsContent>
 
-        {/* EXTRACTION */}
-        <TabsContent value="extract">
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Extraction</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Send uploaded brochures and source files to the extraction service. Use the simulate option for testing the review flow without a live service.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => runExtraction()} disabled={extracting || job.source_files_count === 0}>
-                  {extracting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
-                  Run extraction
-                </Button>
-                <Button variant="outline" onClick={() => runExtraction('mock')} disabled={extracting}>
-                  <PlayCircle className="h-4 w-4 mr-1" /> Simulate response (testing)
-                </Button>
-              </div>
-              {job.extraction_started_at && (
-                <p className="text-xs text-muted-foreground">
-                  Last triggered {new Date(job.extraction_started_at).toLocaleString()}
-                  {job.extraction_finished_at && <> · finished {new Date(job.extraction_finished_at).toLocaleString()}</>}
-                </p>
-              )}
-              {(job.extracted_data as { missingFields?: unknown[] })?.missingFields?.length ? (
-                <div className="rounded-md border p-3">
-                  <div className="text-xs font-medium uppercase text-amber-700 dark:text-amber-400 mb-1">Missing fields reported</div>
-                  <ul className="text-xs text-muted-foreground list-disc pl-4">
-                    {(job.extracted_data as { missingFields?: unknown[] }).missingFields!.map((m, i) => {
-                      const text = typeof m === 'string'
-                        ? m
-                        : (() => {
-                            const o = (m ?? {}) as Record<string, unknown>;
-                            const name = o.field_name ?? o.field ?? o.entity_type ?? 'field';
-                            const reason = o.reason ? ` — ${o.reason}` : '';
-                            return `${name}${reason}`;
-                          })();
-                      return <li key={i}>{text}</li>;
-                    })}
-                  </ul>
-                </div>
-              ) : null}
-              {(job.extracted_data as { assumptions?: unknown[] })?.assumptions?.length ? (
-                <div className="rounded-md border p-3">
-                  <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Assumptions</div>
-                  <ul className="text-xs text-muted-foreground list-disc pl-4">
-                    {(job.extracted_data as { assumptions?: unknown[] }).assumptions!.map((m, i) => {
-                      const text = typeof m === 'string'
-                        ? m
-                        : (() => {
-                            const o = (m ?? {}) as Record<string, unknown>;
-                            return String(o.note ?? o.reason ?? o.field_name ?? JSON.stringify(o));
-                          })();
-                      return <li key={i}>{text}</li>;
-                    })}
-                  </ul>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        </TabsContent>
+
 
         {/* OVERVIEW */}
         <TabsContent value="overview">
