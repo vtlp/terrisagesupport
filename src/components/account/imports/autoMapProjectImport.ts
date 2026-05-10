@@ -148,13 +148,49 @@ function looksLikeKeyValue(aoa: unknown[][]): boolean {
   return kv / nonEmpty.length >= 0.6;
 }
 
-function fileNameHints(name: string): { isProjectSummary: boolean; isConfigurations: boolean; isMissingFields: boolean } {
+function fileNameHints(name: string): { isProjectSummary: boolean; isConfigurations: boolean; isMissingFields: boolean; isAmenities: boolean; isProximity: boolean } {
   const n = norm(name.replace(/\.[^.]+$/, ''));
+  const isAmenities = /(amenit)/.test(n);
+  const isProximity = /(proximit|nearby|connectivity|distance)/.test(n);
   return {
-    isProjectSummary: /(projectsummary|summary|project|overview|projectinfo|details)/.test(n),
-    isConfigurations: /(configurations?|units?|floorplans?|inventory|layout|types?|towerinfo|towers)/.test(n),
+    isProjectSummary: /(projectsummary|summary|project|overview|projectinfo|details)/.test(n) && !isAmenities && !isProximity,
+    isConfigurations: /(configurations?|units?|floorplans?|inventory|layout|types?|towerinfo|towers)/.test(n) && !isAmenities,
     isMissingFields: /(missing|gaps|todo)/.test(n),
+    isAmenities,
+    isProximity,
   };
+}
+
+function parseAmenitiesCsv(aoa: unknown[][]): string[] {
+  if (aoa.length < 2) return [];
+  const headers = (aoa[0] as unknown[]).map(h => norm(String(h ?? '')));
+  const nameIdx = headers.findIndex(h => h === 'amenityname' || h === 'name' || h === 'amenity');
+  if (nameIdx < 0) return [];
+  const out: string[] = [];
+  for (let i = 1; i < aoa.length; i++) {
+    const r = aoa[i] as unknown[];
+    if (!Array.isArray(r)) continue;
+    const v = String(r[nameIdx] ?? '').trim();
+    if (v) out.push(v);
+  }
+  return out;
+}
+
+function parseProximityCsv(aoa: unknown[][]): Array<{ name: string; distance_km: number | string }> {
+  if (aoa.length < 2) return [];
+  const headers = (aoa[0] as unknown[]).map(h => norm(String(h ?? '')));
+  const nIdx = headers.findIndex(h => h === 'name' || h === 'place' || h === 'placename' || h === 'landmark');
+  const dIdx = headers.findIndex(h => h.startsWith('distance') || h === 'km' || h === 'distancekm');
+  if (nIdx < 0) return [];
+  const out: Array<{ name: string; distance_km: number | string }> = [];
+  for (let i = 1; i < aoa.length; i++) {
+    const r = aoa[i] as unknown[];
+    if (!Array.isArray(r)) continue;
+    const name = String(r[nIdx] ?? '').trim();
+    const d = dIdx >= 0 ? String(r[dIdx] ?? '').trim() : '';
+    if (name) out.push({ name, distance_km: d });
+  }
+  return out;
 }
 
 // ---------- Parsers ----------
@@ -400,6 +436,8 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
   const missingFields: Array<{ field: string; status: string }> = [];
   const sheetsParsed: string[] = [];
   const imageManifest = new Map<string, ManifestEntry>();
+  const amenitiesAcc: string[] = [];
+  const proximityAcc: Array<{ name: string; distance_km: number | string }> = [];
 
   for (const f of files) {
     const ext = (f.name.split('.').pop() || '').toLowerCase();
@@ -436,6 +474,16 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
           // missing_fields file
           if (hints.isMissingFields) {
             missingFields.push(...parseMissingFieldsCsv(s.aoa));
+            continue;
+          }
+          // amenities file
+          if (hints.isAmenities) {
+            amenitiesAcc.push(...parseAmenitiesCsv(s.aoa));
+            continue;
+          }
+          // proximity file
+          if (hints.isProximity) {
+            proximityAcc.push(...parseProximityCsv(s.aoa));
             continue;
           }
           // configurations file
@@ -493,13 +541,24 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
     ? Array.from(new Set(towerNamesRaw.split(/[,;]/).flatMap(s => s.split(/\s*&\s*/)).map(s => s.trim()).filter(Boolean)))
     : [];
 
+  // Dedup configRows: same config can arrive via JSON + CSV. Key by type_no/name + bhk + areas + tower.
+  const dedupKey = (r: Record<string, unknown>) => [
+    r.type_no, r.name, r.bhk, r.carpet_area, r.super_built_up_area, r.built_up_area, r.tower,
+  ].map(v => norm(String(v ?? ''))).join('|');
+  const seen = new Set<string>();
+  const dedupedConfigRows: Record<string, unknown>[] = [];
+  for (const row of configRows) {
+    const k = dedupKey(row);
+    if (k === '|||||' || !seen.has(k)) { dedupedConfigRows.push(row); seen.add(k); }
+  }
+
   // Insert configurations (only first AUTOMAP run; never duplicate).
   const { data: existingAutoConfigs } = await supabase.from('import_project_configs')
     .select('id, data').eq('job_id', job.id).eq('source', 'AUTOMAP');
   let configsCreated = 0;
   const configFloorplanFiles = new Map<string, string>(); // filename(lower) -> config_id
-  if ((existingAutoConfigs?.length ?? 0) === 0 && configRows.length > 0) {
-    const inserts = configRows.map((data, idx) => ({
+  if ((existingAutoConfigs?.length ?? 0) === 0 && dedupedConfigRows.length > 0) {
+    const inserts = dedupedConfigRows.map((data, idx) => ({
       job_id: job.id, sort_order: idx, data: data as never, source: 'AUTOMAP',
     }));
     const { data: inserted } = await supabase.from('import_project_configs').insert(inserts).select('id, data');
@@ -562,10 +621,21 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
     filesProcessed,
   };
 
+  const prevAmenities = ((job.extracted_data as { amenities?: string[] })?.amenities) || [];
+  const mergedAmenities = Array.from(new Set([...prevAmenities, ...amenitiesAcc].map(s => s.trim()).filter(Boolean)));
+  const prevProximity = ((job.extracted_data as { proximityMatrix?: Array<{ name: string; distance_km: number | string }> })?.proximityMatrix) || [];
+  const proxKey = (p: { name: string }) => norm(p.name);
+  const mergedProximity = [...prevProximity];
+  for (const p of proximityAcc) {
+    if (p.name && !mergedProximity.some(x => proxKey(x) === proxKey(p))) mergedProximity.push(p);
+  }
+
   const merged = {
     ...((job.extracted_data as object) || {}),
     projectData: { ...((job.extracted_data as { projectData?: ProjectExtract })?.projectData || {}), ...project },
     towers,
+    amenities: mergedAmenities,
+    proximityMatrix: mergedProximity,
     autoMap: result as never,
   };
   await supabase.from('import_jobs').update({ extracted_data: merged as never }).eq('id', job.id);
