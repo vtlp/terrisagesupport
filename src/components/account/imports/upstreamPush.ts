@@ -11,12 +11,12 @@ async function markFailed(jobId: string, message: string) {
 }
 
 async function markImported(jobId: string, inserted: number | null) {
-  const patch: Record<string, unknown> = {
-    status: 'IMPORTED',
+  const patch = {
+    status: 'IMPORTED' as const,
     imported_at: new Date().toISOString(),
     records_failed: 0,
+    ...(typeof inserted === 'number' ? { records_imported: inserted } : {}),
   };
-  if (typeof inserted === 'number') patch.records_imported = inserted;
   await supabase.from('import_jobs').update(patch).eq('id', jobId);
   await supabase.from('import_activity').insert([{
     job_id: jobId, event: 'import_completed', detail: { source: 'terrisage', inserted } as never,
