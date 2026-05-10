@@ -593,12 +593,19 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {towers.map(t => (
-                      <div key={t} className="rounded-md border px-2.5 py-1.5 flex items-center gap-2">
-                        <span className="text-sm font-medium">{t}</span>
-                        <Badge variant="secondary" className="text-[10px]">{configsLinkedTo(t)} config(s)</Badge>
-                      </div>
-                    ))}
+                    {towers.map(t => {
+                      const n = configsLinkedTo(t);
+                      return (
+                        <div key={t} className="rounded-md border px-2.5 py-1.5 flex items-center gap-2">
+                          <span className="text-sm font-medium">{t}</span>
+                          {n > 0 ? (
+                            <Badge variant="secondary" className="text-[10px]">{n} config(s)</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-500/40">Needs mapping</Badge>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
