@@ -1,111 +1,68 @@
-
 ## Goal
 
-Periodically fetch channel-partner project requests from Terrisage's
-`GET /api/integrations/project-requests` and surface each one under the
-matching account's **Project Requests** tab, with full project details
-(name, location, requester, timestamps, etc.).
+Wire the **Confirm and import** action on Lead and Secondary-property imports to also push the file to UpYard's `/api/support/onboarding` ingestion API, then poll the resulting job until terminal and surface the outcome in the UI / activity log.
 
-This complements the existing inbound webhook (which we keep), and
-guarantees nothing is lost if a webhook delivery is missed.
+## What changes
 
-## What we'll build
+### 1. Secret
 
-### 1. Schema extension (`project_requests`)
+Add a new runtime secret **`SUPPORT_ONBOARDING_INGESTION_API_KEY`** (separate from `SEAT_SUPPORT_INTEGRATION_API_KEY`). Used by the new edge function only.
 
-Add nullable columns so Terrisage fields are queryable, not buried in `payload`:
+### 2. New edge function: `terrisage-onboarding-ingest`
 
-- `requested_by_tenant_id text` (CP tenant UUID from Terrisage)
-- `requested_by_agent_id text`
-- `requested_by_agent_name text`
-- `requested_by_agent_phone text`
-- `requested_by_agent_email text`
-- `approved_by_agent_id text`
-- `approved_by_agent_name text`
-- `approved_at timestamptz`
-- `terrisage_status text` (raw `PENDING` / `APPROVED` / `REJECTED` from Terrisage,
-  separate from our internal lifecycle status)
-- `last_synced_at timestamptz`
+Public function (verify_jwt = false), service-role client. Two actions in one function:
 
-Unique index on `(account_id, external_request_id)` already exists; we'll rely
-on it for upserts.
+**POST body**
+```json
+{ "action": "import", "accountId": "...", "jobId": "...", "entityType": "leads" | "properties" }
+```
 
-### 2. New edge function: `terrisage-project-requests-pull`
+Behaviour:
+1. Look up `accounts.tenant_id`. Missing → `{ ok:false, error:'NO_TENANT' }`.
+2. Look up `import_jobs` row + its latest `import_files` (CSV category) row.
+3. Download file bytes from `import-files` storage bucket.
+4. If file is `.csv`, convert to `.xlsx` server-side (use `xlsx` npm via esm.sh) so the upstream accepts it. If already `.xlsx`/`.xls`, pass through.
+5. Build `multipart/form-data` with field `file`.
+6. `POST {TERRISAGE_BASE_URL}/api/support/onboarding/tenants/{tenantId}/{entityType}/import`
+   - `X-API-Key: SUPPORT_ONBOARDING_INGESTION_API_KEY`
+   - `X-Idempotency-Key: {entityType}:{jobId}` (stable per local job)
+7. Persist `upstreamJobId`, `upstreamStatus='PENDING'`, `idempotencyKey` into `import_jobs.summary` (jsonb merge). Write `import_activity` event `upstream_submitted`.
+8. Return `{ ok:true, upstreamJobId, replayed }`.
 
-Public function (no JWT). Behaviour:
+**Poll action**
+```json
+{ "action": "poll", "accountId": "...", "jobId": "..." }
+```
+- Reads `summary.upstreamJobId` from `import_jobs`, calls `GET /tenants/{tenantId}/import-jobs/{upstreamJobId}` with the same `X-API-Key`, mirrors `status / inserted / totalRows / errorDetails` into `summary` and writes a final `upstream_succeeded` or `upstream_failed` activity row when terminal.
 
-1. Read `TERRISAGE_BASE_URL` and `SEAT_SUPPORT_INTEGRATION_API_KEY`.
-2. Call `GET {base}/api/integrations/project-requests` with `X-API-Key`.
-   No filters — fetch all, newest first.
-3. For each item:
-   - Look up `accounts.tenant_id = item.requestedByTenant.id`.
-     If no match → skip (per "Always require match"), log a single warning
-     row in `activity_log` with entity_type=`SYSTEM`.
-   - Upsert into `project_requests` keyed on
-     `(account_id, external_request_id)` with mapped fields:
-     - `project_name` ← `project.name`
-     - `location` ← `project.location`
-     - `city` ← `project.city`
-     - `notes` ← `project.notes`
-     - `representative_*` ← `requestedByAgent.*` (kept for back-compat)
-     - new columns from §1 populated from `requestedByAgent` /
-       `approvedByAgent` / Terrisage timestamps
-     - `terrisage_status` ← item.status
-     - `payload` ← full raw item (for forensics)
-     - `last_synced_at` ← now()
-   - Internal `status` mapping (only on insert; never overwrite a row already
-     past `PENDING_REVIEW`):
-     - `PENDING` → `PENDING_REVIEW`
-     - `APPROVED` → `APPROVED`
-     - `REJECTED` → `REJECTED` (also write `rejection_reason` if present)
-4. Return `{ ok, fetched, upserted, skipped_no_match }` and write one
-   `activity_log` summary entry.
+Errors:
+- 403 from upstream → log + return `{ok:false,error:'FORBIDDEN'}` (key wrong).
+- 409 → log `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` (re-uploaded file with same key) and bubble up.
+- 4xx/5xx → store body preview into `summary.upstreamError`.
 
-### 3. Schedule (pg_cron + pg_net)
+### 3. UI wiring
 
-Run every 15 minutes via `cron.schedule` calling the new function over HTTPS
-with anon key + `Content-Type: application/json`. Inserted via the
-`supabase--insert` tool (not migration) since it embeds project-specific URL.
+`LeadImportWorkspace.tsx` and `SecondaryImportWorkspace.tsx`, in `runImport()`:
 
-### 4. Manual trigger from the UI
+After the existing local `crm_leads` / `crm_secondary_properties` insert succeeds:
 
-On `ProjectRequestsTab`, add a small **"Sync from Terrisage"** button next
-to the search/filter row. It calls
-`supabase.functions.invoke('terrisage-project-requests-pull')` and refreshes
-the list. This gives staff a way to force a sync without waiting 15 min.
+1. Toast "Local rows saved. Pushing to UpYard…".
+2. `supabase.functions.invoke('terrisage-onboarding-ingest', { body: { action:'import', accountId, jobId: job.id, entityType: 'leads' | 'properties' } })`.
+3. Start a setInterval (every 5s, max ~2 min) that calls the same function with `action:'poll'` until `summary.upstreamStatus` is `SUCCEEDED` or `FAILED`.
+4. Toast on terminal: success → `Pushed N rows to UpYard`; failure → show `summary.upstreamError` and a "Retry push" button on the workspace header.
+5. Activity log entries (already rendered by `ActivityLog`) will show `upstream_submitted` → `upstream_succeeded`/`upstream_failed`.
 
-### 5. Show Terrisage-specific fields in the row
+If the function call returns `error:'NO_TENANT'`, surface "Account is not yet linked to an UpYard tenant — local rows saved, push skipped."
 
-Extend `RequestRow` in `ProjectRequestsTab.tsx` to display:
+### 4. No DB migration needed
 
-- The CP tenant id (short) and `requested_by_agent_name` (already partially
-  shown as `representative_name`)
-- A small badge for `terrisage_status` when it differs from internal status
-- Tooltip on "CRM ref" showing full `external_request_id`
+We reuse `import_jobs.summary jsonb` and `import_activity` for everything. (Adding dedicated columns can come later if you want them queryable.)
 
-Project name, location, requester phone/email, and requested-at are already
-rendered correctly.
+## Open questions to confirm before I build
 
-## What we deliberately do NOT change
+1. **TERRISAGE_BASE_URL** — same env var already used by `terrisage-project-push` etc. (resolves to `https://upyard-backend.onrender.com` per current logs). The new path is `/api/support/onboarding/...` on the same host. Confirm same host is correct?
+2. **Push only after local insert succeeds**, not before — correct? (i.e. local copy is source of truth, UpYard is mirrored.)
+3. **Properties** — for now, do we wire it on the existing **Secondary properties** workspace and send to `/properties/import`? (Plot/villa rules from your spec apply on the upstream side; we just forward the file.)
+4. **Projects import** stays out of scope for this round (it has different prerequisites — `businessType=LARGE`)?
 
-- The existing inbound `project-request` webhook stays as-is. The pull is
-  reconciliation, not a replacement.
-- `project-request-status-callback` (outbound) keeps notifying Terrisage when
-  staff approve / reject / start import / go live.
-- Internal status lifecycle (`PENDING_REVIEW → APPROVED → IMPORT_IN_PROGRESS →
-  LIVE / REJECTED / CANCELLED`) is unchanged. We only auto-set it on first
-  insert; subsequent pulls never regress an in-progress request.
-
-## Open assumptions (calling out for confirmation, not blocking)
-
-- Terrisage's response shape for `project` is `{ name, location, city?,
-  notes? }` and `requestedByAgent` is `{ id, name, phone, email }`. If actual
-  field names differ, we adjust the mapper in one place.
-- 15-minute cadence is acceptable. Easy to change later.
-
-## Answer to your question
-
-Yes — with the schema extension above, every project name plus the requester's
-details, tenant, timestamps, and approval info will land in the Project
-Requests tab on the matching account, both via the live webhook and as a
-safety net via the scheduled pull.
+If answers are: (1) yes (2) yes (3) yes (4) yes — I'll proceed straight to adding the secret and building the function + UI changes.
