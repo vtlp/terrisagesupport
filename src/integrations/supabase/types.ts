@@ -3866,6 +3866,7 @@ export type Database = {
         | "TICKET_UPDATED"
         | "EXTERNAL"
         | "GENERAL"
+        | "PROJECT_REQUEST"
       project_request_status:
         | "PENDING_REVIEW"
         | "APPROVED"
@@ -4228,6 +4229,7 @@ export const Constants = {
         "TICKET_UPDATED",
         "EXTERNAL",
         "GENERAL",
+        "PROJECT_REQUEST",
       ],
       project_request_status: [
         "PENDING_REVIEW",
