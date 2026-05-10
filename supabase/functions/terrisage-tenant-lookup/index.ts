@@ -15,6 +15,10 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function softError(body: Record<string, unknown>) {
+  return json({ ok: false, ...body });
+}
+
 interface Body { accountId?: string; emailOverride?: string }
 
 Deno.serve(async (req) => {
@@ -22,11 +26,11 @@ Deno.serve(async (req) => {
 
   try {
     const { accountId, emailOverride } = (await req.json().catch(() => ({}))) as Body;
-    if (!accountId) return json({ ok: false, error: "accountId required" }, 400);
+    if (!accountId) return softError({ error: "ACCOUNT_ID_REQUIRED" });
 
     const BASE_URL = Deno.env.get("TERRISAGE_BASE_URL");
     const API_KEY = Deno.env.get("SEAT_SUPPORT_INTEGRATION_API_KEY");
-    if (!BASE_URL || !API_KEY) return json({ ok: false, error: "INTEGRATION_NOT_CONFIGURED" }, 500);
+    if (!BASE_URL || !API_KEY) return softError({ error: "INTEGRATION_NOT_CONFIGURED" });
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -35,11 +39,11 @@ Deno.serve(async (req) => {
 
     const { data: acct, error: acctErr } = await supabase
       .from("accounts").select("id, owner_email, tenant_id").eq("id", accountId).maybeSingle();
-    if (acctErr) return json({ ok: false, error: acctErr.message }, 500);
-    if (!acct) return json({ ok: false, error: "ACCOUNT_NOT_FOUND" }, 404);
+    if (acctErr) return softError({ error: "ACCOUNT_LOOKUP_FAILED", detail: acctErr.message });
+    if (!acct) return softError({ error: "ACCOUNT_NOT_FOUND" });
 
     const email = (emailOverride ?? acct.owner_email ?? "").trim().toLowerCase();
-    if (!email) return json({ ok: false, error: "NO_OWNER_EMAIL" }, 400);
+    if (!email) return softError({ error: "NO_OWNER_EMAIL" });
 
     const base = BASE_URL.replace(/\/$/, "");
     const lookupUrl = `${base}/api/integrations/tenant-by-superuser`;
@@ -51,11 +55,11 @@ Deno.serve(async (req) => {
     });
     const text = await r.text();
     if (!r.ok) {
-      return json({ ok: false, error: "TENANT_NOT_FOUND", email, status: r.status, detail: text.slice(0, 200) }, 404);
+      return softError({ error: "TENANT_NOT_FOUND", email, status: r.status, detail: text.slice(0, 500) });
     }
     let parsed: Record<string, unknown> = {};
     try { parsed = text ? JSON.parse(text) : {}; } catch (e) {
-      return json({ ok: false, error: "INVALID_RESPONSE", detail: text.slice(0, 200) }, 502);
+      return softError({ error: "INVALID_RESPONSE", detail: text.slice(0, 500) });
     }
     const tenantId = (parsed.tenantId as string | undefined)?.trim();
     if (!tenantId) {
@@ -68,10 +72,10 @@ Deno.serve(async (req) => {
 
     const { error: uErr } = await supabase
       .from("accounts").update({ tenant_id: tenantId }).eq("id", accountId);
-    if (uErr) return json({ ok: false, error: uErr.message }, 500);
+    if (uErr) return softError({ error: "ACCOUNT_UPDATE_FAILED", detail: uErr.message });
 
     return json({ ok: true, tenantId, tenantDisplayName, superUserAgentId, superUserEmail, email });
   } catch (e) {
-    return json({ ok: false, error: String(e) }, 500);
+    return softError({ error: "SERVICE_FAILED", detail: String(e) });
   }
 });
