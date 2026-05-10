@@ -36,6 +36,11 @@ type ProjectExtract = {
   approach_road_width?: string; total_units?: number; website?: string;
   overview?: string; expected_completion_date?: string; possession_date?: string;
   water_sources?: string[]; utilities?: string[]; key_features?: string[];
+  // Brochure-style additions
+  project_type?: string; location?: string;
+  towers_count?: number | string; tower_names?: string; floors_each_tower?: string;
+  config_range?: string; clubhouse?: string; parking?: string; nearby_access?: string;
+  contact_phone?: string; contact_email?: string; office_address?: string;
 };
 
 const REQUIRED_FIELDS: Array<keyof ProjectExtract> = ['project_name', 'builder_name', 'city', 'address'];
