@@ -29,7 +29,7 @@ type NotifType =
   | 'EVENT_DUE' | 'EVENT_OVERDUE' | 'REMINDER'
   | 'ENQUIRY_SUBMISSION' | 'SLA_BREACH' | 'ACCOUNT_STALLED'
   | 'DEMO_NOT_COMPLETED' | 'SEAT_REQUEST' | 'TICKET_ASSIGNED'
-  | 'TICKET_UPDATED' | 'EXTERNAL' | 'GENERAL';
+  | 'TICKET_UPDATED' | 'EXTERNAL' | 'GENERAL' | 'PROJECT_REQUEST';
 
 type Severity = 'INFO' | 'WARNING' | 'CRITICAL';
 
@@ -57,6 +57,7 @@ const ICONS: Record<NotifType, React.ComponentType<{ className?: string }>> = {
   TICKET_UPDATED: Ticket,
   EXTERNAL: ExternalLink,
   GENERAL: Bell,
+  PROJECT_REQUEST: FileCheck,
 };
 
 const SEVERITY_COLOR: Record<Severity, string> = {

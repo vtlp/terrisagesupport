@@ -157,8 +157,27 @@ Deno.serve(async (req) => {
           if (uErr) { errors++; continue; }
         } else {
           const insertRow: AnyRec = { ...baseFields, status: mappedInternal ?? 'PENDING_REVIEW' };
-          const { error: iErr } = await supabase.from('project_requests').insert(insertRow);
+          const { data: created, error: iErr } = await supabase.from('project_requests').insert(insertRow).select('id').single();
           if (iErr) { errors++; continue; }
+
+          // Notify staff (broadcast — user_id null) when a brand-new request lands.
+          try {
+            const { data: acctRow } = await supabase
+              .from('accounts').select('account_name').eq('id', acct.id).maybeSingle();
+            const acctName = (acctRow?.account_name as string | undefined) ?? 'Account';
+            const projName = (baseFields.project_name as string | null) ?? 'New project';
+            const loc = (baseFields.location as string | null) ?? '';
+            await supabase.from('notifications').insert({
+              type: 'PROJECT_REQUEST',
+              severity: 'INFO',
+              title: `New project request: ${projName}`,
+              body: `${acctName} requested ${projName}${loc ? ` in ${loc}` : ''}.`,
+              entity_type: 'account',
+              entity_id: acct.id,
+              link_path: `/accounts/${acct.id}?tab=projects`,
+              dedupe_key: `project_request:${created?.id ?? externalRequestId}`,
+            });
+          } catch (_) { /* non-fatal */ }
         }
         upserted++;
       } catch (_e) {
