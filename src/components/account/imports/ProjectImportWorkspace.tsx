@@ -380,19 +380,37 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   {job.extraction_finished_at && <> · finished {new Date(job.extraction_finished_at).toLocaleString()}</>}
                 </p>
               )}
-              {(job.extracted_data as { missingFields?: string[] })?.missingFields?.length ? (
+              {(job.extracted_data as { missingFields?: unknown[] })?.missingFields?.length ? (
                 <div className="rounded-md border p-3">
                   <div className="text-xs font-medium uppercase text-amber-700 dark:text-amber-400 mb-1">Missing fields reported</div>
                   <ul className="text-xs text-muted-foreground list-disc pl-4">
-                    {(job.extracted_data as { missingFields?: string[] }).missingFields!.map((m, i) => <li key={i}>{m}</li>)}
+                    {(job.extracted_data as { missingFields?: unknown[] }).missingFields!.map((m, i) => {
+                      const text = typeof m === 'string'
+                        ? m
+                        : (() => {
+                            const o = (m ?? {}) as Record<string, unknown>;
+                            const name = o.field_name ?? o.field ?? o.entity_type ?? 'field';
+                            const reason = o.reason ? ` — ${o.reason}` : '';
+                            return `${name}${reason}`;
+                          })();
+                      return <li key={i}>{text}</li>;
+                    })}
                   </ul>
                 </div>
               ) : null}
-              {(job.extracted_data as { assumptions?: string[] })?.assumptions?.length ? (
+              {(job.extracted_data as { assumptions?: unknown[] })?.assumptions?.length ? (
                 <div className="rounded-md border p-3">
                   <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Assumptions</div>
                   <ul className="text-xs text-muted-foreground list-disc pl-4">
-                    {(job.extracted_data as { assumptions?: string[] }).assumptions!.map((m, i) => <li key={i}>{m}</li>)}
+                    {(job.extracted_data as { assumptions?: unknown[] }).assumptions!.map((m, i) => {
+                      const text = typeof m === 'string'
+                        ? m
+                        : (() => {
+                            const o = (m ?? {}) as Record<string, unknown>;
+                            return String(o.note ?? o.reason ?? o.field_name ?? JSON.stringify(o));
+                          })();
+                      return <li key={i}>{text}</li>;
+                    })}
                   </ul>
                 </div>
               ) : null}
