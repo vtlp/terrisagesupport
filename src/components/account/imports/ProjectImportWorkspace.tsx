@@ -36,6 +36,11 @@ type ProjectExtract = {
   approach_road_width?: string; total_units?: number; website?: string;
   overview?: string; expected_completion_date?: string; possession_date?: string;
   water_sources?: string[]; utilities?: string[]; key_features?: string[];
+  // Brochure-style additions
+  project_type?: string; location?: string;
+  towers_count?: number | string; tower_names?: string; floors_each_tower?: string;
+  config_range?: string; clubhouse?: string; parking?: string; nearby_access?: string;
+  contact_phone?: string; contact_email?: string; office_address?: string;
 };
 
 const REQUIRED_FIELDS: Array<keyof ProjectExtract> = ['project_name', 'builder_name', 'city', 'address'];
@@ -44,11 +49,15 @@ const MEDIA_CATEGORIES: MediaCategory[] = ['LOGO', 'GALLERY', 'FLOOR_PLAN', 'BRO
 const MEDIA_REVIEWS: MediaReview[] = ['PENDING', 'CORRECT', 'INCORRECT', 'DUPLICATE', 'NEEDS_RECROP'];
 
 const APARTMENT_FIELDS = [
-  ['name', 'Configuration name'], ['bhk', 'BHK'], ['carpet_area', 'Carpet area (sqft)'],
-  ['built_up_area', 'Built-up (sqft)'], ['super_built_up_area', 'Super built-up (sqft)'],
-  ['balconies', 'Balconies'], ['bathrooms', 'Bathrooms'], ['facing', 'Facing'],
-  ['tower', 'Tower'], ['floor_range', 'Floor range'], ['units_planned', 'Units planned'],
-  ['pricing_range', 'Pricing range'], ['description', 'Description'],
+  ['type_no', 'Type no.'], ['name', 'Configuration name'], ['bhk', 'BHK'],
+  ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
+  ['built_up_area', 'Built-up (sqft)'], ['balcony_area', 'Balcony area (sqft)'],
+  ['common_area', 'Common area (sqft)'], ['utility_area', 'Utility area (sqft)'],
+  ['wall_area', 'Wall area (sqft)'], ['balconies', 'Balconies'], ['bathrooms', 'Bathrooms'],
+  ['facing', 'Facing'], ['tower', 'Tower / Block'], ['floor_range', 'Floor range'],
+  ['units_planned', 'Units planned'], ['unit_numbers', 'Unit numbers'],
+  ['pricing_range', 'Pricing range'], ['floorplan_crop_file', 'Floor plan file'],
+  ['description', 'Description'],
 ];
 const VILLA_FIELDS = [
   ['name', 'Configuration name'], ['bhk', 'BHK'], ['land_area', 'Land area'],
@@ -462,20 +471,24 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   expected_completion_date: 'Expected completion', possession_date: 'Possession date', website: 'Website',
                   open_space_pct: 'Open space %', overview: 'Overview',
                   water_sources: 'Water sources', utilities: 'Utilities', key_features: 'Key features',
+                  project_type: 'Project type', location: 'Location', towers_count: 'Towers count',
+                  tower_names: 'Tower names', floors_each_tower: 'Floors per tower', config_range: 'Configuration range',
+                  clubhouse: 'Clubhouse', parking: 'Parking', nearby_access: 'Nearby access',
+                  contact_phone: 'Contact phone', contact_email: 'Contact email', office_address: 'Office address',
                 };
                 return (
                   <div className="space-y-2">
                     <div className={`rounded-md border p-3 text-xs ${am.unmappedFields.length === 0 ? 'border-success/40 bg-success/5 text-success' : 'border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400'}`}>
                       <div className="font-medium flex items-center gap-2">
                         {am.unmappedFields.length === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-                        Auto-mapped from {am.sheetsParsed.length} sheet(s) · {am.projectFieldsMapped.length} field(s) · {am.configsCreated} config(s) · {am.mediaCreated} media
+                        Auto-mapped from {am.sheetsParsed.length} sheet(s) · {am.projectFieldsMapped.length} field(s) · {am.configsCreated} config(s) · {am.mediaCreated} media{am.towersCreated ? ` · ${am.towersCreated} tower(s)` : ''}
                       </div>
                       {am.unmappedFields.length > 0 && (
-                        <div className="mt-1">{am.unmappedFields.length} field(s) could not be mapped from the spreadsheet. Fill them in manually below.</div>
+                        <div className="mt-1">{am.unmappedFields.length} field(s) could not be mapped from the source. Fill them in manually below.</div>
                       )}
                       <div className="mt-1 text-muted-foreground">Mapped {new Date(am.mappedAt).toLocaleString()}</div>
                     </div>
-                    {(am.unmappedFields.length > 0 || am.unmappedColumns.length > 0) && (
+                    {(am.unmappedFields.length > 0 || am.unmappedColumns.length > 0 || (am.missingFields?.length ?? 0) > 0) && (
                       <div className="rounded-md border p-3 space-y-3">
                         {am.unmappedFields.length > 0 && (
                           <div>
@@ -487,9 +500,22 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                             </div>
                           </div>
                         )}
+                        {(am.missingFields?.length ?? 0) > 0 && (
+                          <div>
+                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Flagged missing in source</div>
+                            <div className="space-y-1">
+                              {am.missingFields.map(m => (
+                                <div key={m.field} className="text-[11px] flex gap-2">
+                                  <Badge variant="outline" className="text-[10px]">{m.field}</Badge>
+                                  <span className="text-muted-foreground">{m.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {am.unmappedColumns.length > 0 && (
                           <div>
-                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Spreadsheet columns we did not recognise</div>
+                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
                             <div className="flex flex-wrap gap-1.5">
                               {am.unmappedColumns.map(c => (
                                 <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
@@ -506,10 +532,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="grid gap-3 md:grid-cols-2">
                 {[
                   ['project_name', 'Project name'], ['builder_name', 'Builder / Developer'],
+                  ['project_type', 'Project type'], ['location', 'Location'],
                   ['city', 'City'], ['rera_id', 'RERA / Approval IDs'],
                   ['status', 'Status'], ['site_area', 'Site area'],
                   ['site_area_unit', 'Site area unit'], ['community_type', 'Community type'],
                   ['approach_road_width', 'Approach road width'], ['total_units', 'Total units planned'],
+                  ['towers_count', 'Towers count'], ['floors_each_tower', 'Floors per tower'],
+                  ['config_range', 'Configuration range'], ['clubhouse', 'Clubhouse'],
+                  ['parking', 'Parking'], ['nearby_access', 'Nearby access'],
+                  ['contact_phone', 'Contact phone'], ['contact_email', 'Contact email'],
                   ['expected_completion_date', 'Expected completion'], ['possession_date', 'Possession date'],
                   ['website', 'Website'], ['open_space_pct', 'Open space %'],
                 ].map(([k, l]) => (
@@ -522,9 +553,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   </div>
                 ))}
               </div>
-              <div className="space-y-1">
-                <Label>Address</Label>
-                <Textarea rows={2} value={project.address ?? ''} onChange={e => setProject(p => ({ ...p, address: e.target.value }))} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Address</Label>
+                  <Textarea rows={2} value={project.address ?? ''} onChange={e => setProject(p => ({ ...p, address: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Office address</Label>
+                  <Textarea rows={2} value={project.office_address ?? ''} onChange={e => setProject(p => ({ ...p, office_address: e.target.value }))} />
+                </div>
               </div>
               <div className="space-y-1">
                 <Label>Overview</Label>
@@ -552,7 +589,33 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         </TabsContent>
 
         {/* CONFIGS */}
-        <TabsContent value="configs">
+        <TabsContent value="configs" className="space-y-3">
+          {(() => {
+            const towers = ((job.extracted_data as { towers?: string[] })?.towers) || [];
+            if (towers.length === 0) return null;
+            const configsLinkedTo = (t: string) => configs.filter(c => {
+              const tv = String((c.data as Record<string, unknown> | null)?.tower ?? '');
+              return tv.toLowerCase().includes(t.toLowerCase());
+            }).length;
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Towers / Blocks · {towers.length}</CardTitle>
+                  <p className="text-xs text-muted-foreground">Detected from project summary. Each tower is linked to the configurations whose Tower field matches its name.</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {towers.map(t => (
+                      <div key={t} className="rounded-md border px-2.5 py-1.5 flex items-center gap-2">
+                        <span className="text-sm font-medium">{t}</span>
+                        <Badge variant="secondary" className="text-[10px]">{configsLinkedTo(t)} config(s)</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
