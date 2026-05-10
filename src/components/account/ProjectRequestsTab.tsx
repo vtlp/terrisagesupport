@@ -26,6 +26,7 @@ export function ProjectRequestsTab({ accountId }: Props) {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | ProjectRequestStatus>('ALL');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [rejectFor, setRejectFor] = useState<ProjectRequest | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
