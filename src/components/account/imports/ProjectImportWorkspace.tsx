@@ -195,6 +195,31 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     });
   }, [configs]);
 
+  // Derive status from possession date and mirror possession_date / status
+  // from Representative input into the Overview project data so the user does
+  // not have to fill them twice.
+  useEffect(() => {
+    const pd = (rep.possession_date || '').trim();
+    let derivedStatus = (rep.status || '').trim();
+    if (!derivedStatus && pd) {
+      const t = Date.parse(pd);
+      if (!Number.isNaN(t)) {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        derivedStatus = t >= today.getTime() ? 'Under Construction' : 'Completed';
+      }
+    }
+    if (derivedStatus && derivedStatus !== (rep.status || '')) {
+      setRep(s => ({ ...s, status: derivedStatus }));
+    }
+    setProject(prev => {
+      const next = { ...prev };
+      let changed = false;
+      if (pd && (prev.possession_date || '') !== pd) { next.possession_date = pd; changed = true; }
+      if (derivedStatus && (prev.status || '') !== derivedStatus) { next.status = derivedStatus; changed = true; }
+      return changed ? next : prev;
+    });
+  }, [rep.possession_date, rep.status]);
+
   const saveRep = async () => {
     setSavingRep(true);
     const { error } = await supabase.from('import_jobs').update({ representative_input: rep as never }).eq('id', job.id);
