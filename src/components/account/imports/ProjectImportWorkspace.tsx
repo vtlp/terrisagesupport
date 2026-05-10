@@ -471,20 +471,24 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   expected_completion_date: 'Expected completion', possession_date: 'Possession date', website: 'Website',
                   open_space_pct: 'Open space %', overview: 'Overview',
                   water_sources: 'Water sources', utilities: 'Utilities', key_features: 'Key features',
+                  project_type: 'Project type', location: 'Location', towers_count: 'Towers count',
+                  tower_names: 'Tower names', floors_each_tower: 'Floors per tower', config_range: 'Configuration range',
+                  clubhouse: 'Clubhouse', parking: 'Parking', nearby_access: 'Nearby access',
+                  contact_phone: 'Contact phone', contact_email: 'Contact email', office_address: 'Office address',
                 };
                 return (
                   <div className="space-y-2">
                     <div className={`rounded-md border p-3 text-xs ${am.unmappedFields.length === 0 ? 'border-success/40 bg-success/5 text-success' : 'border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400'}`}>
                       <div className="font-medium flex items-center gap-2">
                         {am.unmappedFields.length === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-                        Auto-mapped from {am.sheetsParsed.length} sheet(s) · {am.projectFieldsMapped.length} field(s) · {am.configsCreated} config(s) · {am.mediaCreated} media
+                        Auto-mapped from {am.sheetsParsed.length} sheet(s) · {am.projectFieldsMapped.length} field(s) · {am.configsCreated} config(s) · {am.mediaCreated} media{am.towersCreated ? ` · ${am.towersCreated} tower(s)` : ''}
                       </div>
                       {am.unmappedFields.length > 0 && (
-                        <div className="mt-1">{am.unmappedFields.length} field(s) could not be mapped from the spreadsheet. Fill them in manually below.</div>
+                        <div className="mt-1">{am.unmappedFields.length} field(s) could not be mapped from the source. Fill them in manually below.</div>
                       )}
                       <div className="mt-1 text-muted-foreground">Mapped {new Date(am.mappedAt).toLocaleString()}</div>
                     </div>
-                    {(am.unmappedFields.length > 0 || am.unmappedColumns.length > 0) && (
+                    {(am.unmappedFields.length > 0 || am.unmappedColumns.length > 0 || (am.missingFields?.length ?? 0) > 0) && (
                       <div className="rounded-md border p-3 space-y-3">
                         {am.unmappedFields.length > 0 && (
                           <div>
@@ -496,9 +500,22 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                             </div>
                           </div>
                         )}
+                        {(am.missingFields?.length ?? 0) > 0 && (
+                          <div>
+                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Flagged missing in source</div>
+                            <div className="space-y-1">
+                              {am.missingFields.map(m => (
+                                <div key={m.field} className="text-[11px] flex gap-2">
+                                  <Badge variant="outline" className="text-[10px]">{m.field}</Badge>
+                                  <span className="text-muted-foreground">{m.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {am.unmappedColumns.length > 0 && (
                           <div>
-                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Spreadsheet columns we did not recognise</div>
+                            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Source columns we did not recognise</div>
                             <div className="flex flex-wrap gap-1.5">
                               {am.unmappedColumns.map(c => (
                                 <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
