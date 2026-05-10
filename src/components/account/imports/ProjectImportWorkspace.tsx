@@ -49,11 +49,15 @@ const MEDIA_CATEGORIES: MediaCategory[] = ['LOGO', 'GALLERY', 'FLOOR_PLAN', 'BRO
 const MEDIA_REVIEWS: MediaReview[] = ['PENDING', 'CORRECT', 'INCORRECT', 'DUPLICATE', 'NEEDS_RECROP'];
 
 const APARTMENT_FIELDS = [
-  ['name', 'Configuration name'], ['bhk', 'BHK'], ['carpet_area', 'Carpet area (sqft)'],
-  ['built_up_area', 'Built-up (sqft)'], ['super_built_up_area', 'Super built-up (sqft)'],
-  ['balconies', 'Balconies'], ['bathrooms', 'Bathrooms'], ['facing', 'Facing'],
-  ['tower', 'Tower'], ['floor_range', 'Floor range'], ['units_planned', 'Units planned'],
-  ['pricing_range', 'Pricing range'], ['description', 'Description'],
+  ['type_no', 'Type no.'], ['name', 'Configuration name'], ['bhk', 'BHK'],
+  ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
+  ['built_up_area', 'Built-up (sqft)'], ['balcony_area', 'Balcony area (sqft)'],
+  ['common_area', 'Common area (sqft)'], ['utility_area', 'Utility area (sqft)'],
+  ['wall_area', 'Wall area (sqft)'], ['balconies', 'Balconies'], ['bathrooms', 'Bathrooms'],
+  ['facing', 'Facing'], ['tower', 'Tower / Block'], ['floor_range', 'Floor range'],
+  ['units_planned', 'Units planned'], ['unit_numbers', 'Unit numbers'],
+  ['pricing_range', 'Pricing range'], ['floorplan_crop_file', 'Floor plan file'],
+  ['description', 'Description'],
 ];
 const VILLA_FIELDS = [
   ['name', 'Configuration name'], ['bhk', 'BHK'], ['land_area', 'Land area'],
