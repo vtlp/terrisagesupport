@@ -164,7 +164,7 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
     setImporting(true);
     try {
       const { data: files } = await supabase.from('import_files').select('*').eq('job_id', job.id).limit(1);
-      if (!files?.length) { toast.error('Upload a file first'); setImporting(false); return; }
+      if (!files?.length) { toast.error('Upload a file first'); return; }
       const filePath = files[0].storage_path;
 
       await supabase.from('import_jobs').update({ status: 'IMPORTING' }).eq('id', job.id);
@@ -177,41 +177,41 @@ export function LeadImportWorkspace({ job, onChange }: { job: ImportJob; onChang
         toast.error(`Import failed: ${msg}`);
         await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
         await logActivity(supabase, job.id, 'import_failed', { error: msg, response: data }, currentUser?.user_id);
-        setImporting(false); onChange?.(); return;
+        onChange?.();
+        return;
       }
 
-      const { tenantId, upyardJobId } = data as { tenantId: string; upyardJobId: string };
-      await logActivity(supabase, job.id, 'upyard_import_queued', { tenantId, upyardJobId }, currentUser?.user_id);
-      toast.success(`Queued at UpYard (job ${upyardJobId.slice(0, 8)})`);
-
-      // Poll status
-      let final: { status?: string; inserted?: number; totalRows?: number; failureCode?: string; reportJson?: unknown } | null = null;
-      for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 2000));
-        const { data: st } = await supabase.functions.invoke('terrisage-onboarding-import?action=status', {
-          body: { tenantId, upyardJobId },
-        });
-        const p = (st?.payload ?? {}) as { status?: string };
-        if (p.status === 'SUCCEEDED' || p.status === 'FAILED') { final = p as never; break; }
-      }
-      if (!final) {
-        toast.message('Still processing at UpYard. Refresh later for final status.');
-        await logActivity(supabase, job.id, 'upyard_import_pending', { upyardJobId }, currentUser?.user_id);
-      } else if (final.status === 'SUCCEEDED') {
-        await supabase.from('import_jobs').update({
-          records_imported: final.inserted ?? 0, records_total: final.totalRows ?? rows.length, records_failed: 0,
-          status: 'IMPORTED', imported_at: new Date().toISOString(),
-        }).eq('id', job.id);
-        await logActivity(supabase, job.id, 'import_completed', { upyardJobId, inserted: final.inserted, report: final.reportJson }, currentUser?.user_id);
-        toast.success(`Imported ${final.inserted ?? 0} leads via UpYard`);
-      } else {
-        await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
-        await logActivity(supabase, job.id, 'import_failed', { upyardJobId, failureCode: final.failureCode, report: final.reportJson }, currentUser?.user_id);
-        toast.error(`UpYard import failed: ${final.failureCode ?? 'unknown'}`);
-      }
+      const { tenantId: tId, upyardJobId: uId } = data as { tenantId: string; upyardJobId: string };
+      setTenantId(tId);
+      setUpyardJobId(uId);
+      await supabase.from('import_jobs').update({
+        validation: { ...(job.validation as object || {}), tenantId: tId, upyardJobId: uId } as never,
+      }).eq('id', job.id);
+      await logActivity(supabase, job.id, 'upyard_import_queued', { tenantId: tId, upyardJobId: uId }, currentUser?.user_id);
+      toast.success(`Queued at UpYard (${uId.slice(0, 8)})`);
+      onChange?.();
     } finally {
-      setImporting(false); onChange?.(); loadRows();
+      setImporting(false);
     }
+  };
+
+  const handleTerminal = async (snap: UpyardSnapshot) => {
+    if (snap.status === 'SUCCEEDED') {
+      await supabase.from('import_jobs').update({
+        records_imported: snap.inserted ?? 0,
+        records_total: snap.totalRows ?? rows.length,
+        records_failed: 0,
+        status: 'IMPORTED',
+        imported_at: new Date().toISOString(),
+      }).eq('id', job.id);
+      await logActivity(supabase, job.id, 'import_completed', { upyardJobId, inserted: snap.inserted, report: snap.reportJson }, currentUser?.user_id);
+      toast.success(`Imported ${snap.inserted ?? 0} leads via UpYard`);
+    } else if (snap.status === 'FAILED') {
+      await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
+      await logActivity(supabase, job.id, 'import_failed', { upyardJobId, failureCode: snap.failureCode, report: snap.reportJson }, currentUser?.user_id);
+      toast.error(`UpYard import failed: ${snap.failureCode ?? 'unknown'}`);
+    }
+    onChange?.();
   };
 
   const summary = useMemo(() => ({
