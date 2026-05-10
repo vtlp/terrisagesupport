@@ -1,9 +1,17 @@
 // Auto-map uploaded files for a Project import job.
-// - Parses the most recent xlsx/csv (all sheets) into project fields + configurations
-// - Classifies images into LOGO / FLOOR_PLAN / GALLERY
-// - Records unmapped fields & unmapped spreadsheet columns into job.extracted_data.autoMap
 //
-// This runs client-side after files are uploaded.
+// Supports three sources, in priority order:
+//   1) JSON extraction file (e.g. moonglade_extraction.json) with keys
+//      { project, configurations, missing_fields }
+//   2) project_summary.csv / .xlsx (wide or key-value)
+//   3) configurations.csv / .xlsx (one row per config)
+//
+// Side effects:
+//   - Inserts AUTOMAP rows into import_project_configs
+//   - Inserts AUTOMAP rows into import_project_media for any image files
+//     (linking floor plans to configs when filename matches floorplan_crop_file)
+//   - Persists merged project data, towers list, and an autoMap report
+//     into job.extracted_data
 
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,56 +24,73 @@ type FieldKey = string;
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 const PROJECT_SYNONYMS: Record<FieldKey, string[]> = {
-  project_name: ['project', 'projectname', 'name', 'projecttitle'],
-  builder_name: ['builder', 'developer', 'buildername', 'developername', 'builderdeveloper', 'company'],
-  city: ['city', 'town', 'location'],
-  address: ['address', 'fulladdress', 'projectaddress', 'siteaddress'],
-  rera_id: ['rera', 'reraid', 'reranumber', 'reraapproval', 'approval', 'approvalid'],
+  project_name: ['projectname', 'project', 'name', 'projecttitle'],
+  builder_name: ['buildername', 'developername', 'developerbrand', 'developer', 'builder', 'builderdeveloper', 'company', 'brand'],
+  project_type: ['projecttype', 'type'],
+  city: ['city', 'town'],
+  location: ['location', 'area', 'locality'],
+  address: ['address', 'fulladdress', 'projectaddress', 'siteaddress', 'officeaddress'],
+  rera_id: ['reraid', 'rera', 'reranumber', 'reraapproval', 'approval', 'approvalid'],
   status: ['status', 'projectstatus', 'constructionstatus'],
-  site_area: ['sitearea', 'totalarea', 'landarea', 'plotarea', 'area'],
-  site_area_unit: ['siteareaunit', 'areaunit', 'unit'],
-  community_type: ['communitytype', 'community', 'projecttype'],
+  site_area: ['sitearea', 'totalarea', 'landarea', 'plotarea'],
+  site_area_unit: ['siteareaunit', 'areaunit'],
+  community_type: ['communitytype', 'community'],
   approach_road_width: ['approachroadwidth', 'roadwidth', 'approachroad'],
   total_units: ['totalunits', 'units', 'noofunits', 'totalflats'],
-  expected_completion_date: ['expectedcompletion', 'completiondate', 'expectedcompletiondate', 'eta'],
+  expected_completion_date: ['expectedcompletion', 'completiondate', 'expectedcompletiondate', 'eta', 'completion'],
   possession_date: ['possession', 'possessiondate', 'handover', 'handoverdate'],
-  website: ['website', 'url', 'web', 'site'],
+  website: ['website', 'url', 'web'],
   open_space_pct: ['openspace', 'openspacepct', 'openspacepercentage'],
   overview: ['overview', 'description', 'about', 'projectoverview', 'summary'],
   water_sources: ['watersources', 'water', 'watersupply'],
   utilities: ['utilities', 'utility'],
   key_features: ['keyfeatures', 'features', 'highlights', 'usp'],
+  // Brochure-style additional fields
+  towers_count: ['towerscount', 'numberoftowers', 'totaltowers'],
+  tower_names: ['towernames', 'towers', 'blocks', 'blocknames'],
+  floors_each_tower: ['floorseachtower', 'floorspertower', 'floorcount'],
+  config_range: ['configrange', 'configurationrange', 'unitrange'],
+  clubhouse: ['clubhouse', 'club'],
+  parking: ['parking', 'parkinglevels'],
+  nearby_access: ['nearbyaccess', 'connectivity', 'access'],
+  contact_phone: ['contactphone', 'phone', 'mobile', 'contactnumber'],
+  contact_email: ['contactemail', 'email', 'enquiryemail'],
+  office_address: ['officeaddress', 'salesoffice', 'siteoffice'],
 };
 
+// Map "loose" config headers from spreadsheets/JSON to canonical fields.
+// Includes Hi-Tech / Moonglade-style headers.
 const APARTMENT_CONFIG_SYNONYMS: Record<FieldKey, string[]> = {
-  name: ['name', 'configname', 'configuration', 'type', 'unittype'],
+  type_no: ['typeno', 'configno', 'configcode', 'unittype', 'typecode', 'no'],
+  name: ['name', 'configname', 'configuration', 'type'],
   bhk: ['bhk', 'bedrooms', 'beds'],
-  carpet_area: ['carpet', 'carpetarea', 'carpetsqft'],
-  built_up_area: ['builtup', 'builtuparea', 'builtupsqft'],
-  super_built_up_area: ['superbuiltup', 'superbuiltuparea', 'sba'],
+  carpet_area: ['carpet', 'carpetarea', 'carpetareasft', 'carpetsqft'],
+  built_up_area: ['builtup', 'builtuparea', 'builtuparesft', 'builtupsqft'],
+  super_built_up_area: ['superbuiltup', 'superbuiltuparea', 'sba', 'saleablearea', 'saleableareasft'],
   balconies: ['balconies', 'balcony'],
+  balcony_area: ['balconyarea', 'balconyareasft'],
+  common_area: ['commonarea', 'commonareasft'],
+  utility_area: ['utilityarea', 'utilityareasft'],
+  wall_area: ['wallarea', 'wallareasft'],
   bathrooms: ['bathrooms', 'baths', 'toilets'],
   facing: ['facing', 'orientation'],
-  tower: ['tower', 'block', 'wing'],
+  tower: ['tower', 'block', 'wing', 'towermapping'],
   floor_range: ['floor', 'floorrange', 'floors'],
-  units_planned: ['unitsplanned', 'units', 'count', 'noofunits'],
+  units_planned: ['unitsplanned', 'count', 'noofunits'],
+  unit_numbers: ['unitnumbers', 'unitno', 'unitnos', 'units'],
   pricing_range: ['price', 'pricing', 'pricerange', 'pricingrange', 'cost'],
   description: ['description', 'notes', 'remarks'],
+  floorplan_crop_file: ['floorplancropfile', 'floorplanfile', 'floorplanimage', 'planfile', 'planimage'],
 };
 
 const VILLA_CONFIG_SYNONYMS: Record<FieldKey, string[]> = {
-  name: APARTMENT_CONFIG_SYNONYMS.name,
-  bhk: APARTMENT_CONFIG_SYNONYMS.bhk,
+  ...APARTMENT_CONFIG_SYNONYMS,
   land_area: ['landarea', 'plotarea', 'land'],
-  built_up_area: APARTMENT_CONFIG_SYNONYMS.built_up_area,
   floors: ['floors', 'numberoffloors', 'storeys'],
-  bathrooms: APARTMENT_CONFIG_SYNONYMS.bathrooms,
-  facing: APARTMENT_CONFIG_SYNONYMS.facing,
-  units_planned: APARTMENT_CONFIG_SYNONYMS.units_planned,
-  pricing_range: APARTMENT_CONFIG_SYNONYMS.pricing_range,
 };
 
 const PLOT_CONFIG_SYNONYMS: Record<FieldKey, string[]> = {
+  type_no: APARTMENT_CONFIG_SYNONYMS.type_no,
   name: APARTMENT_CONFIG_SYNONYMS.name,
   plot_size_band: ['sizeband', 'plotsizeband', 'band'],
   plot_area: ['plotarea', 'area', 'size'],
@@ -83,10 +108,10 @@ function configSynonymsFor(pt: PropertyType): Record<FieldKey, string[]> {
 function matchField(header: string, synonyms: Record<FieldKey, string[]>): FieldKey | null {
   const n = norm(header);
   if (!n) return null;
+  // Prefer exact match first to avoid greedy fuzzy collisions.
+  for (const [field, list] of Object.entries(synonyms)) if (list.includes(n)) return field;
   for (const [field, list] of Object.entries(synonyms)) {
-    if (list.includes(n)) return field;
-    // fuzzy contains
-    if (list.some(s => n.includes(s) || s.includes(n))) return field;
+    if (list.some(s => s.length >= 4 && (n === s || n.startsWith(s) || s.startsWith(n)))) return field;
   }
   return null;
 }
@@ -108,29 +133,46 @@ async function readWorkbook(signedUrl: string, name: string): Promise<ParsedShee
   return wb.SheetNames.map(s => ({ name: s, aoa: XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[s], { header: 1, defval: '', raw: false }) }));
 }
 
+async function readJson(signedUrl: string): Promise<unknown> {
+  const res = await fetch(signedUrl);
+  return await res.json();
+}
+
 function looksLikeKeyValue(aoa: unknown[][]): boolean {
-  // If most non-empty rows have exactly 2 non-empty cells, treat as key-value.
   const nonEmpty = aoa.filter(r => Array.isArray(r) && r.some(c => String(c ?? '').trim() !== ''));
   if (nonEmpty.length < 2) return false;
-  const kvRows = nonEmpty.filter(r => {
+  const kv = nonEmpty.filter(r => {
     const cells = r.map(c => String(c ?? '').trim()).filter(Boolean);
     return cells.length === 2;
   }).length;
-  return kvRows / nonEmpty.length >= 0.6;
+  return kv / nonEmpty.length >= 0.6;
 }
 
-function sheetIsConfigLike(name: string): boolean {
-  const n = norm(name);
-  return /(config|unit|plan|floorplan|inventory|layout|type)/.test(n);
-}
-function sheetIsSummaryLike(name: string): boolean {
-  const n = norm(name);
-  return /(summary|project|overview|info|details|about|main)/.test(n);
+function fileNameHints(name: string): { isProjectSummary: boolean; isConfigurations: boolean; isMissingFields: boolean } {
+  const n = norm(name.replace(/\.[^.]+$/, ''));
+  return {
+    isProjectSummary: /(projectsummary|summary|project|overview|projectinfo|details)/.test(n),
+    isConfigurations: /(configurations?|units?|floorplans?|inventory|layout|types?|towerinfo|towers)/.test(n),
+    isMissingFields: /(missing|gaps|todo)/.test(n),
+  };
 }
 
-// ---------- Project field parsing ----------
+// ---------- Parsers ----------
 
 type ProjectExtract = Record<string, unknown>;
+
+function assignProject(project: ProjectExtract, field: string, val: unknown) {
+  const sval = typeof val === 'string' ? val.trim() : val;
+  if (sval == null || sval === '') return;
+  if (field === 'water_sources' || field === 'utilities' || field === 'key_features') {
+    project[field] = String(sval).split(/[,;]/).map(s => s.trim()).filter(Boolean);
+  } else if (field === 'total_units' || field === 'open_space_pct' || field === 'towers_count') {
+    const n = Number(String(sval).replace(/[^\d.\-]/g, ''));
+    if (!Number.isNaN(n)) project[field] = n;
+  } else {
+    project[field] = sval;
+  }
+}
 
 function parseProjectKV(aoa: unknown[][]): { project: ProjectExtract; unmappedColumns: string[] } {
   const project: ProjectExtract = {};
@@ -141,11 +183,8 @@ function parseProjectKV(aoa: unknown[][]): { project: ProjectExtract; unmappedCo
     const val = String(row[1] ?? '').trim();
     if (!key || !val) continue;
     const field = matchField(key, PROJECT_SYNONYMS);
-    if (field) {
-      assignProject(project, field, val);
-    } else {
-      unmapped.push(key);
-    }
+    if (field) assignProject(project, field, val);
+    else unmapped.push(key);
   }
   return { project, unmappedColumns: unmapped };
 }
@@ -167,26 +206,13 @@ function parseProjectWide(aoa: unknown[][]): { project: ProjectExtract; unmapped
   return { project, unmappedColumns: unmapped };
 }
 
-function assignProject(project: ProjectExtract, field: string, val: string) {
-  if (field === 'water_sources' || field === 'utilities' || field === 'key_features') {
-    project[field] = val.split(/[,;]/).map(s => s.trim()).filter(Boolean);
-  } else if (field === 'total_units' || field === 'open_space_pct') {
-    const n = Number(val.replace(/[^\d.\-]/g, ''));
-    if (!Number.isNaN(n)) project[field] = n;
-  } else {
-    project[field] = val;
-  }
-}
-
-// ---------- Config rows parsing ----------
-
 function parseConfigSheet(aoa: unknown[][], pt: PropertyType): { rows: Record<string, unknown>[]; unmappedColumns: string[] } {
   const rows: Record<string, unknown>[] = [];
   const unmapped: string[] = [];
   if (aoa.length < 2) return { rows, unmappedColumns: unmapped };
   const headers = (aoa[0] as unknown[]).map(h => String(h ?? '').trim());
   const synonyms = configSynonymsFor(pt);
-  const headerToField: Array<{ header: string; field: string | null }> = headers.map(h => ({ header: h, field: h ? matchField(h, synonyms) : null }));
+  const headerToField = headers.map(h => ({ header: h, field: h ? matchField(h, synonyms) : null }));
   for (const h of headerToField) if (h.header && !h.field) unmapped.push(h.header);
   for (let i = 1; i < aoa.length; i++) {
     const r = aoa[i] as unknown[];
@@ -201,20 +227,109 @@ function parseConfigSheet(aoa: unknown[][], pt: PropertyType): { rows: Record<st
       any = true;
     });
     if (any) {
-      if (!obj.name) obj.name = `Config ${rows.length + 1}`;
+      if (!obj.name) {
+        const tn = obj.type_no ? `Type ${obj.type_no}` : `Config ${rows.length + 1}`;
+        obj.name = obj.bhk ? `${tn} · ${obj.bhk}` : tn;
+      }
       rows.push(obj);
     }
   }
   return { rows, unmappedColumns: Array.from(new Set(unmapped)) };
 }
 
+// JSON shape: { project: {...}, configurations: [...], missing_fields: [{field,status}] }
+function parseExtractionJson(j: unknown, pt: PropertyType): {
+  project: ProjectExtract;
+  configRows: Record<string, unknown>[];
+  missingFields: Array<{ field: string; status: string }>;
+  unmappedColumns: string[];
+} {
+  const project: ProjectExtract = {};
+  const configRows: Record<string, unknown>[] = [];
+  const missingFields: Array<{ field: string; status: string }> = [];
+  const unmapped: string[] = [];
+  if (!j || typeof j !== 'object') return { project, configRows, missingFields, unmappedColumns: unmapped };
+  const obj = j as Record<string, unknown>;
+
+  const proj = (obj.project ?? obj.projectData ?? obj.summary) as Record<string, unknown> | undefined;
+  if (proj && typeof proj === 'object') {
+    for (const [k, v] of Object.entries(proj)) {
+      const field = matchField(k, PROJECT_SYNONYMS);
+      if (field) assignProject(project, field, v);
+      else unmapped.push(`project.${k}`);
+    }
+  }
+
+  const cfgs = (obj.configurations ?? obj.configs ?? obj.configurationData) as unknown;
+  if (Array.isArray(cfgs)) {
+    const synonyms = configSynonymsFor(pt);
+    for (const raw of cfgs) {
+      if (!raw || typeof raw !== 'object') continue;
+      const row: Record<string, unknown> = {};
+      let any = false;
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        const sval = typeof v === 'string' ? v.trim() : v;
+        if (sval == null || sval === '') continue;
+        const field = matchField(k, synonyms);
+        if (field) { row[field] = sval; any = true; }
+        else unmapped.push(`configurations.${k}`);
+      }
+      if (any) {
+        if (!row.name) {
+          const tn = row.type_no ? `Type ${row.type_no}` : `Config ${configRows.length + 1}`;
+          row.name = row.bhk ? `${tn} · ${row.bhk}` : tn;
+        }
+        configRows.push(row);
+      }
+    }
+  }
+
+  const miss = obj.missing_fields ?? obj.missingFields;
+  if (Array.isArray(miss)) {
+    for (const m of miss) {
+      if (!m || typeof m !== 'object') continue;
+      const r = m as Record<string, unknown>;
+      const field = String(r.field ?? '').trim();
+      const status = String(r.status ?? r.reason ?? '').trim();
+      if (field) missingFields.push({ field, status });
+    }
+  }
+  return { project, configRows, missingFields, unmappedColumns: Array.from(new Set(unmapped)) };
+}
+
+function parseMissingFieldsCsv(aoa: unknown[][]): Array<{ field: string; status: string }> {
+  if (aoa.length < 2) return [];
+  const headers = (aoa[0] as unknown[]).map(h => norm(String(h ?? '')));
+  const fIdx = headers.findIndex(h => h === 'field' || h === 'name' || h === 'key');
+  const sIdx = headers.findIndex(h => h === 'status' || h === 'reason' || h === 'note');
+  if (fIdx < 0) return [];
+  const out: Array<{ field: string; status: string }> = [];
+  for (let i = 1; i < aoa.length; i++) {
+    const r = aoa[i] as unknown[];
+    if (!Array.isArray(r)) continue;
+    const f = String(r[fIdx] ?? '').trim();
+    const s = sIdx >= 0 ? String(r[sIdx] ?? '').trim() : '';
+    if (f) out.push({ field: f, status: s });
+  }
+  return out;
+}
+
 // ---------- Image classification ----------
 
-function classifyImage(name: string): 'LOGO' | 'FLOOR_PLAN' | 'GALLERY' {
-  const n = name.toLowerCase();
-  if (n.includes('logo')) return 'LOGO';
-  if (/(floor|plan|layout)/.test(n)) return 'FLOOR_PLAN';
-  return 'GALLERY';
+function classifyImageFor(name: string, configFloorplanFiles: Map<string, string>): {
+  category: 'LOGO' | 'FLOOR_PLAN' | 'GALLERY';
+  configId?: string;
+} {
+  const lower = name.toLowerCase();
+  const base = lower.split('/').pop() || lower;
+  if (lower.includes('logo')) return { category: 'LOGO' };
+  // Direct match on floorplan_crop_file references
+  if (configFloorplanFiles.has(base)) return { category: 'FLOOR_PLAN', configId: configFloorplanFiles.get(base) };
+  // Hi-Tech naming: anything containing project_image / projectimage → gallery
+  if (/(projectimage|project_image|elevation|render|gallery|amenity|amenities|clubhouse|view)/.test(lower)) return { category: 'GALLERY' };
+  // Generic floor-plan keywords
+  if (/(floorplan|floor_plan|floor-plan|floor|plan|layout|fullsheet)/.test(lower)) return { category: 'FLOOR_PLAN' };
+  return { category: 'GALLERY' };
 }
 
 // ---------- Main entry ----------
@@ -224,10 +339,12 @@ export type AutoMapResult = {
   projectFieldsMapped: string[];
   unmappedFields: string[];
   unmappedColumns: string[];
+  missingFields: Array<{ field: string; status: string }>;
   configsCreated: number;
   mediaCreated: number;
+  towersCreated: number;
   sheetsParsed: string[];
-  filesProcessed: { name: string; kind: 'spreadsheet' | 'image' | 'skipped' }[];
+  filesProcessed: { name: string; kind: 'json' | 'spreadsheet' | 'image' | 'skipped' }[];
 };
 
 const TARGET_PROJECT_FIELDS = Object.keys(PROJECT_SYNONYMS);
@@ -241,64 +358,116 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
   let project: ProjectExtract = ((job.extracted_data as { projectData?: ProjectExtract })?.projectData) || {};
   const configRows: Record<string, unknown>[] = [];
   const unmappedColumns = new Set<string>();
+  const missingFields: Array<{ field: string; status: string }> = [];
   const sheetsParsed: string[] = [];
 
   for (const f of files) {
     const ext = (f.name.split('.').pop() || '').toLowerCase();
-    if (['xlsx', 'xls', 'csv'].includes(ext)) {
-      try {
-        const { data: signed } = await supabase.storage.from('import-files').createSignedUrl(f.storage_path, 60 * 5);
-        if (!signed?.signedUrl) { filesProcessed.push({ name: f.name, kind: 'skipped' }); continue; }
+    const hints = fileNameHints(f.name);
+    try {
+      const { data: signed } = ['xlsx', 'xls', 'csv', 'json'].includes(ext)
+        ? await supabase.storage.from('import-files').createSignedUrl(f.storage_path, 60 * 5)
+        : { data: null };
+
+      if (ext === 'json' && signed?.signedUrl) {
+        const j = await readJson(signed.signedUrl);
+        const r = parseExtractionJson(j, pt);
+        project = { ...project, ...r.project };
+        configRows.push(...r.configRows);
+        r.unmappedColumns.forEach(c => unmappedColumns.add(c));
+        missingFields.push(...r.missingFields);
+        sheetsParsed.push(`${f.name}:json`);
+        filesProcessed.push({ name: f.name, kind: 'json' });
+        continue;
+      }
+
+      if (['xlsx', 'xls', 'csv'].includes(ext) && signed?.signedUrl) {
         const sheets = await readWorkbook(signed.signedUrl, f.name);
         for (const s of sheets) {
           sheetsParsed.push(`${f.name}:${s.name}`);
-          if (sheetIsConfigLike(s.name)) {
+          // missing_fields file
+          if (hints.isMissingFields) {
+            missingFields.push(...parseMissingFieldsCsv(s.aoa));
+            continue;
+          }
+          // configurations file
+          if (hints.isConfigurations) {
             const { rows, unmappedColumns: u } = parseConfigSheet(s.aoa, pt);
             configRows.push(...rows);
-            u.forEach(c => unmappedColumns.add(`${s.name}.${c}`));
-          } else if (sheetIsSummaryLike(s.name) || looksLikeKeyValue(s.aoa)) {
-            const { project: p, unmappedColumns: u } = parseProjectKV(s.aoa);
-            project = { ...project, ...p };
-            u.forEach(c => unmappedColumns.add(`${s.name}.${c}`));
-          } else {
-            // Try wide first; if nothing mapped, try config layout
-            const { project: p, unmappedColumns: uw } = parseProjectWide(s.aoa);
-            const mappedAny = Object.keys(p).length > 0;
-            if (mappedAny) {
+            u.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
+            continue;
+          }
+          // project summary
+          if (hints.isProjectSummary) {
+            if (looksLikeKeyValue(s.aoa)) {
+              const { project: p, unmappedColumns: u } = parseProjectKV(s.aoa);
               project = { ...project, ...p };
-              uw.forEach(c => unmappedColumns.add(`${s.name}.${c}`));
+              u.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
             } else {
-              const { rows, unmappedColumns: uc } = parseConfigSheet(s.aoa, pt);
-              configRows.push(...rows);
-              uc.forEach(c => unmappedColumns.add(`${s.name}.${c}`));
+              const { project: p, unmappedColumns: u } = parseProjectWide(s.aoa);
+              project = { ...project, ...p };
+              u.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
             }
+            continue;
+          }
+          // Generic: try wide then config then KV
+          const wide = parseProjectWide(s.aoa);
+          if (Object.keys(wide.project).length >= 3) {
+            project = { ...project, ...wide.project };
+            wide.unmappedColumns.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
+          } else if (looksLikeKeyValue(s.aoa)) {
+            const kv = parseProjectKV(s.aoa);
+            project = { ...project, ...kv.project };
+            kv.unmappedColumns.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
+          } else {
+            const { rows, unmappedColumns: u } = parseConfigSheet(s.aoa, pt);
+            configRows.push(...rows);
+            u.forEach(c => unmappedColumns.add(`${f.name}.${c}`));
           }
         }
         filesProcessed.push({ name: f.name, kind: 'spreadsheet' });
-      } catch {
+        continue;
+      }
+
+      if (f.mime_type?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
+        filesProcessed.push({ name: f.name, kind: 'image' });
+      } else {
         filesProcessed.push({ name: f.name, kind: 'skipped' });
       }
-    } else if (f.mime_type?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
-      filesProcessed.push({ name: f.name, kind: 'image' });
-    } else {
+    } catch {
       filesProcessed.push({ name: f.name, kind: 'skipped' });
     }
   }
 
-  // Insert configurations (only the new ones from this run; we replace nothing existing).
-  // To avoid duplicates on re-uploads, only insert configs if no extracted/manual configs are tied to source 'AUTOMAP'.
+  // Derive towers list from project.tower_names (comma separated) — clean &-pairs.
+  const towerNamesRaw = String(project.tower_names ?? '').trim();
+  const towers: string[] = towerNamesRaw
+    ? Array.from(new Set(towerNamesRaw.split(/[,;]/).flatMap(s => s.split(/\s*&\s*/)).map(s => s.trim()).filter(Boolean)))
+    : [];
+
+  // Insert configurations (only first AUTOMAP run; never duplicate).
   const { data: existingAutoConfigs } = await supabase.from('import_project_configs')
-    .select('id').eq('job_id', job.id).eq('source', 'AUTOMAP');
+    .select('id, data').eq('job_id', job.id).eq('source', 'AUTOMAP');
   let configsCreated = 0;
+  const configFloorplanFiles = new Map<string, string>(); // filename(lower) -> config_id
   if ((existingAutoConfigs?.length ?? 0) === 0 && configRows.length > 0) {
     const inserts = configRows.map((data, idx) => ({
       job_id: job.id, sort_order: idx, data: data as never, source: 'AUTOMAP',
     }));
-    const { error } = await supabase.from('import_project_configs').insert(inserts);
-    if (!error) configsCreated = inserts.length;
+    const { data: inserted } = await supabase.from('import_project_configs').insert(inserts).select('id, data');
+    configsCreated = inserted?.length ?? 0;
+    (inserted ?? []).forEach(c => {
+      const fp = (c.data as Record<string, unknown> | null)?.floorplan_crop_file;
+      if (typeof fp === 'string' && fp) configFloorplanFiles.set(fp.toLowerCase(), c.id);
+    });
+  } else {
+    (existingAutoConfigs ?? []).forEach(c => {
+      const fp = (c.data as Record<string, unknown> | null)?.floorplan_crop_file;
+      if (typeof fp === 'string' && fp) configFloorplanFiles.set(fp.toLowerCase(), c.id);
+    });
   }
 
-  // Insert media for images (skip if a media row already references the same storage_path)
+  // Insert media for image files (skip duplicates by storage_path)
   const { data: existingMedia } = await supabase.from('import_project_media')
     .select('storage_path').eq('job_id', job.id);
   const existingPaths = new Set((existingMedia ?? []).map(m => m.storage_path));
@@ -309,14 +478,18 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
   });
   const mediaInserts = imageFiles
     .filter(f => !existingPaths.has(f.storage_path))
-    .map(f => ({
-      job_id: job.id,
-      category: classifyImage(f.name),
-      storage_path: f.storage_path,
-      caption: f.name,
-      review_state: 'PENDING' as const,
-      source: 'AUTOMAP',
-    }));
+    .map(f => {
+      const c = classifyImageFor(f.name, configFloorplanFiles);
+      return {
+        job_id: job.id,
+        category: c.category,
+        config_id: c.configId ?? null,
+        storage_path: f.storage_path,
+        caption: f.name,
+        review_state: 'PENDING' as const,
+        source: 'AUTOMAP',
+      };
+    });
   if (mediaInserts.length > 0) {
     const { error } = await supabase.from('import_project_media').insert(mediaInserts as never);
     if (!error) mediaCreated = mediaInserts.length;
@@ -333,22 +506,26 @@ export async function autoMapProjectImport(job: ImportJob, actorId?: string | nu
     projectFieldsMapped,
     unmappedFields,
     unmappedColumns: Array.from(unmappedColumns),
+    missingFields,
     configsCreated,
     mediaCreated,
+    towersCreated: towers.length,
     sheetsParsed,
     filesProcessed,
   };
 
-  // Persist the merged project + autoMap report into job.extracted_data
   const merged = {
     ...((job.extracted_data as object) || {}),
     projectData: { ...((job.extracted_data as { projectData?: ProjectExtract })?.projectData || {}), ...project },
+    towers,
     autoMap: result as never,
   };
   await supabase.from('import_jobs').update({ extracted_data: merged as never }).eq('id', job.id);
   await logActivity(supabase, job.id, 'auto_mapped', {
-    configsCreated, mediaCreated, mappedFields: projectFieldsMapped.length,
+    configsCreated, mediaCreated, towersCreated: towers.length,
+    mappedFields: projectFieldsMapped.length,
     unmappedFields: unmappedFields.length, unmappedColumns: result.unmappedColumns.length,
+    missingFields: missingFields.length,
   }, actorId ?? null);
 
   return result;
