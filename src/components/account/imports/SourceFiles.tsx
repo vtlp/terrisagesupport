@@ -13,6 +13,7 @@ interface Props {
   accept?: string;
   allowedCategories?: FileCategory[];
   onChange?: () => void;
+  onAfterUpload?: (uploadedCount: number) => void | Promise<void>;
 }
 
 const CATEGORY_ICON: Record<FileCategory, typeof FileText> = {
