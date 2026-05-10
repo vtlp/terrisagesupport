@@ -40,6 +40,25 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
+  // Optional scoping: when called from an account page, only count/upsert
+  // requests that belong to that account's tenant.
+  let scopeAccountId: string | null = null;
+  let scopeTenantId: string | null = null;
+  if (req.method === 'POST') {
+    try {
+      const body = await req.json() as { accountId?: string };
+      if (body?.accountId) {
+        scopeAccountId = body.accountId;
+        const { data: acct } = await supabase
+          .from('accounts').select('tenant_id').eq('id', scopeAccountId).maybeSingle();
+        scopeTenantId = (acct?.tenant_id as string | null) ?? null;
+        if (!scopeTenantId) {
+          return json({ ok: true, fetched: 0, upserted: 0, skipped: 0, errors: 0, scoped: true, note: 'Account has no tenant_id linked yet.' });
+        }
+      }
+    } catch { /* no body, treat as global */ }
+  }
+
   let fetched = 0, upserted = 0, skipped = 0, errors = 0;
   const skippedTenants: string[] = [];
 
@@ -53,7 +72,16 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: `UPSTREAM_${r.status}`, detail: body.slice(0, 500) }, 502);
     }
     const payload = await r.json() as { ok?: boolean; requests?: AnyRec[] };
-    const items = Array.isArray(payload.requests) ? payload.requests : [];
+    let items = Array.isArray(payload.requests) ? payload.requests : [];
+
+    // If scoped to one account, filter upstream items to that tenant before counting.
+    if (scopeTenantId) {
+      items = items.filter((it) => {
+        const t = (it.requestedByTenant ?? {}) as AnyRec;
+        const tid = pick(t, 'id') ?? pick(it, 'requestedByTenantId') ?? pick(it, 'tenantId');
+        return tid === scopeTenantId;
+      });
+    }
     fetched = items.length;
 
     for (const item of items) {
