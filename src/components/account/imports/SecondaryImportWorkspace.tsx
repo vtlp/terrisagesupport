@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, logActivity, parseTabularFile } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
+import { pushToUpstream } from './upstreamPush';
 import { useUser } from '@/context/UserContext';
 
 export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; onChange?: () => void }) {
@@ -64,8 +65,9 @@ export function SecondaryImportWorkspace({ job, onChange }: { job: ImportJob; on
         imported_at: new Date().toISOString(),
       }).eq('id', job.id);
       await logActivity(supabase, job.id, 'import_completed', { inserted }, currentUser?.user_id);
-      toast.success(`Imported ${inserted} properties`);
+      toast.success(`Imported ${inserted} properties locally. Pushing to UpYard…`);
       onChange?.();
+      pushToUpstream('properties', job.id, job.account_id, onChange);
     } finally {
       setImporting(false);
     }
