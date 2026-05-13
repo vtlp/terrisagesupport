@@ -125,21 +125,16 @@ export function SeatRequestsTab({ accountId }: { accountId: string }) {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  {r.status === 'PENDING' && (
+                  {(r.status === 'PENDING' || r.status === 'APPROVED') && (
                     <>
-                      <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setStatus(r.id, 'APPROVED')}>
-                        <Check className="h-4 w-4 mr-1" /> Approve
+                      <Button size="sm" disabled={busyId === r.id} onClick={() => fulfil(r.id)}>
+                        {busyId === r.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-1" />}
+                        Fulfil
                       </Button>
                       <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setStatus(r.id, 'REJECTED')}>
                         <X className="h-4 w-4 mr-1" /> Reject
                       </Button>
                     </>
-                  )}
-                  {(r.status === 'PENDING' || r.status === 'APPROVED') && (
-                    <Button size="sm" disabled={busyId === r.id} onClick={() => fulfil(r.id)}>
-                      {busyId === r.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-1" />}
-                      Fulfil
-                    </Button>
                   )}
                 </div>
               </div>
