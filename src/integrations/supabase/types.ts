@@ -3087,6 +3087,7 @@ export type Database = {
           created_at: string
           members: Json
           reported_at: string
+          requested: number
           reserved: number
           source: string
           updated_at: string
@@ -3099,6 +3100,7 @@ export type Database = {
           created_at?: string
           members?: Json
           reported_at?: string
+          requested?: number
           reserved?: number
           source?: string
           updated_at?: string
@@ -3111,6 +3113,7 @@ export type Database = {
           created_at?: string
           members?: Json
           reported_at?: string
+          requested?: number
           reserved?: number
           source?: string
           updated_at?: string
