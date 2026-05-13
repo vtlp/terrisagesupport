@@ -1,0 +1,1 @@
+ALTER TABLE public.seat_usage_snapshots ADD COLUMN IF NOT EXISTS requested integer NOT NULL DEFAULT 0;

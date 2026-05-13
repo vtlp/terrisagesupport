@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     supabase.from('account_seat_capacity').select('*').eq('account_id', accountId).maybeSingle(),
     supabase.from('account_billing_settings').select('*').eq('account_id', accountId).maybeSingle(),
     supabase.from('accounts').select('account_name, owner_name, city').eq('id', accountId).maybeSingle(),
-    supabase.from('seat_usage_snapshots').select('reserved, consumed, reported_at').eq('account_id', accountId).maybeSingle(),
+    supabase.from('seat_usage_snapshots').select('reserved, consumed, requested, reported_at').eq('account_id', accountId).maybeSingle(),
     supabase.from('seat_requests').select('requested_seats').eq('account_id', accountId).in('status', ['PENDING', 'APPROVED']),
   ]);
 
@@ -45,7 +45,10 @@ Deno.serve(async (req) => {
       { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  const requested = (reqRes.data ?? []).reduce((s, r: { requested_seats: number }) => s + (r.requested_seats || 0), 0);
+  const localRequested = (reqRes.data ?? []).reduce((s, r: { requested_seats: number }) => s + (r.requested_seats || 0), 0);
+  // Prefer Terrisage-reported requestedSeats from the latest snapshot when present;
+  // fall back to summing local PENDING/APPROVED seat_requests.
+  const requested = snapRes.data?.requested ?? localRequested;
 
   return new Response(JSON.stringify({
     account_id: accountId,
