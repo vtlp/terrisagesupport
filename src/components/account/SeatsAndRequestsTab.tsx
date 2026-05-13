@@ -217,7 +217,9 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
   const consumed = capacity?.seats_used ?? activeSeatsUsed;
   const reserved = capacity?.seats_reserved ?? 0;
   const available = capacity?.seats_available ?? Math.max(0, purchased - consumed - reserved);
-  const pendingRequested = rows.filter(r => r.status === 'PENDING' || r.status === 'APPROVED').reduce((acc, r) => acc + r.requested_seats, 0);
+  const localPendingRequested = rows.filter(r => r.status === 'PENDING' || r.status === 'APPROVED').reduce((acc, r) => acc + r.requested_seats, 0);
+  // Prefer the Terrisage snapshot value when present so our number matches CRM exactly.
+  const pendingRequested = capacity?.seats_requested ?? localPendingRequested;
   
   const lastSync = capacity?.last_crm_sync_at;
 
