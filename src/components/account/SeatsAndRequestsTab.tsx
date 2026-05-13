@@ -35,6 +35,7 @@ interface Capacity {
   seats_used: number | null;
   seats_reserved: number | null;
   seats_available: number | null;
+  seats_requested?: number | null;
   last_crm_sync_at?: string | null;
 }
 
@@ -94,13 +95,17 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [reqRes, capRes] = await Promise.all([
+    const [reqRes, capRes, snapRes] = await Promise.all([
       supabase.from('seat_requests').select('*').eq('account_id', accountId).order('created_at', { ascending: false }),
       supabase.from('account_seat_capacity').select('seats_purchased, seats_used, seats_reserved, seats_available, last_crm_sync_at').eq('account_id', accountId).maybeSingle(),
+      supabase.from('seat_usage_snapshots').select('requested').eq('account_id', accountId).maybeSingle(),
     ]);
     if (reqRes.error) toast.error(reqRes.error.message);
     setRows((reqRes.data ?? []) as SeatRequest[]);
-    setCapacity((capRes.data ?? null) as Capacity | null);
+    setCapacity({
+      ...((capRes.data ?? {}) as Capacity),
+      seats_requested: (snapRes.data as { requested?: number } | null)?.requested ?? null,
+    } as Capacity);
     setLoading(false);
   }, [accountId]);
 
@@ -116,11 +121,17 @@ export function SeatsAndRequestsTab({ accountId, activeSeatsUsed, onboardingPayl
       const linked = Boolean((data as { linked?: boolean } | null)?.linked);
       setCrmLinked(linked);
       if (linked) {
-        // Reload capacity from snapshot view
-        const capRes = await supabase.from('account_seat_capacity')
-          .select('seats_purchased, seats_used, seats_reserved, seats_available, last_crm_sync_at')
-          .eq('account_id', accountId).maybeSingle();
-        setCapacity((capRes.data ?? null) as Capacity | null);
+        // Reload capacity from snapshot view + snapshot requested
+        const [capRes, snapRes] = await Promise.all([
+          supabase.from('account_seat_capacity')
+            .select('seats_purchased, seats_used, seats_reserved, seats_available, last_crm_sync_at')
+            .eq('account_id', accountId).maybeSingle(),
+          supabase.from('seat_usage_snapshots').select('requested').eq('account_id', accountId).maybeSingle(),
+        ]);
+        setCapacity({
+          ...((capRes.data ?? {}) as Capacity),
+          seats_requested: (snapRes.data as { requested?: number } | null)?.requested ?? null,
+        } as Capacity);
       }
     } finally {
       setSyncing(false);
