@@ -166,6 +166,7 @@ Deno.serve(async (req) => {
           consumed,
           reserved,
           available,
+          requested,
           members,
           source: "terrisage",
           reported_at: new Date().toISOString(),
