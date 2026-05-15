@@ -589,68 +589,186 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {/* Auto-map summary now lives above the tabs as a global review banner. */}
-              <div className="grid gap-3 md:grid-cols-2">
-                {[
-                  ['project_name', 'Project name'], ['builder_name', 'Builder / Developer'],
-                  ['project_type', 'Project type'], ['location', 'Location'],
-                  ['city', 'City'], ['rera_id', 'RERA / Approval IDs'],
-                  ['status', 'Status'], ['site_area', 'Site area'],
-                  ['site_area_unit', 'Site area unit'], ['community_type', 'Community type'],
-                  ['approach_road_width', 'Approach road width'], ['total_units', 'Total units planned'],
-                  ['towers_count', 'Towers count'], ['floors_each_tower', 'Floors per tower'],
-                  ['config_range', 'Configuration range'], ['clubhouse', 'Clubhouse'],
-                  ['parking', 'Parking'], ['nearby_access', 'Nearby access'],
-                  ['contact_phone', 'Contact phone'], ['contact_email', 'Contact email'],
-                  ['expected_completion_date', 'Expected completion'], ['possession_date', 'Possession date'],
-                  ['website', 'Website'], ['open_space_pct', 'Open space %'],
-                ].map(([k, l]) => {
-                  const raw = (project as Record<string, unknown>)[k];
-                  const val = raw != null ? String(raw) : '';
-                  if (k === 'status') {
-                    return (
-                      <div key={k} className="space-y-1">
-                        <Label>{l}</Label>
-                        <Select value={val || '__none__'} onValueChange={v => setProject(p => ({ ...p, status: v === '__none__' ? '' : v }))}>
-                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">—</SelectItem>
-                            <SelectItem value="Under Construction">Under Construction</SelectItem>
-                            <SelectItem value="Completed">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    );
-                  }
-                  if (k === 'expected_completion_date' || k === 'possession_date') {
-                    return (
-                      <div key={k} className="space-y-1">
-                        <Label>{l}</Label>
-                        <Input type="date" value={toDateInput(val)} onChange={e => setProject(p => ({ ...p, [k]: e.target.value }))} />
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={k} className="space-y-1">
-                      <Label>{l}</Label>
-                      <Input value={val} onChange={e => setProject(p => ({ ...p, [k]: e.target.value }))} />
+              {(() => {
+                const ag = parseAcresGuntas(project.site_area_acres ?? project.site_area);
+                const acres = project.site_area_acres != null && project.site_area_acres !== '' ? Number(project.site_area_acres) : ag.acres;
+                const guntas = project.site_area_guntas != null && project.site_area_guntas !== '' ? Number(project.site_area_guntas) : ag.guntas;
+                const setAg = (a: number, g: number) => {
+                  const total = combineAcresGuntas(a, g);
+                  setProject(p => ({ ...p, site_area_acres: a, site_area_guntas: g, site_area: String(total), site_area_unit: 'acres' }));
+                };
+                const communityOptions = COMMUNITY_TYPES_BY_PT[propertyType];
+                return (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>Project name</Label>
+                      <Input value={project.project_name ?? ''} onChange={e => setProject(p => ({ ...p, project_name: e.target.value }))} />
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="space-y-1">
+                      <Label>Builder / Developer</Label>
+                      <Input value={project.builder_name ?? ''} onChange={e => setProject(p => ({ ...p, builder_name: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>City</Label>
+                      <Input value={project.city ?? ''} onChange={e => setProject(p => ({ ...p, city: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Locality (auto-filled from Maps URL)</Label>
+                      <Input value={project.location ?? ''} onChange={e => setProject(p => ({ ...p, location: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>RERA / Approval IDs</Label>
+                      <Input value={project.rera_id ?? ''} onChange={e => setProject(p => ({ ...p, rera_id: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Status</Label>
+                      <Select value={(project.status as string) || '__none__'} onValueChange={v => setProject(p => ({ ...p, status: v === '__none__' ? '' : v }))}>
+                        <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">—</SelectItem>
+                          {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Community type</Label>
+                      <Select value={(project.community_type as string) || '__none__'} onValueChange={v => setProject(p => ({ ...p, community_type: v === '__none__' ? '' : v }))}>
+                        <SelectTrigger><SelectValue placeholder="Select community type" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">—</SelectItem>
+                          {communityOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Site area</Label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" min={0} step="0.01" placeholder="Acres" value={acres || ''} onChange={e => setAg(Number(e.target.value) || 0, guntas)} />
+                        <span className="text-xs text-muted-foreground">ac</span>
+                        <Input type="number" min={0} max={39} step="1" placeholder="Guntas" value={guntas || ''} onChange={e => setAg(acres, Number(e.target.value) || 0)} />
+                        <span className="text-xs text-muted-foreground">gu</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">Total: {combineAcresGuntas(acres, guntas)} acres</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Approach road width</Label>
+                      <Input value={project.approach_road_width ?? ''} onChange={e => setProject(p => ({ ...p, approach_road_width: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Total units planned</Label>
+                      <Input value={project.total_units != null ? String(project.total_units) : ''} onChange={e => setProject(p => ({ ...p, total_units: e.target.value as never }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Open space %</Label>
+                      <Input value={project.open_space_pct != null ? String(project.open_space_pct) : ''} onChange={e => setProject(p => ({ ...p, open_space_pct: Number(e.target.value) || 0 }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Contact phone</Label>
+                      <Input value={project.contact_phone ?? ''} onChange={e => setProject(p => ({ ...p, contact_phone: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Contact email</Label>
+                      <Input value={project.contact_email ?? ''} onChange={e => setProject(p => ({ ...p, contact_email: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Expected completion</Label>
+                      <Input type="date" value={toDateInput(project.expected_completion_date)} onChange={e => setProject(p => ({ ...p, expected_completion_date: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Website</Label>
+                      <Input value={project.website ?? ''} onChange={e => setProject(p => ({ ...p, website: e.target.value }))} />
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Address + Maps URL */}
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
-                  <Label>Address</Label>
+                  <Label>Full address</Label>
                   <Textarea rows={2} value={project.address ?? ''} onChange={e => setProject(p => ({ ...p, address: e.target.value }))} />
                 </div>
+                <div className="space-y-1">
+                  <Label>Google Maps location URL</Label>
+                  <Input type="url" placeholder="https://maps.google.com/..." value={project.maps_url ?? ''} onChange={e => setProject(p => ({ ...p, maps_url: e.target.value }))} />
+                  <p className="text-[11px] text-muted-foreground">Locality is auto-derived from this URL.</p>
+                </div>
+              </div>
+
+              {/* Apartment-only: tower names + floors per tower */}
+              {propertyType === 'APARTMENT' && (
+                <div className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Tower names</Label>
+                    <Button size="sm" variant="outline" onClick={() => setProject(p => ({ ...p, tower_names_list: [...(p.tower_names_list || []), ''] }))}>
+                      <Plus className="h-3 w-3 mr-1" />Add tower
+                    </Button>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    {(project.tower_names_list || []).map((t, i) => (
+                      <div key={i} className="flex gap-1">
+                        <Input className="h-8 text-sm" value={t} onChange={e => setProject(p => ({ ...p, tower_names_list: (p.tower_names_list || []).map((x, j) => j === i ? e.target.value : x) }))} />
+                        <Button size="sm" variant="ghost" onClick={() => setProject(p => ({ ...p, tower_names_list: (p.tower_names_list || []).filter((_, j) => j !== i) }))}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                    {(!project.tower_names_list || project.tower_names_list.length === 0) && (
+                      <p className="text-xs text-muted-foreground md:col-span-3">No towers yet. Add one or run mapping.</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Floors per tower</Label>
+                    <Input className="h-8 text-sm" value={project.floors_each_tower ?? ''} onChange={e => setProject(p => ({ ...p, floors_each_tower: e.target.value }))} />
+                  </div>
+                </div>
+              )}
+
+              {/* Villa / Plot: clusters + (villa) floors per unit */}
+              {(propertyType === 'VILLA' || propertyType === 'PLOT') && (
+                <div className="rounded-md border p-3 space-y-2">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>Clusters / Streets count</Label>
+                      <Input type="number" min={0} value={project.clusters_count != null ? String(project.clusters_count) : ''} onChange={e => setProject(p => ({ ...p, clusters_count: Number(e.target.value) || 0 }))} />
+                    </div>
+                    {propertyType === 'VILLA' && (
+                      <div className="space-y-1">
+                        <Label>Floors per unit</Label>
+                        <Input value={project.floors_per_unit ?? ''} onChange={e => setProject(p => ({ ...p, floors_per_unit: e.target.value }))} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Cluster / Street names</Label>
+                      <Button size="sm" variant="outline" onClick={() => setProject(p => ({ ...p, cluster_names: [...(p.cluster_names || []), ''] }))}>
+                        <Plus className="h-3 w-3 mr-1" />Add
+                      </Button>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {(project.cluster_names || []).map((t, i) => (
+                        <div key={i} className="flex gap-1">
+                          <Input className="h-8 text-sm" value={t} onChange={e => setProject(p => ({ ...p, cluster_names: (p.cluster_names || []).map((x, j) => j === i ? e.target.value : x) }))} />
+                          <Button size="sm" variant="ghost" onClick={() => setProject(p => ({ ...p, cluster_names: (p.cluster_names || []).filter((_, j) => j !== i) }))}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <Label>About the project (clubhouse, parking, nearby access etc.)</Label>
+                <Textarea rows={4} value={project.overview ?? ''} onChange={e => setProject(p => ({ ...p, overview: e.target.value }))} />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
                   <Label>Office address</Label>
                   <Textarea rows={2} value={project.office_address ?? ''} onChange={e => setProject(p => ({ ...p, office_address: e.target.value }))} />
                 </div>
-              </div>
-              <div className="space-y-1">
-                <Label>Overview</Label>
-                <Textarea rows={3} value={project.overview ?? ''} onChange={e => setProject(p => ({ ...p, overview: e.target.value }))} />
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-1">
