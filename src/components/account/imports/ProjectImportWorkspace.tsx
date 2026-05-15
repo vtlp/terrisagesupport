@@ -23,31 +23,83 @@ import { autoMapProjectImport, deriveCityFromLocation, type AutoMapResult } from
 import { useUser } from '@/context/UserContext';
 
 type Rep = {
-  builder_name?: string; project_name?: string; city?: string; address?: string;
+  builder_name?: string; project_name?: string; city?: string;
   representative_name?: string; representative_phone?: string; representative_email?: string;
-  website?: string; rera_id?: string; status?: string;
-  expected_completion_date?: string; possession_date?: string; banks?: string; notes?: string;
+  website?: string; expected_completion_date?: string; banks?: string; notes?: string;
+  // Deprecated/hidden fields kept for backward compatibility (not shown in UI)
+  address?: string; rera_id?: string; status?: string; possession_date?: string;
 };
 
 type ProjectExtract = {
-  project_name?: string; builder_name?: string; city?: string; address?: string;
+  project_name?: string; builder_name?: string; city?: string;
+  address?: string; maps_url?: string;
   rera_id?: string; status?: string; open_space_pct?: number;
-  site_area?: string; site_area_unit?: string; community_type?: string;
+  site_area?: string; site_area_unit?: string;
+  site_area_acres?: number | string; site_area_guntas?: number | string;
+  community_type?: string;
   approach_road_width?: string; total_units?: number; website?: string;
-  overview?: string; expected_completion_date?: string; possession_date?: string;
+  overview?: string; expected_completion_date?: string;
   water_sources?: string[]; utilities?: string[]; key_features?: string[];
-  // Brochure-style additions
-  project_type?: string; location?: string;
-  towers_count?: number | string; tower_names?: string; floors_each_tower?: string;
-  config_range?: string; clubhouse?: string; parking?: string; nearby_access?: string;
+  location?: string;
+  // Apartment
+  tower_names_list?: string[]; floors_each_tower?: string;
+  // Villa / Plot
+  clusters_count?: number | string; cluster_names?: string[];
+  // Villa
+  floors_per_unit?: string;
   contact_phone?: string; contact_email?: string; office_address?: string;
+  // Deprecated/hidden — auto-folded into overview where present
+  possession_date?: string; project_type?: string;
+  towers_count?: number | string; tower_names?: string;
+  config_range?: string; clubhouse?: string; parking?: string; nearby_access?: string;
 };
 
 const REQUIRED_FIELDS: Array<keyof ProjectExtract> = ['project_name', 'builder_name', 'city', 'address'];
 
+const COMMUNITY_TYPES_BY_PT: Record<PropertyType, string[]> = {
+  APARTMENT: ['Gated', 'High-rise gated', 'Open'],
+  VILLA: ['Gated', 'Open'],
+  PLOT: ['Gated', 'Open'],
+};
+
+const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed'];
+
+// Parse "4.5", "4 acres 11 guntas", or numeric to {acres, guntas}
+function parseAcresGuntas(siteArea: unknown): { acres: number; guntas: number } {
+  const s = String(siteArea ?? '').trim();
+  if (!s) return { acres: 0, guntas: 0 };
+  const ag = s.match(/([\d.]+)\s*ac[a-z]*\s*([\d.]+)?\s*gun/i);
+  if (ag) return { acres: Number(ag[1]) || 0, guntas: Number(ag[2] ?? 0) || 0 };
+  const n = Number(s.replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(n)) return { acres: 0, guntas: 0 };
+  const acres = Math.floor(n);
+  const guntas = Math.round((n - acres) * 40);
+  return { acres, guntas };
+}
+
+function combineAcresGuntas(acres: number | string, guntas: number | string): number {
+  const a = Number(acres) || 0;
+  const g = Number(guntas) || 0;
+  return Number((a + g / 40).toFixed(4));
+}
+
+// Derive a locality from a Google Maps URL or free-text address
+function deriveLocalityFromMapsUrl(url: string): string {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    const q = u.searchParams.get('q') || u.searchParams.get('query') || '';
+    if (q) return decodeURIComponent(q.split(',')[0].trim());
+    const place = u.pathname.match(/\/place\/([^/]+)/);
+    if (place) return decodeURIComponent(place[1].replace(/\+/g, ' ').split(',')[0].trim());
+  } catch { /* not a URL */ }
+  return '';
+}
+
 const MEDIA_CATEGORIES: MediaCategory[] = ['LOGO', 'GALLERY', 'FLOOR_PLAN', 'BROCHURE', 'VIDEO', 'DOCUMENT', 'OTHER'];
 const MEDIA_REVIEWS: MediaReview[] = ['PENDING', 'CORRECT', 'INCORRECT', 'DUPLICATE', 'NEEDS_RECROP'];
 
+// 'tower' is rendered as a Select (Apartment only) wired to tower_names_list.
 const APARTMENT_FIELDS = [
   ['type_no', 'Type no.'], ['name', 'Configuration name'], ['bhk', 'BHK'],
   ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
@@ -57,7 +109,6 @@ const APARTMENT_FIELDS = [
   ['facing', 'Facing'], ['tower', 'Tower / Block'], ['floor_range', 'Floor range'],
   ['units_planned', 'Units planned'], ['unit_numbers', 'Unit numbers'],
   ['pricing_range', 'Pricing range'], ['floorplan_crop_file', 'Floor plan file'],
-  ['description', 'Description'],
 ];
 const VILLA_FIELDS = [
   ['name', 'Configuration name'], ['bhk', 'BHK'], ['land_area', 'Land area'],
@@ -141,8 +192,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   }, [media, mediaUrls]);
 
   // Re-sync local edit state when job changes (e.g. after extraction).
-  // For Representative input we MERGE: any rep field still empty inherits from
-  // the auto-mapped project data so the user does not retype shared values.
+  // Representative input only carries fields not duplicated on the project record.
   useEffect(() => {
     const incomingRep = (job.representative_input as Rep) || {};
     const proj = (job.extracted_data as { projectData?: ProjectExtract })?.projectData || {};
@@ -150,14 +200,10 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       builder_name: proj.builder_name,
       project_name: proj.project_name,
       city: proj.city,
-      address: proj.address,
       representative_phone: proj.contact_phone,
       representative_email: proj.contact_email,
       website: proj.website,
-      rera_id: proj.rera_id,
-      status: proj.status,
       expected_completion_date: proj.expected_completion_date,
-      possession_date: proj.possession_date,
     };
     const merged: Rep = { ...repFromProject };
     (Object.keys(incomingRep) as (keyof Rep)[]).forEach(k => {
@@ -195,33 +241,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     });
   }, [configs]);
 
-  // Derive status from possession date and mirror possession_date / status
-  // from Representative input into the Overview project data so the user does
-  // not have to fill them twice. Uses toDateInput so quirky formats like
-  // "Dec 2026" or "31/12/2026" still resolve.
+  // Auto-derive locality from Google Maps URL when location is empty.
   useEffect(() => {
-    const pdRaw = (rep.possession_date || '').trim();
-    const pdIso = toDateInput(pdRaw);
-    let derivedStatus = '';
-    if (pdIso) {
-      const t = Date.parse(pdIso);
-      if (!Number.isNaN(t)) {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        derivedStatus = t >= today.getTime() ? 'Under Construction' : 'Completed';
-      }
+    const url = (project.maps_url || '').trim();
+    if (!url) return;
+    const loc = deriveLocalityFromMapsUrl(url);
+    if (loc && (!project.location || String(project.location).trim() === '')) {
+      setProject(p => ({ ...p, location: loc }));
     }
-    if (derivedStatus && derivedStatus !== (rep.status || '').trim()) {
-      setRep(s => ({ ...s, status: derivedStatus }));
-    }
-    setProject(prev => {
-      const next = { ...prev };
-      let changed = false;
-      const pdToWrite = pdIso || pdRaw;
-      if (pdToWrite && (prev.possession_date || '') !== pdToWrite) { next.possession_date = pdToWrite; changed = true; }
-      if (derivedStatus && (prev.status || '') !== derivedStatus) { next.status = derivedStatus; changed = true; }
-      return changed ? next : prev;
-    });
-  }, [rep.possession_date, rep.status]);
+  }, [project.maps_url, project.location]);
 
   const saveRep = async () => {
     setSavingRep(true);
