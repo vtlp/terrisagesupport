@@ -165,7 +165,7 @@ const APARTMENT_CONFIG_SYNONYMS: Record<FieldKey, string[]> = {
   units_planned: ['unitsplanned', 'count', 'noofunits'],
   unit_numbers: ['unitnumbers', 'unitno', 'unitnos', 'units'],
   pricing_range: ['price', 'pricing', 'pricerange', 'pricingrange', 'cost'],
-  description: ['description', 'notes', 'remarks'],
+  description: ['description', 'notes', 'remarks', 'confignotes', 'specnotes', 'configdescription', 'details'],
   floorplan_crop_file: ['floorplancropfile', 'floorplanfile', 'floorplanimage', 'planfile', 'planimage'],
 };
 
