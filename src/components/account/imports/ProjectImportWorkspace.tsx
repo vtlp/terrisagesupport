@@ -852,14 +852,41 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       <Button size="sm" variant="ghost" onClick={() => removeConfig(c.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                     <div className="grid gap-2 md:grid-cols-3">
-                      {fieldsFor(propertyType).map(([k, l]) => (
-                        <div key={k} className="space-y-1">
-                          <Label className="text-xs">{l}</Label>
-                          <Input className="h-8 text-sm"
-                            value={data[k] != null ? String(data[k]) : ''}
-                            onChange={e => updateConfig(c.id, { [k]: e.target.value })} />
-                        </div>
-                      ))}
+                      {fieldsFor(propertyType).map(([k, l]) => {
+                        if (k === 'tower' && propertyType === 'APARTMENT') {
+                          const towerOpts = (project.tower_names_list || []).filter(Boolean);
+                          const cur = data[k] != null ? String(data[k]) : '';
+                          return (
+                            <div key={k} className="space-y-1">
+                              <Label className="text-xs">{l}</Label>
+                              {towerOpts.length > 0 ? (
+                                <Select value={cur || '__none__'} onValueChange={v => updateConfig(c.id, { [k]: v === '__none__' ? '' : v })}>
+                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select tower" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">—</SelectItem>
+                                    {towerOpts.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Input className="h-8 text-sm" value={cur} onChange={e => updateConfig(c.id, { [k]: e.target.value })} />
+                              )}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={k} className="space-y-1">
+                            <Label className="text-xs">{l}</Label>
+                            <Input className="h-8 text-sm"
+                              value={data[k] != null ? String(data[k]) : ''}
+                              onChange={e => updateConfig(c.id, { [k]: e.target.value })} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <Label className="text-xs">Description / notes (location, parking mentions, price structure)</Label>
+                      <Textarea rows={2} className="text-sm" value={data.description != null ? String(data.description) : ''}
+                        onChange={e => updateConfig(c.id, { description: e.target.value })} />
                     </div>
                   </div>
                 );
