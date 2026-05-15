@@ -1,78 +1,62 @@
-# Project Import Overhaul
+Continue the Project Import overhaul with the three remaining items from the previous turn.
 
-A large set of changes to the Project import workspace, the Admin → Data list, the Representative input, the configuration/media model, and the cross-tenant linking flow.
+## 1. Synonym mapping updates (`autoMapProjectImport.ts`)
 
-## 1. Enums and field model
+Extend the field-synonym dictionary so the auto-mapper recognises the new field model coming out of GPT/OCR:
 
-**Community type** (now per property type):
-- **Apartment**: `Gated`, `High-rise gated`, `Open`
-- **Villa**: `Gated`, `Open`
-- **Plot**: `Gated`, `Open`
-- Replace the free-text input with a Select on the Overview tab; options switch based on `job.property_type`.
+- `maps_url` ← "google maps", "maps link", "map url", "location url", "gmap"
+- `address_full` ← "full address", "site address", "project address"
+- `site_area_acres` ← "acres", "area (acres)"
+- `site_area_guntas` ← "guntas", "gunta"
+- `floors_per_unit` ← "floors per villa", "floors per unit", "no. of floors"
+- `tower_names_list` ← "tower names", "blocks", "tower/block list"
+- `cluster_names_list` ← "clusters", "streets", "phases"
+- `community_type` enum normaliser: map free-text into `Gated | High-rise gated | Open` (apartment) or `Gated | Open` (villa/plot)
+- `property_type` normaliser: collapse "Flats/Apartment/Apt" → `Apartment`, "Independent House/Villa" → `Villa`, "Plot/Land" → `Plot`
+- `status` adds "Phase 1 completed" matcher
+- Configuration `description` ← "notes", "config notes", "remarks", "spec notes"
 
-**Project type**: restrict to `Apartment`, `Villa`, `Plot`. Remove the free-text `project_type` field; rely on `job.property_type`.
+Also drop synonyms for fields we removed from the console (parking, nearby access, configuration range, clubhouse, possession date) so they no longer auto-populate.
 
-**Tower names (Apartment only)**:
-- Add an editable list of tower names on Apartment Overview (chip/multi-input). Stored as `tower_names: string[]`.
-- Auto-populated from extraction when present; supports add / rename / remove.
-- Each Apartment configuration's "Tower / Block" field becomes a Select sourced from this list (with free-text fallback).
-- Hidden for Villa / Plot (replaced by Clusters / Streets — see §3).
+## 2. Multi-image villa configurations (one config → many floor plans)
 
-**Address split**:
-- `address` → "Full address" (textarea).
-- New `maps_url` → "Google Maps location URL" (text input, validated).
+Data model:
 
-**Location**:
-- `location` becomes "Locality" derived automatically from `maps_url` (parse `?q=` / place segment) or, if blank, from address text. Manual override allowed.
+- Reuse existing `import_project_media` rows with `category = 'FLOOR_PLAN'` and existing `config_id` FK. No schema change — the link is already one-to-many.
+- For `crm_project_media` (post-import), confirm same FK exists; if not, the Admin migration in the previous turn will add it.
 
-**Site area**:
-- Convert to a single numeric (acres). Two small inputs (acres + guntas) combined as `acres + guntas/40` (e.g. 4 acres 11 guntas = 4.275). Stored as a number; unit fixed to "acres".
+UI in `ProjectImportWorkspace.tsx` Configurations tab (Villa only):
 
-**Status enum**: add `Phase 1 completed` to existing options (`Under Construction`, `Completed`, `Phase 1 completed`).
+- Inside each config card, render a "Floor plans" gallery: thumbnails of every `import_project_media` row where `config_id = thisConfig.id` AND `category = 'FLOOR_PLAN'`.
+- Add an "Upload floor plan" button per config card that uploads to `import-files` bucket and inserts an `import_project_media` row with `config_id` set.
+- Each thumbnail gets a remove (×) button and a caption field.
+- For Apartment/Plot, keep the single-image behaviour (one floor plan per config) but use the same gallery component capped at 1.
 
-## 2. Representative input cleanup
-Remove from the Representative tab: Address, Status, RERA ID, Possession date.
-Keep: builder name, project name, city, contact phone/email, website, expected completion date, banks, notes.
+## 3. Update `terrisage-project-push` payload
 
-## 3. Overview / Console field cleanup
-Remove from console UI:
-- Possession date (entirely)
-- Configuration range
-- Parking
-- Nearby access
-- Clubhouse field (auto-fold its text into "About the project" overview instead)
-- Towers count for Villa and Plot — replace with **Clusters / Streets** (count + names list)
+In `supabase/functions/terrisage-project-push/index.ts`, extend the outgoing payload to include the new fields so the tenant CRM receives them:
 
-Add for Villa overview: **Floors per unit** field.
+- `maps_url`, `address_full`, `locality` (derived)
+- `site_area_acres_total` (numeric, acres + guntas/40)
+- `community_type` (validated against per-property-type enum)
+- `tower_names: string[]` (Apartment only)
+- `cluster_names: string[]` (Villa/Plot only)
+- `floors_per_unit` (Villa only)
+- For each configuration: `description`, plus `floor_plans: [{url, caption}]` array instead of single `floor_plan_url`.
 
-## 4. Configurations
-- Add **Description / Notes** field on every configuration, populated by auto-mapper / GPT (location of the config in the project, parking notes, price-structure mentions drawn from brochure images and text). Editable in console.
-- **Villa configs** support **multiple floor plan images per single config**. Switch the config↔media link to one-to-many for villa floor plans (UI: gallery within the config card, multi-upload).
-- Apartment config "Tower" picker pulls from §1 tower names.
+Remove these from the payload (no longer collected): `possession_date`, `configuration_range`, `parking`, `nearby_access`, `clubhouse` (folded into `about_project` text).
 
-## 5. Media uploads in console
-- Add a manual **upload** action in the Media tab so support can upload Gallery images and Floor plans separately into the `import-files` bucket with category preselected.
+## Files to change
 
-## 6. Admin → Data list view
-- Show **project name** prominently in each row (from `extracted_data.projectData.project_name` → `representative_input.project_name` → `label`).
-- After a successful project request OR a successful onboarding-imported project, the resulting global project also appears in this list. Implementation: when a tenant-scoped import job reaches `IMPORTED` (or a `project_request` is fulfilled), insert/clone a corresponding row into `import_jobs` with `account_id = NULL`, `status = IMPORTED`.
+```text
+src/components/account/imports/autoMapProjectImport.ts
+src/components/account/imports/ProjectImportWorkspace.tsx   (Configurations tab only)
+supabase/functions/terrisage-project-push/index.ts
+```
 
-## 7. Link a global project to a tenant
-- New "Link to tenant…" action on each Admin → Data project row.
-- Dialog: pick account, optional notes.
-- On confirm: create a tenant-scoped `import_jobs` row (account_id set, status `READY_TO_IMPORT`) cloned from the global one, copy configs and media references, then push upstream so the tenant gains access.
+No new migrations required — `import_project_media.config_id` already supports the one-to-many link.
 
----
+## Out of scope for this step
 
-## Technical notes
-
-**Files:**
-- `src/components/account/imports/ProjectImportWorkspace.tsx` — community-type Select, tower-names manager, site-area acres+guntas, status enum, villa floors-per-unit, multiple floor plans per villa config, manual media upload, config description.
-- `src/components/account/imports/autoMapProjectImport.ts` — extract `maps_url`, derive locality, parse acres+guntas to numeric, add `description` synonyms, fold `clubhouse`/`parking`/`nearby_access` into `overview`, swap `towers_count` → `clusters` for VILLA/PLOT, surface `tower_names` array.
-- `src/pages/admin/AdminData.tsx` — show project name, "Link to tenant" dialog, surface auto-cloned global jobs.
-- `src/components/account/imports/shared.ts` — community-type and status enums.
-- `supabase/functions/terrisage-project-push/index.ts` — include new fields in payload.
-- New RPC / edge function `link_global_project_to_account(jobId, accountId)`.
-- Migration: add `account_link_origin_job_id` on `import_jobs` to track clones; trigger to auto-clone on tenant-job IMPORTED (deduped by project_name + builder_name).
-
-**No data destruction**: removed UI fields are simply hidden; underlying JSON keys remain.
+- Backfilling existing imported projects with the new fields
+- Tenant-side CRM rendering changes (handled on the CRM repo)
