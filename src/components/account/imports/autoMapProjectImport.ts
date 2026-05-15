@@ -49,29 +49,29 @@ const PROJECT_SYNONYMS: Record<FieldKey, string[]> = {
   city: ['city', 'town'],
   location: ['location', 'area', 'locality'],
   address: ['siteaddress', 'address', 'fulladdress', 'projectaddress'],
+  address_full: ['fulladdress', 'siteaddressfull', 'projectfulladdress', 'completeaddress'],
+  maps_url: ['googlemaps', 'mapslink', 'mapurl', 'mapsurl', 'locationurl', 'gmap', 'gmaps', 'googlemapurl', 'googlemapslink'],
   rera_id: ['reraid', 'rera', 'reranumber', 'reraapproval', 'approval', 'approvalid'],
   status: ['status', 'projectstatus', 'constructionstatus'],
   site_area: ['sitearea', 'totalarea', 'landarea', 'plotarea'],
   site_area_unit: ['siteareaunit', 'areaunit'],
+  site_area_acres: ['acres', 'areaacres', 'siteareaacres', 'totalacres'],
+  site_area_guntas: ['guntas', 'gunta', 'siteareaguntas'],
   community_type: ['communitytype', 'community'],
   approach_road_width: ['approachroadwidth', 'roadwidth', 'approachroad'],
   total_units: ['totalunits', 'units', 'noofunits', 'totalflats'],
   expected_completion_date: ['expectedcompletion', 'completiondate', 'expectedcompletiondate', 'eta', 'completion'],
-  possession_date: ['possession', 'possessiondate', 'handover', 'handoverdate'],
   website: ['website', 'url', 'web'],
   open_space_pct: ['openspace', 'openspacepct', 'openspacepercentage'],
-  overview: ['overview', 'description', 'about', 'projectoverview', 'summary'],
+  overview: ['overview', 'description', 'about', 'projectoverview', 'summary', 'aboutproject'],
   water_sources: ['watersources', 'water', 'watersupply'],
   utilities: ['utilities', 'utility'],
   key_features: ['keyfeatures', 'features', 'highlights', 'usp'],
   // Brochure-style additional fields
-  towers_count: ['towerscount', 'numberoftowers', 'totaltowers'],
-  tower_names: ['towernames', 'towers', 'blocks', 'blocknames'],
+  tower_names_list: ['towernames', 'towers', 'blocks', 'blocknames', 'towerblocklist'],
+  cluster_names_list: ['clusters', 'clusternames', 'streets', 'phases', 'phasenames'],
   floors_each_tower: ['floorseachtower', 'floorspertower', 'floorcount'],
-  config_range: ['configrange', 'configurationrange', 'unitrange'],
-  clubhouse: ['clubhouse', 'club'],
-  parking: ['parking', 'parkinglevels'],
-  nearby_access: ['nearbyaccess', 'connectivity', 'access'],
+  floors_per_unit: ['floorsperunit', 'floorspervilla', 'noofloors', 'numberoffloors', 'storeyspervilla'],
   contact_phone: ['contactphone', 'phone', 'mobile', 'contactnumber'],
   contact_email: ['contactemail', 'email', 'enquiryemail'],
   office_address: ['officeaddress', 'salesoffice', 'siteoffice'],
@@ -165,7 +165,7 @@ const APARTMENT_CONFIG_SYNONYMS: Record<FieldKey, string[]> = {
   units_planned: ['unitsplanned', 'count', 'noofunits'],
   unit_numbers: ['unitnumbers', 'unitno', 'unitnos', 'units'],
   pricing_range: ['price', 'pricing', 'pricerange', 'pricingrange', 'cost'],
-  description: ['description', 'notes', 'remarks'],
+  description: ['description', 'notes', 'remarks', 'confignotes', 'specnotes', 'configdescription', 'details'],
   floorplan_crop_file: ['floorplancropfile', 'floorplanfile', 'floorplanimage', 'planfile', 'planimage'],
 };
 
@@ -283,14 +283,49 @@ function parseProximityCsv(aoa: unknown[][]): Array<{ name: string; distance_km:
 
 type ProjectExtract = Record<string, unknown>;
 
+function normaliseCommunityType(s: string): string {
+  const n = s.toLowerCase();
+  if (/(high\s*-?\s*rise|hi\s*-?\s*rise|highrise|hirise)/.test(n)) return 'High-rise gated';
+  if (/gated/.test(n)) return 'Gated';
+  if (/open|non[\s-]*gated|standalone/.test(n)) return 'Open';
+  return s;
+}
+
+function normalisePropertyType(s: string): string {
+  const n = s.toLowerCase();
+  if (/(apartment|apt\b|flat)/.test(n)) return 'Apartment';
+  if (/(villa|independent\s*house|row\s*house)/.test(n)) return 'Villa';
+  if (/(plot|land|layout)/.test(n)) return 'Plot';
+  return s;
+}
+
+function normaliseStatus(s: string): string {
+  const n = s.toLowerCase();
+  if (/phase\s*1.*complet/.test(n)) return 'Phase 1 completed';
+  return s;
+}
+
 function assignProject(project: ProjectExtract, field: string, val: unknown) {
   const sval = typeof val === 'string' ? val.trim() : val;
   if (sval == null || sval === '') return;
-  if (field === 'water_sources' || field === 'utilities' || field === 'key_features') {
-    project[field] = String(sval).split(/[,;]/).map(s => s.trim()).filter(Boolean);
-  } else if (field === 'total_units' || field === 'open_space_pct' || field === 'towers_count') {
+  if (field === 'water_sources' || field === 'utilities' || field === 'key_features'
+      || field === 'tower_names_list' || field === 'cluster_names_list') {
+    if (Array.isArray(sval)) {
+      project[field] = sval.map(s => String(s).trim()).filter(Boolean);
+    } else {
+      project[field] = String(sval).split(/[,;|\n]/).map(s => s.trim()).filter(Boolean);
+    }
+  } else if (field === 'total_units' || field === 'open_space_pct'
+      || field === 'site_area_acres' || field === 'site_area_guntas'
+      || field === 'floors_per_unit') {
     const n = Number(String(sval).replace(/[^\d.\-]/g, ''));
     if (!Number.isNaN(n)) project[field] = n;
+  } else if (field === 'community_type') {
+    project[field] = normaliseCommunityType(String(sval));
+  } else if (field === 'property_type') {
+    project[field] = normalisePropertyType(String(sval));
+  } else if (field === 'status') {
+    project[field] = normaliseStatus(String(sval));
   } else {
     project[field] = sval;
   }

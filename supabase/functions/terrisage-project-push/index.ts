@@ -53,10 +53,23 @@ Deno.serve(async (req) => {
   ]);
 
   const extracted = (job.extracted_data ?? {}) as Record<string, unknown>;
-  const projectData = (extracted.projectData ?? {}) as Record<string, unknown>;
+  const projectDataRaw = (extracted.projectData ?? {}) as Record<string, unknown>;
+
+  // Strip fields removed from the console — these are no longer collected.
+  const REMOVED_FIELDS = ['possession_date', 'config_range', 'configuration_range', 'parking', 'nearby_access', 'clubhouse', 'towers_count'];
+  const projectData: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(projectDataRaw)) {
+    if (!REMOVED_FIELDS.includes(k)) projectData[k] = v;
+  }
+
+  // Derive convenience fields for downstream consumers.
+  const acres = Number(projectData.site_area_acres ?? 0) || 0;
+  const guntas = Number(projectData.site_area_guntas ?? 0) || 0;
+  if (acres || guntas) projectData.site_area_acres_total = acres + guntas / 40;
 
   // Sign storage paths so Terrisage can fetch images for ~24h.
   const mediaPayload: Array<Record<string, unknown>> = [];
+  const floorPlansByConfig = new Map<string, Array<{ url: string | null; caption: string | null }>>();
   for (const m of (media ?? [])) {
     if (m.review_state === 'INCORRECT' || m.review_state === 'DUPLICATE') continue;
     let url = m.external_url ?? null;
@@ -71,6 +84,11 @@ Deno.serve(async (req) => {
       configRef: m.config_id ?? null,
       meta: m.meta ?? {},
     });
+    if (m.category === 'FLOOR_PLAN' && m.config_id) {
+      const arr = floorPlansByConfig.get(m.config_id) ?? [];
+      arr.push({ url, caption: m.caption });
+      floorPlansByConfig.set(m.config_id, arr);
+    }
   }
 
   const payload = {
@@ -83,7 +101,12 @@ Deno.serve(async (req) => {
       approvedBanks: extracted.approvedBanks ?? [],
       representative: job.representative_input ?? {},
     },
-    configurations: (configs ?? []).map(c => ({ ref: c.id, sortOrder: c.sort_order, data: c.data })),
+    configurations: (configs ?? []).map(c => ({
+      ref: c.id,
+      sortOrder: c.sort_order,
+      data: c.data,
+      floor_plans: floorPlansByConfig.get(c.id) ?? [],
+    })),
     media: mediaPayload,
     pushedAt: new Date().toISOString(),
     pushedBy: user.id,
