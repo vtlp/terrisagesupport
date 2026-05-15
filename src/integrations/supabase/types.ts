@@ -1705,6 +1705,7 @@ export type Database = {
           label: string | null
           mapping: Json
           notes: string | null
+          origin_job_id: string | null
           property_type:
             | Database["public"]["Enums"]["import_property_type"]
             | null
@@ -1731,6 +1732,7 @@ export type Database = {
           label?: string | null
           mapping?: Json
           notes?: string | null
+          origin_job_id?: string | null
           property_type?:
             | Database["public"]["Enums"]["import_property_type"]
             | null
@@ -1757,6 +1759,7 @@ export type Database = {
           label?: string | null
           mapping?: Json
           notes?: string | null
+          origin_job_id?: string | null
           property_type?:
             | Database["public"]["Enums"]["import_property_type"]
             | null
@@ -1770,7 +1773,15 @@ export type Database = {
           updated_at?: string
           validation?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_origin_job_id_fkey"
+            columns: ["origin_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       import_project_configs: {
         Row: {
@@ -3666,6 +3677,10 @@ export type Database = {
         Returns: string
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      link_global_project_to_account: {
+        Args: { _account_id: string; _global_job_id: string; _notes?: string }
+        Returns: string
+      }
       log_activity: {
         Args: {
           _details?: Json
