@@ -544,29 +544,11 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   ['representative_phone', 'Representative phone'],
                   ['representative_email', 'Representative email'],
                   ['website', 'Website'],
-                  ['rera_id', 'RERA / Approval IDs'],
-                  ['status', 'Status'],
                   ['expected_completion_date', 'Expected completion date'],
-                  ['possession_date', 'Possession date'],
                   ['banks', 'Approved banks'],
                 ].map(([k, l]) => {
                   const val = (rep as Record<string, string>)[k] ?? '';
-                  if (k === 'status') {
-                    return (
-                      <div key={k} className="space-y-1">
-                        <Label>{l}</Label>
-                        <Select value={val || '__none__'} onValueChange={v => setRep(s => ({ ...s, status: v === '__none__' ? '' : v }))}>
-                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">—</SelectItem>
-                            <SelectItem value="Under Construction">Under Construction</SelectItem>
-                            <SelectItem value="Completed">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    );
-                  }
-                  if (k === 'expected_completion_date' || k === 'possession_date') {
+                  if (k === 'expected_completion_date') {
                     return (
                       <div key={k} className="space-y-1">
                         <Label>{l}</Label>
@@ -581,10 +563,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                     </div>
                   );
                 })}
-              </div>
-              <div className="space-y-1">
-                <Label>Address</Label>
-                <Textarea rows={2} value={rep.address ?? ''} onChange={e => setRep(s => ({ ...s, address: e.target.value }))} />
               </div>
               <div className="space-y-1">
                 <Label>Notes</Label>
