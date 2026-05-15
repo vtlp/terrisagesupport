@@ -1,68 +1,78 @@
-## Goal
+# Project Import Overhaul
 
-Wire the **Confirm and import** action on Lead and Secondary-property imports to also push the file to UpYard's `/api/support/onboarding` ingestion API, then poll the resulting job until terminal and surface the outcome in the UI / activity log.
+A large set of changes to the Project import workspace, the Admin → Data list, the Representative input, the configuration/media model, and the cross-tenant linking flow.
 
-## What changes
+## 1. Enums and field model
 
-### 1. Secret
+**Community type** (now per property type):
+- **Apartment**: `Gated`, `High-rise gated`, `Open`
+- **Villa**: `Gated`, `Open`
+- **Plot**: `Gated`, `Open`
+- Replace the free-text input with a Select on the Overview tab; options switch based on `job.property_type`.
 
-Add a new runtime secret **`SUPPORT_ONBOARDING_INGESTION_API_KEY`** (separate from `SEAT_SUPPORT_INTEGRATION_API_KEY`). Used by the new edge function only.
+**Project type**: restrict to `Apartment`, `Villa`, `Plot`. Remove the free-text `project_type` field; rely on `job.property_type`.
 
-### 2. New edge function: `terrisage-onboarding-ingest`
+**Tower names (Apartment only)**:
+- Add an editable list of tower names on Apartment Overview (chip/multi-input). Stored as `tower_names: string[]`.
+- Auto-populated from extraction when present; supports add / rename / remove.
+- Each Apartment configuration's "Tower / Block" field becomes a Select sourced from this list (with free-text fallback).
+- Hidden for Villa / Plot (replaced by Clusters / Streets — see §3).
 
-Public function (verify_jwt = false), service-role client. Two actions in one function:
+**Address split**:
+- `address` → "Full address" (textarea).
+- New `maps_url` → "Google Maps location URL" (text input, validated).
 
-**POST body**
-```json
-{ "action": "import", "accountId": "...", "jobId": "...", "entityType": "leads" | "properties" }
-```
+**Location**:
+- `location` becomes "Locality" derived automatically from `maps_url` (parse `?q=` / place segment) or, if blank, from address text. Manual override allowed.
 
-Behaviour:
-1. Look up `accounts.tenant_id`. Missing → `{ ok:false, error:'NO_TENANT' }`.
-2. Look up `import_jobs` row + its latest `import_files` (CSV category) row.
-3. Download file bytes from `import-files` storage bucket.
-4. If file is `.csv`, convert to `.xlsx` server-side (use `xlsx` npm via esm.sh) so the upstream accepts it. If already `.xlsx`/`.xls`, pass through.
-5. Build `multipart/form-data` with field `file`.
-6. `POST {TERRISAGE_BASE_URL}/api/support/onboarding/tenants/{tenantId}/{entityType}/import`
-   - `X-API-Key: SUPPORT_ONBOARDING_INGESTION_API_KEY`
-   - `X-Idempotency-Key: {entityType}:{jobId}` (stable per local job)
-7. Persist `upstreamJobId`, `upstreamStatus='PENDING'`, `idempotencyKey` into `import_jobs.summary` (jsonb merge). Write `import_activity` event `upstream_submitted`.
-8. Return `{ ok:true, upstreamJobId, replayed }`.
+**Site area**:
+- Convert to a single numeric (acres). Two small inputs (acres + guntas) combined as `acres + guntas/40` (e.g. 4 acres 11 guntas = 4.275). Stored as a number; unit fixed to "acres".
 
-**Poll action**
-```json
-{ "action": "poll", "accountId": "...", "jobId": "..." }
-```
-- Reads `summary.upstreamJobId` from `import_jobs`, calls `GET /tenants/{tenantId}/import-jobs/{upstreamJobId}` with the same `X-API-Key`, mirrors `status / inserted / totalRows / errorDetails` into `summary` and writes a final `upstream_succeeded` or `upstream_failed` activity row when terminal.
+**Status enum**: add `Phase 1 completed` to existing options (`Under Construction`, `Completed`, `Phase 1 completed`).
 
-Errors:
-- 403 from upstream → log + return `{ok:false,error:'FORBIDDEN'}` (key wrong).
-- 409 → log `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` (re-uploaded file with same key) and bubble up.
-- 4xx/5xx → store body preview into `summary.upstreamError`.
+## 2. Representative input cleanup
+Remove from the Representative tab: Address, Status, RERA ID, Possession date.
+Keep: builder name, project name, city, contact phone/email, website, expected completion date, banks, notes.
 
-### 3. UI wiring
+## 3. Overview / Console field cleanup
+Remove from console UI:
+- Possession date (entirely)
+- Configuration range
+- Parking
+- Nearby access
+- Clubhouse field (auto-fold its text into "About the project" overview instead)
+- Towers count for Villa and Plot — replace with **Clusters / Streets** (count + names list)
 
-`LeadImportWorkspace.tsx` and `SecondaryImportWorkspace.tsx`, in `runImport()`:
+Add for Villa overview: **Floors per unit** field.
 
-After the existing local `crm_leads` / `crm_secondary_properties` insert succeeds:
+## 4. Configurations
+- Add **Description / Notes** field on every configuration, populated by auto-mapper / GPT (location of the config in the project, parking notes, price-structure mentions drawn from brochure images and text). Editable in console.
+- **Villa configs** support **multiple floor plan images per single config**. Switch the config↔media link to one-to-many for villa floor plans (UI: gallery within the config card, multi-upload).
+- Apartment config "Tower" picker pulls from §1 tower names.
 
-1. Toast "Local rows saved. Pushing to UpYard…".
-2. `supabase.functions.invoke('terrisage-onboarding-ingest', { body: { action:'import', accountId, jobId: job.id, entityType: 'leads' | 'properties' } })`.
-3. Start a setInterval (every 5s, max ~2 min) that calls the same function with `action:'poll'` until `summary.upstreamStatus` is `SUCCEEDED` or `FAILED`.
-4. Toast on terminal: success → `Pushed N rows to UpYard`; failure → show `summary.upstreamError` and a "Retry push" button on the workspace header.
-5. Activity log entries (already rendered by `ActivityLog`) will show `upstream_submitted` → `upstream_succeeded`/`upstream_failed`.
+## 5. Media uploads in console
+- Add a manual **upload** action in the Media tab so support can upload Gallery images and Floor plans separately into the `import-files` bucket with category preselected.
 
-If the function call returns `error:'NO_TENANT'`, surface "Account is not yet linked to an UpYard tenant — local rows saved, push skipped."
+## 6. Admin → Data list view
+- Show **project name** prominently in each row (from `extracted_data.projectData.project_name` → `representative_input.project_name` → `label`).
+- After a successful project request OR a successful onboarding-imported project, the resulting global project also appears in this list. Implementation: when a tenant-scoped import job reaches `IMPORTED` (or a `project_request` is fulfilled), insert/clone a corresponding row into `import_jobs` with `account_id = NULL`, `status = IMPORTED`.
 
-### 4. No DB migration needed
+## 7. Link a global project to a tenant
+- New "Link to tenant…" action on each Admin → Data project row.
+- Dialog: pick account, optional notes.
+- On confirm: create a tenant-scoped `import_jobs` row (account_id set, status `READY_TO_IMPORT`) cloned from the global one, copy configs and media references, then push upstream so the tenant gains access.
 
-We reuse `import_jobs.summary jsonb` and `import_activity` for everything. (Adding dedicated columns can come later if you want them queryable.)
+---
 
-## Open questions to confirm before I build
+## Technical notes
 
-1. **TERRISAGE_BASE_URL** — same env var already used by `terrisage-project-push` etc. (resolves to `https://upyard-backend.onrender.com` per current logs). The new path is `/api/support/onboarding/...` on the same host. Confirm same host is correct?
-2. **Push only after local insert succeeds**, not before — correct? (i.e. local copy is source of truth, UpYard is mirrored.)
-3. **Properties** — for now, do we wire it on the existing **Secondary properties** workspace and send to `/properties/import`? (Plot/villa rules from your spec apply on the upstream side; we just forward the file.)
-4. **Projects import** stays out of scope for this round (it has different prerequisites — `businessType=LARGE`)?
+**Files:**
+- `src/components/account/imports/ProjectImportWorkspace.tsx` — community-type Select, tower-names manager, site-area acres+guntas, status enum, villa floors-per-unit, multiple floor plans per villa config, manual media upload, config description.
+- `src/components/account/imports/autoMapProjectImport.ts` — extract `maps_url`, derive locality, parse acres+guntas to numeric, add `description` synonyms, fold `clubhouse`/`parking`/`nearby_access` into `overview`, swap `towers_count` → `clusters` for VILLA/PLOT, surface `tower_names` array.
+- `src/pages/admin/AdminData.tsx` — show project name, "Link to tenant" dialog, surface auto-cloned global jobs.
+- `src/components/account/imports/shared.ts` — community-type and status enums.
+- `supabase/functions/terrisage-project-push/index.ts` — include new fields in payload.
+- New RPC / edge function `link_global_project_to_account(jobId, accountId)`.
+- Migration: add `account_link_origin_job_id` on `import_jobs` to track clones; trigger to auto-clone on tenant-job IMPORTED (deduped by project_name + builder_name).
 
-If answers are: (1) yes (2) yes (3) yes (4) yes — I'll proceed straight to adding the secret and building the function + UI changes.
+**No data destruction**: removed UI fields are simply hidden; underlying JSON keys remain.
