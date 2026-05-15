@@ -283,14 +283,49 @@ function parseProximityCsv(aoa: unknown[][]): Array<{ name: string; distance_km:
 
 type ProjectExtract = Record<string, unknown>;
 
+function normaliseCommunityType(s: string): string {
+  const n = s.toLowerCase();
+  if (/(high\s*-?\s*rise|hi\s*-?\s*rise|highrise|hirise)/.test(n)) return 'High-rise gated';
+  if (/gated/.test(n)) return 'Gated';
+  if (/open|non[\s-]*gated|standalone/.test(n)) return 'Open';
+  return s;
+}
+
+function normalisePropertyType(s: string): string {
+  const n = s.toLowerCase();
+  if (/(apartment|apt\b|flat)/.test(n)) return 'Apartment';
+  if (/(villa|independent\s*house|row\s*house)/.test(n)) return 'Villa';
+  if (/(plot|land|layout)/.test(n)) return 'Plot';
+  return s;
+}
+
+function normaliseStatus(s: string): string {
+  const n = s.toLowerCase();
+  if (/phase\s*1.*complet/.test(n)) return 'Phase 1 completed';
+  return s;
+}
+
 function assignProject(project: ProjectExtract, field: string, val: unknown) {
   const sval = typeof val === 'string' ? val.trim() : val;
   if (sval == null || sval === '') return;
-  if (field === 'water_sources' || field === 'utilities' || field === 'key_features') {
-    project[field] = String(sval).split(/[,;]/).map(s => s.trim()).filter(Boolean);
-  } else if (field === 'total_units' || field === 'open_space_pct' || field === 'towers_count') {
+  if (field === 'water_sources' || field === 'utilities' || field === 'key_features'
+      || field === 'tower_names_list' || field === 'cluster_names_list') {
+    if (Array.isArray(sval)) {
+      project[field] = sval.map(s => String(s).trim()).filter(Boolean);
+    } else {
+      project[field] = String(sval).split(/[,;|\n]/).map(s => s.trim()).filter(Boolean);
+    }
+  } else if (field === 'total_units' || field === 'open_space_pct'
+      || field === 'site_area_acres' || field === 'site_area_guntas'
+      || field === 'floors_per_unit') {
     const n = Number(String(sval).replace(/[^\d.\-]/g, ''));
     if (!Number.isNaN(n)) project[field] = n;
+  } else if (field === 'community_type') {
+    project[field] = normaliseCommunityType(String(sval));
+  } else if (field === 'property_type') {
+    project[field] = normalisePropertyType(String(sval));
+  } else if (field === 'status') {
+    project[field] = normaliseStatus(String(sval));
   } else {
     project[field] = sval;
   }
