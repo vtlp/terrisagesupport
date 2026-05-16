@@ -46,6 +46,7 @@ export function OwnerAccountCard({ jobId, onOwnerChange }: { jobId: string; onOw
     if (error) { toast.error(error.message); return; }
     setOpen(false);
     setOwner(accountId ? accounts.find(a => a.id === accountId) ?? null : null);
+    onOwnerChange?.(!!accountId);
   };
 
   return (
