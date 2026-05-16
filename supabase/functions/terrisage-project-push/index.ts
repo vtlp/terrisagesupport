@@ -38,12 +38,14 @@ const STATUS_LOOKUP: Record<string, string> = {
 };
 const mapStatus = (v: unknown): string | null => STATUS_LOOKUP[norm(v)] ?? null;
 
-// Only GATED / OPEN. STANDALONE → OPEN; everything else community-ish → GATED.
+// Only GATED / OPEN are accepted. Unknown values are dropped (null) so we never send a
+// fabricated value to Terrisage.
 const mapCommunity = (v: unknown): string | null => {
   const n = norm(v);
   if (!n) return null;
-  if (n === 'open' || n === 'standalone') return 'OPEN';
-  return 'GATED';
+  if (n === 'open') return 'OPEN';
+  if (n === 'gated' || n === 'high rise gated' || n === 'highrise gated') return 'GATED';
+  return null;
 };
 
 const WATER_LOOKUP: Record<string, string> = {
@@ -53,12 +55,13 @@ const WATER_LOOKUP: Record<string, string> = {
   'lake': 'LAKE',
   'other': 'OTHER',
 };
+// Drop anything we can't confidently map. Send only spec-accepted values.
 const mapWater = (arr: unknown): string[] => {
   if (!Array.isArray(arr)) return [];
   const seen = new Set<string>();
   for (const x of arr) {
-    const v = WATER_LOOKUP[norm(x)] ?? 'OTHER';
-    seen.add(v);
+    const v = WATER_LOOKUP[norm(x)];
+    if (v) seen.add(v);
   }
   return [...seen];
 };
