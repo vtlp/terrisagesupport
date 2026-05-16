@@ -999,9 +999,13 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Media & floor plans</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={addMedia}><Plus className="h-4 w-4 mr-1" />Add item</Button>
+                  <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border bg-background hover:bg-muted cursor-pointer">
+                    <Plus className="h-3 w-3" /> Bulk upload
+                    <input type="file" accept="image/*,application/pdf" multiple className="hidden"
+                      onChange={async e => { await uploadBulkMedia(e.target.files); (e.target as HTMLInputElement).value = ''; }} />
+                  </label>
+                  <Button size="sm" variant="outline" onClick={addMedia}><Plus className="h-4 w-4 mr-1" />Add empty item</Button>
                 </div>
-              </div>
               <p className="text-xs text-muted-foreground">Floor plans should be cleanly cropped and mapped to the right configuration. Mark items that need re-cropping or are incorrect.</p>
             </CardHeader>
             <CardContent>
