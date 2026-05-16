@@ -574,6 +574,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         );
       })()}
 
+      {!job.account_id && <OwnerAccountCard jobId={job.id} />}
       {!job.account_id && <LinkedAccountsCard jobId={job.id} />}
 
       <Tabs defaultValue="files">
