@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, 405);
 
-  let body: { jobId?: string; action?: string };
+  let body: { jobId?: string; action?: string; accountId?: string };
   try { body = await req.json(); } catch { return json({ ok: false, error: 'INVALID_BODY' }, 400); }
   const jobId = body.jobId;
   const action = body.action ?? 'push';
