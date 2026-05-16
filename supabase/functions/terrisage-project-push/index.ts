@@ -18,42 +18,91 @@ const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 // ---------- Enum maps (Support UI label → Terrisage enum) ----------
-const STATUS_MAP: Record<string, string> = {
-  'Under Construction': 'UNDER_CONSTRUCTION',
-  'Phase 1 completed': 'PHASE_1_COMPLETED',
-  'Completed': 'COMPLETED_WITH_OC',
+// Confirmed by Terrisage 2026-05-16: only the values below are accepted; everything else falls back.
+const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+
+const STATUS_LOOKUP: Record<string, string> = {
+  'under construction': 'UNDER_CONSTRUCTION',
+  'uc': 'UNDER_CONSTRUCTION',
+  'pre launch': 'UNDER_CONSTRUCTION',
+  'launched': 'UNDER_CONSTRUCTION',
+  'launch': 'UNDER_CONSTRUCTION',
+  'phase 1 completed': 'PHASE_1_COMPLETED',
+  'phase 1 complete': 'PHASE_1_COMPLETED',
+  'phase1 completed': 'PHASE_1_COMPLETED',
+  'completed': 'COMPLETED_WITH_OC',
+  'completed with oc': 'COMPLETED_WITH_OC',
+  'ready to move': 'COMPLETED_WITH_OC',
+  'ready to move in': 'COMPLETED_WITH_OC',
+  'rtm': 'COMPLETED_WITH_OC',
 };
-const COMMUNITY_MAP: Record<string, string> = {
-  'Gated': 'GATED',
-  'High-rise gated': 'GATED',
-  'Open': 'OPEN',
+const mapStatus = (v: unknown): string | null => STATUS_LOOKUP[norm(v)] ?? null;
+
+// Only GATED / OPEN. STANDALONE → OPEN; everything else community-ish → GATED.
+const mapCommunity = (v: unknown): string | null => {
+  const n = norm(v);
+  if (!n) return null;
+  if (n === 'open' || n === 'standalone') return 'OPEN';
+  return 'GATED';
 };
-const WATER_MAP: Record<string, string> = {
-  'Borewell': 'BORE_WELL', 'Bore well': 'BORE_WELL', 'BORE_WELL': 'BORE_WELL',
-  'BWSSB': 'MUNICIPAL', 'Municipal': 'MUNICIPAL', 'Corporation': 'MUNICIPAL', 'MUNICIPAL': 'MUNICIPAL',
-  'Tanker': 'TANKER', 'TANKER': 'TANKER',
-  'Lake': 'LAKE', 'LAKE': 'LAKE',
-  'Other': 'OTHER', 'OTHER': 'OTHER',
+
+const WATER_LOOKUP: Record<string, string> = {
+  'bore well': 'BORE_WELL', 'borewell': 'BORE_WELL',
+  'municipal': 'MUNICIPAL', 'bwssb': 'MUNICIPAL', 'corporation': 'MUNICIPAL', 'water board': 'MUNICIPAL',
+  'tanker': 'TANKER',
+  'lake': 'LAKE',
+  'other': 'OTHER',
 };
-const UTILITY_MAP: Record<string, string> = {
-  'Electricity': 'ELECTRICITY', 'ELECTRICITY': 'ELECTRICITY',
-  'Water': 'WATER', 'WATER': 'WATER',
-  'Gas': 'GAS', 'GAS': 'GAS',
-  'Sewage': 'SEWAGE', 'SEWAGE': 'SEWAGE',
-  'STP': 'STP',
-  'Intercom': 'INTERCOM_SECURITY', 'Security': 'INTERCOM_SECURITY', 'INTERCOM_SECURITY': 'INTERCOM_SECURITY',
-  'Rainwater harvesting': 'RAIN_WATER_HARVESTING', 'Rain water harvesting': 'RAIN_WATER_HARVESTING', 'RAIN_WATER_HARVESTING': 'RAIN_WATER_HARVESTING',
-  'Storm water drains': 'STORM_WATER_DRAINS', 'STORM_WATER_DRAINS': 'STORM_WATER_DRAINS',
+const mapWater = (arr: unknown): string[] => {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set<string>();
+  for (const x of arr) {
+    const v = WATER_LOOKUP[norm(x)] ?? 'OTHER';
+    seen.add(v);
+  }
+  return [...seen];
 };
+
+// Utilities → { utilityType, details? }.
+const UTILITY_TYPES = new Set(['ELECTRICITY','WATER','GAS','SEWAGE','STP','INTERCOM_SECURITY','RAIN_WATER_HARVESTING','STORM_WATER_DRAINS']);
+const UTILITY_LOOKUP: Record<string, { utilityType: string; details?: string }> = {
+  'electricity': { utilityType: 'ELECTRICITY' },
+  'power': { utilityType: 'ELECTRICITY' },
+  'power backup': { utilityType: 'ELECTRICITY', details: 'Power backup' },
+  'solar': { utilityType: 'ELECTRICITY', details: 'Solar panels' },
+  'solar panels': { utilityType: 'ELECTRICITY', details: 'Solar panels' },
+  'water': { utilityType: 'WATER' },
+  'water supply 24 7': { utilityType: 'WATER', details: '24x7 supply' },
+  'gas': { utilityType: 'GAS' },
+  'gas pipeline': { utilityType: 'GAS', details: 'Piped gas' },
+  'sewage': { utilityType: 'SEWAGE' },
+  'sewage treatment': { utilityType: 'STP' },
+  'stp': { utilityType: 'STP' },
+  'intercom': { utilityType: 'INTERCOM_SECURITY' },
+  'security': { utilityType: 'INTERCOM_SECURITY' },
+  'intercom security': { utilityType: 'INTERCOM_SECURITY' },
+  'rain water harvesting': { utilityType: 'RAIN_WATER_HARVESTING' },
+  'rainwater harvesting': { utilityType: 'RAIN_WATER_HARVESTING' },
+  'storm water drains': { utilityType: 'STORM_WATER_DRAINS' },
+};
+
+// Media kind: only LOGO|PHOTO|VIDEO|FLOORPLAN|TOUR_3D|OTHER on the wire.
 const MEDIA_KIND_MAP: Record<string, string> = {
   LOGO: 'LOGO',
   GALLERY: 'PHOTO',
+  MASTER_PLAN: 'PHOTO',
+  PHOTO: 'PHOTO',
   FLOOR_PLAN: 'FLOORPLAN',
+  FLOORPLAN: 'FLOORPLAN',
   VIDEO: 'VIDEO',
+  WALKTHROUGH_VIDEO: 'VIDEO',
+  TOUR_3D: 'TOUR_3D',
   BROCHURE: 'OTHER',
   DOCUMENT: 'OTHER',
   OTHER: 'OTHER',
 };
+
+const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'unknown';
 
 // ---------- Coercion helpers ----------
 const numOrNull = (v: unknown): number | null => {
@@ -92,29 +141,92 @@ const parseDims = (v: unknown): { width: number | null; length: number | null } 
   if (m) return { width: parseFloat(m[1]), length: parseFloat(m[2]) };
   return { width: null, length: null };
 };
-const mapArr = (arr: unknown, m: Record<string, string>): string[] => {
+const mapUtilities = (arr: unknown): Array<{ utilityType: string; details?: string }> => {
   if (!Array.isArray(arr)) return [];
-  const seen = new Set<string>();
+  const seenKey = new Set<string>();
+  const out: Array<{ utilityType: string; details?: string }> = [];
   for (const x of arr) {
-    const v = m[String(x).trim()];
-    if (v) seen.add(v);
-  }
-  return [...seen];
-};
-const mapUtilities = (arr: unknown): Array<{ utilityType: string; details: string | null }> => {
-  if (!Array.isArray(arr)) return [];
-  const seen = new Set<string>();
-  const out: Array<{ utilityType: string; details: string | null }> = [];
-  for (const x of arr) {
-    const raw = String(x).trim();
-    const v = UTILITY_MAP[raw];
-    if (v && !seen.has(v)) {
-      seen.add(v);
-      out.push({ utilityType: v, details: null });
+    const key = norm(x);
+    if (!key) continue;
+    let mapped = UTILITY_LOOKUP[key];
+    if (!mapped) {
+      const upper = String(x).trim().toUpperCase().replace(/\s+/g, '_');
+      if (UTILITY_TYPES.has(upper)) mapped = { utilityType: upper };
     }
+    if (!mapped) continue;
+    const k = `${mapped.utilityType}|${mapped.details ?? ''}`;
+    if (seenKey.has(k)) continue;
+    seenKey.add(k);
+    out.push(mapped.details ? { utilityType: mapped.utilityType, details: mapped.details } : { utilityType: mapped.utilityType });
   }
   return out;
 };
+
+type AmenityMaster = { amenity_id: string; code: string | null; display_name: string; property_type: string };
+function resolveAmenities(
+  labels: unknown,
+  master: AmenityMaster[],
+  propertyType: string,
+): { amenities: Array<{ amenityId: string; boolValue: boolean }>; unmapped: string[] } {
+  if (!Array.isArray(labels) || master.length === 0) {
+    return { amenities: [], unmapped: Array.isArray(labels) ? (labels as unknown[]).map(String) : [] };
+  }
+  const lookup = new Map<string, string>();
+  for (const m of master) {
+    if (m.property_type && m.property_type !== propertyType) continue;
+    lookup.set(norm(m.display_name), m.amenity_id);
+    if (m.code) lookup.set(norm(m.code), m.amenity_id);
+  }
+  const seen = new Set<string>();
+  const out: Array<{ amenityId: string; boolValue: boolean }> = [];
+  const unmapped: string[] = [];
+  for (const raw of labels) {
+    const id = lookup.get(norm(raw));
+    if (id) {
+      if (!seen.has(id)) { seen.add(id); out.push({ amenityId: id, boolValue: true }); }
+    } else {
+      const s = String(raw).trim();
+      if (s) unmapped.push(s);
+    }
+  }
+  return { amenities: out, unmapped };
+}
+
+function synthesiseBuildings(
+  configs: Array<{ data: Record<string, unknown> }>,
+  propertyType: string,
+): {
+  buildings: Array<Record<string, unknown>>;
+  streetClusters: Array<Record<string, unknown>>;
+  buildingKeyByName: Map<string, string>;
+  clusterKeyByName: Map<string, string>;
+} {
+  const buildingKeyByName = new Map<string, string>();
+  const clusterKeyByName = new Map<string, string>();
+  const buildings: Array<Record<string, unknown>> = [];
+  const streetClusters: Array<Record<string, unknown>> = [];
+
+  if (propertyType === 'APARTMENT') {
+    let sort = 0;
+    for (const c of configs) {
+      const name = strOrNull(c.data.tower);
+      if (!name || buildingKeyByName.has(name)) continue;
+      const key = slugify(name);
+      buildingKeyByName.set(name, key);
+      buildings.push({ supportBuildingKey: key, buildingName: name, sortOrder: sort++ });
+    }
+  } else {
+    let sort = 0;
+    for (const c of configs) {
+      const name = strOrNull(c.data.cluster);
+      if (!name || clusterKeyByName.has(name)) continue;
+      const key = slugify(name);
+      clusterKeyByName.set(name, key);
+      streetClusters.push({ supportClusterKey: key, clusterName: name, sortOrder: sort++ });
+    }
+  }
+  return { buildings, streetClusters, buildingKeyByName, clusterKeyByName };
+}
 
 // ---------- Builders ----------
 function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<string, unknown>, rep: unknown, propertyType: string) {
@@ -135,16 +247,16 @@ function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<strin
     projectAddress: strOrNull(pd.address),
     mapsUrl: strOrNull(pd.maps_url),
     reraRegistrationNo: strOrNull(pd.rera_id),
-    projectStatus: STATUS_MAP[String(pd.status ?? '')] ?? null,
+    projectStatus: mapStatus(pd.status),
     openSpacePercent: numOrNull(pd.open_space_pct),
     projectSiteAreaAcres: acres,
-    projectCommunityType: COMMUNITY_MAP[String(pd.community_type ?? '')] ?? null,
+    projectCommunityType: mapCommunity(pd.community_type),
     approachRoadWidth: numOrNull(pd.approach_road_width),
     projectTotalUnits: intOrNull(pd.total_units),
     projectWebsite: strOrNull(pd.website),
     projectDescription: desc.join('\n\n') || null,
     possessionOrOcDate: toIsoDate(pd.expected_completion_date),
-    projectWaterSourceList: mapArr(pd.water_sources, WATER_MAP),
+    projectWaterSourceList: mapWater(pd.water_sources),
     utilities: mapUtilities(pd.utilities),
     projectUsps: Array.isArray(pd.key_features) ? (pd.key_features as string[]).join('; ') : strOrNull(pd.key_features),
     projectContactPhoneNo: strOrNull(pd.contact_phone),
@@ -157,7 +269,7 @@ function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<strin
           sortOrder: i,
         }))
       : [],
-    amenities: [], // TODO: requires Terrisage amenity master ID lookup
+    amenities: [] as Array<{ amenityId: string; boolValue: boolean }>, // filled in by handler after master lookup
     internalNotes: Object.keys(notes).length ? JSON.stringify(notes) : null,
   };
 
@@ -181,8 +293,16 @@ function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<strin
   return project;
 }
 
-function buildConfiguration(c: { id: string; sort_order: number; data: Record<string, unknown> }, propertyType: string) {
+function buildConfiguration(
+  c: { id: string; sort_order: number; data: Record<string, unknown> },
+  propertyType: string,
+  buildingKeyByName: Map<string, string>,
+  clusterKeyByName: Map<string, string>,
+) {
   const d = c.data ?? {};
+  // Prefer parsed price band → string description. Numeric base/per-sqft kept null unless explicitly numeric.
+  const baseNum = numOrNull(d.price_base);
+  const perSqftNum = numOrNull(d.price_per_sqft);
   const cfg: Record<string, unknown> = {
     supportConfigRef: c.id,
     sortOrder: c.sort_order,
@@ -193,40 +313,58 @@ function buildConfiguration(c: { id: string; sort_order: number; data: Record<st
     configurationUnitCarpetAreaSqft: numOrNull(d.carpet_area),
     configurationUnitBuiltupAreaSqft: numOrNull(d.built_up_area),
     configurationUnitSuperBuiltupAreaSqft: numOrNull(d.super_built_up_area),
-    configUnitPriceBaseValue: null,
-    configurationUnitPricePerSqft: null,
-    configurationUnitDescription: [d.description, d.pricing_range ? `Pricing: ${d.pricing_range}` : null, d.type_no ? `Type: ${d.type_no}` : null, d.unit_numbers ? `Units: ${d.unit_numbers}` : null]
-      .filter(Boolean).join('. ') || null,
+    configUnitPriceBaseValue: baseNum,
+    configurationUnitPricePerSqft: perSqftNum,
+    configurationUnitDescription: [
+      d.description,
+      d.pricing_range ? `Pricing: ${d.pricing_range}` : null,
+      d.type_no ? `Type: ${d.type_no}` : null,
+      d.unit_numbers ? `Units: ${d.unit_numbers}` : null,
+    ].filter(Boolean).join('. ') || null,
   };
 
   const facings = strOrNull(d.facing);
   const facingArr = facings ? facings.split(/[,/]/).map(s => s.trim()).filter(Boolean) : [];
+  const excludedFloors = Array.isArray(d.excluded_floors)
+    ? (d.excluded_floors as unknown[]).map(String)
+    : [];
+  const variationsRaw = Array.isArray(d.variations) ? d.variations as unknown[] : [];
+  const variations = variationsRaw.map((v, i) => ({
+    text: typeof v === 'string' ? v : (v as Record<string, unknown>)?.text ? String((v as Record<string, unknown>).text) : '',
+    sortOrder: i,
+  })).filter(v => v.text);
 
   if (propertyType === 'APARTMENT') {
+    const towerName = strOrNull(d.tower);
     cfg.apartmentConfiguration = {
-      projectTowerName: strOrNull(d.tower),
+      projectTowerName: towerName,
       balconyCount: intOrNull(d.balconies),
-      masterBedroomSizeSqft: null,
-      variations: [],
+      masterBedroomSizeSqft: strOrNull(d.master_bedroom_size),
+      variations,
     };
     const range = parseFloorRange(d.floor_range);
     cfg.mapping = {
-      supportBuildingKey: strOrNull(d.tower),
+      supportBuildingKey: towerName ? (buildingKeyByName.get(towerName) ?? slugify(towerName)) : null,
       floorFrom: range.from,
       floorTo: range.to,
-      excludedFloors: [],
+      excludedFloors,
       availableFacings: facingArr,
     };
   } else if (propertyType === 'VILLA') {
+    const clusterName = strOrNull(d.cluster);
     const dims = parseDims(d.dimensions ?? d.land_area);
     cfg.villaConfiguration = {
       configurationVillaFloorsPerUnit: intOrNull(d.floors_per_unit),
       configurationVillaWidth: dims.width,
       configurationVillaLength: dims.length,
-      masterBedroomSizeSqft: null,
+      masterBedroomSizeSqft: strOrNull(d.master_bedroom_size),
     };
-    cfg.mapping = { supportClusterKey: strOrNull(d.cluster), availableFacings: facingArr };
+    cfg.mapping = {
+      supportClusterKey: clusterName ? (clusterKeyByName.get(clusterName) ?? slugify(clusterName)) : null,
+      availableFacings: facingArr,
+    };
   } else if (propertyType === 'PLOT') {
+    const clusterName = strOrNull(d.cluster);
     const dims = parseDims(d.dimensions);
     cfg.plotConfiguration = {
       configurationPlotUnitAreaSqft: numOrNull(d.plot_area),
@@ -234,7 +372,10 @@ function buildConfiguration(c: { id: string; sort_order: number; data: Record<st
       configurationPlotWidth: dims.width,
       configurationPlotLength: dims.length,
     };
-    cfg.mapping = { supportClusterKey: strOrNull(d.cluster), availableFacings: facingArr };
+    cfg.mapping = {
+      supportClusterKey: clusterName ? (clusterKeyByName.get(clusterName) ?? slugify(clusterName)) : null,
+      availableFacings: facingArr,
+    };
   }
   return cfg;
 }
@@ -248,7 +389,8 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ ok: false, error: 'INVALID_BODY' }, 400); }
   const jobId = body.jobId;
   const action = body.action ?? 'push';
-  if (!jobId) return json({ ok: false, error: 'MISSING_JOB_ID' }, 400);
+  // refresh-amenities doesn't need a jobId; everything else does.
+  if (action !== 'refresh-amenities' && !jobId) return json({ ok: false, error: 'MISSING_JOB_ID' }, 400);
 
   const authHeader = req.headers.get('Authorization') ?? '';
   const userClient = createClient(
@@ -272,15 +414,10 @@ Deno.serve(async (req) => {
   const root = baseUrl.replace(/\/$/, '');
 
   // -------- POLL action --------
+  // Confirmed: poll by sourceJobId. projectId arrives in the poll JSON when status === 'SUCCEEDED'.
   if (action === 'poll') {
-    const { data: job } = await supabase.from('import_jobs').select('summary').eq('id', jobId).maybeSingle();
-    const summary = (job?.summary ?? {}) as Record<string, unknown>;
-    const ingestJobId = summary.ingestJobId as string | undefined;
-    if (!ingestJobId) {
-      return json({ ok: false, error: 'NO_INGEST_JOB' }, 404);
-    }
     try {
-      const r = await fetch(`${root}/api/integrations/projects/ingest-jobs/${ingestJobId}`, {
+      const r = await fetch(`${root}/api/integrations/projects/ingest-jobs?sourceJobId=${encodeURIComponent(jobId)}`, {
         method: 'GET',
         headers: { 'X-API-Key': apiKey },
       });
@@ -288,10 +425,55 @@ Deno.serve(async (req) => {
       let parsed: Record<string, unknown> = {};
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
       if (!r.ok) return json({ ok: false, error: `HTTP ${r.status}`, detail: text.slice(0, 300) }, 502);
-      return json({ ok: true, status: parsed.status, data: parsed });
+      // Persist projectId on terminal SUCCEEDED.
+      const status = parsed.status as string | undefined;
+      const projectId = (parsed.projectId as string) ?? null;
+      if (status === 'SUCCEEDED' && projectId) {
+        const { data: jobRow } = await supabase.from('import_jobs').select('summary').eq('id', jobId).maybeSingle();
+        await supabase.from('import_jobs').update({
+          summary: { ...((jobRow?.summary as object) ?? {}), terrisage_project_id: projectId, lastPollAt: new Date().toISOString() } as never,
+        }).eq('id', jobId);
+      }
+      return json({ ok: true, status, projectId, data: parsed });
     } catch (e) {
       return json({ ok: false, error: (e as Error).message }, 502);
     }
+  }
+
+  // -------- REFRESH-AMENITIES action --------
+  // Pulls Terrisage's amenity master per propertyType into the local cache so we can map free-text labels → amenityId.
+  if (action === 'refresh-amenities') {
+    const types = ['APARTMENT', 'VILLA', 'PLOT'];
+    let total = 0;
+    const errors: Array<{ propertyType: string; error: string }> = [];
+    for (const pt of types) {
+      try {
+        const r = await fetch(`${root}/api/integrations/amenities?propertyType=${pt}`, {
+          method: 'GET',
+          headers: { 'X-API-Key': apiKey },
+        });
+        if (!r.ok) {
+          errors.push({ propertyType: pt, error: `HTTP ${r.status}` });
+          continue;
+        }
+        const parsed = await r.json() as { amenities?: Array<{ amenityId: string; code?: string; displayName: string; category?: string }> };
+        const rows = (parsed.amenities ?? []).map(a => ({
+          amenity_id: a.amenityId,
+          code: a.code ?? null,
+          display_name: a.displayName,
+          category: a.category ?? null,
+          property_type: pt,
+          fetched_at: new Date().toISOString(),
+        }));
+        if (rows.length > 0) {
+          await supabase.from('terrisage_amenity_master').upsert(rows as never, { onConflict: 'amenity_id' });
+          total += rows.length;
+        }
+      } catch (e) {
+        errors.push({ propertyType: pt, error: (e as Error).message });
+      }
+    }
+    return json({ ok: errors.length === 0, total, errors });
   }
 
   // -------- LINK-AGENCY action --------
@@ -341,13 +523,14 @@ Deno.serve(async (req) => {
   if (jErr || !job) return json({ ok: false, error: 'JOB_NOT_FOUND' }, 404);
   if (job.kind !== 'PROJECT') return json({ ok: false, error: 'NOT_A_PROJECT_JOB' }, 400);
 
-  const [{ data: configs }, { data: media }, { data: linkRows }, { data: ownerAcct }] = await Promise.all([
+  const [{ data: configs }, { data: media }, { data: linkRows }, { data: ownerAcct }, { data: amenityMaster }] = await Promise.all([
     supabase.from('import_project_configs').select('*').eq('job_id', jobId).order('sort_order'),
     supabase.from('import_project_media').select('*').eq('job_id', jobId).order('created_at'),
     supabase.from('import_job_account_links').select('account_id, accounts:account_id(id, tenant_id)').eq('job_id', jobId),
     job.owner_account_id
       ? supabase.from('accounts').select('tenant_id').eq('id', job.owner_account_id).maybeSingle()
       : Promise.resolve({ data: null as { tenant_id: string | null } | null }),
+    supabase.from('terrisage_amenity_master').select('amenity_id, code, display_name, property_type'),
   ]);
 
   // projectOwnerOrgId: prefer the explicit owner account's tenant_id; fall back to first linked account.
@@ -361,12 +544,25 @@ Deno.serve(async (req) => {
 
   const projectMaster = buildProjectMaster(projectData, extracted, job.representative_input, propertyType);
 
-  // Configurations
-  const configurations = (configs ?? []).map(c =>
-    buildConfiguration({ id: c.id, sort_order: c.sort_order ?? 0, data: (c.data ?? {}) as Record<string, unknown> }, propertyType)
+  // Amenities: free-text labels → { amenityId, boolValue } via local cache of Terrisage master.
+  const amenityLabels = Array.isArray(extracted.amenities) ? extracted.amenities : [];
+  const { amenities: amenityPayload, unmapped: unmappedAmenities } = resolveAmenities(
+    amenityLabels, (amenityMaster ?? []) as AmenityMaster[], propertyType,
+  );
+  projectMaster.amenities = amenityPayload;
+
+  // Buildings/clusters: synthesise from configs (Terrisage rejects empty when mappings reference keys).
+  const configsRaw = (configs ?? []).map(c => ({
+    id: c.id, sort_order: c.sort_order ?? 0, data: (c.data ?? {}) as Record<string, unknown>,
+  }));
+  const { buildings, streetClusters, buildingKeyByName, clusterKeyByName } =
+    synthesiseBuildings(configsRaw, propertyType);
+
+  const configurations = configsRaw.map(c =>
+    buildConfiguration(c, propertyType, buildingKeyByName, clusterKeyByName)
   );
 
-  // Media: sign URLs, map category → kind
+  // Media: sign URLs, map category → kind, attach meta.mime for non-image kinds.
   const mediaPayload: Array<Record<string, unknown>> = [];
   for (const m of (media ?? [])) {
     if (m.review_state === 'INCORRECT' || m.review_state === 'DUPLICATE') continue;
@@ -376,8 +572,13 @@ Deno.serve(async (req) => {
       url = signed?.signedUrl ?? null;
     }
     const meta = (m.meta ?? {}) as Record<string, unknown>;
+    const kind = MEDIA_KIND_MAP[String(m.category)] ?? 'OTHER';
+    // Brochures/documents → meta.mime hint for downstream download.
+    if (!meta.mime && (m.category === 'BROCHURE' || m.category === 'DOCUMENT')) {
+      meta.mime = 'application/pdf';
+    }
     mediaPayload.push({
-      kind: MEDIA_KIND_MAP[String(m.category)] ?? 'OTHER',
+      kind,
       url,
       caption: m.caption ?? null,
       configRef: m.config_id ?? null,
@@ -392,8 +593,8 @@ Deno.serve(async (req) => {
     projectOrigin: 'SUPPORT_ADDED',
     projectOwnerOrgId,
     project: projectMaster,
-    buildings: [],         // TODO: requires structures table; spec allows empty
-    streetClusters: [],    // TODO: requires structures table; spec allows empty
+    buildings,
+    streetClusters,
     configurations,
     media: mediaPayload,
     pushedAt: new Date().toISOString(),
@@ -433,14 +634,20 @@ Deno.serve(async (req) => {
         terrisage_project_id: projectId,
         configs: configs?.length ?? 0,
         media: mediaPayload.length,
+        buildings: buildings.length,
+        streetClusters: streetClusters.length,
+        amenitiesSent: amenityPayload.length,
+        push_warnings: {
+          unmappedAmenities,
+        },
         lastPushAt: new Date().toISOString(),
       } as never,
     }).eq('id', jobId);
     await supabase.from('import_activity').insert([{
       job_id: jobId, event: 'push_to_terrisage_accepted',
-      detail: { ingestJobId, httpStatus, response } as never, actor_id: user.id,
+      detail: { ingestJobId, httpStatus, response, unmappedAmenities } as never, actor_id: user.id,
     }]);
-    return json({ ok: true, ingestJobId, status: response?.status ?? 'PENDING', httpStatus, response });
+    return json({ ok: true, ingestJobId, status: response?.status ?? 'PENDING', httpStatus, response, warnings: { unmappedAmenities } });
   }
 
   await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', jobId);
