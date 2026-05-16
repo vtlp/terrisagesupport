@@ -574,8 +574,12 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         );
       })()}
 
-      {!job.account_id && <OwnerAccountCard jobId={job.id} />}
-      {!job.account_id && <LinkedAccountsCard jobId={job.id} />}
+      {!job.account_id && (
+        <>
+          <OwnerAccountCard jobId={job.id} onOwnerChange={setHasOwner} />
+          <LinkedAccountsCard jobId={job.id} disabled={hasOwner} />
+        </>
+      )}
 
       <Tabs defaultValue="files">
         <TabsList className="flex-wrap h-auto">
