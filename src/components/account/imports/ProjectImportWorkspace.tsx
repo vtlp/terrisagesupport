@@ -891,71 +891,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       <Textarea rows={2} className="text-sm" value={data.description != null ? String(data.description) : ''}
                         onChange={e => updateConfig(c.id, { description: e.target.value })} />
                     </div>
-                    {/* Per-config floor plans (one-to-many for villas, capped at 1 for apartment/plot) */}
-                    {(() => {
-                      const planMedia = media.filter(m => m.category === 'FLOOR_PLAN' && m.config_id === c.id);
-                      const cap = propertyType === 'VILLA' ? Infinity : 1;
-                      const canAddMore = planMedia.length < cap;
-                      return (
-                        <div className="mt-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs">Floor plans {propertyType === 'VILLA' ? '(multiple allowed)' : ''}</Label>
-                            {canAddMore && (
-                              <label className="inline-flex">
-                                <input type="file" multiple={propertyType === 'VILLA'} accept="image/*" className="hidden"
-                                  onChange={async (e) => {
-                                    const fl = e.target.files; if (!fl || !fl.length) return;
-                                    const files = Array.from(fl).slice(0, cap === Infinity ? fl.length : Math.max(0, cap - planMedia.length));
-                                    for (const file of files) {
-                                      const path = `${job.account_id ?? 'global'}/${job.id}/floorplan-${c.id}-${Date.now()}-${file.name}`;
-                                      const { error: upErr } = await supabase.storage.from('import-files').upload(path, file);
-                                      if (upErr) { toast.error(upErr.message); continue; }
-                                      const { data: ins, error } = await supabase.from('import_project_media').insert([{
-                                        job_id: job.id, category: 'FLOOR_PLAN', storage_path: path,
-                                        caption: file.name, source: 'MANUAL', config_id: c.id,
-                                      }]).select('*').single();
-                                      if (error) { toast.error(error.message); continue; }
-                                      setMedia(ms => [...ms, ins as ImportMedia]);
-                                    }
-                                    toast.success('Floor plan uploaded');
-                                    (e.target as HTMLInputElement).value = '';
-                                  }}
-                                />
-                                <span className="inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent text-xs h-7 px-2 cursor-pointer">
-                                  <Plus className="h-3 w-3 mr-1" />Upload
-                                </span>
-                              </label>
-                            )}
-                          </div>
-                          {planMedia.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">No floor plans yet.</p>
-                          ) : (
-                            <div className="grid gap-2 grid-cols-2 md:grid-cols-3">
-                              {planMedia.map(m => {
-                                const url = mediaUrls[m.id] || m.external_url || '';
-                                return (
-                                  <div key={m.id} className="rounded border p-1.5 space-y-1 relative">
-                                    <button type="button" onClick={() => removeMedia(m.id)}
-                                      className="absolute top-1 right-1 z-10 rounded-full bg-background/90 border p-0.5 hover:bg-destructive hover:text-destructive-foreground">
-                                      <Trash2 className="h-3 w-3" />
-                                    </button>
-                                    <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center">
-                                      {url ? (
-                                        <img src={url} alt={m.caption ?? 'floor plan'} className="w-full h-full object-contain" loading="lazy" />
-                                      ) : (
-                                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                                      )}
-                                    </div>
-                                    <Input className="h-7 text-xs" placeholder="Caption" value={m.caption ?? ''}
-                                      onChange={e => updateMedia(m.id, { caption: e.target.value })} />
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    {/* Floor plans are managed in the Media tab. */}
                   </div>
                 );
               })}
