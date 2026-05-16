@@ -4,14 +4,9 @@ We're wiring up the async project push from our CRM into Terrisage. Below are th
 
 ---
 
-## 1. Project ownership & multi-tenant sharing  *(Blocker)*
+## 1. Project ownership & multi-tenant sharing  *(Resolved)*
 
-- Is `projectOwnerOrgId` the same UUID space as what we store as `accounts.tenant_id` on our side (i.e. the Terrisage org/tenant ID), or is it a separate "project owner" entity with its own IDs?
-- A single project on our side can be linked to **multiple** client accounts (multi-tenant visibility). What is the intended pattern?
-  - (a) Push once per linked account → N duplicate projects on your side (we'd like to avoid).
-  - (b) Push once with one owner, then a separate "share/grant access" API call for the other tenants.
-  - (c) A field like `sharedWithOrgIds: string[]` on the push payload that we're not using.
-- Is `projectOwnerOrgId: null` accepted (e.g. for unassigned/global projects), or is it always required?
+**Confirmed by Terrisage:** `projectOwnerOrgId` is the same UUID space as our `accounts.tenant_id`. On push we send the selected builder account's `tenant_id`. Agency visibility is handled via a separate call (`POST /api/integrations/projects/{projectId}/agency-access`) per linked agency, only after the project is imported on our side. Exact endpoint path / payload shape for the agency-access call is still to be confirmed.
 
 ## 2. Amenities  *(Blocker)*
 
