@@ -18,7 +18,7 @@ type LinkRow = {
   accounts?: AccountLite | null;
 };
 
-export function LinkedAccountsCard({ jobId, disabled = false }: { jobId: string; disabled?: boolean }) {
+export function LinkedAccountsCard({ jobId, disabled = false, disabledReason }: { jobId: string; disabled?: boolean; disabledReason?: string }) {
   const { currentUser } = useUser();
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [accounts, setAccounts] = useState<AccountLite[]>([]);
