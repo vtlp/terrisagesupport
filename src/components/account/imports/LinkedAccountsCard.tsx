@@ -89,7 +89,7 @@ export function LinkedAccountsCard({ jobId, disabled = false, disabledReason }: 
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               {disabled
-                ? 'Disabled while a builder owner is selected. Clear the owner to link agencies instead.'
+                ? (disabledReason ?? 'Linking agencies is currently disabled.')
                 : 'Link agency accounts that should see this project. Each link is registered with Terrisage.'}
             </p>
           </div>
