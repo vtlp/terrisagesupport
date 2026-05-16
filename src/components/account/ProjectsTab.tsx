@@ -138,6 +138,7 @@ export function ProjectsTab({ payload, accountId }: Props) {
 
   return (
     <div className="space-y-3">
+      {accountId && linkedSection}
       {projects.map((p, i) => {
         const name = p.projectName || p.project_name || `Project ${i + 1}`;
         const contactName = p.repName || p.contactName;
