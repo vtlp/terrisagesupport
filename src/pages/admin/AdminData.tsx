@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, Plus, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProjectImportWorkspace } from '@/components/account/imports/ProjectImportWorkspace';
 import {
@@ -27,7 +27,7 @@ function projectNameFor(j: ImportJob): string {
   return ed.projectData?.project_name?.trim() || ri.project_name?.trim() || j.label || `Job ${j.id.slice(0, 8)}`;
 }
 
-type AccountLite = { id: string; account_name: string };
+type _AccountLite = { id: string; account_name: string };
 
 export default function AdminData() {
   const { currentUser } = useUser();
