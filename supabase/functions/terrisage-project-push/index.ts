@@ -413,15 +413,10 @@ Deno.serve(async (req) => {
   const root = baseUrl.replace(/\/$/, '');
 
   // -------- POLL action --------
+  // Confirmed: poll by sourceJobId. projectId arrives in the poll JSON when status === 'SUCCEEDED'.
   if (action === 'poll') {
-    const { data: job } = await supabase.from('import_jobs').select('summary').eq('id', jobId).maybeSingle();
-    const summary = (job?.summary ?? {}) as Record<string, unknown>;
-    const ingestJobId = summary.ingestJobId as string | undefined;
-    if (!ingestJobId) {
-      return json({ ok: false, error: 'NO_INGEST_JOB' }, 404);
-    }
     try {
-      const r = await fetch(`${root}/api/integrations/projects/ingest-jobs/${ingestJobId}`, {
+      const r = await fetch(`${root}/api/integrations/projects/ingest-jobs?sourceJobId=${encodeURIComponent(jobId)}`, {
         method: 'GET',
         headers: { 'X-API-Key': apiKey },
       });
@@ -429,10 +424,55 @@ Deno.serve(async (req) => {
       let parsed: Record<string, unknown> = {};
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
       if (!r.ok) return json({ ok: false, error: `HTTP ${r.status}`, detail: text.slice(0, 300) }, 502);
-      return json({ ok: true, status: parsed.status, data: parsed });
+      // Persist projectId on terminal SUCCEEDED.
+      const status = parsed.status as string | undefined;
+      const projectId = (parsed.projectId as string) ?? null;
+      if (status === 'SUCCEEDED' && projectId) {
+        const { data: jobRow } = await supabase.from('import_jobs').select('summary').eq('id', jobId).maybeSingle();
+        await supabase.from('import_jobs').update({
+          summary: { ...((jobRow?.summary as object) ?? {}), terrisage_project_id: projectId, lastPollAt: new Date().toISOString() } as never,
+        }).eq('id', jobId);
+      }
+      return json({ ok: true, status, projectId, data: parsed });
     } catch (e) {
       return json({ ok: false, error: (e as Error).message }, 502);
     }
+  }
+
+  // -------- REFRESH-AMENITIES action --------
+  // Pulls Terrisage's amenity master per propertyType into the local cache so we can map free-text labels → amenityId.
+  if (action === 'refresh-amenities') {
+    const types = ['APARTMENT', 'VILLA', 'PLOT'];
+    let total = 0;
+    const errors: Array<{ propertyType: string; error: string }> = [];
+    for (const pt of types) {
+      try {
+        const r = await fetch(`${root}/api/integrations/amenities?propertyType=${pt}`, {
+          method: 'GET',
+          headers: { 'X-API-Key': apiKey },
+        });
+        if (!r.ok) {
+          errors.push({ propertyType: pt, error: `HTTP ${r.status}` });
+          continue;
+        }
+        const parsed = await r.json() as { amenities?: Array<{ amenityId: string; code?: string; displayName: string; category?: string }> };
+        const rows = (parsed.amenities ?? []).map(a => ({
+          amenity_id: a.amenityId,
+          code: a.code ?? null,
+          display_name: a.displayName,
+          category: a.category ?? null,
+          property_type: pt,
+          fetched_at: new Date().toISOString(),
+        }));
+        if (rows.length > 0) {
+          await supabase.from('terrisage_amenity_master').upsert(rows as never, { onConflict: 'amenity_id' });
+          total += rows.length;
+        }
+      } catch (e) {
+        errors.push({ propertyType: pt, error: (e as Error).message });
+      }
+    }
+    return json({ ok: errors.length === 0, total, errors });
   }
 
   // -------- LINK-AGENCY action --------
