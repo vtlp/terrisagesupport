@@ -829,7 +829,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
-              <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-1">
                   <Label>Water sources</Label>
                   <div className="flex flex-wrap gap-1.5">
