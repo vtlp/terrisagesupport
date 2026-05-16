@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Building2, Home, UserPlus, Search, ArrowLeft, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Home, UserPlus, Search, ArrowLeft, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useUser } from '@/context/UserContext';
@@ -31,8 +31,7 @@ interface Props {
   tenancyType?: Tenancy;
 }
 
-const KIND_TILES: Array<{ kind: ImportKind; icon: typeof Building2; title: string; blurb: string }> = [
-  { kind: 'PROJECT', icon: Building2, title: 'Project import', blurb: 'Upload brochures and project details. Run extraction, review, then import to CRM.' },
+const KIND_TILES: Array<{ kind: ImportKind; icon: typeof Home; title: string; blurb: string }> = [
   { kind: 'SECONDARY_PROPERTY', icon: Home, title: 'Secondary market property import', blurb: 'Bulk import resale and rental property listings from CSV or XLSX.' },
   { kind: 'LEAD', icon: UserPlus, title: 'Lead import', blurb: 'Import leads with phone-based deduplication and quick validation.' },
 ];
@@ -101,9 +100,9 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
   useEffect(() => { load(); }, [load]);
 
   const allowedKinds = useMemo<ImportKind[]>(() => {
-    if (tenancyType === 'AGENCY_BROKERAGE_CONSULTANCY') return ['PROJECT', 'SECONDARY_PROPERTY', 'LEAD'];
-    if (tenancyType === 'BUILDER_DEVELOPER') return ['PROJECT', 'LEAD'];
-    return ['PROJECT', 'SECONDARY_PROPERTY', 'LEAD'];
+    if (tenancyType === 'AGENCY_BROKERAGE_CONSULTANCY') return ['SECONDARY_PROPERTY', 'LEAD'];
+    if (tenancyType === 'BUILDER_DEVELOPER') return ['LEAD'];
+    return ['SECONDARY_PROPERTY', 'LEAD'];
   }, [tenancyType]);
 
   const projectNameFor = (j: ImportJob): string => {

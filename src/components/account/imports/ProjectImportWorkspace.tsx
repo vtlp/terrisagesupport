@@ -19,6 +19,7 @@ import {
 } from './shared';
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
+import { LinkedAccountsCard } from './LinkedAccountsCard';
 import { autoMapProjectImport, deriveCityFromLocation, type AutoMapResult } from './autoMapProjectImport';
 import { useUser } from '@/context/UserContext';
 
@@ -488,6 +489,8 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           </Card>
         );
       })()}
+
+      {!job.account_id && <LinkedAccountsCard jobId={job.id} />}
 
       <Tabs defaultValue="files">
         <TabsList className="flex-wrap h-auto">
