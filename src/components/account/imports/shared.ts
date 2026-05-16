@@ -9,7 +9,11 @@ export type ImportStatus =
   | 'FAILED' | 'ARCHIVED';
 export type PropertyType = 'APARTMENT' | 'VILLA' | 'PLOT';
 export type FileCategory = 'BROCHURE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'CSV' | 'FLOOR_PLAN' | 'LOGO' | 'OTHER';
-export type MediaCategory = 'LOGO' | 'GALLERY' | 'FLOOR_PLAN' | 'BROCHURE' | 'VIDEO' | 'DOCUMENT' | 'OTHER';
+// Terrisage-aligned categories. Legacy values (GALLERY/FLOOR_PLAN/BROCHURE/DOCUMENT) are still accepted
+// when reading old rows; the edge function maps them onto the spec set on push.
+export type MediaCategory =
+  | 'LOGO' | 'PHOTO' | 'FLOORPLAN' | 'VIDEO' | 'TOUR_3D' | 'OTHER'
+  | 'GALLERY' | 'FLOOR_PLAN' | 'BROCHURE' | 'DOCUMENT';
 export type MediaReview = 'PENDING' | 'CORRECT' | 'INCORRECT' | 'DUPLICATE' | 'NEEDS_RECROP';
 export type RowState = 'PENDING' | 'VALID' | 'WARNING' | 'INVALID' | 'IMPORTED' | 'FAILED' | 'SKIPPED';
 
