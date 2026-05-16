@@ -247,16 +247,16 @@ function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<strin
     projectAddress: strOrNull(pd.address),
     mapsUrl: strOrNull(pd.maps_url),
     reraRegistrationNo: strOrNull(pd.rera_id),
-    projectStatus: STATUS_MAP[String(pd.status ?? '')] ?? null,
+    projectStatus: mapStatus(pd.status),
     openSpacePercent: numOrNull(pd.open_space_pct),
     projectSiteAreaAcres: acres,
-    projectCommunityType: COMMUNITY_MAP[String(pd.community_type ?? '')] ?? null,
+    projectCommunityType: mapCommunity(pd.community_type),
     approachRoadWidth: numOrNull(pd.approach_road_width),
     projectTotalUnits: intOrNull(pd.total_units),
     projectWebsite: strOrNull(pd.website),
     projectDescription: desc.join('\n\n') || null,
     possessionOrOcDate: toIsoDate(pd.expected_completion_date),
-    projectWaterSourceList: mapArr(pd.water_sources, WATER_MAP),
+    projectWaterSourceList: mapWater(pd.water_sources),
     utilities: mapUtilities(pd.utilities),
     projectUsps: Array.isArray(pd.key_features) ? (pd.key_features as string[]).join('; ') : strOrNull(pd.key_features),
     projectContactPhoneNo: strOrNull(pd.contact_phone),
@@ -269,7 +269,7 @@ function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<strin
           sortOrder: i,
         }))
       : [],
-    amenities: [], // TODO: requires Terrisage amenity master ID lookup
+    amenities: [] as Array<{ amenityId: string; boolValue: boolean }>, // filled in by handler after master lookup
     internalNotes: Object.keys(notes).length ? JSON.stringify(notes) : null,
   };
 
