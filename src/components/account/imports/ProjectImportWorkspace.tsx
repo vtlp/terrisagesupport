@@ -65,6 +65,11 @@ const COMMUNITY_TYPES_BY_PT: Record<PropertyType, string[]> = {
 
 const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed'];
 
+// Terrisage-aligned enum options shown in UI. Labels are human-readable; values are the
+// strings the edge function maps to Terrisage enums.
+const WATER_SOURCE_OPTIONS = ['Borewell', 'Municipal', 'Tanker', 'Lake', 'Other'];
+const UTILITY_OPTIONS = ['Electricity', 'Water', 'Gas', 'Sewage', 'STP', 'Intercom', 'Rainwater harvesting', 'Storm water drains'];
+
 // Parse "4.5", "4 acres 11 guntas", or numeric to {acres, guntas}
 function parseAcresGuntas(siteArea: unknown): { acres: number; guntas: number } {
   const s = String(siteArea ?? '').trim();
@@ -433,11 +438,39 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         };
         await supabase.from('import_jobs').update({ extracted_data: merged as never }).eq('id', job.id);
 
-        const { data, error } = await supabase.functions.invoke('terrisage-project-push', { body: { jobId: job.id } });
+        const { data, error } = await supabase.functions.invoke('terrisage-project-push', { body: { action: 'push', jobId: job.id } });
         if (error) throw error;
-        const res = data as { ok?: boolean; terrisageProjectId?: string; error?: string } | null;
+        const res = data as { ok?: boolean; ingestJobId?: string; status?: string; error?: string } | null;
         if (!res?.ok) throw new Error(res?.error || 'Push failed');
-        toast.success(`Pushed to Terrisage${res.terrisageProjectId ? ` (id: ${res.terrisageProjectId})` : ''}`);
+        const ingestId = res.ingestJobId;
+        toast.success(`Submitted to Terrisage${ingestId ? ` (ingest ${ingestId.slice(0, 8)})` : ''}. Waiting for confirmation…`);
+
+        // Poll until terminal (max ~5 min)
+        const start = Date.now();
+        const maxMs = 5 * 60 * 1000;
+        let interval = 5000;
+        while (Date.now() - start < maxMs) {
+          await new Promise(r => setTimeout(r, interval));
+          if (Date.now() - start > 2 * 60 * 1000) interval = 15000;
+          try {
+            const { data: poll } = await supabase.functions.invoke('terrisage-project-push', { body: { action: 'poll', jobId: job.id } });
+            const p = poll as { ok?: boolean; status?: string; data?: { projectId?: string; failureCode?: string; message?: string; media?: { succeeded?: number; total?: number } } } | null;
+            if (!p?.ok) continue;
+            if (p.status === 'SUCCEEDED') {
+              await supabase.from('import_jobs').update({
+                status: 'IMPORTED', imported_at: new Date().toISOString(),
+              }).eq('id', job.id);
+              toast.success(`Terrisage accepted project${p.data?.projectId ? ` (id: ${p.data.projectId.slice(0, 8)})` : ''}`);
+              return;
+            }
+            if (p.status === 'FAILED') {
+              const msg = `${p.data?.failureCode ?? 'FAILED'}: ${p.data?.message ?? ''}`;
+              await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
+              throw new Error(msg);
+            }
+          } catch { /* keep polling */ }
+        }
+        toast.message('Terrisage push still processing - check Activity tab later.');
       } else {
         const fullProject = {
           ...project,
@@ -825,14 +858,40 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-1">
-                  <Label>Water sources (comma separated)</Label>
-                  <Input value={(project.water_sources || []).join(', ')}
-                    onChange={e => setProject(p => ({ ...p, water_sources: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} />
+                  <Label>Water sources</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WATER_SOURCE_OPTIONS.map(opt => {
+                      const active = (project.water_sources || []).includes(opt);
+                      return (
+                        <button key={opt} type="button"
+                          onClick={() => setProject(p => {
+                            const cur = p.water_sources || [];
+                            return { ...p, water_sources: active ? cur.filter(x => x !== opt) : [...cur, opt] };
+                          })}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'}`}>
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-1">
-                  <Label>Utilities (comma separated)</Label>
-                  <Input value={(project.utilities || []).join(', ')}
-                    onChange={e => setProject(p => ({ ...p, utilities: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} />
+                  <Label>Utilities</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {UTILITY_OPTIONS.map(opt => {
+                      const active = (project.utilities || []).includes(opt);
+                      return (
+                        <button key={opt} type="button"
+                          onClick={() => setProject(p => {
+                            const cur = p.utilities || [];
+                            return { ...p, utilities: active ? cur.filter(x => x !== opt) : [...cur, opt] };
+                          })}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'}`}>
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label>Key features (comma separated)</Label>
