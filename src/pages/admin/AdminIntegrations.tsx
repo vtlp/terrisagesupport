@@ -229,6 +229,59 @@ export default function AdminIntegrations() {
           )}
         </CardContent>
       </Card>
+
+      <TerrisageAmenityCard />
     </div>
+  );
+}
+
+function TerrisageAmenityCard() {
+  const [busy, setBusy] = useState(false);
+  const [count, setCount] = useState<number | null>(null);
+  const [lastFetched, setLastFetched] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from('terrisage_amenity_master' as never)
+      .select('fetched_at', { count: 'exact', head: false })
+      .order('fetched_at', { ascending: false })
+      .limit(1)
+      .then(({ data, count }) => {
+        setCount(count ?? (data?.length ?? 0));
+        const row = (data?.[0] as { fetched_at?: string } | undefined);
+        setLastFetched(row?.fetched_at ?? null);
+      });
+  }, [busy]);
+
+  const refresh = async () => {
+    setBusy(true);
+    const { data, error } = await supabase.functions.invoke('terrisage-project-push', {
+      body: { action: 'refresh-amenities' },
+    });
+    setBusy(false);
+    if (error || !(data as { ok?: boolean })?.ok) {
+      toast.error((data as { errors?: unknown })?.errors ? 'Some property types failed. See logs.' : (error?.message ?? 'Refresh failed'));
+    } else {
+      toast.success(`Refreshed ${(data as { total?: number })?.total ?? 0} amenities`);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Terrisage amenity master</CardTitle>
+        <CardDescription>
+          Cache of the amenity catalogue from Terrisage. Required to convert free-text amenities into amenityId UUIDs on project push.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="text-sm text-muted-foreground">
+          {count != null ? `${count} cached` : '—'}
+          {lastFetched ? ` · Last refreshed ${new Date(lastFetched).toLocaleString()}` : ' · Never refreshed'}
+        </div>
+        <Button onClick={refresh} disabled={busy} variant="outline" size="sm">
+          {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Refresh amenity master
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
