@@ -1069,7 +1069,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                           <div className="text-xs text-muted-foreground">conf {(Number(m.confidence) * 100).toFixed(0)}%</div>
                         )}
                       </div>
-                      </div>
                     );
                   })}
                 </div>
