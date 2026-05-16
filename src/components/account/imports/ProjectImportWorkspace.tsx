@@ -65,6 +65,11 @@ const COMMUNITY_TYPES_BY_PT: Record<PropertyType, string[]> = {
 
 const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed'];
 
+// Terrisage-aligned enum options shown in UI. Labels are human-readable; values are the
+// strings the edge function maps to Terrisage enums.
+const WATER_SOURCE_OPTIONS = ['Borewell', 'Municipal', 'Tanker', 'Lake', 'Other'];
+const UTILITY_OPTIONS = ['Electricity', 'Water', 'Gas', 'Sewage', 'STP', 'Intercom', 'Rainwater harvesting', 'Storm water drains'];
+
 // Parse "4.5", "4 acres 11 guntas", or numeric to {acres, guntas}
 function parseAcresGuntas(siteArea: unknown): { acres: number; guntas: number } {
   const s = String(siteArea ?? '').trim();
