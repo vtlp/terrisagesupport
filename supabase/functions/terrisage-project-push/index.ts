@@ -141,29 +141,92 @@ const parseDims = (v: unknown): { width: number | null; length: number | null } 
   if (m) return { width: parseFloat(m[1]), length: parseFloat(m[2]) };
   return { width: null, length: null };
 };
-const mapArr = (arr: unknown, m: Record<string, string>): string[] => {
+const mapUtilities = (arr: unknown): Array<{ utilityType: string; details?: string }> => {
   if (!Array.isArray(arr)) return [];
-  const seen = new Set<string>();
+  const seenKey = new Set<string>();
+  const out: Array<{ utilityType: string; details?: string }> = [];
   for (const x of arr) {
-    const v = m[String(x).trim()];
-    if (v) seen.add(v);
-  }
-  return [...seen];
-};
-const mapUtilities = (arr: unknown): Array<{ utilityType: string; details: string | null }> => {
-  if (!Array.isArray(arr)) return [];
-  const seen = new Set<string>();
-  const out: Array<{ utilityType: string; details: string | null }> = [];
-  for (const x of arr) {
-    const raw = String(x).trim();
-    const v = UTILITY_MAP[raw];
-    if (v && !seen.has(v)) {
-      seen.add(v);
-      out.push({ utilityType: v, details: null });
+    const key = norm(x);
+    if (!key) continue;
+    let mapped = UTILITY_LOOKUP[key];
+    if (!mapped) {
+      const upper = String(x).trim().toUpperCase().replace(/\s+/g, '_');
+      if (UTILITY_TYPES.has(upper)) mapped = { utilityType: upper };
     }
+    if (!mapped) continue;
+    const k = `${mapped.utilityType}|${mapped.details ?? ''}`;
+    if (seenKey.has(k)) continue;
+    seenKey.add(k);
+    out.push(mapped.details ? { utilityType: mapped.utilityType, details: mapped.details } : { utilityType: mapped.utilityType });
   }
   return out;
 };
+
+type AmenityMaster = { amenity_id: string; code: string | null; display_name: string; property_type: string };
+function resolveAmenities(
+  labels: unknown,
+  master: AmenityMaster[],
+  propertyType: string,
+): { amenities: Array<{ amenityId: string; boolValue: boolean }>; unmapped: string[] } {
+  if (!Array.isArray(labels) || master.length === 0) {
+    return { amenities: [], unmapped: Array.isArray(labels) ? (labels as unknown[]).map(String) : [] };
+  }
+  const lookup = new Map<string, string>();
+  for (const m of master) {
+    if (m.property_type && m.property_type !== propertyType) continue;
+    lookup.set(norm(m.display_name), m.amenity_id);
+    if (m.code) lookup.set(norm(m.code), m.amenity_id);
+  }
+  const seen = new Set<string>();
+  const out: Array<{ amenityId: string; boolValue: boolean }> = [];
+  const unmapped: string[] = [];
+  for (const raw of labels) {
+    const id = lookup.get(norm(raw));
+    if (id) {
+      if (!seen.has(id)) { seen.add(id); out.push({ amenityId: id, boolValue: true }); }
+    } else {
+      const s = String(raw).trim();
+      if (s) unmapped.push(s);
+    }
+  }
+  return { amenities: out, unmapped };
+}
+
+function synthesiseBuildings(
+  configs: Array<{ data: Record<string, unknown> }>,
+  propertyType: string,
+): {
+  buildings: Array<Record<string, unknown>>;
+  streetClusters: Array<Record<string, unknown>>;
+  buildingKeyByName: Map<string, string>;
+  clusterKeyByName: Map<string, string>;
+} {
+  const buildingKeyByName = new Map<string, string>();
+  const clusterKeyByName = new Map<string, string>();
+  const buildings: Array<Record<string, unknown>> = [];
+  const streetClusters: Array<Record<string, unknown>> = [];
+
+  if (propertyType === 'APARTMENT') {
+    let sort = 0;
+    for (const c of configs) {
+      const name = strOrNull(c.data.tower);
+      if (!name || buildingKeyByName.has(name)) continue;
+      const key = slugify(name);
+      buildingKeyByName.set(name, key);
+      buildings.push({ supportBuildingKey: key, buildingName: name, sortOrder: sort++ });
+    }
+  } else {
+    let sort = 0;
+    for (const c of configs) {
+      const name = strOrNull(c.data.cluster);
+      if (!name || clusterKeyByName.has(name)) continue;
+      const key = slugify(name);
+      clusterKeyByName.set(name, key);
+      streetClusters.push({ supportClusterKey: key, clusterName: name, sortOrder: sort++ });
+    }
+  }
+  return { buildings, streetClusters, buildingKeyByName, clusterKeyByName };
+}
 
 // ---------- Builders ----------
 function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<string, unknown>, rep: unknown, propertyType: string) {
