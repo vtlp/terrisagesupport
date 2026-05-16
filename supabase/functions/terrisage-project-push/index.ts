@@ -199,12 +199,20 @@ const mapUtilities = (arr: unknown): Array<{ utilityType: string; details?: stri
   const seenKey = new Set<string>();
   const out: Array<{ utilityType: string; details?: string }> = [];
   for (const x of arr) {
-    const key = norm(x);
+    const raw = String(x ?? '').trim();
+    const key = norm(raw);
     if (!key) continue;
     let mapped = UTILITY_LOOKUP[key];
     if (!mapped) {
-      const upper = String(x).trim().toUpperCase().replace(/\s+/g, '_');
+      const upper = raw.toUpperCase().replace(/\s+/g, '_');
       if (UTILITY_TYPES.has(upper)) mapped = { utilityType: upper };
+    }
+    // Substring pass over the lookup so variants like "24x7 power backup", "Piped gas connection",
+    // "Rainwater harvesting system" still resolve.
+    if (!mapped) {
+      for (const [k, v] of Object.entries(UTILITY_LOOKUP)) {
+        if (key.includes(k)) { mapped = { ...v, details: v.details ?? raw }; break; }
+      }
     }
     if (!mapped) continue;
     const k = `${mapped.utilityType}|${mapped.details ?? ''}`;
@@ -224,17 +232,37 @@ function resolveAmenities(
   if (!Array.isArray(labels) || master.length === 0) {
     return { amenities: [], unmapped: Array.isArray(labels) ? (labels as unknown[]).map(String) : [] };
   }
-  const lookup = new Map<string, string>();
+  // Exact lookup by display_name and code, plus a token list for substring fallback.
+  const exact = new Map<string, string>();
+  const tokens: Array<{ key: string; id: string }> = [];
   for (const m of master) {
     if (m.property_type && m.property_type !== propertyType) continue;
-    lookup.set(norm(m.display_name), m.amenity_id);
-    if (m.code) lookup.set(norm(m.code), m.amenity_id);
+    const dn = norm(m.display_name);
+    exact.set(dn, m.amenity_id);
+    tokens.push({ key: dn, id: m.amenity_id });
+    if (m.code) {
+      const cn = norm(m.code);
+      exact.set(cn, m.amenity_id);
+      tokens.push({ key: cn, id: m.amenity_id });
+    }
   }
   const seen = new Set<string>();
   const out: Array<{ amenityId: string; boolValue: boolean }> = [];
   const unmapped: string[] = [];
   for (const raw of labels) {
-    const id = lookup.get(norm(raw));
+    const n = norm(raw);
+    if (!n) continue;
+    let id = exact.get(n);
+    // Substring fallback: prefer the longest master entry contained in or containing the input.
+    if (!id) {
+      let bestLen = 0;
+      for (const t of tokens) {
+        if ((t.key.length >= 4 && (n.includes(t.key) || t.key.includes(n))) && t.key.length > bestLen) {
+          id = t.id;
+          bestLen = t.key.length;
+        }
+      }
+    }
     if (id) {
       if (!seen.has(id)) { seen.add(id); out.push({ amenityId: id, boolValue: true }); }
     } else {
