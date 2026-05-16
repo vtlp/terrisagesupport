@@ -117,6 +117,8 @@ Deno.serve(async (req) => {
       floor_plans: floorPlansByConfig.get(c.id) ?? [],
     })),
     media: mediaPayload,
+    linkedTenantIds,
+    linkedAccounts,
     pushedAt: new Date().toISOString(),
     pushedBy: user.id,
   };
