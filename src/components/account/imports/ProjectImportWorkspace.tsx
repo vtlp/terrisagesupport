@@ -310,11 +310,12 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   };
 
   const addConfig = async () => {
+    const minSort = configs.reduce((m, c) => Math.min(m, c.sort_order ?? 0), 0);
     const { data, error } = await supabase.from('import_project_configs').insert([{
-      job_id: job.id, sort_order: configs.length, data: { name: 'New configuration' } as never, source: 'MANUAL',
+      job_id: job.id, sort_order: minSort - 1, data: { name: 'New configuration' } as never, source: 'MANUAL',
     }]).select('*').single();
     if (error) { toast.error(error.message); return; }
-    setConfigs(cs => [...cs, data as ImportConfig]);
+    setConfigs(cs => [data as ImportConfig, ...cs]);
   };
 
   const removeConfig = async (id: string) => {
@@ -337,7 +338,23 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       job_id: job.id, category: 'GALLERY', caption: 'New media item', source: 'MANUAL',
     }]).select('*').single();
     if (error) { toast.error(error.message); return; }
-    setMedia(ms => [...ms, data as ImportMedia]);
+    setMedia(ms => [data as ImportMedia, ...ms]);
+  };
+
+  const uploadForConfig = async (configId: string, fileList: FileList | null, category: 'FLOOR_PLAN' | 'GALLERY') => {
+    if (!fileList || !fileList.length) return;
+    for (const file of Array.from(fileList)) {
+      const path = `${job.account_id ?? 'global'}/${job.id}/${category.toLowerCase()}-${configId}-${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from('import-files').upload(path, file);
+      if (upErr) { toast.error(upErr.message); continue; }
+      const { data: ins, error } = await supabase.from('import_project_media').insert([{
+        job_id: job.id, category, storage_path: path,
+        caption: file.name, source: 'MANUAL', config_id: configId,
+      }]).select('*').single();
+      if (error) { toast.error(error.message); continue; }
+      setMedia(ms => [ins as ImportMedia, ...ms]);
+    }
+    toast.success('Uploaded');
   };
 
   // VALIDATION
@@ -891,7 +908,62 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       <Textarea rows={2} className="text-sm" value={data.description != null ? String(data.description) : ''}
                         onChange={e => updateConfig(c.id, { description: e.target.value })} />
                     </div>
-                    {/* Floor plans are managed in the Media tab. */}
+                    {/* Per-config uploads: floor plan or gallery images */}
+                    {(() => {
+                      const linked = media.filter(m => m.config_id === c.id && (m.category === 'FLOOR_PLAN' || m.category === 'GALLERY'));
+                      return (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <Label className="text-xs">Images for this configuration</Label>
+                            <div className="flex items-center gap-2">
+                              <label className="inline-flex">
+                                <input type="file" multiple accept="image/*" className="hidden"
+                                  onChange={async e => { await uploadForConfig(c.id, e.target.files, 'FLOOR_PLAN'); (e.target as HTMLInputElement).value = ''; }} />
+                                <span className="inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent text-xs h-7 px-2 cursor-pointer">
+                                  <Plus className="h-3 w-3 mr-1" />Floor plan
+                                </span>
+                              </label>
+                              <label className="inline-flex">
+                                <input type="file" multiple accept="image/*" className="hidden"
+                                  onChange={async e => { await uploadForConfig(c.id, e.target.files, 'GALLERY'); (e.target as HTMLInputElement).value = ''; }} />
+                                <span className="inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent text-xs h-7 px-2 cursor-pointer">
+                                  <Plus className="h-3 w-3 mr-1" />Gallery
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                          {linked.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">No images yet. Upload a floor plan or gallery image.</p>
+                          ) : (
+                            <div className="grid gap-2 grid-cols-2 md:grid-cols-3">
+                              {linked.map(m => {
+                                const url = mediaUrls[m.id] || m.external_url || '';
+                                return (
+                                  <div key={m.id} className="rounded border p-1.5 space-y-1 relative">
+                                    <button type="button" onClick={() => removeMedia(m.id)}
+                                      className="absolute top-1 right-1 z-10 rounded-full bg-background/90 border p-0.5 hover:bg-destructive hover:text-destructive-foreground">
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                    <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center">
+                                      {url ? (
+                                        <img src={url} alt={m.caption ?? m.category} className="w-full h-full object-contain" loading="lazy" />
+                                      ) : (
+                                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Badge variant="outline" className="text-[9px]">{m.category}</Badge>
+                                    </div>
+                                    <Input className="h-7 text-xs" placeholder="Caption" value={m.caption ?? ''}
+                                      onChange={e => updateMedia(m.id, { caption: e.target.value })} />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -906,31 +978,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Media & floor plans</CardTitle>
                 <div className="flex items-center gap-2">
-                  <label className="inline-flex">
-                    <input type="file" multiple accept="image/*" className="hidden"
-                      onChange={async (e) => {
-                        const fl = e.target.files; if (!fl || !fl.length) return;
-                        const cat: MediaCategory = (prompt('Upload as category? FLOOR_PLAN or GALLERY', 'GALLERY') || 'GALLERY').toUpperCase() as MediaCategory;
-                        const ok: MediaCategory[] = ['GALLERY','FLOOR_PLAN','LOGO','BROCHURE','VIDEO','DOCUMENT','OTHER'];
-                        const cc = ok.includes(cat) ? cat : 'GALLERY';
-                        for (const file of Array.from(fl)) {
-                          const path = `${job.account_id ?? 'global'}/${job.id}/manual-${Date.now()}-${file.name}`;
-                          const { error: upErr } = await supabase.storage.from('import-files').upload(path, file);
-                          if (upErr) { toast.error(upErr.message); continue; }
-                          const { data, error } = await supabase.from('import_project_media').insert([{
-                            job_id: job.id, category: cc, storage_path: path, caption: file.name, source: 'MANUAL',
-                          }]).select('*').single();
-                          if (error) { toast.error(error.message); continue; }
-                          setMedia(ms => [...ms, data as ImportMedia]);
-                        }
-                        toast.success('Uploaded');
-                        (e.target as HTMLInputElement).value = '';
-                      }}
-                    />
-                    <span className="inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent text-xs h-8 px-3 cursor-pointer">
-                      <Plus className="h-3 w-3 mr-1" />Upload images
-                    </span>
-                  </label>
                   <Button size="sm" onClick={addMedia}><Plus className="h-4 w-4 mr-1" />Add item</Button>
                 </div>
               </div>
