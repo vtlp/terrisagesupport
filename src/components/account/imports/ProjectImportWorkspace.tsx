@@ -1006,6 +1006,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   </label>
                   <Button size="sm" variant="outline" onClick={addMedia}><Plus className="h-4 w-4 mr-1" />Add empty item</Button>
                 </div>
+              </div>
               <p className="text-xs text-muted-foreground">Floor plans should be cleanly cropped and mapped to the right configuration. Mark items that need re-cropping or are incorrect.</p>
             </CardHeader>
             <CardContent>
