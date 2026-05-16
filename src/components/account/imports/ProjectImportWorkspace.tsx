@@ -20,6 +20,7 @@ import {
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
 import { LinkedAccountsCard } from './LinkedAccountsCard';
+import { OwnerAccountCard } from './OwnerAccountCard';
 import { autoMapProjectImport, deriveCityFromLocation, type AutoMapResult } from './autoMapProjectImport';
 import { useUser } from '@/context/UserContext';
 
