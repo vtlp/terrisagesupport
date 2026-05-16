@@ -106,10 +106,20 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
     return ['PROJECT', 'SECONDARY_PROPERTY', 'LEAD'];
   }, [tenancyType]);
 
+  const projectNameFor = (j: ImportJob): string => {
+    const ed = (j.extracted_data ?? {}) as { projectData?: { project_name?: string } };
+    const ri = (j.representative_input ?? {}) as { project_name?: string };
+    return ed.projectData?.project_name?.trim() || ri.project_name?.trim() || '';
+  };
+
   const filtered = useMemo(() => jobs.filter(j => {
     if (kindFilter !== 'ALL' && j.kind !== kindFilter) return false;
     if (statusFilter !== 'ALL' && j.status !== statusFilter) return false;
-    if (q && !(j.label?.toLowerCase().includes(q.toLowerCase()) || j.id.startsWith(q))) return false;
+    if (q) {
+      const ql = q.toLowerCase();
+      const name = projectNameFor(j).toLowerCase();
+      if (!(j.label?.toLowerCase().includes(ql) || j.id.startsWith(q) || name.includes(ql))) return false;
+    }
     return true;
   }), [jobs, kindFilter, statusFilter, q]);
 
@@ -228,6 +238,7 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                   <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="text-left px-3 py-2">ID</th>
+                      <th className="text-left px-3 py-2">Project name</th>
                       <th className="text-left px-3 py-2">Type</th>
                       <th className="text-left px-3 py-2">Label</th>
                       <th className="text-left px-3 py-2">Status</th>
@@ -239,9 +250,14 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(j => (
+                    {filtered.map(j => {
+                      const name = projectNameFor(j);
+                      return (
                       <tr key={j.id} className="border-t hover:bg-muted/30">
                         <td className="px-3 py-2 font-mono text-xs">{j.id.slice(0, 8)}</td>
+                        <td className="px-3 py-2 font-medium">
+                          {name || <span className="text-muted-foreground font-normal">—</span>}
+                        </td>
                         <td className="px-3 py-2">
                           {KIND_LABEL[j.kind as ImportKind]}
                           {j.property_type && <span className="text-xs text-muted-foreground ml-1">({PROPERTY_TYPE_LABEL[j.property_type as PropertyType]})</span>}
@@ -269,9 +285,10 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={9} className="text-center text-sm text-muted-foreground py-6">No imports match your filters.</td></tr>
+                      <tr><td colSpan={10} className="text-center text-sm text-muted-foreground py-6">No imports match your filters.</td></tr>
                     )}
                   </tbody>
                 </table>
