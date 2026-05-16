@@ -870,7 +870,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   <Input value={(project.key_features || []).join(', ')}
                     onChange={e => setProject(p => ({ ...p, key_features: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} />
                 </div>
-                </div>
               </div>
             </CardContent>
           </Card>
