@@ -74,7 +74,7 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [createKind, setCreateKind] = useState<ImportKind>('PROJECT');
+  const [createKind, setCreateKind] = useState<ImportKind>('LEAD');
   const [createPropType, setCreatePropType] = useState<PropertyType>('APARTMENT');
   const [createLabel, setCreateLabel] = useState('');
   const [createNotes, setCreateNotes] = useState('');
@@ -112,6 +112,7 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
   };
 
   const filtered = useMemo(() => jobs.filter(j => {
+    if (j.kind === 'PROJECT') return false; // Project imports now live in Admin → Data
     if (kindFilter !== 'ALL' && j.kind !== kindFilter) return false;
     if (statusFilter !== 'ALL' && j.status !== statusFilter) return false;
     if (q) {
@@ -224,8 +225,8 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                   </SelectContent>
                 </Select>
                 <div className="ml-auto flex gap-2">
-                  {allowedKinds.map(k => (
-                    <Button key={k} size="sm" variant={k === 'PROJECT' ? 'default' : 'outline'} onClick={() => startCreate(k)}>
+                  {allowedKinds.map((k, idx) => (
+                    <Button key={k} size="sm" variant={idx === 0 ? 'default' : 'outline'} onClick={() => startCreate(k)}>
                       <Plus className="h-4 w-4 mr-1" /> {KIND_LABEL[k]}
                     </Button>
                   ))}
