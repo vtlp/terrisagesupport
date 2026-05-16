@@ -58,16 +58,16 @@ type ProjectExtract = {
 
 const REQUIRED_FIELDS: Array<keyof ProjectExtract> = ['project_name', 'builder_name', 'city', 'address'];
 
+// Only values that Terrisage explicitly accepts. Anything from the CSV that doesn't match these is
+// silently dropped on push (per spec) so we never offer non-accepted options here.
 const COMMUNITY_TYPES_BY_PT: Record<PropertyType, string[]> = {
-  APARTMENT: ['Gated', 'High-rise gated', 'Open'],
+  APARTMENT: ['Gated', 'Open'],
   VILLA: ['Gated', 'Open'],
   PLOT: ['Gated', 'Open'],
 };
 
-const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed'];
+const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed (with OC)'];
 
-// Terrisage-aligned enum options shown in UI. Labels are human-readable; values are the
-// strings the edge function maps to Terrisage enums.
 const WATER_SOURCE_OPTIONS = ['Borewell', 'Municipal', 'Tanker', 'Lake', 'Other'];
 const UTILITY_OPTIONS = ['Electricity', 'Water', 'Gas', 'Sewage', 'STP', 'Intercom', 'Rainwater harvesting', 'Storm water drains'];
 
@@ -162,6 +162,26 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [configs, setConfigs] = useState<ImportConfig[]>([]);
   const [media, setMedia] = useState<ImportMedia[]>([]);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const [amenityMaster, setAmenityMaster] = useState<Array<{ display_name: string; code: string | null; property_type: string }>>([]);
+
+  useEffect(() => {
+    supabase.from('terrisage_amenity_master')
+      .select('display_name, code, property_type')
+      .then(({ data }) => setAmenityMaster(data ?? []));
+  }, []);
+
+  // Amenities the user typed that don't exist in the Terrisage master for this property type.
+  const unmappedAmenities = useMemo(() => {
+    const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+    const known = new Set<string>();
+    for (const m of amenityMaster) {
+      if (m.property_type && m.property_type !== propertyType) continue;
+      known.add(norm(m.display_name));
+      if (m.code) known.add(norm(m.code));
+    }
+    const items = amenities.split(',').map(s => s.trim()).filter(Boolean);
+    return items.filter(a => !known.has(norm(a)));
+  }, [amenities, amenityMaster, propertyType]);
   
   const [importing, setImporting] = useState(false);
   const [hasOwner, setHasOwner] = useState<boolean>(!!(job as { owner_account_id?: string | null }).owner_account_id);
@@ -1169,6 +1189,21 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 <Label>Amenities (comma separated)</Label>
                 <Textarea rows={2} value={amenities} onChange={e => setAmenities(e.target.value)} />
               </div>
+              {unmappedAmenities.length > 0 && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-medium text-sm mb-2">
+                    <AlertTriangle className="h-4 w-4" /> Unmapped amenities
+                  </div>
+                  <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mb-2">
+                    These amenities are not available in Terrisage's master list for {PROPERTY_TYPE_LABEL[propertyType]} and will be skipped on push. Refresh the amenity master from Admin → Integrations if you expect them to be present.
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {unmappedAmenities.map(a => (
+                      <Badge key={a} variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-400">{a}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label>Proximity matrix</Label>
