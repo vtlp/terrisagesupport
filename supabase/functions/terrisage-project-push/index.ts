@@ -739,15 +739,16 @@ Deno.serve(async (req) => {
         amenitiesSent: amenityPayload.length,
         push_warnings: {
           unmappedAmenities,
+          amenityAutoRefresh: autoRefresh,
         },
         lastPushAt: new Date().toISOString(),
       } as never,
     }).eq('id', jobId);
     await supabase.from('import_activity').insert([{
       job_id: jobId, event: 'push_to_terrisage_accepted',
-      detail: { ingestJobId, httpStatus, response, unmappedAmenities } as never, actor_id: user.id,
+      detail: { ingestJobId, httpStatus, response, unmappedAmenities, amenityAutoRefresh: autoRefresh } as never, actor_id: user.id,
     }]);
-    return json({ ok: true, ingestJobId, status: response?.status ?? 'PENDING', httpStatus, response, warnings: { unmappedAmenities } });
+    return json({ ok: true, ingestJobId, status: response?.status ?? 'PENDING', httpStatus, response, warnings: { unmappedAmenities, amenityAutoRefresh: autoRefresh } });
   }
 
   await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', jobId);
