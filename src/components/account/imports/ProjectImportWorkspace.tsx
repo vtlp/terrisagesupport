@@ -578,7 +578,17 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       {!job.account_id && (
         <>
           <OwnerAccountCard jobId={job.id} onOwnerChange={setHasOwner} />
-          <LinkedAccountsCard jobId={job.id} disabled={hasOwner} />
+          <LinkedAccountsCard
+            jobId={job.id}
+            disabled={hasOwner || job.status !== 'IMPORTED'}
+            disabledReason={
+              hasOwner
+                ? 'Disabled while a builder owner is selected. Clear the owner to link agencies instead.'
+                : job.status !== 'IMPORTED'
+                  ? 'Available after the project is imported. Complete the import to link agencies.'
+                  : undefined
+            }
+          />
         </>
       )}
 
