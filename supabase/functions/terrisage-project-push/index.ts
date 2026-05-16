@@ -381,9 +381,10 @@ function buildConfiguration(
   clusterKeyByName: Map<string, string>,
 ) {
   const d = c.data ?? {};
-  // Prefer parsed price band → string description. Numeric base/per-sqft kept null unless explicitly numeric.
-  const baseNum = numOrNull(d.price_base);
-  const perSqftNum = numOrNull(d.price_per_sqft);
+  // Numeric first, then Indian price band ("1.2 Cr", "85 Lakh", "1.2-1.5 Cr onwards") as fallback.
+  // pricing_range often holds the band when price_base/price_per_sqft are blank.
+  const baseNum = numOrNull(d.price_base) ?? parseIndianPrice(d.price_base) ?? parseIndianPrice(d.pricing_range);
+  const perSqftNum = numOrNull(d.price_per_sqft) ?? parseIndianPrice(d.price_per_sqft);
   const cfg: Record<string, unknown> = {
     supportConfigRef: c.id,
     sortOrder: c.sort_order,
