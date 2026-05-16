@@ -634,14 +634,20 @@ Deno.serve(async (req) => {
         terrisage_project_id: projectId,
         configs: configs?.length ?? 0,
         media: mediaPayload.length,
+        buildings: buildings.length,
+        streetClusters: streetClusters.length,
+        amenitiesSent: amenityPayload.length,
+        push_warnings: {
+          unmappedAmenities,
+        },
         lastPushAt: new Date().toISOString(),
       } as never,
     }).eq('id', jobId);
     await supabase.from('import_activity').insert([{
       job_id: jobId, event: 'push_to_terrisage_accepted',
-      detail: { ingestJobId, httpStatus, response } as never, actor_id: user.id,
+      detail: { ingestJobId, httpStatus, response, unmappedAmenities } as never, actor_id: user.id,
     }]);
-    return json({ ok: true, ingestJobId, status: response?.status ?? 'PENDING', httpStatus, response });
+    return json({ ok: true, ingestJobId, status: response?.status ?? 'PENDING', httpStatus, response, warnings: { unmappedAmenities } });
   }
 
   await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', jobId);
