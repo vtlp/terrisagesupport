@@ -162,6 +162,26 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [configs, setConfigs] = useState<ImportConfig[]>([]);
   const [media, setMedia] = useState<ImportMedia[]>([]);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const [amenityMaster, setAmenityMaster] = useState<Array<{ display_name: string; code: string | null; property_type: string }>>([]);
+
+  useEffect(() => {
+    supabase.from('terrisage_amenity_master')
+      .select('display_name, code, property_type')
+      .then(({ data }) => setAmenityMaster(data ?? []));
+  }, []);
+
+  // Amenities the user typed that don't exist in the Terrisage master for this property type.
+  const unmappedAmenities = useMemo(() => {
+    const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+    const known = new Set<string>();
+    for (const m of amenityMaster) {
+      if (m.property_type && m.property_type !== propertyType) continue;
+      known.add(norm(m.display_name));
+      if (m.code) known.add(norm(m.code));
+    }
+    const items = amenities.split(',').map(s => s.trim()).filter(Boolean);
+    return items.filter(a => !known.has(norm(a)));
+  }, [amenities, amenityMaster, propertyType]);
   
   const [importing, setImporting] = useState(false);
   const [hasOwner, setHasOwner] = useState<boolean>(!!(job as { owner_account_id?: string | null }).owner_account_id);
