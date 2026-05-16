@@ -1,62 +1,71 @@
-Continue the Project Import overhaul with the three remaining items from the previous turn.
+## Goal
 
-## 1. Synonym mapping updates (`autoMapProjectImport.ts`)
+Align our project push to match the confirmed Terrisage spec answers. All changes are server-side in `supabase/functions/terrisage-project-push/index.ts` plus one schema column + a minimal UI surface for the amenity master cache. No new tables besides a cache of the amenity master.
 
-Extend the field-synonym dictionary so the auto-mapper recognises the new field model coming out of GPT/OCR:
+## Changes (grouped)
 
-- `maps_url` ← "google maps", "maps link", "map url", "location url", "gmap"
-- `address_full` ← "full address", "site address", "project address"
-- `site_area_acres` ← "acres", "area (acres)"
-- `site_area_guntas` ← "guntas", "gunta"
-- `floors_per_unit` ← "floors per villa", "floors per unit", "no. of floors"
-- `tower_names_list` ← "tower names", "blocks", "tower/block list"
-- `cluster_names_list` ← "clusters", "streets", "phases"
-- `community_type` enum normaliser: map free-text into `Gated | High-rise gated | Open` (apartment) or `Gated | Open` (villa/plot)
-- `property_type` normaliser: collapse "Flats/Apartment/Apt" → `Apartment`, "Independent House/Villa" → `Villa`, "Plot/Land" → `Plot`
-- `status` adds "Phase 1 completed" matcher
-- Configuration `description` ← "notes", "config notes", "remarks", "spec notes"
+### 1. Enums — replace existing maps with spec-exact values
+- **projectStatus** → only `UNDER_CONSTRUCTION` | `PHASE_1_COMPLETED` | `COMPLETED_WITH_OC`. Map `COMPLETED`/`READY_TO_MOVE` → `COMPLETED_WITH_OC`; `PRE_LAUNCH`/`LAUNCHED` → `UNDER_CONSTRUCTION`; unknown → `null`.
+- **projectCommunityType** → only `GATED` | `OPEN`. Map `STANDALONE` → `OPEN`; everything else → `GATED`; unknown → `null`.
+- **projectWaterSourceList[]** → `BORE_WELL` | `MUNICIPAL` | `TANKER` | `LAKE` | `OTHER`. BWSSB/water-board/corporation → `MUNICIPAL`. Drop `RAINWATER_HARVESTING` from water sources.
+- **utilities[]** → push as `{ utilityType, details? }` (not bare strings). Valid types: `ELECTRICITY`, `WATER`, `GAS`, `SEWAGE`, `STP`, `INTERCOM_SECURITY`, `RAIN_WATER_HARVESTING`, `STORM_WATER_DRAINS`. `SOLAR`/`Solar panels` → `{ utilityType: 'ELECTRICITY', details: 'Solar panels' }`. `POWER_BACKUP` → `{ ELECTRICITY, 'Power backup' }`. Drop unmappable.
+- **media.kind** → `LOGO` | `PHOTO` | `VIDEO` | `FLOORPLAN` | `TOUR_3D` | `OTHER`. Map `GALLERY`/`MASTER_PLAN` → `PHOTO`; `BROCHURE`/`DOCUMENT` → `OTHER` with `meta.mime: 'application/pdf'`. `FLOORPLAN` carries `configRef`.
 
-Also drop synonyms for fields we removed from the console (parking, nearby access, configuration range, clubhouse, possession date) so they no longer auto-populate.
+### 2. Amenities — object shape + master fetch
+- New table `terrisage_amenity_master(amenity_id uuid pk, code text, display_name text, category text, property_type text, fetched_at timestamptz)`.
+- New action in push function: `action: 'refresh-amenities'` → calls `GET /api/integrations/amenities?propertyType=…` for `APARTMENT|VILLA|PLOT`, upserts the cache.
+- On push, look up each free-text amenity by normalised `displayName`/`code` against the cache (filtered by job's `property_type`). Build payload as `[{ amenityId, boolValue: true }]`. Unmapped amenities go into `push_warnings` on `import_jobs.summary` (don't fail the push).
+- Admin Data page: small "Refresh Terrisage amenity master" button calling the new action. Show last-refreshed timestamp.
 
-## 2. Multi-image villa configurations (one config → many floor plans)
+### 3. Buildings / clusters synthesis (Blocker)
+- Today we send `buildings: []` / `streetClusters: []`. Spec rejects empty when mappings reference tower/cluster keys.
+- Derive unique tower names from `configurations[].data.towerName` (and cluster names from `clusterName` for VILLA/PLOT).
+- Synthesise:
+  - `buildings: [{ supportBuildingKey: slug(name), buildingName: name, sortOrder }]` for APARTMENT.
+  - `streetClusters: [{ supportClusterKey: slug(name), clusterName: name, sortOrder }]` for VILLA/PLOT.
+- Rewrite each config's `mapping.supportBuildingKey` / `supportClusterKey` to match the slug.
+- `mapping.excludedFloors: string[]` passes through.
 
-Data model:
+### 4. Proximity, banks, facings
+- Proximity: drop `category`; combine into `label` (`"School: DPS East"`). `distance` stringified with unit (`"2.1 km"`), `time` string (`"15 min"` or null), `sortOrder` int.
+- Approved banks: free-text array (already correct, just confirm).
+- Facings: free text array on `mapping.availableFacings` (already free text).
 
-- Reuse existing `import_project_media` rows with `category = 'FLOOR_PLAN'` and existing `config_id` FK. No schema change — the link is already one-to-many.
-- For `crm_project_media` (post-import), confirm same FK exists; if not, the Admin migration in the previous turn will add it.
+### 5. Configurations
+- Make `configUnitPriceBaseValue` / `configurationUnitPricePerSqft` nullable in payload (no synthetic 0s). Free-text bands go into `configurationUnitDescription`.
+- `masterBedroomSizeSqft` accepted as string.
+- `variations[]` shape: `[{ text, sortOrder }]`.
 
-UI in `ProjectImportWorkspace.tsx` Configurations tab (Villa only):
+### 6. Async ingest contract
+- Poll by `sourceJobId`: change poll to `GET …/ingest-jobs?sourceJobId={jobId}` instead of using stored `ingestJobId`. Keep `ingestJobId` for logging.
+- Terminal: `SUCCEEDED` | `FAILED`. Running: `PENDING` | `RUNNING`. On `SUCCEEDED`, persist `summary.terrisage_project_id` from poll response.
+- UI poll cadence: 10s for first 2 min, then 30s, up to ~15 min then surface "still processing".
 
-- Inside each config card, render a "Floor plans" gallery: thumbnails of every `import_project_media` row where `config_id = thisConfig.id` AND `category = 'FLOOR_PLAN'`.
-- Add an "Upload floor plan" button per config card that uploads to `import-files` bucket and inserts an `import_project_media` row with `config_id` set.
-- Each thumbnail gets a remove (×) button and a caption field.
-- For Apartment/Plot, keep the single-image behaviour (one floor plan per config) but use the same gallery component capped at 1.
+### 7. Internal notes
+- Keep current JSON-stringified representative blob in `internalNotes`. Append office/email there. Move phone to `projectContactPhoneNo`.
 
-## 3. Update `terrisage-project-push` payload
+### 8. Agency access endpoint
+- Keep current `POST …/projects/{terrisageProjectId}/agency-access` placeholder but flag as `TODO: confirm path` in code comment (spec answer didn't include this endpoint — Terrisage said agency visibility is out-of-scope for this contract; it's `ChannelPartnerProject` in CRM app, no bulk API). Leave UI hidden if endpoint returns 404, with a clearer error.
 
-In `supabase/functions/terrisage-project-push/index.ts`, extend the outgoing payload to include the new fields so the tenant CRM receives them:
+## Files to touch
 
-- `maps_url`, `address_full`, `locality` (derived)
-- `site_area_acres_total` (numeric, acres + guntas/40)
-- `community_type` (validated against per-property-type enum)
-- `tower_names: string[]` (Apartment only)
-- `cluster_names: string[]` (Villa/Plot only)
-- `floors_per_unit` (Villa only)
-- For each configuration: `description`, plus `floor_plans: [{url, caption}]` array instead of single `floor_plan_url`.
+- `supabase/functions/terrisage-project-push/index.ts` — all enum maps, builders, payload assembly, poll-by-sourceJobId, amenity lookup, building/cluster synthesis, action `refresh-amenities`.
+- `supabase/migrations/...` — create `terrisage_amenity_master` table + RLS (staff read; service role write).
+- `src/pages/admin/AdminData.tsx` (or AdminIntegrations) — add "Refresh amenity master" button + last-refreshed display.
+- `src/components/account/imports/ProjectImportWorkspace.tsx` — surface `push_warnings` (unmapped amenities) after a push.
+- `docs/terrisage-mapping-questions.md` — mark all answered.
 
-Remove these from the payload (no longer collected): `possession_date`, `configuration_range`, `parking`, `nearby_access`, `clubhouse` (folded into `about_project` text).
+## Out of scope
 
-## Files to change
+- Multi-builder co-ownership (Terrisage v1 picks one primary).
+- Agency-share bulk API (not in contract).
+- Auto-creating amenity master entries when missing — log only.
 
-```text
-src/components/account/imports/autoMapProjectImport.ts
-src/components/account/imports/ProjectImportWorkspace.tsx   (Configurations tab only)
-supabase/functions/terrisage-project-push/index.ts
-```
+## Validation plan
 
-No new migrations required — `import_project_media.config_id` already supports the one-to-many link.
+1. Deploy edge function; call `refresh-amenities`; verify cache populated.
+2. Push a sample APARTMENT job with multi-tower configs; assert `buildings[]` synthesised and `mapping.supportBuildingKey` matches.
+3. Push with mixed-case amenities; assert mapped ones come back with UUIDs, unmapped land in `push_warnings`.
+4. Poll by `sourceJobId`; assert `projectId` appears once status reaches `SUCCEEDED`.
 
-## Out of scope for this step
-
-- Backfilling existing imported projects with the new fields
-- Tenant-side CRM rendering changes (handled on the CRM repo)
+Approve to proceed and I'll execute in this order: schema → edge function → admin refresh UI → push UX for warnings → doc update.

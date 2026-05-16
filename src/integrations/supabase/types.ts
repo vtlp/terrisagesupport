@@ -3256,6 +3256,33 @@ export type Database = {
         }
         Relationships: []
       }
+      terrisage_amenity_master: {
+        Row: {
+          amenity_id: string
+          category: string | null
+          code: string | null
+          display_name: string
+          fetched_at: string
+          property_type: string
+        }
+        Insert: {
+          amenity_id: string
+          category?: string | null
+          code?: string | null
+          display_name: string
+          fetched_at?: string
+          property_type: string
+        }
+        Update: {
+          amenity_id?: string
+          category?: string | null
+          code?: string | null
+          display_name?: string
+          fetched_at?: string
+          property_type?: string
+        }
+        Relationships: []
+      }
       ticket_attachments: {
         Row: {
           created_at: string
