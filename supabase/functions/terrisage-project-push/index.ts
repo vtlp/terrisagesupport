@@ -654,9 +654,8 @@ Deno.serve(async (req) => {
       url = signed?.signedUrl ?? null;
     }
     const meta = (m.meta ?? {}) as Record<string, unknown>;
-    const kind = MEDIA_KIND_MAP[String(m.category)];
-    // Per spec, only LOGO|PHOTO|VIDEO|FLOORPLAN|TOUR_3D|OTHER are accepted. Skip anything we can't map.
-    if (!kind) continue;
+    // Unknown categories fall back to OTHER so we still ship the asset rather than losing it.
+    const kind = MEDIA_KIND_MAP[String(m.category)] ?? 'OTHER';
     // Brochures/documents → meta.mime hint for downstream download.
     if (!meta.mime && (m.category === 'BROCHURE' || m.category === 'DOCUMENT')) {
       meta.mime = 'application/pdf';
