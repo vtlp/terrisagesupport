@@ -923,31 +923,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Media & floor plans</CardTitle>
                 <div className="flex items-center gap-2">
-                  <label className="inline-flex">
-                    <input type="file" multiple accept="image/*" className="hidden"
-                      onChange={async (e) => {
-                        const fl = e.target.files; if (!fl || !fl.length) return;
-                        const cat: MediaCategory = (prompt('Upload as category? FLOOR_PLAN or GALLERY', 'GALLERY') || 'GALLERY').toUpperCase() as MediaCategory;
-                        const ok: MediaCategory[] = ['GALLERY','FLOOR_PLAN','LOGO','BROCHURE','VIDEO','DOCUMENT','OTHER'];
-                        const cc = ok.includes(cat) ? cat : 'GALLERY';
-                        for (const file of Array.from(fl)) {
-                          const path = `${job.account_id ?? 'global'}/${job.id}/manual-${Date.now()}-${file.name}`;
-                          const { error: upErr } = await supabase.storage.from('import-files').upload(path, file);
-                          if (upErr) { toast.error(upErr.message); continue; }
-                          const { data, error } = await supabase.from('import_project_media').insert([{
-                            job_id: job.id, category: cc, storage_path: path, caption: file.name, source: 'MANUAL',
-                          }]).select('*').single();
-                          if (error) { toast.error(error.message); continue; }
-                          setMedia(ms => [...ms, data as ImportMedia]);
-                        }
-                        toast.success('Uploaded');
-                        (e.target as HTMLInputElement).value = '';
-                      }}
-                    />
-                    <span className="inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent text-xs h-8 px-3 cursor-pointer">
-                      <Plus className="h-3 w-3 mr-1" />Upload images
-                    </span>
-                  </label>
                   <Button size="sm" onClick={addMedia}><Plus className="h-4 w-4 mr-1" />Add item</Button>
                 </div>
               </div>
