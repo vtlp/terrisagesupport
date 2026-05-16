@@ -343,9 +343,11 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
 
   const uploadForConfig = async (configId: string, fileList: FileList | null, category: 'FLOOR_PLAN' | 'GALLERY') => {
     if (!fileList || !fileList.length) return;
+    let uploaded = 0;
     for (const file of Array.from(fileList)) {
-      const path = `${job.account_id ?? 'global'}/${job.id}/${category.toLowerCase()}-${configId}-${Date.now()}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from('import-files').upload(path, file);
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const path = `${job.account_id ?? 'global'}/${job.id}/${category.toLowerCase()}-${configId}-${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage.from('import-files').upload(path, file, { contentType: file.type || undefined });
       if (upErr) { toast.error(upErr.message); continue; }
       const { data: ins, error } = await supabase.from('import_project_media').insert([{
         job_id: job.id, category, storage_path: path,
@@ -353,8 +355,9 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       }]).select('*').single();
       if (error) { toast.error(error.message); continue; }
       setMedia(ms => [ins as ImportMedia, ...ms]);
+      uploaded++;
     }
-    toast.success('Uploaded');
+    if (uploaded > 0) toast.success(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
   };
 
   // VALIDATION
