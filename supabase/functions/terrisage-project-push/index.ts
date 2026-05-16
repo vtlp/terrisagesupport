@@ -524,7 +524,7 @@ Deno.serve(async (req) => {
 
   // -------- REFRESH-AMENITIES action --------
   // Pulls Terrisage's amenity master per propertyType into the local cache so we can map free-text labels → amenityId.
-  if (action === 'refresh-amenities') {
+  async function runAmenityRefresh(): Promise<{ total: number; errors: Array<{ propertyType: string; error: string }> }> {
     const types = ['APARTMENT', 'VILLA', 'PLOT'];
     let total = 0;
     const errors: Array<{ propertyType: string; error: string }> = [];
@@ -534,10 +534,7 @@ Deno.serve(async (req) => {
           method: 'GET',
           headers: { 'X-API-Key': apiKey },
         });
-        if (!r.ok) {
-          errors.push({ propertyType: pt, error: `HTTP ${r.status}` });
-          continue;
-        }
+        if (!r.ok) { errors.push({ propertyType: pt, error: `HTTP ${r.status}` }); continue; }
         const parsed = await r.json() as { amenities?: Array<{ amenityId: string; code?: string; displayName: string; category?: string }> };
         const rows = (parsed.amenities ?? []).map(a => ({
           amenity_id: a.amenityId,
@@ -555,6 +552,10 @@ Deno.serve(async (req) => {
         errors.push({ propertyType: pt, error: (e as Error).message });
       }
     }
+    return { total, errors };
+  }
+  if (action === 'refresh-amenities') {
+    const { total, errors } = await runAmenityRefresh();
     return json({ ok: errors.length === 0, total, errors });
   }
 
