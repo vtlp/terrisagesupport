@@ -908,7 +908,62 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       <Textarea rows={2} className="text-sm" value={data.description != null ? String(data.description) : ''}
                         onChange={e => updateConfig(c.id, { description: e.target.value })} />
                     </div>
-                    {/* Floor plans are managed in the Media tab. */}
+                    {/* Per-config uploads: floor plan or gallery images */}
+                    {(() => {
+                      const linked = media.filter(m => m.config_id === c.id && (m.category === 'FLOOR_PLAN' || m.category === 'GALLERY'));
+                      return (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <Label className="text-xs">Images for this configuration</Label>
+                            <div className="flex items-center gap-2">
+                              <label className="inline-flex">
+                                <input type="file" multiple accept="image/*" className="hidden"
+                                  onChange={async e => { await uploadForConfig(c.id, e.target.files, 'FLOOR_PLAN'); (e.target as HTMLInputElement).value = ''; }} />
+                                <span className="inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent text-xs h-7 px-2 cursor-pointer">
+                                  <Plus className="h-3 w-3 mr-1" />Floor plan
+                                </span>
+                              </label>
+                              <label className="inline-flex">
+                                <input type="file" multiple accept="image/*" className="hidden"
+                                  onChange={async e => { await uploadForConfig(c.id, e.target.files, 'GALLERY'); (e.target as HTMLInputElement).value = ''; }} />
+                                <span className="inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent text-xs h-7 px-2 cursor-pointer">
+                                  <Plus className="h-3 w-3 mr-1" />Gallery
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                          {linked.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">No images yet. Upload a floor plan or gallery image.</p>
+                          ) : (
+                            <div className="grid gap-2 grid-cols-2 md:grid-cols-3">
+                              {linked.map(m => {
+                                const url = mediaUrls[m.id] || m.external_url || '';
+                                return (
+                                  <div key={m.id} className="rounded border p-1.5 space-y-1 relative">
+                                    <button type="button" onClick={() => removeMedia(m.id)}
+                                      className="absolute top-1 right-1 z-10 rounded-full bg-background/90 border p-0.5 hover:bg-destructive hover:text-destructive-foreground">
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                    <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center">
+                                      {url ? (
+                                        <img src={url} alt={m.caption ?? m.category} className="w-full h-full object-contain" loading="lazy" />
+                                      ) : (
+                                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Badge variant="outline" className="text-[9px]">{m.category}</Badge>
+                                    </div>
+                                    <Input className="h-7 text-xs" placeholder="Caption" value={m.caption ?? ''}
+                                      onChange={e => updateMedia(m.id, { caption: e.target.value })} />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
