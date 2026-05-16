@@ -310,11 +310,12 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   };
 
   const addConfig = async () => {
+    const minSort = configs.reduce((m, c) => Math.min(m, c.sort_order ?? 0), 0);
     const { data, error } = await supabase.from('import_project_configs').insert([{
-      job_id: job.id, sort_order: configs.length, data: { name: 'New configuration' } as never, source: 'MANUAL',
+      job_id: job.id, sort_order: minSort - 1, data: { name: 'New configuration' } as never, source: 'MANUAL',
     }]).select('*').single();
     if (error) { toast.error(error.message); return; }
-    setConfigs(cs => [...cs, data as ImportConfig]);
+    setConfigs(cs => [data as ImportConfig, ...cs]);
   };
 
   const removeConfig = async (id: string) => {
@@ -337,7 +338,23 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       job_id: job.id, category: 'GALLERY', caption: 'New media item', source: 'MANUAL',
     }]).select('*').single();
     if (error) { toast.error(error.message); return; }
-    setMedia(ms => [...ms, data as ImportMedia]);
+    setMedia(ms => [data as ImportMedia, ...ms]);
+  };
+
+  const uploadForConfig = async (configId: string, fileList: FileList | null, category: 'FLOOR_PLAN' | 'GALLERY') => {
+    if (!fileList || !fileList.length) return;
+    for (const file of Array.from(fileList)) {
+      const path = `${job.account_id ?? 'global'}/${job.id}/${category.toLowerCase()}-${configId}-${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from('import-files').upload(path, file);
+      if (upErr) { toast.error(upErr.message); continue; }
+      const { data: ins, error } = await supabase.from('import_project_media').insert([{
+        job_id: job.id, category, storage_path: path,
+        caption: file.name, source: 'MANUAL', config_id: configId,
+      }]).select('*').single();
+      if (error) { toast.error(error.message); continue; }
+      setMedia(ms => [ins as ImportMedia, ...ms]);
+    }
+    toast.success('Uploaded');
   };
 
   // VALIDATION
