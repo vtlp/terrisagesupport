@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, Loader2, Plus, X, Link as LinkIcon } from 'lucide-react';
@@ -19,7 +18,7 @@ type LinkRow = {
   accounts?: AccountLite | null;
 };
 
-export function LinkedAccountsCard({ jobId }: { jobId: string }) {
+export function LinkedAccountsCard({ jobId, disabled = false }: { jobId: string; disabled?: boolean }) {
   const { currentUser } = useUser();
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [accounts, setAccounts] = useState<AccountLite[]>([]);
@@ -35,7 +34,11 @@ export function LinkedAccountsCard({ jobId }: { jobId: string }) {
         .select('id, account_id, notes, linked_at, accounts:account_id(id, account_name, city)')
         .eq('job_id', jobId)
         .order('linked_at', { ascending: false }),
-      supabase.from('accounts').select('id, account_name, city').order('account_name'),
+      supabase
+        .from('accounts')
+        .select('id, account_name, city')
+        .eq('tenancy_type', 'AGENCY_BROKERAGE_CONSULTANCY')
+        .order('account_name'),
     ]);
     setLinks((l ?? []) as unknown as LinkRow[]);
     setAccounts((a ?? []) as AccountLite[]);
@@ -52,9 +55,20 @@ export function LinkedAccountsCard({ jobId }: { jobId: string }) {
     const { error } = await supabase.from('import_job_account_links' as never).insert([{
       job_id: jobId, account_id: accountId, linked_by: currentUser?.user_id ?? null,
     }] as never);
-    setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { setBusy(false); toast.error(error.message); return; }
     setOpen(false);
+
+    // Call Terrisage to link the existing project to this agency.
+    const { data: resp, error: fnErr } = await supabase.functions.invoke('terrisage-project-push', {
+      body: { action: 'link-agency', jobId, accountId },
+    });
+    setBusy(false);
+    if (fnErr || !(resp as { ok?: boolean })?.ok) {
+      const msg = (resp as { error?: string })?.error ?? fnErr?.message ?? 'Failed to link agency in Terrisage';
+      toast.error(msg);
+    } else {
+      toast.success('Agency linked in Terrisage');
+    }
     await load();
   };
 
@@ -71,24 +85,26 @@ export function LinkedAccountsCard({ jobId }: { jobId: string }) {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <CardTitle className="text-sm flex items-center gap-2">
-              <LinkIcon className="h-4 w-4" /> Linked accounts
+              <LinkIcon className="h-4 w-4" /> Linked agencies
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Optionally tag tenants this project applies to. Visible from the account's Projects section.
+              {disabled
+                ? 'Disabled while a builder owner is selected. Clear the owner to link agencies instead.'
+                : 'Link agency accounts that should see this project. Each link is registered with Terrisage.'}
             </p>
           </div>
-          <Popover open={open} onOpenChange={setOpen}>
+          <Popover open={open} onOpenChange={(v) => !disabled && setOpen(v)}>
             <PopoverTrigger asChild>
-              <Button size="sm" variant="outline" disabled={busy}>
+              <Button size="sm" variant="outline" disabled={busy || disabled}>
                 {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
-                Link to tenant
+                Link to agency
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[320px] p-0" align="end">
               <Command>
-                <CommandInput placeholder="Search account name…" />
+                <CommandInput placeholder="Search agency name…" />
                 <CommandList>
-                  <CommandEmpty>No accounts found.</CommandEmpty>
+                  <CommandEmpty>No agencies found.</CommandEmpty>
                   <CommandGroup>
                     {available.map(a => (
                       <CommandItem
@@ -114,9 +130,9 @@ export function LinkedAccountsCard({ jobId }: { jobId: string }) {
         {loading ? (
           <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
         ) : links.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No tenants linked. Linking is optional.</p>
+          <p className="text-xs text-muted-foreground">No agencies linked.</p>
         ) : (
-          <div className="divide-y rounded-md border">
+          <div className={cn('divide-y rounded-md border', disabled && 'opacity-60')}>
             {links.map(l => (
               <div key={l.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <div className="min-w-0">
@@ -132,6 +148,7 @@ export function LinkedAccountsCard({ jobId }: { jobId: string }) {
                   size="sm"
                   variant="ghost"
                   onClick={() => removeLink(l.id)}
+                  disabled={disabled}
                   aria-label="Unlink"
                   className="text-destructive hover:text-destructive"
                 >

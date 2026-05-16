@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 type BuilderAccount = { id: string; account_name: string; city: string | null; tenant_id: string | null };
 
-export function OwnerAccountCard({ jobId }: { jobId: string }) {
+export function OwnerAccountCard({ jobId, onOwnerChange }: { jobId: string; onOwnerChange?: (hasOwner: boolean) => void }) {
   const [owner, setOwner] = useState<BuilderAccount | null>(null);
   const [accounts, setAccounts] = useState<BuilderAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,8 +30,9 @@ export function OwnerAccountCard({ jobId }: { jobId: string }) {
     setAccounts(list);
     const ownerId = (job as { owner_account_id: string | null } | null)?.owner_account_id ?? null;
     setOwner(ownerId ? list.find(x => x.id === ownerId) ?? null : null);
+    onOwnerChange?.(!!ownerId);
     setLoading(false);
-  }, [jobId]);
+  }, [jobId, onOwnerChange]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -45,6 +46,7 @@ export function OwnerAccountCard({ jobId }: { jobId: string }) {
     if (error) { toast.error(error.message); return; }
     setOpen(false);
     setOwner(accountId ? accounts.find(a => a.id === accountId) ?? null : null);
+    onOwnerChange?.(!!accountId);
   };
 
   return (

@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, 405);
 
-  let body: { jobId?: string; action?: string };
+  let body: { jobId?: string; action?: string; accountId?: string };
   try { body = await req.json(); } catch { return json({ ok: false, error: 'INVALID_BODY' }, 400); }
   const jobId = body.jobId;
   const action = body.action ?? 'push';
@@ -294,7 +294,48 @@ Deno.serve(async (req) => {
     }
   }
 
-  // -------- PUSH action --------
+  // -------- LINK-AGENCY action --------
+  // Asks Terrisage to grant an existing project visibility to an agency tenant.
+  if (action === 'link-agency') {
+    const accountId = body.accountId;
+    if (!accountId) return json({ ok: false, error: 'MISSING_ACCOUNT_ID' }, 400);
+
+    const [{ data: job }, { data: acct }] = await Promise.all([
+      supabase.from('import_jobs').select('summary').eq('id', jobId).maybeSingle(),
+      supabase.from('accounts').select('tenant_id, account_name, tenancy_type').eq('id', accountId).maybeSingle(),
+    ]);
+    const terrisageProjectId = ((job?.summary ?? {}) as Record<string, unknown>).terrisage_project_id as string | undefined;
+    if (!terrisageProjectId) {
+      return json({ ok: false, error: 'PROJECT_NOT_PUSHED', detail: 'Push the project to Terrisage first before linking an agency.' }, 409);
+    }
+    if (!acct?.tenant_id) {
+      return json({ ok: false, error: 'AGENCY_HAS_NO_TENANT', detail: 'Selected agency has no tenant ID on its account.' }, 400);
+    }
+    if (acct.tenancy_type !== 'AGENCY_BROKERAGE_CONSULTANCY') {
+      return json({ ok: false, error: 'NOT_AN_AGENCY' }, 400);
+    }
+
+    try {
+      const r = await fetch(`${root}/api/integrations/projects/${terrisageProjectId}/agency-access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+        body: JSON.stringify({ agencyOrgId: acct.tenant_id, sourceJobId: jobId }),
+      });
+      const text = await r.text();
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+      await supabase.from('import_activity').insert([{
+        job_id: jobId,
+        event: r.ok ? 'terrisage_agency_linked' : 'terrisage_agency_link_failed',
+        detail: { accountId, agencyOrgId: acct.tenant_id, httpStatus: r.status, response: parsed } as never,
+        actor_id: user.id,
+      }]);
+      if (!r.ok) return json({ ok: false, error: `HTTP ${r.status}`, detail: text.slice(0, 300) }, 502);
+      return json({ ok: true, response: parsed });
+    } catch (e) {
+      return json({ ok: false, error: (e as Error).message }, 502);
+    }
+  }
   const { data: job, error: jErr } = await supabase
     .from('import_jobs').select('*').eq('id', jobId).maybeSingle();
   if (jErr || !job) return json({ ok: false, error: 'JOB_NOT_FOUND' }, 404);

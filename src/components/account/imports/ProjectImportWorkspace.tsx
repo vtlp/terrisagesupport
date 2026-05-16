@@ -164,6 +164,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   
   const [importing, setImporting] = useState(false);
+  const [hasOwner, setHasOwner] = useState<boolean>(!!(job as { owner_account_id?: string | null }).owner_account_id);
   const [savingRep, setSavingRep] = useState(false);
   const [savingReview, setSavingReview] = useState(false);
 
@@ -574,8 +575,12 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         );
       })()}
 
-      {!job.account_id && <OwnerAccountCard jobId={job.id} />}
-      {!job.account_id && <LinkedAccountsCard jobId={job.id} />}
+      {!job.account_id && (
+        <>
+          <OwnerAccountCard jobId={job.id} onOwnerChange={setHasOwner} />
+          <LinkedAccountsCard jobId={job.id} disabled={hasOwner} />
+        </>
+      )}
 
       <Tabs defaultValue="files">
         <TabsList className="flex-wrap h-auto">
