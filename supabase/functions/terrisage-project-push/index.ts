@@ -524,7 +524,7 @@ Deno.serve(async (req) => {
 
   // -------- REFRESH-AMENITIES action --------
   // Pulls Terrisage's amenity master per propertyType into the local cache so we can map free-text labels → amenityId.
-  if (action === 'refresh-amenities') {
+  async function runAmenityRefresh(): Promise<{ total: number; errors: Array<{ propertyType: string; error: string }> }> {
     const types = ['APARTMENT', 'VILLA', 'PLOT'];
     let total = 0;
     const errors: Array<{ propertyType: string; error: string }> = [];
@@ -534,10 +534,7 @@ Deno.serve(async (req) => {
           method: 'GET',
           headers: { 'X-API-Key': apiKey },
         });
-        if (!r.ok) {
-          errors.push({ propertyType: pt, error: `HTTP ${r.status}` });
-          continue;
-        }
+        if (!r.ok) { errors.push({ propertyType: pt, error: `HTTP ${r.status}` }); continue; }
         const parsed = await r.json() as { amenities?: Array<{ amenityId: string; code?: string; displayName: string; category?: string }> };
         const rows = (parsed.amenities ?? []).map(a => ({
           amenity_id: a.amenityId,
@@ -555,6 +552,10 @@ Deno.serve(async (req) => {
         errors.push({ propertyType: pt, error: (e as Error).message });
       }
     }
+    return { total, errors };
+  }
+  if (action === 'refresh-amenities') {
+    const { total, errors } = await runAmenityRefresh();
     return json({ ok: errors.length === 0, total, errors });
   }
 
@@ -604,6 +605,22 @@ Deno.serve(async (req) => {
     .from('import_jobs').select('*').eq('id', jobId).maybeSingle();
   if (jErr || !job) return json({ ok: false, error: 'JOB_NOT_FOUND' }, 404);
   if (job.kind !== 'PROJECT') return json({ ok: false, error: 'NOT_A_PROJECT_JOB' }, 400);
+
+  // Auto-refresh the amenity master if it's empty or older than 24h. Failures here are non-fatal:
+  // we'll fall through and just produce more "unmapped" warnings than usual.
+  let autoRefresh: { ran: boolean; total?: number; errors?: unknown } = { ran: false };
+  const { data: freshness } = await supabase
+    .from('terrisage_amenity_master')
+    .select('fetched_at')
+    .order('fetched_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const lastFetched = freshness?.fetched_at ? new Date(freshness.fetched_at).getTime() : 0;
+  const STALE_MS = 24 * 60 * 60 * 1000;
+  if (!lastFetched || Date.now() - lastFetched > STALE_MS) {
+    const r = await runAmenityRefresh();
+    autoRefresh = { ran: true, total: r.total, errors: r.errors };
+  }
 
   const [{ data: configs }, { data: media }, { data: linkRows }, { data: ownerAcct }, { data: amenityMaster }] = await Promise.all([
     supabase.from('import_project_configs').select('*').eq('job_id', jobId).order('sort_order'),
@@ -722,15 +739,16 @@ Deno.serve(async (req) => {
         amenitiesSent: amenityPayload.length,
         push_warnings: {
           unmappedAmenities,
+          amenityAutoRefresh: autoRefresh,
         },
         lastPushAt: new Date().toISOString(),
       } as never,
     }).eq('id', jobId);
     await supabase.from('import_activity').insert([{
       job_id: jobId, event: 'push_to_terrisage_accepted',
-      detail: { ingestJobId, httpStatus, response, unmappedAmenities } as never, actor_id: user.id,
+      detail: { ingestJobId, httpStatus, response, unmappedAmenities, amenityAutoRefresh: autoRefresh } as never, actor_id: user.id,
     }]);
-    return json({ ok: true, ingestJobId, status: response?.status ?? 'PENDING', httpStatus, response, warnings: { unmappedAmenities } });
+    return json({ ok: true, ingestJobId, status: response?.status ?? 'PENDING', httpStatus, response, warnings: { unmappedAmenities, amenityAutoRefresh: autoRefresh } });
   }
 
   await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', jobId);
