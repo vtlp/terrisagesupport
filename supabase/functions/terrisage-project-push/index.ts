@@ -21,6 +21,8 @@ const json = (b: unknown, s = 200) =>
 // Confirmed by Terrisage 2026-05-16: only the values below are accepted; everything else falls back.
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
 
+// Status: exact lookup first, then a forgiving substring pass so values like "Nearing completion",
+// "Soft launch", "Tower 1 handed over" still land on the closest spec value.
 const STATUS_LOOKUP: Record<string, string> = {
   'under construction': 'UNDER_CONSTRUCTION',
   'uc': 'UNDER_CONSTRUCTION',
@@ -36,32 +38,50 @@ const STATUS_LOOKUP: Record<string, string> = {
   'ready to move in': 'COMPLETED_WITH_OC',
   'rtm': 'COMPLETED_WITH_OC',
 };
-const mapStatus = (v: unknown): string | null => STATUS_LOOKUP[norm(v)] ?? null;
+const mapStatus = (v: unknown): string | null => {
+  const n = norm(v);
+  if (!n) return null;
+  if (STATUS_LOOKUP[n]) return STATUS_LOOKUP[n];
+  if (/\b(oc|occupation|handover|handed over|possess)/.test(n)) return 'COMPLETED_WITH_OC';
+  if (/\b(phase|tower)\s*\d*\s*(complete|done|handed|ready)/.test(n) || /nearing/.test(n)) return 'PHASE_1_COMPLETED';
+  if (/\b(launch|construct|ongoing|progress|excavat|foundation|piling|booking)/.test(n)) return 'UNDER_CONSTRUCTION';
+  if (/\bcomplete|finished|ready\b/.test(n)) return 'COMPLETED_WITH_OC';
+  return null;
+};
 
-// Only GATED / OPEN are accepted. Unknown values are dropped (null) so we never send a
-// fabricated value to Terrisage.
+// Community: substring-friendly. Falls back to GATED for community-style words
+// (township, enclave, residency) so we don't lose intent.
 const mapCommunity = (v: unknown): string | null => {
   const n = norm(v);
   if (!n) return null;
-  if (n === 'open') return 'OPEN';
-  if (n === 'gated' || n === 'high rise gated' || n === 'highrise gated') return 'GATED';
+  if (/\bopen\b|\bstandalone\b|\bplotted\b/.test(n)) return 'OPEN';
+  if (/gated|high\s*rise|township|enclave|community|residency|gateway|villa community/.test(n)) return 'GATED';
   return null;
 };
 
 const WATER_LOOKUP: Record<string, string> = {
-  'bore well': 'BORE_WELL', 'borewell': 'BORE_WELL',
-  'municipal': 'MUNICIPAL', 'bwssb': 'MUNICIPAL', 'corporation': 'MUNICIPAL', 'water board': 'MUNICIPAL',
+  'bore well': 'BORE_WELL', 'borewell': 'BORE_WELL', 'bore': 'BORE_WELL',
+  'municipal': 'MUNICIPAL', 'bwssb': 'MUNICIPAL', 'corporation': 'MUNICIPAL',
+  'water board': 'MUNICIPAL', 'cauvery': 'MUNICIPAL', 'kaveri': 'MUNICIPAL',
   'tanker': 'TANKER',
   'lake': 'LAKE',
   'other': 'OTHER',
 };
-// Drop anything we can't confidently map. Send only spec-accepted values.
+// Try exact, then substring; anything left non-empty falls back to OTHER so we don't silently lose it.
 const mapWater = (arr: unknown): string[] => {
   if (!Array.isArray(arr)) return [];
   const seen = new Set<string>();
   for (const x of arr) {
-    const v = WATER_LOOKUP[norm(x)];
-    if (v) seen.add(v);
+    const n = norm(x);
+    if (!n) continue;
+    let v = WATER_LOOKUP[n];
+    if (!v) {
+      for (const [k, val] of Object.entries(WATER_LOOKUP)) {
+        if (n.includes(k)) { v = val; break; }
+      }
+    }
+    if (!v) v = 'OTHER';
+    seen.add(v);
   }
   return [...seen];
 };
@@ -72,37 +92,67 @@ const UTILITY_LOOKUP: Record<string, { utilityType: string; details?: string }> 
   'electricity': { utilityType: 'ELECTRICITY' },
   'power': { utilityType: 'ELECTRICITY' },
   'power backup': { utilityType: 'ELECTRICITY', details: 'Power backup' },
+  'dg backup': { utilityType: 'ELECTRICITY', details: 'DG backup' },
+  'generator': { utilityType: 'ELECTRICITY', details: 'DG backup' },
   'solar': { utilityType: 'ELECTRICITY', details: 'Solar panels' },
   'solar panels': { utilityType: 'ELECTRICITY', details: 'Solar panels' },
+  'solar water heater': { utilityType: 'ELECTRICITY', details: 'Solar water heater' },
+  'ev charging': { utilityType: 'ELECTRICITY', details: 'EV charging' },
   'water': { utilityType: 'WATER' },
   'water supply 24 7': { utilityType: 'WATER', details: '24x7 supply' },
   'gas': { utilityType: 'GAS' },
   'gas pipeline': { utilityType: 'GAS', details: 'Piped gas' },
+  'piped gas': { utilityType: 'GAS', details: 'Piped gas' },
   'sewage': { utilityType: 'SEWAGE' },
   'sewage treatment': { utilityType: 'STP' },
   'stp': { utilityType: 'STP' },
   'intercom': { utilityType: 'INTERCOM_SECURITY' },
   'security': { utilityType: 'INTERCOM_SECURITY' },
+  '24 7 security': { utilityType: 'INTERCOM_SECURITY', details: '24x7 security' },
+  'cctv': { utilityType: 'INTERCOM_SECURITY', details: 'CCTV' },
   'intercom security': { utilityType: 'INTERCOM_SECURITY' },
   'rain water harvesting': { utilityType: 'RAIN_WATER_HARVESTING' },
   'rainwater harvesting': { utilityType: 'RAIN_WATER_HARVESTING' },
+  'rwh': { utilityType: 'RAIN_WATER_HARVESTING' },
   'storm water drains': { utilityType: 'STORM_WATER_DRAINS' },
+  'storm water': { utilityType: 'STORM_WATER_DRAINS' },
 };
 
 // Media kind: only LOGO|PHOTO|VIDEO|FLOORPLAN|TOUR_3D|OTHER on the wire.
+// Unknown categories fall through to OTHER so the media item is still sent.
 const MEDIA_KIND_MAP: Record<string, string> = {
   LOGO: 'LOGO',
   GALLERY: 'PHOTO',
   MASTER_PLAN: 'PHOTO',
   PHOTO: 'PHOTO',
+  IMAGE: 'PHOTO',
+  RENDER: 'PHOTO',
   FLOOR_PLAN: 'FLOORPLAN',
   FLOORPLAN: 'FLOORPLAN',
   VIDEO: 'VIDEO',
   WALKTHROUGH_VIDEO: 'VIDEO',
   TOUR_3D: 'TOUR_3D',
+  VIRTUAL_TOUR: 'TOUR_3D',
   BROCHURE: 'OTHER',
   DOCUMENT: 'OTHER',
   OTHER: 'OTHER',
+};
+
+// Indian price band parser: "1.2 Cr", "85 Lakh", "₹95L", "1.2-1.5 Cr onwards" → absolute INR.
+// Returns the low end of a range when present.
+const parseIndianPrice = (v: unknown): number | null => {
+  const s = String(v ?? '').toLowerCase().replace(/,/g, '');
+  if (!s.trim()) return null;
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(cr|crore|crores|l|lakh|lac|lacs|k)?/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return null;
+  const unit = (m[2] ?? '').replace(/s$/, '');
+  if (unit === 'cr' || unit === 'crore') return Math.round(n * 1_00_00_000);
+  if (unit === 'l' || unit === 'lakh' || unit === 'lac') return Math.round(n * 1_00_000);
+  if (unit === 'k') return Math.round(n * 1_000);
+  // Bare number ≥ 1000 → treat as INR already; smaller numbers without a unit are too ambiguous.
+  return n >= 1000 ? Math.round(n) : null;
 };
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'unknown';
