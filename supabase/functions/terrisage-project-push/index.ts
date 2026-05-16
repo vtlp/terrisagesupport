@@ -293,8 +293,16 @@ function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<strin
   return project;
 }
 
-function buildConfiguration(c: { id: string; sort_order: number; data: Record<string, unknown> }, propertyType: string) {
+function buildConfiguration(
+  c: { id: string; sort_order: number; data: Record<string, unknown> },
+  propertyType: string,
+  buildingKeyByName: Map<string, string>,
+  clusterKeyByName: Map<string, string>,
+) {
   const d = c.data ?? {};
+  // Prefer parsed price band → string description. Numeric base/per-sqft kept null unless explicitly numeric.
+  const baseNum = numOrNull(d.price_base);
+  const perSqftNum = numOrNull(d.price_per_sqft);
   const cfg: Record<string, unknown> = {
     supportConfigRef: c.id,
     sortOrder: c.sort_order,
@@ -305,40 +313,58 @@ function buildConfiguration(c: { id: string; sort_order: number; data: Record<st
     configurationUnitCarpetAreaSqft: numOrNull(d.carpet_area),
     configurationUnitBuiltupAreaSqft: numOrNull(d.built_up_area),
     configurationUnitSuperBuiltupAreaSqft: numOrNull(d.super_built_up_area),
-    configUnitPriceBaseValue: null,
-    configurationUnitPricePerSqft: null,
-    configurationUnitDescription: [d.description, d.pricing_range ? `Pricing: ${d.pricing_range}` : null, d.type_no ? `Type: ${d.type_no}` : null, d.unit_numbers ? `Units: ${d.unit_numbers}` : null]
-      .filter(Boolean).join('. ') || null,
+    configUnitPriceBaseValue: baseNum,
+    configurationUnitPricePerSqft: perSqftNum,
+    configurationUnitDescription: [
+      d.description,
+      d.pricing_range ? `Pricing: ${d.pricing_range}` : null,
+      d.type_no ? `Type: ${d.type_no}` : null,
+      d.unit_numbers ? `Units: ${d.unit_numbers}` : null,
+    ].filter(Boolean).join('. ') || null,
   };
 
   const facings = strOrNull(d.facing);
   const facingArr = facings ? facings.split(/[,/]/).map(s => s.trim()).filter(Boolean) : [];
+  const excludedFloors = Array.isArray(d.excluded_floors)
+    ? (d.excluded_floors as unknown[]).map(String)
+    : [];
+  const variationsRaw = Array.isArray(d.variations) ? d.variations as unknown[] : [];
+  const variations = variationsRaw.map((v, i) => ({
+    text: typeof v === 'string' ? v : (v as Record<string, unknown>)?.text ? String((v as Record<string, unknown>).text) : '',
+    sortOrder: i,
+  })).filter(v => v.text);
 
   if (propertyType === 'APARTMENT') {
+    const towerName = strOrNull(d.tower);
     cfg.apartmentConfiguration = {
-      projectTowerName: strOrNull(d.tower),
+      projectTowerName: towerName,
       balconyCount: intOrNull(d.balconies),
-      masterBedroomSizeSqft: null,
-      variations: [],
+      masterBedroomSizeSqft: strOrNull(d.master_bedroom_size),
+      variations,
     };
     const range = parseFloorRange(d.floor_range);
     cfg.mapping = {
-      supportBuildingKey: strOrNull(d.tower),
+      supportBuildingKey: towerName ? (buildingKeyByName.get(towerName) ?? slugify(towerName)) : null,
       floorFrom: range.from,
       floorTo: range.to,
-      excludedFloors: [],
+      excludedFloors,
       availableFacings: facingArr,
     };
   } else if (propertyType === 'VILLA') {
+    const clusterName = strOrNull(d.cluster);
     const dims = parseDims(d.dimensions ?? d.land_area);
     cfg.villaConfiguration = {
       configurationVillaFloorsPerUnit: intOrNull(d.floors_per_unit),
       configurationVillaWidth: dims.width,
       configurationVillaLength: dims.length,
-      masterBedroomSizeSqft: null,
+      masterBedroomSizeSqft: strOrNull(d.master_bedroom_size),
     };
-    cfg.mapping = { supportClusterKey: strOrNull(d.cluster), availableFacings: facingArr };
+    cfg.mapping = {
+      supportClusterKey: clusterName ? (clusterKeyByName.get(clusterName) ?? slugify(clusterName)) : null,
+      availableFacings: facingArr,
+    };
   } else if (propertyType === 'PLOT') {
+    const clusterName = strOrNull(d.cluster);
     const dims = parseDims(d.dimensions);
     cfg.plotConfiguration = {
       configurationPlotUnitAreaSqft: numOrNull(d.plot_area),
@@ -346,7 +372,10 @@ function buildConfiguration(c: { id: string; sort_order: number; data: Record<st
       configurationPlotWidth: dims.width,
       configurationPlotLength: dims.length,
     };
-    cfg.mapping = { supportClusterKey: strOrNull(d.cluster), availableFacings: facingArr };
+    cfg.mapping = {
+      supportClusterKey: clusterName ? (clusterKeyByName.get(clusterName) ?? slugify(clusterName)) : null,
+      availableFacings: facingArr,
+    };
   }
   return cfg;
 }
