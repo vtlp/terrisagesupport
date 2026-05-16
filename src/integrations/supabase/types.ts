@@ -1762,6 +1762,7 @@ export type Database = {
           mapping: Json
           notes: string | null
           origin_job_id: string | null
+          owner_account_id: string | null
           property_type:
             | Database["public"]["Enums"]["import_property_type"]
             | null
@@ -1789,6 +1790,7 @@ export type Database = {
           mapping?: Json
           notes?: string | null
           origin_job_id?: string | null
+          owner_account_id?: string | null
           property_type?:
             | Database["public"]["Enums"]["import_property_type"]
             | null
@@ -1816,6 +1818,7 @@ export type Database = {
           mapping?: Json
           notes?: string | null
           origin_job_id?: string | null
+          owner_account_id?: string | null
           property_type?:
             | Database["public"]["Enums"]["import_property_type"]
             | null
@@ -1836,6 +1839,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "import_jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_owner_account_id_fkey"
+            columns: ["owner_account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "import_jobs_owner_account_id_fkey"
+            columns: ["owner_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_owner_account_id_fkey"
+            columns: ["owner_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
           },
         ]
       }

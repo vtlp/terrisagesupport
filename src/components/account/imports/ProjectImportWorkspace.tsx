@@ -20,6 +20,7 @@ import {
 import { SourceFiles } from './SourceFiles';
 import { ActivityLog } from './ActivityLog';
 import { LinkedAccountsCard } from './LinkedAccountsCard';
+import { OwnerAccountCard } from './OwnerAccountCard';
 import { autoMapProjectImport, deriveCityFromLocation, type AutoMapResult } from './autoMapProjectImport';
 import { useUser } from '@/context/UserContext';
 
@@ -573,6 +574,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         );
       })()}
 
+      {!job.account_id && <OwnerAccountCard jobId={job.id} />}
       {!job.account_id && <LinkedAccountsCard jobId={job.id} />}
 
       <Tabs defaultValue="files">

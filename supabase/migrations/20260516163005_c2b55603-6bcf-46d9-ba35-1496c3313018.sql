@@ -1,0 +1,2 @@
+ALTER TABLE public.import_jobs ADD COLUMN IF NOT EXISTS owner_account_id uuid REFERENCES public.accounts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_import_jobs_owner_account ON public.import_jobs(owner_account_id);

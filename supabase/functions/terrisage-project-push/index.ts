@@ -300,16 +300,19 @@ Deno.serve(async (req) => {
   if (jErr || !job) return json({ ok: false, error: 'JOB_NOT_FOUND' }, 404);
   if (job.kind !== 'PROJECT') return json({ ok: false, error: 'NOT_A_PROJECT_JOB' }, 400);
 
-  const [{ data: configs }, { data: media }, { data: linkRows }] = await Promise.all([
+  const [{ data: configs }, { data: media }, { data: linkRows }, { data: ownerAcct }] = await Promise.all([
     supabase.from('import_project_configs').select('*').eq('job_id', jobId).order('sort_order'),
     supabase.from('import_project_media').select('*').eq('job_id', jobId).order('created_at'),
     supabase.from('import_job_account_links').select('account_id, accounts:account_id(id, tenant_id)').eq('job_id', jobId),
+    job.owner_account_id
+      ? supabase.from('accounts').select('tenant_id').eq('id', job.owner_account_id).maybeSingle()
+      : Promise.resolve({ data: null as { tenant_id: string | null } | null }),
   ]);
 
-  // projectOwnerOrgId: single UUID or null. Take first linked account's tenant_id.
-  const tenantIds = ((linkRows ?? []) as Array<{ accounts: { tenant_id: string | null } | null }>)
+  // projectOwnerOrgId: prefer the explicit owner account's tenant_id; fall back to first linked account.
+  const linkedTenantIds = ((linkRows ?? []) as Array<{ accounts: { tenant_id: string | null } | null }>)
     .map(r => r.accounts?.tenant_id).filter((t): t is string => !!t);
-  const projectOwnerOrgId = tenantIds[0] ?? null;
+  const projectOwnerOrgId = (ownerAcct as { tenant_id: string | null } | null)?.tenant_id ?? linkedTenantIds[0] ?? null;
 
   const extracted = (job.extracted_data ?? {}) as Record<string, unknown>;
   const projectData = (extracted.projectData ?? {}) as Record<string, unknown>;
