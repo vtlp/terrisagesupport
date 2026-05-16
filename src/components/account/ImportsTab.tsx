@@ -238,6 +238,7 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                   <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="text-left px-3 py-2">ID</th>
+                      <th className="text-left px-3 py-2">Project name</th>
                       <th className="text-left px-3 py-2">Type</th>
                       <th className="text-left px-3 py-2">Label</th>
                       <th className="text-left px-3 py-2">Status</th>
@@ -249,9 +250,14 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(j => (
+                    {filtered.map(j => {
+                      const name = projectNameFor(j);
+                      return (
                       <tr key={j.id} className="border-t hover:bg-muted/30">
                         <td className="px-3 py-2 font-mono text-xs">{j.id.slice(0, 8)}</td>
+                        <td className="px-3 py-2 font-medium">
+                          {name || <span className="text-muted-foreground font-normal">—</span>}
+                        </td>
                         <td className="px-3 py-2">
                           {KIND_LABEL[j.kind as ImportKind]}
                           {j.property_type && <span className="text-xs text-muted-foreground ml-1">({PROPERTY_TYPE_LABEL[j.property_type as PropertyType]})</span>}
@@ -279,9 +285,10 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={9} className="text-center text-sm text-muted-foreground py-6">No imports match your filters.</td></tr>
+                      <tr><td colSpan={10} className="text-center text-sm text-muted-foreground py-6">No imports match your filters.</td></tr>
                     )}
                   </tbody>
                 </table>
