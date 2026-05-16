@@ -18,42 +18,91 @@ const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 // ---------- Enum maps (Support UI label → Terrisage enum) ----------
-const STATUS_MAP: Record<string, string> = {
-  'Under Construction': 'UNDER_CONSTRUCTION',
-  'Phase 1 completed': 'PHASE_1_COMPLETED',
-  'Completed': 'COMPLETED_WITH_OC',
+// Confirmed by Terrisage 2026-05-16: only the values below are accepted; everything else falls back.
+const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+
+const STATUS_LOOKUP: Record<string, string> = {
+  'under construction': 'UNDER_CONSTRUCTION',
+  'uc': 'UNDER_CONSTRUCTION',
+  'pre launch': 'UNDER_CONSTRUCTION',
+  'launched': 'UNDER_CONSTRUCTION',
+  'launch': 'UNDER_CONSTRUCTION',
+  'phase 1 completed': 'PHASE_1_COMPLETED',
+  'phase 1 complete': 'PHASE_1_COMPLETED',
+  'phase1 completed': 'PHASE_1_COMPLETED',
+  'completed': 'COMPLETED_WITH_OC',
+  'completed with oc': 'COMPLETED_WITH_OC',
+  'ready to move': 'COMPLETED_WITH_OC',
+  'ready to move in': 'COMPLETED_WITH_OC',
+  'rtm': 'COMPLETED_WITH_OC',
 };
-const COMMUNITY_MAP: Record<string, string> = {
-  'Gated': 'GATED',
-  'High-rise gated': 'GATED',
-  'Open': 'OPEN',
+const mapStatus = (v: unknown): string | null => STATUS_LOOKUP[norm(v)] ?? null;
+
+// Only GATED / OPEN. STANDALONE → OPEN; everything else community-ish → GATED.
+const mapCommunity = (v: unknown): string | null => {
+  const n = norm(v);
+  if (!n) return null;
+  if (n === 'open' || n === 'standalone') return 'OPEN';
+  return 'GATED';
 };
-const WATER_MAP: Record<string, string> = {
-  'Borewell': 'BORE_WELL', 'Bore well': 'BORE_WELL', 'BORE_WELL': 'BORE_WELL',
-  'BWSSB': 'MUNICIPAL', 'Municipal': 'MUNICIPAL', 'Corporation': 'MUNICIPAL', 'MUNICIPAL': 'MUNICIPAL',
-  'Tanker': 'TANKER', 'TANKER': 'TANKER',
-  'Lake': 'LAKE', 'LAKE': 'LAKE',
-  'Other': 'OTHER', 'OTHER': 'OTHER',
+
+const WATER_LOOKUP: Record<string, string> = {
+  'bore well': 'BORE_WELL', 'borewell': 'BORE_WELL',
+  'municipal': 'MUNICIPAL', 'bwssb': 'MUNICIPAL', 'corporation': 'MUNICIPAL', 'water board': 'MUNICIPAL',
+  'tanker': 'TANKER',
+  'lake': 'LAKE',
+  'other': 'OTHER',
 };
-const UTILITY_MAP: Record<string, string> = {
-  'Electricity': 'ELECTRICITY', 'ELECTRICITY': 'ELECTRICITY',
-  'Water': 'WATER', 'WATER': 'WATER',
-  'Gas': 'GAS', 'GAS': 'GAS',
-  'Sewage': 'SEWAGE', 'SEWAGE': 'SEWAGE',
-  'STP': 'STP',
-  'Intercom': 'INTERCOM_SECURITY', 'Security': 'INTERCOM_SECURITY', 'INTERCOM_SECURITY': 'INTERCOM_SECURITY',
-  'Rainwater harvesting': 'RAIN_WATER_HARVESTING', 'Rain water harvesting': 'RAIN_WATER_HARVESTING', 'RAIN_WATER_HARVESTING': 'RAIN_WATER_HARVESTING',
-  'Storm water drains': 'STORM_WATER_DRAINS', 'STORM_WATER_DRAINS': 'STORM_WATER_DRAINS',
+const mapWater = (arr: unknown): string[] => {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set<string>();
+  for (const x of arr) {
+    const v = WATER_LOOKUP[norm(x)] ?? 'OTHER';
+    seen.add(v);
+  }
+  return [...seen];
 };
+
+// Utilities → { utilityType, details? }.
+const UTILITY_TYPES = new Set(['ELECTRICITY','WATER','GAS','SEWAGE','STP','INTERCOM_SECURITY','RAIN_WATER_HARVESTING','STORM_WATER_DRAINS']);
+const UTILITY_LOOKUP: Record<string, { utilityType: string; details?: string }> = {
+  'electricity': { utilityType: 'ELECTRICITY' },
+  'power': { utilityType: 'ELECTRICITY' },
+  'power backup': { utilityType: 'ELECTRICITY', details: 'Power backup' },
+  'solar': { utilityType: 'ELECTRICITY', details: 'Solar panels' },
+  'solar panels': { utilityType: 'ELECTRICITY', details: 'Solar panels' },
+  'water': { utilityType: 'WATER' },
+  'water supply 24 7': { utilityType: 'WATER', details: '24x7 supply' },
+  'gas': { utilityType: 'GAS' },
+  'gas pipeline': { utilityType: 'GAS', details: 'Piped gas' },
+  'sewage': { utilityType: 'SEWAGE' },
+  'sewage treatment': { utilityType: 'STP' },
+  'stp': { utilityType: 'STP' },
+  'intercom': { utilityType: 'INTERCOM_SECURITY' },
+  'security': { utilityType: 'INTERCOM_SECURITY' },
+  'intercom security': { utilityType: 'INTERCOM_SECURITY' },
+  'rain water harvesting': { utilityType: 'RAIN_WATER_HARVESTING' },
+  'rainwater harvesting': { utilityType: 'RAIN_WATER_HARVESTING' },
+  'storm water drains': { utilityType: 'STORM_WATER_DRAINS' },
+};
+
+// Media kind: only LOGO|PHOTO|VIDEO|FLOORPLAN|TOUR_3D|OTHER on the wire.
 const MEDIA_KIND_MAP: Record<string, string> = {
   LOGO: 'LOGO',
   GALLERY: 'PHOTO',
+  MASTER_PLAN: 'PHOTO',
+  PHOTO: 'PHOTO',
   FLOOR_PLAN: 'FLOORPLAN',
+  FLOORPLAN: 'FLOORPLAN',
   VIDEO: 'VIDEO',
+  WALKTHROUGH_VIDEO: 'VIDEO',
+  TOUR_3D: 'TOUR_3D',
   BROCHURE: 'OTHER',
   DOCUMENT: 'OTHER',
   OTHER: 'OTHER',
 };
+
+const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'unknown';
 
 // ---------- Coercion helpers ----------
 const numOrNull = (v: unknown): number | null => {
