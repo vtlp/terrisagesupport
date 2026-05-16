@@ -606,6 +606,22 @@ Deno.serve(async (req) => {
   if (jErr || !job) return json({ ok: false, error: 'JOB_NOT_FOUND' }, 404);
   if (job.kind !== 'PROJECT') return json({ ok: false, error: 'NOT_A_PROJECT_JOB' }, 400);
 
+  // Auto-refresh the amenity master if it's empty or older than 24h. Failures here are non-fatal:
+  // we'll fall through and just produce more "unmapped" warnings than usual.
+  let autoRefresh: { ran: boolean; total?: number; errors?: unknown } = { ran: false };
+  const { data: freshness } = await supabase
+    .from('terrisage_amenity_master')
+    .select('fetched_at')
+    .order('fetched_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const lastFetched = freshness?.fetched_at ? new Date(freshness.fetched_at).getTime() : 0;
+  const STALE_MS = 24 * 60 * 60 * 1000;
+  if (!lastFetched || Date.now() - lastFetched > STALE_MS) {
+    const r = await runAmenityRefresh();
+    autoRefresh = { ran: true, total: r.total, errors: r.errors };
+  }
+
   const [{ data: configs }, { data: media }, { data: linkRows }, { data: ownerAcct }, { data: amenityMaster }] = await Promise.all([
     supabase.from('import_project_configs').select('*').eq('job_id', jobId).order('sort_order'),
     supabase.from('import_project_media').select('*').eq('job_id', jobId).order('created_at'),
