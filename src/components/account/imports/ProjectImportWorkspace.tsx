@@ -1189,6 +1189,21 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 <Label>Amenities (comma separated)</Label>
                 <Textarea rows={2} value={amenities} onChange={e => setAmenities(e.target.value)} />
               </div>
+              {unmappedAmenities.length > 0 && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-medium text-sm mb-2">
+                    <AlertTriangle className="h-4 w-4" /> Unmapped amenities
+                  </div>
+                  <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mb-2">
+                    These amenities are not available in Terrisage's master list for {PROPERTY_TYPE_LABEL[propertyType]} and will be skipped on push. Refresh the amenity master from Admin → Integrations if you expect them to be present.
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {unmappedAmenities.map(a => (
+                      <Badge key={a} variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-400">{a}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label>Proximity matrix</Label>
