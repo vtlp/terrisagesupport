@@ -389,7 +389,8 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ ok: false, error: 'INVALID_BODY' }, 400); }
   const jobId = body.jobId;
   const action = body.action ?? 'push';
-  if (!jobId) return json({ ok: false, error: 'MISSING_JOB_ID' }, 400);
+  // refresh-amenities doesn't need a jobId; everything else does.
+  if (action !== 'refresh-amenities' && !jobId) return json({ ok: false, error: 'MISSING_JOB_ID' }, 400);
 
   const authHeader = req.headers.get('Authorization') ?? '';
   const userClient = createClient(
