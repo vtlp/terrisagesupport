@@ -106,10 +106,20 @@ export function ImportsTab({ accountId, tenancyType }: Props) {
     return ['PROJECT', 'SECONDARY_PROPERTY', 'LEAD'];
   }, [tenancyType]);
 
+  const projectNameFor = (j: ImportJob): string => {
+    const ed = (j.extracted_data ?? {}) as { projectData?: { project_name?: string } };
+    const ri = (j.representative_input ?? {}) as { project_name?: string };
+    return ed.projectData?.project_name?.trim() || ri.project_name?.trim() || '';
+  };
+
   const filtered = useMemo(() => jobs.filter(j => {
     if (kindFilter !== 'ALL' && j.kind !== kindFilter) return false;
     if (statusFilter !== 'ALL' && j.status !== statusFilter) return false;
-    if (q && !(j.label?.toLowerCase().includes(q.toLowerCase()) || j.id.startsWith(q))) return false;
+    if (q) {
+      const ql = q.toLowerCase();
+      const name = projectNameFor(j).toLowerCase();
+      if (!(j.label?.toLowerCase().includes(ql) || j.id.startsWith(q) || name.includes(ql))) return false;
+    }
     return true;
   }), [jobs, kindFilter, statusFilter, q]);
 
