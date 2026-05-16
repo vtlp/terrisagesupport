@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Loader2, Save, Sparkles, PlayCircle, AlertTriangle, CheckCircle2, XCircle, Plus, Trash2,
+  Loader2, Save, Sparkles, PlayCircle, AlertTriangle, CheckCircle2, XCircle, Plus, Trash2, Upload, X,
   Image as ImageIcon, FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -1021,7 +1021,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                     const linkedName = linkedConfig ? ((linkedConfig.data as Record<string, unknown>)?.name as string) : '';
                     return (
                       <div key={m.id} className="rounded-md border p-3 space-y-2">
-                        <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center text-muted-foreground">
+                        <div className="relative aspect-video bg-muted rounded overflow-hidden flex items-center justify-center text-muted-foreground group">
                           {isImg && url ? (
                             <img src={url} alt={m.caption ?? 'media'} className="w-full h-full object-contain" loading="lazy" />
                           ) : isImg ? (
@@ -1029,6 +1029,18 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                           ) : (
                             <FileText className="h-8 w-8" />
                           )}
+                          <button type="button" onClick={() => removeMedia(m.id)}
+                            title="Delete"
+                            className="absolute top-1 right-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-destructive hover:text-destructive-foreground transition-colors">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                          <label
+                            title={m.storage_path || m.external_url ? 'Replace file' : 'Upload file'}
+                            className="absolute top-1 left-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-primary hover:text-primary-foreground cursor-pointer transition-colors">
+                            <Upload className="h-3 w-3" />
+                            <input type="file" accept="image/*,application/pdf" className="hidden"
+                              onChange={async e => { await replaceMediaFile(m.id, e.target.files?.[0], m.category); (e.target as HTMLInputElement).value = ''; }} />
+                          </label>
                         </div>
                         {linkedName && (
                           <Badge variant="secondary" className="text-[10px]">Linked: {linkedName}</Badge>
@@ -1053,17 +1065,9 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                             </SelectContent>
                           </Select>
                         )}
-                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                          {m.confidence != null && <span>conf {(Number(m.confidence) * 100).toFixed(0)}%</span>}
-                          <div className="flex items-center gap-1 ml-auto">
-                            <label className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border bg-background hover:bg-muted cursor-pointer">
-                              {m.storage_path || m.external_url ? 'Replace' : 'Upload'}
-                              <input type="file" accept="image/*,application/pdf" className="hidden"
-                                onChange={async e => { await replaceMediaFile(m.id, e.target.files?.[0], m.category); (e.target as HTMLInputElement).value = ''; }} />
-                            </label>
-                            <Button size="sm" variant="ghost" className="h-7" onClick={() => removeMedia(m.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
-                          </div>
-                        </div>
+                        {m.confidence != null && (
+                          <div className="text-xs text-muted-foreground">conf {(Number(m.confidence) * 100).toFixed(0)}%</div>
+                        )}
                       </div>
                     );
                   })}
