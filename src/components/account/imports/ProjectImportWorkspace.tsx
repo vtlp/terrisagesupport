@@ -829,20 +829,49 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-1">
-                  <Label>Water sources (comma separated)</Label>
-                  <Input value={(project.water_sources || []).join(', ')}
-                    onChange={e => setProject(p => ({ ...p, water_sources: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} />
+                  <Label>Water sources</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WATER_SOURCE_OPTIONS.map(opt => {
+                      const active = (project.water_sources || []).includes(opt);
+                      return (
+                        <button key={opt} type="button"
+                          onClick={() => setProject(p => {
+                            const cur = p.water_sources || [];
+                            return { ...p, water_sources: active ? cur.filter(x => x !== opt) : [...cur, opt] };
+                          })}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'}`}>
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-1">
-                  <Label>Utilities (comma separated)</Label>
-                  <Input value={(project.utilities || []).join(', ')}
-                    onChange={e => setProject(p => ({ ...p, utilities: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} />
+                  <Label>Utilities</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {UTILITY_OPTIONS.map(opt => {
+                      const active = (project.utilities || []).includes(opt);
+                      return (
+                        <button key={opt} type="button"
+                          onClick={() => setProject(p => {
+                            const cur = p.utilities || [];
+                            return { ...p, utilities: active ? cur.filter(x => x !== opt) : [...cur, opt] };
+                          })}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'}`}>
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label>Key features (comma separated)</Label>
                   <Input value={(project.key_features || []).join(', ')}
                     onChange={e => setProject(p => ({ ...p, key_features: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} />
+                </div>
+              </div>
                 </div>
               </div>
             </CardContent>
