@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,21 +10,18 @@ interface ProjectRecord {
   projectName?: string;
   project_name?: string;
   location?: string;
-  // Agency
   repName?: string;
   repMobile?: string;
   repMobileCode?: string;
   repEmail?: string;
   builderName?: string;
   builderDetails?: string;
-  // Builder
   contactName?: string;
   contactMobile?: string;
   contactMobileCode?: string;
   contactEmail?: string;
   propertyType?: string;
   additionalNotes?: string;
-  // Files
   brochurePaths?: string[];
 }
 
@@ -33,48 +30,9 @@ interface Props {
   accountId?: string;
 }
 
-type LinkedProject = {
-  id: string;
-  job_id: string;
-  linked_at: string;
-  import_jobs: {
-    id: string;
-    label: string | null;
-    property_type: string | null;
-    status: string;
-    extracted_data: Record<string, unknown> | null;
-    representative_input: Record<string, unknown> | null;
-  } | null;
-};
-
-function linkedProjectName(lp: LinkedProject): string {
-  const job = lp.import_jobs;
-  if (!job) return lp.job_id.slice(0, 8);
-  const ed = (job.extracted_data ?? {}) as { projectData?: { project_name?: string } };
-  const ri = (job.representative_input ?? {}) as { project_name?: string };
-  return ed.projectData?.project_name?.trim() || ri.project_name?.trim() || job.label || `Job ${job.id.slice(0, 8)}`;
-}
-
-export function ProjectsTab({ payload, accountId }: Props) {
+export function ProjectsTab({ payload }: Props) {
   const projects = (payload?.projects as ProjectRecord[] | undefined) ?? [];
   const [signing, setSigning] = useState<string | null>(null);
-  const [linked, setLinked] = useState<LinkedProject[]>([]);
-  const [linkedLoading, setLinkedLoading] = useState(false);
-
-  useEffect(() => {
-    if (!accountId) return;
-    setLinkedLoading(true);
-    supabase
-      .from('import_job_account_links' as never)
-      .select('id, job_id, linked_at, import_jobs:job_id(id, label, property_type, status, extracted_data, representative_input)')
-      .eq('account_id', accountId)
-      .order('linked_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) toast.error(error.message);
-        setLinked(((data ?? []) as unknown) as LinkedProject[]);
-        setLinkedLoading(false);
-      });
-  }, [accountId]);
 
   const openFile = async (path: string) => {
     setSigning(path);
@@ -89,56 +47,18 @@ export function ProjectsTab({ payload, accountId }: Props) {
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const linkedSection = (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-primary" /> Linked projects from Admin Data
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Projects that the support team has tagged to this account.
-        </p>
-      </CardHeader>
-      <CardContent>
-        {linkedLoading ? (
-          <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-        ) : linked.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No linked projects.</p>
-        ) : (
-          <div className="divide-y rounded-md border">
-            {linked.map(lp => (
-              <div key={lp.id} className="p-3 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{linkedProjectName(lp)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {lp.import_jobs?.property_type ?? '—'} · linked {new Date(lp.linked_at).toLocaleDateString()}
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-[10px]">{lp.import_jobs?.status ?? '—'}</Badge>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   if (projects.length === 0) {
     return (
-      <div className="space-y-3">
-        {accountId && linkedSection}
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No projects were captured during onboarding.
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          No projects were captured during onboarding.
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-3">
-      {accountId && linkedSection}
       {projects.map((p, i) => {
         const name = p.projectName || p.project_name || `Project ${i + 1}`;
         const contactName = p.repName || p.contactName;
