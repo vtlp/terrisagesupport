@@ -523,13 +523,14 @@ Deno.serve(async (req) => {
   if (jErr || !job) return json({ ok: false, error: 'JOB_NOT_FOUND' }, 404);
   if (job.kind !== 'PROJECT') return json({ ok: false, error: 'NOT_A_PROJECT_JOB' }, 400);
 
-  const [{ data: configs }, { data: media }, { data: linkRows }, { data: ownerAcct }] = await Promise.all([
+  const [{ data: configs }, { data: media }, { data: linkRows }, { data: ownerAcct }, { data: amenityMaster }] = await Promise.all([
     supabase.from('import_project_configs').select('*').eq('job_id', jobId).order('sort_order'),
     supabase.from('import_project_media').select('*').eq('job_id', jobId).order('created_at'),
     supabase.from('import_job_account_links').select('account_id, accounts:account_id(id, tenant_id)').eq('job_id', jobId),
     job.owner_account_id
       ? supabase.from('accounts').select('tenant_id').eq('id', job.owner_account_id).maybeSingle()
       : Promise.resolve({ data: null as { tenant_id: string | null } | null }),
+    supabase.from('terrisage_amenity_master').select('amenity_id, code, display_name, property_type'),
   ]);
 
   // projectOwnerOrgId: prefer the explicit owner account's tenant_id; fall back to first linked account.
@@ -543,12 +544,25 @@ Deno.serve(async (req) => {
 
   const projectMaster = buildProjectMaster(projectData, extracted, job.representative_input, propertyType);
 
-  // Configurations
-  const configurations = (configs ?? []).map(c =>
-    buildConfiguration({ id: c.id, sort_order: c.sort_order ?? 0, data: (c.data ?? {}) as Record<string, unknown> }, propertyType)
+  // Amenities: free-text labels → { amenityId, boolValue } via local cache of Terrisage master.
+  const amenityLabels = Array.isArray(extracted.amenities) ? extracted.amenities : [];
+  const { amenities: amenityPayload, unmapped: unmappedAmenities } = resolveAmenities(
+    amenityLabels, (amenityMaster ?? []) as AmenityMaster[], propertyType,
+  );
+  projectMaster.amenities = amenityPayload;
+
+  // Buildings/clusters: synthesise from configs (Terrisage rejects empty when mappings reference keys).
+  const configsRaw = (configs ?? []).map(c => ({
+    id: c.id, sort_order: c.sort_order ?? 0, data: (c.data ?? {}) as Record<string, unknown>,
+  }));
+  const { buildings, streetClusters, buildingKeyByName, clusterKeyByName } =
+    synthesiseBuildings(configsRaw, propertyType);
+
+  const configurations = configsRaw.map(c =>
+    buildConfiguration(c, propertyType, buildingKeyByName, clusterKeyByName)
   );
 
-  // Media: sign URLs, map category → kind
+  // Media: sign URLs, map category → kind, attach meta.mime for non-image kinds.
   const mediaPayload: Array<Record<string, unknown>> = [];
   for (const m of (media ?? [])) {
     if (m.review_state === 'INCORRECT' || m.review_state === 'DUPLICATE') continue;
@@ -558,8 +572,13 @@ Deno.serve(async (req) => {
       url = signed?.signedUrl ?? null;
     }
     const meta = (m.meta ?? {}) as Record<string, unknown>;
+    const kind = MEDIA_KIND_MAP[String(m.category)] ?? 'OTHER';
+    // Brochures/documents → meta.mime hint for downstream download.
+    if (!meta.mime && (m.category === 'BROCHURE' || m.category === 'DOCUMENT')) {
+      meta.mime = 'application/pdf';
+    }
     mediaPayload.push({
-      kind: MEDIA_KIND_MAP[String(m.category)] ?? 'OTHER',
+      kind,
       url,
       caption: m.caption ?? null,
       configRef: m.config_id ?? null,
@@ -574,8 +593,8 @@ Deno.serve(async (req) => {
     projectOrigin: 'SUPPORT_ADDED',
     projectOwnerOrgId,
     project: projectMaster,
-    buildings: [],         // TODO: requires structures table; spec allows empty
-    streetClusters: [],    // TODO: requires structures table; spec allows empty
+    buildings,
+    streetClusters,
     configurations,
     media: mediaPayload,
     pushedAt: new Date().toISOString(),
