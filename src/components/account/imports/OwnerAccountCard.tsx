@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 type BuilderAccount = { id: string; account_name: string; city: string | null; tenant_id: string | null };
 
-export function OwnerAccountCard({ jobId }: { jobId: string }) {
+export function OwnerAccountCard({ jobId, onOwnerChange }: { jobId: string; onOwnerChange?: (hasOwner: boolean) => void }) {
   const [owner, setOwner] = useState<BuilderAccount | null>(null);
   const [accounts, setAccounts] = useState<BuilderAccount[]>([]);
   const [loading, setLoading] = useState(true);
