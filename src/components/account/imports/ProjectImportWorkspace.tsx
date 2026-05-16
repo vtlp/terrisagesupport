@@ -58,16 +58,16 @@ type ProjectExtract = {
 
 const REQUIRED_FIELDS: Array<keyof ProjectExtract> = ['project_name', 'builder_name', 'city', 'address'];
 
+// Only values that Terrisage explicitly accepts. Anything from the CSV that doesn't match these is
+// silently dropped on push (per spec) so we never offer non-accepted options here.
 const COMMUNITY_TYPES_BY_PT: Record<PropertyType, string[]> = {
-  APARTMENT: ['Gated', 'High-rise gated', 'Open'],
+  APARTMENT: ['Gated', 'Open'],
   VILLA: ['Gated', 'Open'],
   PLOT: ['Gated', 'Open'],
 };
 
-const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed'];
+const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed (with OC)'];
 
-// Terrisage-aligned enum options shown in UI. Labels are human-readable; values are the
-// strings the edge function maps to Terrisage enums.
 const WATER_SOURCE_OPTIONS = ['Borewell', 'Municipal', 'Tanker', 'Lake', 'Other'];
 const UTILITY_OPTIONS = ['Electricity', 'Water', 'Gas', 'Sewage', 'STP', 'Intercom', 'Rainwater harvesting', 'Storm water drains'];
 
