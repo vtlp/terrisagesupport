@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, Plus, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProjectImportWorkspace } from '@/components/account/imports/ProjectImportWorkspace';
 import {
@@ -27,8 +27,6 @@ function projectNameFor(j: ImportJob): string {
   return ed.projectData?.project_name?.trim() || ri.project_name?.trim() || j.label || `Job ${j.id.slice(0, 8)}`;
 }
 
-type AccountLite = { id: string; account_name: string };
-
 export default function AdminData() {
   const { currentUser } = useUser();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
@@ -38,12 +36,6 @@ export default function AdminData() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<PropertyType>('APARTMENT');
-
-  const [linkOpenForJobId, setLinkOpenForJobId] = useState<string | null>(null);
-  const [linkAccountId, setLinkAccountId] = useState<string>('');
-  const [linkNotes, setLinkNotes] = useState<string>('');
-  const [linking, setLinking] = useState(false);
-  const [accounts, setAccounts] = useState<AccountLite[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,13 +58,6 @@ export default function AdminData() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [load]);
-
-  useEffect(() => {
-    if (!linkOpenForJobId) return;
-    supabase.from('accounts').select('id, account_name').order('account_name').then(({ data }) => {
-      setAccounts((data ?? []) as AccountLite[]);
-    });
-  }, [linkOpenForJobId]);
 
   const selected = jobs.find(j => j.id === selectedId) ?? null;
 
@@ -100,19 +85,6 @@ export default function AdminData() {
     if (!selectedId) return;
     const { data } = await supabase.from('import_jobs').select('*').eq('id', selectedId).maybeSingle();
     if (data) setJobs(j => j.map(x => x.id === data.id ? data as ImportJob : x));
-  };
-
-  const submitLink = async () => {
-    if (!linkOpenForJobId || !linkAccountId) { toast.error('Pick an account'); return; }
-    setLinking(true);
-    const { data, error } = await supabase.rpc('link_global_project_to_account' as never, {
-      _global_job_id: linkOpenForJobId, _account_id: linkAccountId, _notes: linkNotes || null,
-    } as never);
-    setLinking(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Linked to tenant');
-    setLinkOpenForJobId(null); setLinkAccountId(''); setLinkNotes('');
-    void data;
   };
 
   return (
@@ -208,9 +180,6 @@ export default function AdminData() {
                             <Badge className={`text-[10px] ${STATUS_TONE[j.status as ImportStatus]}`}>
                               {STATUS_LABEL[j.status as ImportStatus]}
                             </Badge>
-                            <Button size="sm" variant="outline" onClick={() => { setLinkOpenForJobId(j.id); setLinkAccountId(''); setLinkNotes(''); }}>
-                              <LinkIcon className="h-3 w-3 mr-1" />Link to tenant
-                            </Button>
                           </div>
                         </div>
                       );
@@ -222,34 +191,6 @@ export default function AdminData() {
           )}
         </TabsContent>
       </Tabs>
-
-      <Dialog open={!!linkOpenForJobId} onOpenChange={(v) => !v && setLinkOpenForJobId(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Link project to a tenant</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>Account</Label>
-              <Select value={linkAccountId || '__none__'} onValueChange={v => setLinkAccountId(v === '__none__' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">—</SelectItem>
-                  {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.account_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Notes (optional)</Label>
-              <Input value={linkNotes} onChange={e => setLinkNotes(e.target.value)} placeholder="Why this tenant gets access" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setLinkOpenForJobId(null)}>Cancel</Button>
-            <Button onClick={submitLink} disabled={linking || !linkAccountId}>
-              {linking && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

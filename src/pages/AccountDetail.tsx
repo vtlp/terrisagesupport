@@ -761,7 +761,7 @@ export default function AccountDetail() {
               <h3 className="text-sm font-semibold">Projects from onboarding</h3>
               <p className="text-xs text-muted-foreground">Captured during the account's onboarding submission.</p>
             </div>
-            <ProjectsTab payload={acc.payload} />
+            <ProjectsTab payload={acc.payload} accountId={acc.id} />
           </section>
 
           <section className="space-y-3">

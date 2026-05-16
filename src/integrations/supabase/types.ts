@@ -1691,6 +1691,62 @@ export type Database = {
           },
         ]
       }
+      import_job_account_links: {
+        Row: {
+          account_id: string
+          id: string
+          job_id: string
+          linked_at: string
+          linked_by: string | null
+          notes: string | null
+        }
+        Insert: {
+          account_id: string
+          id?: string
+          job_id: string
+          linked_at?: string
+          linked_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          account_id?: string
+          id?: string
+          job_id?: string
+          linked_at?: string
+          linked_by?: string | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_job_account_links_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_seat_capacity"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "import_job_account_links_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_job_account_links_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_usage"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "import_job_account_links_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_jobs: {
         Row: {
           account_id: string | null
