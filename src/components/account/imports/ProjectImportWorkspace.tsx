@@ -360,6 +360,36 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     if (uploaded > 0) toast.success(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
   };
 
+  const uploadBulkMedia = async (fileList: FileList | null, category: MediaCategory = 'GALLERY') => {
+    if (!fileList || !fileList.length) return;
+    let uploaded = 0;
+    for (const file of Array.from(fileList)) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const path = `${job.account_id ?? 'global'}/${job.id}/${category.toLowerCase()}-bulk-${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage.from('import-files').upload(path, file, { contentType: file.type || undefined });
+      if (upErr) { toast.error(upErr.message); continue; }
+      const { data: ins, error } = await supabase.from('import_project_media').insert([{
+        job_id: job.id, category, storage_path: path, caption: file.name, source: 'MANUAL',
+      }]).select('*').single();
+      if (error) { toast.error(error.message); continue; }
+      setMedia(ms => [ins as ImportMedia, ...ms]);
+      uploaded++;
+    }
+    if (uploaded > 0) toast.success(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
+  };
+
+  const replaceMediaFile = async (mediaId: string, file: File | undefined, category: MediaCategory) => {
+    if (!file) return;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const path = `${job.account_id ?? 'global'}/${job.id}/${category.toLowerCase()}-replace-${mediaId}-${Date.now()}-${safeName}`;
+    const { error: upErr } = await supabase.storage.from('import-files').upload(path, file, { contentType: file.type || undefined });
+    if (upErr) { toast.error(upErr.message); return; }
+    const { error } = await supabase.from('import_project_media').update({ storage_path: path, caption: file.name, external_url: null }).eq('id', mediaId);
+    if (error) { toast.error(error.message); return; }
+    setMedia(ms => ms.map(m => m.id === mediaId ? { ...m, storage_path: path, caption: file.name, external_url: null } : m));
+    toast.success('File replaced');
+  };
+
   // VALIDATION
   const validation = useMemo(() => {
     const missing: string[] = [];
