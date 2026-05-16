@@ -47,10 +47,19 @@ Deno.serve(async (req) => {
   if (jErr || !job) return json({ ok: false, error: 'JOB_NOT_FOUND' }, 404);
   if (job.kind !== 'PROJECT') return json({ ok: false, error: 'NOT_A_PROJECT_JOB' }, 400);
 
-  const [{ data: configs }, { data: media }] = await Promise.all([
+  const [{ data: configs }, { data: media }, { data: linkRows }] = await Promise.all([
     supabase.from('import_project_configs').select('*').eq('job_id', jobId).order('sort_order'),
     supabase.from('import_project_media').select('*').eq('job_id', jobId).order('created_at'),
+    supabase.from('import_job_account_links').select('account_id, accounts:account_id(id, tenant_id, account_name)').eq('job_id', jobId),
   ]);
+
+  const linkedAccounts = ((linkRows ?? []) as Array<{ account_id: string; accounts: { id: string; tenant_id: string | null; account_name: string } | null }>)
+    .map(r => ({
+      accountId: r.account_id,
+      tenantId: r.accounts?.tenant_id ?? null,
+      accountName: r.accounts?.account_name ?? null,
+    }));
+  const linkedTenantIds = linkedAccounts.map(l => l.tenantId).filter((t): t is string => !!t);
 
   const extracted = (job.extracted_data ?? {}) as Record<string, unknown>;
   const projectDataRaw = (extracted.projectData ?? {}) as Record<string, unknown>;
@@ -108,6 +117,8 @@ Deno.serve(async (req) => {
       floor_plans: floorPlansByConfig.get(c.id) ?? [],
     })),
     media: mediaPayload,
+    linkedTenantIds,
+    linkedAccounts,
     pushedAt: new Date().toISOString(),
     pushedBy: user.id,
   };
