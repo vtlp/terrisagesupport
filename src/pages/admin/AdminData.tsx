@@ -180,9 +180,6 @@ export default function AdminData() {
                             <Badge className={`text-[10px] ${STATUS_TONE[j.status as ImportStatus]}`}>
                               {STATUS_LABEL[j.status as ImportStatus]}
                             </Badge>
-                            <Button size="sm" variant="outline" onClick={() => { setLinkOpenForJobId(j.id); setLinkAccountId(''); setLinkNotes(''); }}>
-                              <LinkIcon className="h-3 w-3 mr-1" />Link to tenant
-                            </Button>
                           </div>
                         </div>
                       );
@@ -194,34 +191,6 @@ export default function AdminData() {
           )}
         </TabsContent>
       </Tabs>
-
-      <Dialog open={!!linkOpenForJobId} onOpenChange={(v) => !v && setLinkOpenForJobId(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Link project to a tenant</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>Account</Label>
-              <Select value={linkAccountId || '__none__'} onValueChange={v => setLinkAccountId(v === '__none__' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">—</SelectItem>
-                  {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.account_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Notes (optional)</Label>
-              <Input value={linkNotes} onChange={e => setLinkNotes(e.target.value)} placeholder="Why this tenant gets access" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setLinkOpenForJobId(null)}>Cancel</Button>
-            <Button onClick={submitLink} disabled={linking || !linkAccountId}>
-              {linking && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
