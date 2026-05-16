@@ -116,18 +116,28 @@ export function LinkedAccountsCard({ jobId }: { jobId: string }) {
         ) : links.length === 0 ? (
           <p className="text-xs text-muted-foreground">No tenants linked. Linking is optional.</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="divide-y rounded-md border">
             {links.map(l => (
-              <Badge key={l.id} variant="secondary" className="gap-1 pl-2 pr-1 py-1">
-                <span>{l.accounts?.account_name ?? l.account_id.slice(0, 8)}</span>
-                <button
+              <div key={l.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    {l.accounts?.account_name ?? l.account_id.slice(0, 8)}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {l.accounts?.city ? `${l.accounts.city} · ` : ''}
+                    Linked {new Date(l.linked_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
                   onClick={() => removeLink(l.id)}
-                  className="ml-1 rounded-sm hover:bg-muted-foreground/20 p-0.5"
                   aria-label="Unlink"
+                  className="text-destructive hover:text-destructive"
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
+                  <X className="h-4 w-4 mr-1" /> Unlink
+                </Button>
+              </div>
             ))}
           </div>
         )}
