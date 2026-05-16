@@ -30,8 +30,9 @@ export function OwnerAccountCard({ jobId, onOwnerChange }: { jobId: string; onOw
     setAccounts(list);
     const ownerId = (job as { owner_account_id: string | null } | null)?.owner_account_id ?? null;
     setOwner(ownerId ? list.find(x => x.id === ownerId) ?? null : null);
+    onOwnerChange?.(!!ownerId);
     setLoading(false);
-  }, [jobId]);
+  }, [jobId, onOwnerChange]);
 
   useEffect(() => { load(); }, [load]);
 
