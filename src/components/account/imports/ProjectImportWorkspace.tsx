@@ -360,6 +360,36 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     if (uploaded > 0) toast.success(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
   };
 
+  const uploadBulkMedia = async (fileList: FileList | null, category: MediaCategory = 'GALLERY') => {
+    if (!fileList || !fileList.length) return;
+    let uploaded = 0;
+    for (const file of Array.from(fileList)) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const path = `${job.account_id ?? 'global'}/${job.id}/${category.toLowerCase()}-bulk-${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage.from('import-files').upload(path, file, { contentType: file.type || undefined });
+      if (upErr) { toast.error(upErr.message); continue; }
+      const { data: ins, error } = await supabase.from('import_project_media').insert([{
+        job_id: job.id, category, storage_path: path, caption: file.name, source: 'MANUAL',
+      }]).select('*').single();
+      if (error) { toast.error(error.message); continue; }
+      setMedia(ms => [ins as ImportMedia, ...ms]);
+      uploaded++;
+    }
+    if (uploaded > 0) toast.success(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
+  };
+
+  const replaceMediaFile = async (mediaId: string, file: File | undefined, category: MediaCategory) => {
+    if (!file) return;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const path = `${job.account_id ?? 'global'}/${job.id}/${category.toLowerCase()}-replace-${mediaId}-${Date.now()}-${safeName}`;
+    const { error: upErr } = await supabase.storage.from('import-files').upload(path, file, { contentType: file.type || undefined });
+    if (upErr) { toast.error(upErr.message); return; }
+    const { error } = await supabase.from('import_project_media').update({ storage_path: path, caption: file.name, external_url: null }).eq('id', mediaId);
+    if (error) { toast.error(error.message); return; }
+    setMedia(ms => ms.map(m => m.id === mediaId ? { ...m, storage_path: path, caption: file.name, external_url: null } : m));
+    toast.success('File replaced');
+  };
+
   // VALIDATION
   const validation = useMemo(() => {
     const missing: string[] = [];
@@ -969,7 +999,12 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Media & floor plans</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={addMedia}><Plus className="h-4 w-4 mr-1" />Add item</Button>
+                  <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border bg-background hover:bg-muted cursor-pointer">
+                    <Plus className="h-3 w-3" /> Bulk upload
+                    <input type="file" accept="image/*,application/pdf" multiple className="hidden"
+                      onChange={async e => { await uploadBulkMedia(e.target.files); (e.target as HTMLInputElement).value = ''; }} />
+                  </label>
+                  <Button size="sm" variant="outline" onClick={addMedia}><Plus className="h-4 w-4 mr-1" />Add empty item</Button>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">Floor plans should be cleanly cropped and mapped to the right configuration. Mark items that need re-cropping or are incorrect.</p>
@@ -1018,9 +1053,16 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                             </SelectContent>
                           </Select>
                         )}
-                        <div className="flex justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                           {m.confidence != null && <span>conf {(Number(m.confidence) * 100).toFixed(0)}%</span>}
-                          <Button size="sm" variant="ghost" className="h-7 ml-auto" onClick={() => removeMedia(m.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <label className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border bg-background hover:bg-muted cursor-pointer">
+                              {m.storage_path || m.external_url ? 'Replace' : 'Upload'}
+                              <input type="file" accept="image/*,application/pdf" className="hidden"
+                                onChange={async e => { await replaceMediaFile(m.id, e.target.files?.[0], m.category); (e.target as HTMLInputElement).value = ''; }} />
+                            </label>
+                            <Button size="sm" variant="ghost" className="h-7" onClick={() => removeMedia(m.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                          </div>
                         </div>
                       </div>
                     );
