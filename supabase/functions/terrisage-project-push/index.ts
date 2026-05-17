@@ -781,6 +781,16 @@ Deno.serve(async (req) => {
   const { buildings, streetClusters, buildingKeyByName, clusterKeyByName } =
     synthesiseBuildings(configsRaw, propertyType, intOrNull(projectMaster.projectTotalUnits));
 
+  // Terrisage requires: sum(buildings/clusters totalUnits) === projectTotalUnits.
+  // If our project total is null/0/mismatched, reconcile by setting it to the inventory sum.
+  const inventorySum =
+    buildings.reduce((a, b) => a + (Number(b.totalUnits) || 0), 0) +
+    streetClusters.reduce((a, b) => a + (Number(b.totalUnits) || 0), 0);
+  const currentTotal = intOrNull(projectMaster.projectTotalUnits) ?? 0;
+  if (inventorySum > 0 && currentTotal !== inventorySum) {
+    projectMaster.projectTotalUnits = inventorySum;
+  }
+
   const configurations = configsRaw.map(c =>
     buildConfiguration(c, propertyType, buildingKeyByName, clusterKeyByName)
   );
