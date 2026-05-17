@@ -235,20 +235,23 @@ export default function AdminIntegrations() {
   );
 }
 
+type AmenityRow = { amenity_id: string; display_name: string; property_type: string; fetched_at: string };
+
 function TerrisageAmenityCard() {
   const [busy, setBusy] = useState(false);
-  const [count, setCount] = useState<number | null>(null);
+  const [rows, setRows] = useState<AmenityRow[]>([]);
   const [lastFetched, setLastFetched] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.from('terrisage_amenity_master' as never)
-      .select('fetched_at', { count: 'exact', head: false })
-      .order('fetched_at', { ascending: false })
-      .limit(1)
-      .then(({ data, count }) => {
-        setCount(count ?? (data?.length ?? 0));
-        const row = (data?.[0] as { fetched_at?: string } | undefined);
-        setLastFetched(row?.fetched_at ?? null);
+      .select('amenity_id, display_name, property_type, fetched_at')
+      .order('property_type', { ascending: true })
+      .order('display_name', { ascending: true })
+      .then(({ data }) => {
+        const list = (data as AmenityRow[] | null) ?? [];
+        setRows(list);
+        const latest = list.reduce<string | null>((acc, r) => (!acc || r.fetched_at > acc ? r.fetched_at : acc), null);
+        setLastFetched(latest);
       });
   }, [busy]);
 
@@ -265,22 +268,50 @@ function TerrisageAmenityCard() {
     }
   };
 
+  const grouped = rows.reduce<Record<string, string[]>>((acc, r) => {
+    (acc[r.property_type] ||= []).push(r.display_name);
+    return acc;
+  }, {});
+  const order = ['APARTMENT', 'VILLA', 'PLOT'];
+  const types = [...order.filter(t => grouped[t]), ...Object.keys(grouped).filter(t => !order.includes(t))];
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Terrisage amenity master</CardTitle>
         <CardDescription>
-          Cache of the amenity catalogue from Terrisage. Required to convert free-text amenities into amenityId UUIDs on project push.
+          Cache of the amenity catalogue from Terrisage. Required to convert free-text amenities into amenityId values on project push.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="text-sm text-muted-foreground">
-          {count != null ? `${count} cached` : '—'}
-          {lastFetched ? ` · Last refreshed ${new Date(lastFetched).toLocaleString()}` : ' · Never refreshed'}
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {rows.length} cached
+            {lastFetched ? ` · Last refreshed ${new Date(lastFetched).toLocaleString()}` : ' · Never refreshed'}
+          </div>
+          <Button onClick={refresh} disabled={busy} variant="outline" size="sm">
+            {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Refresh amenity master
+          </Button>
         </div>
-        <Button onClick={refresh} disabled={busy} variant="outline" size="sm">
-          {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Refresh amenity master
-        </Button>
+
+        {types.length > 0 && (
+          <div className="space-y-3">
+            {types.map(t => (
+              <div key={t} className="rounded-md border p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  {t} <span className="text-foreground/70">({grouped[t].length})</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {grouped[t].map((name, i) => (
+                    <span key={`${t}-${i}`} className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs">
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
