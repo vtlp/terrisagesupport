@@ -495,6 +495,57 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       }
     });
 
+    // ---- Overview tab: enum sanity (Terrisage silently drops non-matching values) ----
+    const STATUS_OK = new Set(['Under Construction', 'Phase 1 completed', 'Completed (with OC)', 'Completed']);
+    if (project.status && !STATUS_OK.has(String(project.status).trim())) {
+      warnings.push({ field: 'status', note: `"${project.status}" will not map to a Terrisage status and will be sent as empty.` });
+    }
+    const COMMUNITY_OK = new Set(['Gated', 'Open']);
+    if (project.community_type && !COMMUNITY_OK.has(String(project.community_type).trim())) {
+      warnings.push({ field: 'community_type', note: `"${project.community_type}" is not a recognised community type and will be dropped.` });
+    }
+    if (propertyType === 'APARTMENT') {
+      const towerNames = Array.isArray(project.tower_names_list) ? project.tower_names_list.filter(Boolean) : [];
+      const towersUsedByConfigs = new Set(
+        configs.map(c => String((c.data as Record<string, unknown>)?.tower ?? '').trim()).filter(Boolean)
+      );
+      if (towerNames.length === 0 && towersUsedByConfigs.size > 0) {
+        warnings.push({ field: 'tower_names_list', note: 'Configurations reference towers but no tower names are listed in Overview.' });
+      }
+      towersUsedByConfigs.forEach(t => {
+        if (towerNames.length > 0 && !towerNames.includes(t)) {
+          warnings.push({ field: 'tower_names_list', note: `Tower "${t}" used by a configuration is not listed in Overview.` });
+        }
+      });
+    }
+
+    // ---- Amenities & Proximity tab ----
+    // Amenities are optional; unmappedAmenities already surfaces in the Amenities card.
+    const proximityRows = (job.extracted_data as { proximityMatrix?: Array<{ name?: string; distance_km?: number | string }> })?.proximityMatrix || [];
+    const badProx = proximityRows.filter(p => !String(p.name ?? '').trim() || String(p.distance_km ?? '').trim() === '').length;
+    if (badProx > 0) {
+      warnings.push({ field: 'proximity', note: `${badProx} proximity row(s) missing name or distance — they will be sent but show as blank in Terrisage.` });
+    }
+
+    // ---- Media & Floor plans tab ----
+    // Hard block: a pushable media item without storage_path or external_url would push url:null and break Terrisage's download step.
+    const pushableMedia = media.filter(m => m.review_state !== 'INCORRECT' && m.review_state !== 'DUPLICATE');
+    const orphanMedia = pushableMedia.filter(m => !m.storage_path && !m.external_url).length;
+    if (orphanMedia > 0) {
+      errors.push({ field: 'media', note: `${orphanMedia} media item(s) have neither an uploaded file nor an external URL. Remove them or attach a source.` });
+    }
+    const pendingReview = media.filter(m => m.review_state === 'PENDING').length;
+    if (pendingReview > 0) {
+      warnings.push({ field: 'media', note: `${pendingReview} media item(s) still in PENDING review — mark them Correct, Incorrect, or Duplicate.` });
+    }
+    if (propertyType === 'APARTMENT' || propertyType === 'VILLA') {
+      const configsWithFp = new Set(media.filter(m => m.category === 'FLOOR_PLAN' && m.config_id).map(m => m.config_id));
+      const missingFp = configs.filter(c => !configsWithFp.has(c.id)).length;
+      if (missingFp > 0) {
+        warnings.push({ field: 'floor_plans', note: `${missingFp} configuration(s) have no floor plan attached.` });
+      }
+    }
+
     return {
       missing,
       warnings,
