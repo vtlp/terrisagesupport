@@ -32,7 +32,7 @@ function projectNameFor(j: ImportJob): string {
 }
 
 export default function AdminData() {
-  const { currentUser } = useUser();
+  const { currentUser, isAdmin } = useUser();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -40,6 +40,8 @@ export default function AdminData() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<PropertyType>('APARTMENT');
+  const [deleteJob, setDeleteJob] = useState<ImportJob | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
