@@ -821,8 +821,9 @@ Deno.serve(async (req) => {
   const configsRaw = (configs ?? []).map(c => ({
     id: c.id, sort_order: c.sort_order ?? 0, data: (c.data ?? {}) as Record<string, unknown>,
   }));
+  const floorsSpec = parseFloorsSpec((projectData as Record<string, unknown>).floors_each_tower);
   const { buildings, streetClusters, buildingKeyByName, clusterKeyByName } =
-    synthesiseBuildings(configsRaw, propertyType, intOrNull(projectMaster.projectTotalUnits));
+    synthesiseBuildings(configsRaw, propertyType, intOrNull(projectMaster.projectTotalUnits), floorsSpec);
 
   // Invariant: project total_units MUST equal Σ(configs.units_planned).
   // Terrisage also enforces Σ(buildings.totalUnits) === project.projectTotalUnits.
