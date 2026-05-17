@@ -276,6 +276,7 @@ function resolveAmenities(
 function synthesiseBuildings(
   configs: Array<{ data: Record<string, unknown> }>,
   propertyType: string,
+  projectTotalUnits: number | null,
 ): {
   buildings: Array<Record<string, unknown>>;
   streetClusters: Array<Record<string, unknown>>;
@@ -287,25 +288,85 @@ function synthesiseBuildings(
   const buildings: Array<Record<string, unknown>> = [];
   const streetClusters: Array<Record<string, unknown>> = [];
 
+  // Sum config.units_planned per tower/cluster — Terrisage requires totalUnits on each
+  // and the sum across buildings/clusters must equal projectTotalUnits (else 422).
+  const unitsByName = new Map<string, number>();
+  const nameKey = propertyType === 'APARTMENT' ? 'tower' : 'cluster';
+  let assignedUnits = 0;
+  let assignedCount = 0;
+  for (const c of configs) {
+    const name = strOrNull(c.data[nameKey]);
+    if (!name) continue;
+    const u = intOrNull(c.data.units_planned) ?? 0;
+    unitsByName.set(name, (unitsByName.get(name) ?? 0) + u);
+    assignedUnits += u;
+    assignedCount += 1;
+  }
+  // If config-level units don't add up to projectTotalUnits, distribute the diff evenly across
+  // the buildings/clusters so the spec invariant holds. Otherwise the push will be rejected with 422.
+  let diff = 0;
+  if (projectTotalUnits != null && unitsByName.size > 0) {
+    const sum = [...unitsByName.values()].reduce((a, b) => a + b, 0);
+    diff = projectTotalUnits - sum;
+  }
+
+  const distribute = (names: string[]): Map<string, number> => {
+    const out = new Map<string, number>();
+    if (names.length === 0) return out;
+    for (const n of names) out.set(n, unitsByName.get(n) ?? 0);
+    if (diff !== 0) {
+      const per = Math.floor(diff / names.length);
+      let leftover = diff - per * names.length;
+      for (const n of names) {
+        const cur = (out.get(n) ?? 0) + per;
+        out.set(n, cur + (leftover > 0 ? 1 : leftover < 0 ? -1 : 0));
+        if (leftover > 0) leftover -= 1; else if (leftover < 0) leftover += 1;
+      }
+      // Clamp to >= 1 per building (Terrisage will reject 0)
+      for (const n of names) if ((out.get(n) ?? 0) < 1) out.set(n, 1);
+    } else {
+      for (const n of names) if ((out.get(n) ?? 0) < 1) out.set(n, 1);
+    }
+    return out;
+  };
+
   if (propertyType === 'APARTMENT') {
-    let sort = 0;
+    const names: string[] = [];
     for (const c of configs) {
       const name = strOrNull(c.data.tower);
       if (!name || buildingKeyByName.has(name)) continue;
-      const key = slugify(name);
-      buildingKeyByName.set(name, key);
-      buildings.push({ supportBuildingKey: key, buildingName: name, sortOrder: sort++ });
+      buildingKeyByName.set(name, slugify(name));
+      names.push(name);
     }
+    const allocated = distribute(names);
+    names.forEach((name, i) => {
+      buildings.push({
+        supportBuildingKey: buildingKeyByName.get(name)!,
+        buildingName: name,
+        totalUnits: allocated.get(name) ?? 1,
+        sortOrder: i,
+      });
+    });
   } else {
-    let sort = 0;
+    const names: string[] = [];
     for (const c of configs) {
       const name = strOrNull(c.data.cluster);
       if (!name || clusterKeyByName.has(name)) continue;
-      const key = slugify(name);
-      clusterKeyByName.set(name, key);
-      streetClusters.push({ supportClusterKey: key, clusterName: name, sortOrder: sort++ });
+      clusterKeyByName.set(name, slugify(name));
+      names.push(name);
     }
+    const allocated = distribute(names);
+    names.forEach((name, i) => {
+      streetClusters.push({
+        supportClusterKey: clusterKeyByName.get(name)!,
+        clusterName: name,
+        totalUnits: allocated.get(name) ?? 1,
+        sortOrder: i,
+      });
+    });
   }
+  // Silence unused vars for the assigned counters (kept for future telemetry).
+  void assignedUnits; void assignedCount;
   return { buildings, streetClusters, buildingKeyByName, clusterKeyByName };
 }
 
