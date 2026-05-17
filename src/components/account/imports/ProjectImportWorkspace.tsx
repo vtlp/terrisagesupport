@@ -170,17 +170,24 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       .then(({ data }) => setAmenityMaster(data ?? []));
   }, []);
 
-  // Amenities the user typed that don't exist in the Terrisage master for this property type.
-  const unmappedAmenities = useMemo(() => {
+  // Map typed amenities against the Terrisage master for the selected property type.
+  const { mappedAmenities, unmappedAmenities } = useMemo(() => {
     const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
-    const known = new Set<string>();
+    const lookup = new Map<string, { display_name: string; code: string | null }>();
     for (const m of amenityMaster) {
       if (m.property_type && m.property_type !== propertyType) continue;
-      known.add(norm(m.display_name));
-      if (m.code) known.add(norm(m.code));
+      lookup.set(norm(m.display_name), { display_name: m.display_name, code: m.code });
+      if (m.code) lookup.set(norm(m.code), { display_name: m.display_name, code: m.code });
     }
     const items = amenities.split(',').map(s => s.trim()).filter(Boolean);
-    return items.filter(a => !known.has(norm(a)));
+    const mapped: Array<{ input: string; display_name: string; code: string | null }> = [];
+    const unmapped: string[] = [];
+    for (const a of items) {
+      const hit = lookup.get(norm(a));
+      if (hit) mapped.push({ input: a, display_name: hit.display_name, code: hit.code });
+      else unmapped.push(a);
+    }
+    return { mappedAmenities: mapped, unmappedAmenities: unmapped };
   }, [amenities, amenityMaster, propertyType]);
   
   const [importing, setImporting] = useState(false);
@@ -1361,6 +1368,36 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="space-y-1">
                 <Label>Amenities (comma separated)</Label>
                 <Textarea rows={2} value={amenities} onChange={e => setAmenities(e.target.value)} />
+                <p className="text-[11px] text-muted-foreground">
+                  {mappedAmenities.length} mapped · {unmappedAmenities.length} unmapped · {mappedAmenities.length + unmappedAmenities.length} total
+                </p>
+              </div>
+              {mappedAmenities.length > 0 && (
+                <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3">
+                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-medium text-sm mb-2">
+                    <CheckCircle2 className="h-4 w-4" /> Mapped amenities ({mappedAmenities.length})
+                  </div>
+                  <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mb-2">
+                    These will be sent to Terrisage with their resolved master IDs.
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {mappedAmenities.map(m => (
+                      <Badge
+                        key={m.input}
+                        variant="outline"
+                        className="border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                        title={m.input.toLowerCase() !== m.display_name.toLowerCase() ? `Input: ${m.input}` : undefined}
+                      >
+                        {m.display_name}
+                        {m.input.toLowerCase() !== m.display_name.toLowerCase() && (
+                          <span className="ml-1 opacity-60">← {m.input}</span>
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="hidden">
               </div>
               {unmappedAmenities.length > 0 && (
                 <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
