@@ -619,15 +619,21 @@ Deno.serve(async (req) => {
     let total = 0;
     const errors: Array<{ propertyType: string; error: string }> = [];
     for (const pt of types) {
+      const url = `${root}/api/integrations/amenities?propertyType=${pt}`;
+      const t0 = Date.now();
       try {
-        const r = await fetch(`${root}/api/integrations/amenities?propertyType=${pt}`, {
-          method: 'GET',
-          headers: { 'X-API-Key': apiKey },
-        });
-        if (!r.ok) { errors.push({ propertyType: pt, error: `HTTP ${r.status}` }); continue; }
-        // Spec response: { societyAmenities[], unitAmenities[], tags[] } each with { id, code, displayName, category, valueType }.
-        // Merge all three so a user-entered label like "Reserved parking" (unit amenity) still resolves.
-        const parsed = await r.json() as {
+        const r = await fetch(url, { method: 'GET', headers: { 'X-API-Key': apiKey } });
+        const text = await r.text();
+        let parsedBody: Record<string, unknown> = {};
+        try { parsedBody = JSON.parse(text); } catch { parsedBody = { raw: text }; }
+        const latency = Date.now() - t0;
+        if (!r.ok) {
+          const { code, message } = parseTerrisageError(parsedBody, r.status);
+          console.error('[terrisage] amenities.failed', { url, status: r.status, latency_ms: latency, code, message, body: parsedBody });
+          errors.push({ propertyType: pt, error: `${code}: ${message}` });
+          continue;
+        }
+        const parsed = parsedBody as {
           societyAmenities?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
           unitAmenities?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
           tags?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
@@ -637,6 +643,7 @@ Deno.serve(async (req) => {
           ...(parsed.unitAmenities ?? []),
           ...(parsed.tags ?? []),
         ];
+        logTerrisage('amenities.ok', { url, status: r.status, latency_ms: latency, propertyType: pt, count: all.length });
         const rows = all.map(a => ({
           amenity_id: a.id,
           code: a.code ?? null,
@@ -646,10 +653,16 @@ Deno.serve(async (req) => {
           fetched_at: new Date().toISOString(),
         }));
         if (rows.length > 0) {
-          await supabase.from('terrisage_amenity_master').upsert(rows as never, { onConflict: 'amenity_id' });
-          total += rows.length;
+          const { error: upsertErr } = await supabase.from('terrisage_amenity_master').upsert(rows as never, { onConflict: 'amenity_id' });
+          if (upsertErr) {
+            console.error('[terrisage] amenities.upsert_failed', { propertyType: pt, error: upsertErr.message });
+            errors.push({ propertyType: pt, error: `upsert: ${upsertErr.message}` });
+          } else {
+            total += rows.length;
+          }
         }
       } catch (e) {
+        console.error('[terrisage] amenities.exception', { url, error: (e as Error).message });
         errors.push({ propertyType: pt, error: (e as Error).message });
       }
     }
