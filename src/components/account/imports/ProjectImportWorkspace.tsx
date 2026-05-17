@@ -577,6 +577,55 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     (!isGlobal || validation.errors.length === 0) &&
     !['IMPORTED', 'IMPORTING'].includes(job.status as string);
 
+  // Reusable poller: queries Terrisage /api/integrations/projects/ingest-jobs?sourceJobId=<jobId>
+  // until SUCCEEDED/FAILED or timeout. Updates the local import_jobs row accordingly.
+  const pollUpstreamUntilTerminal = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
+    const start = Date.now();
+    const maxMs = 5 * 60 * 1000;
+    let interval = 5000;
+    while (Date.now() - start < maxMs) {
+      await new Promise(r => setTimeout(r, interval));
+      if (Date.now() - start > 2 * 60 * 1000) interval = 15000;
+      try {
+        const { data: poll } = await supabase.functions.invoke('terrisage-project-push', { body: { action: 'poll', jobId: job.id } });
+        const p = poll as { ok?: boolean; status?: string; data?: { projectId?: string; failureCode?: string; message?: string } } | null;
+        if (!p?.ok) continue;
+        if (p.status === 'SUCCEEDED') {
+          await supabase.from('import_jobs').update({ status: 'IMPORTED', imported_at: new Date().toISOString() }).eq('id', job.id);
+          if (!silent) toast.success(`Terrisage accepted project${p.data?.projectId ? ` (id: ${p.data.projectId.slice(0, 8)})` : ''}`);
+          onChange?.();
+          return 'SUCCEEDED' as const;
+        }
+        if (p.status === 'FAILED') {
+          const msg = `${p.data?.failureCode ?? 'FAILED'}: ${p.data?.message ?? ''}`;
+          await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
+          if (!silent) toast.error(`Terrisage rejected project: ${msg}`);
+          onChange?.();
+          return 'FAILED' as const;
+        }
+      } catch { /* keep polling */ }
+    }
+    if (!silent) toast.message('Terrisage push still processing - check Activity tab later.');
+    return 'TIMEOUT' as const;
+  }, [job.id, onChange]);
+
+  // Resume polling if we reopen a job that is still IMPORTING upstream.
+  useEffect(() => {
+    if (!isGlobal) return;
+    if (job.status !== 'IMPORTING') return;
+    const summary = (job.summary ?? {}) as { ingestJobId?: string };
+    if (!summary.ingestJobId) return;
+    let cancelled = false;
+    (async () => {
+      if (cancelled) return;
+      toast.message('Resuming Terrisage status check…');
+      await pollUpstreamUntilTerminal({ silent: false });
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.id, job.status, isGlobal]);
+
   const finalImport = async () => {
     const confirmMsg = isGlobal
       ? 'Push this project directly to Terrisage as an independent project?'
