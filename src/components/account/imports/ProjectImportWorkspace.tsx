@@ -500,8 +500,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     if (project.status && !STATUS_OK.has(String(project.status).trim())) {
       warnings.push({ field: 'status', note: `"${project.status}" will not map to a Terrisage status and will be sent as empty.` });
     }
-    const COMMUNITY_OK = new Set(['Gated', 'Open']);
-    if (project.community_type && !COMMUNITY_OK.has(String(project.community_type).trim())) {
+    // Mirror push function's mapCommunity(): anything matching gated/high-rise/township/etc → GATED; standalone/open → OPEN.
+    const mapsToCommunity = (raw: string): 'GATED' | 'OPEN' | null => {
+      const n = raw.toLowerCase().trim();
+      if (!n) return null;
+      if (/gated|high\s*rise|township|enclave|community|residency|gateway|villa community/.test(n)) return 'GATED';
+      if (/open|standalone|independent|plot/.test(n)) return 'OPEN';
+      return null;
+    };
+    if (project.community_type && !mapsToCommunity(String(project.community_type))) {
       warnings.push({ field: 'community_type', note: `"${project.community_type}" is not a recognised community type and will be dropped.` });
     }
     if (propertyType === 'APARTMENT') {
