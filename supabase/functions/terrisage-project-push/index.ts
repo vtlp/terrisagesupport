@@ -303,10 +303,36 @@ function resolveAmenities(
   return { amenities: out, unmapped };
 }
 
+// Parse strings like "40 floors in each tower; 36 floors in Block A note visible"
+// into { dominant: 40, exceptions: Map { 'a' => 36 } }. Exception keys are normalised
+// (lowercased, "Block "/"Tower " prefix stripped) so they match synthesised building names.
+function normaliseTowerKey(name: string): string {
+  return name.toLowerCase().replace(/^\s*(block|tower)\s+/i, '').trim();
+}
+function parseFloorsSpec(v: unknown): { dominant: number | null; exceptions: Map<string, number> } {
+  const out = { dominant: null as number | null, exceptions: new Map<string, number>() };
+  if (v == null) return out;
+  const s = String(v);
+  const first = s.match(/-?\d+/);
+  if (first) out.dominant = parseInt(first[0], 10);
+  // Pattern: "<N> floors in [Block|Tower]? <Name>"  — capture name up to ; , . or end.
+  const re = /(\d+)\s*floors?\s+in\s+(?:(?:block|tower)\s+)?([A-Za-z][\w &-]{0,30}?)(?=[;,.\n]|$| note| visible)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) {
+    const n = parseInt(m[1], 10);
+    const key = normaliseTowerKey(m[2]);
+    if (!key || key === 'each tower' || key === 'every tower') continue;
+    if (out.dominant != null && n === out.dominant) continue; // not an exception
+    out.exceptions.set(key, n);
+  }
+  return out;
+}
+
 function synthesiseBuildings(
   configs: Array<{ data: Record<string, unknown> }>,
   propertyType: string,
   projectTotalUnits: number | null,
+  floorsSpec: { dominant: number | null; exceptions: Map<string, number> } = { dominant: null, exceptions: new Map() },
 ): {
   buildings: Array<Record<string, unknown>>;
   streetClusters: Array<Record<string, unknown>>;
@@ -370,12 +396,18 @@ function synthesiseBuildings(
     }
     const allocated = distribute(names);
     names.forEach((name, i) => {
-      buildings.push({
+      // Per-tower floor count: use the exception if this building name matches one,
+      // else fall back to the project-level dominant value.
+      const floorKey = normaliseTowerKey(name);
+      const totalFloors = floorsSpec.exceptions.get(floorKey) ?? floorsSpec.dominant ?? null;
+      const b: Record<string, unknown> = {
         supportBuildingKey: buildingKeyByName.get(name)!,
         buildingName: name,
         totalUnits: allocated.get(name) ?? 1,
         sortOrder: i,
-      });
+      };
+      if (totalFloors != null) b.totalFloors = totalFloors;
+      buildings.push(b);
     });
   } else {
     const names: string[] = [];
@@ -449,7 +481,7 @@ function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<strin
     project.apartmentDetail = {
       projectOpenSpacePercent: numOrNull(pd.open_space_pct),
       projectTotalTowers: Array.isArray(pd.tower_names_list) ? (pd.tower_names_list as unknown[]).length : null,
-      projectTotalFloorsPerTower: intOrNull(pd.floors_each_tower),
+      projectTotalFloorsPerTower: parseFloorsSpec(pd.floors_each_tower).dominant,
       projectUnitsPerFloor: null,
       projectUnitsPerLift: null,
     };
@@ -789,8 +821,9 @@ Deno.serve(async (req) => {
   const configsRaw = (configs ?? []).map(c => ({
     id: c.id, sort_order: c.sort_order ?? 0, data: (c.data ?? {}) as Record<string, unknown>,
   }));
+  const floorsSpec = parseFloorsSpec((projectData as Record<string, unknown>).floors_each_tower);
   const { buildings, streetClusters, buildingKeyByName, clusterKeyByName } =
-    synthesiseBuildings(configsRaw, propertyType, intOrNull(projectMaster.projectTotalUnits));
+    synthesiseBuildings(configsRaw, propertyType, intOrNull(projectMaster.projectTotalUnits), floorsSpec);
 
   // Invariant: project total_units MUST equal Σ(configs.units_planned).
   // Terrisage also enforces Σ(buildings.totalUnits) === project.projectTotalUnits.
