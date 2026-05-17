@@ -17,6 +17,25 @@ const corsHeaders = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
+// Terrisage standard error envelope per spec:
+//   { success: false, error: { message, code, statusCode } }
+// Extract code + message so toasts and import_activity show the real reason instead of just "HTTP 422".
+function parseTerrisageError(parsed: unknown, fallbackStatus: number): { code: string; message: string } {
+  const p = (parsed ?? {}) as Record<string, unknown>;
+  const err = (p.error ?? {}) as Record<string, unknown>;
+  const code = String(err.code ?? p.code ?? `HTTP_${fallbackStatus}`);
+  const message = String(err.message ?? p.message ?? p.raw ?? 'Unknown error');
+  return { code, message };
+}
+
+// Log every Terrisage call with method, path, status, latency, and (on failure) the parsed body.
+// These show up in the Edge Function Logs panel and make debugging push failures trivial.
+function logTerrisage(label: string, info: Record<string, unknown>) {
+  // eslint-disable-next-line no-console
+  console.log(`[terrisage] ${label}`, JSON.stringify(info));
+}
+
+
 // ---------- Enum maps (Support UI label → Terrisage enum) ----------
 // Confirmed by Terrisage 2026-05-16: only the values below are accepted; everything else falls back.
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
@@ -559,20 +578,27 @@ Deno.serve(async (req) => {
   const root = baseUrl.replace(/\/$/, '');
 
   // -------- POLL action --------
-  // Confirmed: poll by sourceJobId. projectId arrives in the poll JSON when status === 'SUCCEEDED'.
   if (action === 'poll') {
+    const url = `${root}/api/integrations/projects/ingest-jobs?sourceJobId=${encodeURIComponent(jobId)}`;
+    const t0 = Date.now();
     try {
-      const r = await fetch(`${root}/api/integrations/projects/ingest-jobs?sourceJobId=${encodeURIComponent(jobId)}`, {
-        method: 'GET',
-        headers: { 'X-API-Key': apiKey },
-      });
+      const r = await fetch(url, { method: 'GET', headers: { 'X-API-Key': apiKey } });
       const text = await r.text();
       let parsed: Record<string, unknown> = {};
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
-      if (!r.ok) return json({ ok: false, error: `HTTP ${r.status}`, detail: text.slice(0, 300) }, 502);
-      // Persist projectId on terminal SUCCEEDED.
+      const latency = Date.now() - t0;
+      logTerrisage('poll.response', { url, status: r.status, latency_ms: latency, body: parsed });
+      if (!r.ok) {
+        const { code, message } = parseTerrisageError(parsed, r.status);
+        console.error('[terrisage] poll.failed', { url, status: r.status, code, message, body: parsed });
+        return json({ ok: false, error: code, detail: message, httpStatus: r.status, response: parsed }, 502);
+      }
       const status = parsed.status as string | undefined;
       const projectId = (parsed.projectId as string) ?? null;
+      const failureCode = (parsed.failureCode as string) ?? null;
+      if (status === 'FAILED') {
+        console.error('[terrisage] poll.terminal_failed', { sourceJobId: jobId, failureCode, message: parsed.message, body: parsed });
+      }
       if (status === 'SUCCEEDED' && projectId) {
         const { data: jobRow } = await supabase.from('import_jobs').select('summary').eq('id', jobId).maybeSingle();
         await supabase.from('import_jobs').update({
@@ -581,6 +607,7 @@ Deno.serve(async (req) => {
       }
       return json({ ok: true, status, projectId, data: parsed });
     } catch (e) {
+      console.error('[terrisage] poll.exception', { url, error: (e as Error).message });
       return json({ ok: false, error: (e as Error).message }, 502);
     }
   }
@@ -592,15 +619,21 @@ Deno.serve(async (req) => {
     let total = 0;
     const errors: Array<{ propertyType: string; error: string }> = [];
     for (const pt of types) {
+      const url = `${root}/api/integrations/amenities?propertyType=${pt}`;
+      const t0 = Date.now();
       try {
-        const r = await fetch(`${root}/api/integrations/amenities?propertyType=${pt}`, {
-          method: 'GET',
-          headers: { 'X-API-Key': apiKey },
-        });
-        if (!r.ok) { errors.push({ propertyType: pt, error: `HTTP ${r.status}` }); continue; }
-        // Spec response: { societyAmenities[], unitAmenities[], tags[] } each with { id, code, displayName, category, valueType }.
-        // Merge all three so a user-entered label like "Reserved parking" (unit amenity) still resolves.
-        const parsed = await r.json() as {
+        const r = await fetch(url, { method: 'GET', headers: { 'X-API-Key': apiKey } });
+        const text = await r.text();
+        let parsedBody: Record<string, unknown> = {};
+        try { parsedBody = JSON.parse(text); } catch { parsedBody = { raw: text }; }
+        const latency = Date.now() - t0;
+        if (!r.ok) {
+          const { code, message } = parseTerrisageError(parsedBody, r.status);
+          console.error('[terrisage] amenities.failed', { url, status: r.status, latency_ms: latency, code, message, body: parsedBody });
+          errors.push({ propertyType: pt, error: `${code}: ${message}` });
+          continue;
+        }
+        const parsed = parsedBody as {
           societyAmenities?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
           unitAmenities?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
           tags?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
@@ -610,6 +643,7 @@ Deno.serve(async (req) => {
           ...(parsed.unitAmenities ?? []),
           ...(parsed.tags ?? []),
         ];
+        logTerrisage('amenities.ok', { url, status: r.status, latency_ms: latency, propertyType: pt, count: all.length });
         const rows = all.map(a => ({
           amenity_id: a.id,
           code: a.code ?? null,
@@ -619,10 +653,16 @@ Deno.serve(async (req) => {
           fetched_at: new Date().toISOString(),
         }));
         if (rows.length > 0) {
-          await supabase.from('terrisage_amenity_master').upsert(rows as never, { onConflict: 'amenity_id' });
-          total += rows.length;
+          const { error: upsertErr } = await supabase.from('terrisage_amenity_master').upsert(rows as never, { onConflict: 'amenity_id' });
+          if (upsertErr) {
+            console.error('[terrisage] amenities.upsert_failed', { propertyType: pt, error: upsertErr.message });
+            errors.push({ propertyType: pt, error: `upsert: ${upsertErr.message}` });
+          } else {
+            total += rows.length;
+          }
         }
       } catch (e) {
+        console.error('[terrisage] amenities.exception', { url, error: (e as Error).message });
         errors.push({ propertyType: pt, error: (e as Error).message });
       }
     }
@@ -654,8 +694,10 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: 'NOT_AN_AGENCY' }, 400);
     }
 
+    const url = `${root}/api/integrations/projects/${terrisageProjectId}/agency-access`;
+    const t0 = Date.now();
     try {
-      const r = await fetch(`${root}/api/integrations/projects/${terrisageProjectId}/agency-access`, {
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
         body: JSON.stringify({ agencyOrgId: acct.tenant_id, sourceJobId: jobId }),
@@ -663,15 +705,23 @@ Deno.serve(async (req) => {
       const text = await r.text();
       let parsed: Record<string, unknown> = {};
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+      const latency = Date.now() - t0;
+      const { code, message } = parseTerrisageError(parsed, r.status);
+      if (!r.ok) {
+        console.error('[terrisage] agency_link.failed', { url, status: r.status, latency_ms: latency, code, message, body: parsed });
+      } else {
+        logTerrisage('agency_link.ok', { url, status: r.status, latency_ms: latency });
+      }
       await supabase.from('import_activity').insert([{
         job_id: jobId,
         event: r.ok ? 'terrisage_agency_linked' : 'terrisage_agency_link_failed',
-        detail: { accountId, agencyOrgId: acct.tenant_id, httpStatus: r.status, response: parsed } as never,
+        detail: { accountId, agencyOrgId: acct.tenant_id, httpStatus: r.status, code, message, response: parsed } as never,
         actor_id: user.id,
       }]);
-      if (!r.ok) return json({ ok: false, error: `HTTP ${r.status}`, detail: text.slice(0, 300) }, 502);
+      if (!r.ok) return json({ ok: false, error: code, detail: message, httpStatus: r.status, response: parsed }, 502);
       return json({ ok: true, response: parsed });
     } catch (e) {
+      console.error('[terrisage] agency_link.exception', { url, error: (e as Error).message });
       return json({ ok: false, error: (e as Error).message }, 502);
     }
   }
@@ -775,13 +825,32 @@ Deno.serve(async (req) => {
     pushedBy: user.id,
   };
 
-  // POST with retry on network/5xx/401 only (once).
+  // POST with retry on network/5xx/401 only (once). Every attempt is logged with status, latency,
+  // and the parsed body so failures (and Terrisage's exact error code/message) are visible in Edge Function Logs.
+  const url = `${root}/api/integrations/projects`;
   let lastErr = '';
+  let lastCode = '';
+  let lastMessage = '';
   let response: Record<string, unknown> | null = null;
   let httpStatus = 0;
+  logTerrisage('push.request', {
+    url,
+    sourceJobId: job.id,
+    propertyType,
+    projectOwnerOrgId,
+    counts: {
+      buildings: buildings.length,
+      streetClusters: streetClusters.length,
+      configurations: configurations.length,
+      media: mediaPayload.length,
+      amenities: amenityPayload.length,
+    },
+    projectTotalUnits: projectMaster.projectTotalUnits,
+  });
   for (let attempt = 0; attempt < 2; attempt++) {
+    const t0 = Date.now();
     try {
-      const r = await fetch(`${root}/api/integrations/projects`, {
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
         body: JSON.stringify(payload),
@@ -789,12 +858,30 @@ Deno.serve(async (req) => {
       httpStatus = r.status;
       const text = await r.text();
       try { response = JSON.parse(text); } catch { response = { raw: text }; }
-      if (r.status === 202 || r.status === 200) break;
-      lastErr = `HTTP ${r.status}: ${text.slice(0, 300)}`;
+      const latency = Date.now() - t0;
+      const parsedErr = parseTerrisageError(response, r.status);
+      lastCode = parsedErr.code;
+      lastMessage = parsedErr.message;
+      if (r.status === 202 || r.status === 200) {
+        logTerrisage('push.accepted', { url, attempt, status: r.status, latency_ms: latency, body: response });
+        break;
+      }
+      // Log the full response body so 400/422 validation errors are visible verbatim.
+      console.error('[terrisage] push.failed', {
+        url, attempt, status: r.status, latency_ms: latency,
+        code: parsedErr.code, message: parsedErr.message, body: response,
+        // Echo top-level payload shape for cross-checking against spec.
+        payloadShape: {
+          buildings: buildings.length, streetClusters: streetClusters.length,
+          configurations: configurations.length, media: mediaPayload.length,
+        },
+      });
+      lastErr = `HTTP ${r.status}: ${parsedErr.code} ${parsedErr.message}`;
       // Only retry on 5xx / 401
       if (r.status < 500 && r.status !== 401) break;
     } catch (e) {
       lastErr = (e as Error).message;
+      console.error('[terrisage] push.exception', { url, attempt, error: lastErr });
     }
   }
 
@@ -828,7 +915,7 @@ Deno.serve(async (req) => {
   await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', jobId);
   await supabase.from('import_activity').insert([{
     job_id: jobId, event: 'push_to_terrisage_failed',
-    detail: { error: lastErr, httpStatus, response } as never, actor_id: user.id,
+    detail: { error: lastErr, code: lastCode, message: lastMessage, httpStatus, response } as never, actor_id: user.id,
   }]);
-  return json({ ok: false, error: lastErr || 'PUSH_FAILED', httpStatus, response }, 502);
+  return json({ ok: false, error: lastCode || 'PUSH_FAILED', detail: lastMessage || lastErr, httpStatus, response }, 502);
 });
