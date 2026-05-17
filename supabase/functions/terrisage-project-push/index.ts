@@ -694,8 +694,10 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: 'NOT_AN_AGENCY' }, 400);
     }
 
+    const url = `${root}/api/integrations/projects/${terrisageProjectId}/agency-access`;
+    const t0 = Date.now();
     try {
-      const r = await fetch(`${root}/api/integrations/projects/${terrisageProjectId}/agency-access`, {
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
         body: JSON.stringify({ agencyOrgId: acct.tenant_id, sourceJobId: jobId }),
@@ -703,15 +705,23 @@ Deno.serve(async (req) => {
       const text = await r.text();
       let parsed: Record<string, unknown> = {};
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+      const latency = Date.now() - t0;
+      const { code, message } = parseTerrisageError(parsed, r.status);
+      if (!r.ok) {
+        console.error('[terrisage] agency_link.failed', { url, status: r.status, latency_ms: latency, code, message, body: parsed });
+      } else {
+        logTerrisage('agency_link.ok', { url, status: r.status, latency_ms: latency });
+      }
       await supabase.from('import_activity').insert([{
         job_id: jobId,
         event: r.ok ? 'terrisage_agency_linked' : 'terrisage_agency_link_failed',
-        detail: { accountId, agencyOrgId: acct.tenant_id, httpStatus: r.status, response: parsed } as never,
+        detail: { accountId, agencyOrgId: acct.tenant_id, httpStatus: r.status, code, message, response: parsed } as never,
         actor_id: user.id,
       }]);
-      if (!r.ok) return json({ ok: false, error: `HTTP ${r.status}`, detail: text.slice(0, 300) }, 502);
+      if (!r.ok) return json({ ok: false, error: code, detail: message, httpStatus: r.status, response: parsed }, 502);
       return json({ ok: true, response: parsed });
     } catch (e) {
+      console.error('[terrisage] agency_link.exception', { url, error: (e as Error).message });
       return json({ ok: false, error: (e as Error).message }, 502);
     }
   }
