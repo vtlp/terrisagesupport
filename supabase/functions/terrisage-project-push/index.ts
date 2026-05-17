@@ -180,9 +180,15 @@ const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'
 const numOrNull = (v: unknown): number | null => {
   if (v == null || v === '') return null;
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  // Extract the FIRST numeric token only. Globally stripping non-digits
-  // concatenates separate numbers (e.g. "40 floors; 36 in Block A" -> 4036).
-  const m = String(v).match(/-?\d+(?:\.\d+)?/);
+  const s = String(v);
+  // Range like "15-20 mins" or "15 to 20 mins" -> take the upper bound (20).
+  const range = s.match(/(-?\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(-?\d+(?:\.\d+)?)/i);
+  if (range) {
+    const a = parseFloat(range[1]); const b = parseFloat(range[2]);
+    if (Number.isFinite(a) && Number.isFinite(b)) return Math.max(a, b);
+  }
+  // Otherwise take the FIRST numeric token (avoids "40 floors; 36 in Block A" -> 4036).
+  const m = s.match(/-?\d+(?:\.\d+)?/);
   if (!m) return null;
   const n = parseFloat(m[0]);
   return Number.isFinite(n) ? n : null;
