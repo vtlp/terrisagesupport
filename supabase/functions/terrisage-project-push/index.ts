@@ -328,6 +328,26 @@ function parseFloorsSpec(v: unknown): { dominant: number | null; exceptions: Map
   return out;
 }
 
+// A configuration may reference multiple towers (apartment) or clusters (villa/plot).
+// Accept arrays or comma/slash/pipe/&/+ separated strings; trim + dedupe; preserve order.
+function splitMulti(v: unknown): string[] {
+  if (v == null) return [];
+  const raw = Array.isArray(v) ? v.map(x => String(x ?? '')) : [String(v)];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const s of raw) {
+    for (const part of s.split(/\s*(?:,|;|\/|\||&|\+| and )\s*/i)) {
+      const p = part.trim();
+      if (!p) continue;
+      const key = p.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
 function synthesiseBuildings(
   configs: Array<{ data: Record<string, unknown> }>,
   propertyType: string,
@@ -346,16 +366,23 @@ function synthesiseBuildings(
 
   // Sum config.units_planned per tower/cluster — Terrisage requires totalUnits on each
   // and the sum across buildings/clusters must equal projectTotalUnits (else 422).
+  // When a single config references multiple towers/clusters, split its units evenly across them.
   const unitsByName = new Map<string, number>();
   const nameKey = propertyType === 'APARTMENT' ? 'tower' : 'cluster';
   let assignedUnits = 0;
   let assignedCount = 0;
   for (const c of configs) {
-    const name = strOrNull(c.data[nameKey]);
-    if (!name) continue;
-    const u = intOrNull(c.data.units_planned) ?? 0;
-    unitsByName.set(name, (unitsByName.get(name) ?? 0) + u);
-    assignedUnits += u;
+    const names = splitMulti(c.data[nameKey]);
+    if (names.length === 0) continue;
+    const totalU = intOrNull(c.data.units_planned) ?? 0;
+    const per = Math.floor(totalU / names.length);
+    let leftover = totalU - per * names.length;
+    for (const name of names) {
+      const share = per + (leftover > 0 ? 1 : 0);
+      if (leftover > 0) leftover -= 1;
+      unitsByName.set(name, (unitsByName.get(name) ?? 0) + share);
+    }
+    assignedUnits += totalU;
     assignedCount += 1;
   }
   // If config-level units don't add up to projectTotalUnits, distribute the diff evenly across
@@ -389,10 +416,11 @@ function synthesiseBuildings(
   if (propertyType === 'APARTMENT') {
     const names: string[] = [];
     for (const c of configs) {
-      const name = strOrNull(c.data.tower);
-      if (!name || buildingKeyByName.has(name)) continue;
-      buildingKeyByName.set(name, slugify(name));
-      names.push(name);
+      for (const name of splitMulti(c.data.tower)) {
+        if (buildingKeyByName.has(name)) continue;
+        buildingKeyByName.set(name, slugify(name));
+        names.push(name);
+      }
     }
     const allocated = distribute(names);
     names.forEach((name, i) => {
@@ -412,10 +440,11 @@ function synthesiseBuildings(
   } else {
     const names: string[] = [];
     for (const c of configs) {
-      const name = strOrNull(c.data.cluster);
-      if (!name || clusterKeyByName.has(name)) continue;
-      clusterKeyByName.set(name, slugify(name));
-      names.push(name);
+      for (const name of splitMulti(c.data.cluster)) {
+        if (clusterKeyByName.has(name)) continue;
+        clusterKeyByName.set(name, slugify(name));
+        names.push(name);
+      }
     }
     const allocated = distribute(names);
     names.forEach((name, i) => {
@@ -540,23 +569,28 @@ function buildConfiguration(
   })).filter(v => v.text);
 
   if (propertyType === 'APARTMENT') {
-    const towerName = strOrNull(d.tower);
+    // A config may reference multiple towers (e.g. "Tower A, Tower B" or ["A","B"]).
+    const towerNames = splitMulti(d.tower);
+    const buildingKeys = towerNames.map(n => buildingKeyByName.get(n) ?? slugify(n));
     cfg.apartmentConfiguration = {
-      projectTowerName: towerName,
+      projectTowerName: towerNames[0] ?? null,
+      projectTowerNames: towerNames,
       balconyCount: intOrNull(d.balconies),
       masterBedroomSizeSqft: strOrNull(d.master_bedroom_size),
       variations,
     };
     const range = parseFloorRange(d.floor_range);
     cfg.mapping = {
-      supportBuildingKey: towerName ? (buildingKeyByName.get(towerName) ?? slugify(towerName)) : null,
+      supportBuildingKey: buildingKeys[0] ?? null,
+      supportBuildingKeys: buildingKeys,
       floorFrom: range.from,
       floorTo: range.to,
       excludedFloors,
       availableFacings: facingArr,
     };
   } else if (propertyType === 'VILLA') {
-    const clusterName = strOrNull(d.cluster);
+    const clusterNames = splitMulti(d.cluster);
+    const clusterKeys = clusterNames.map(n => clusterKeyByName.get(n) ?? slugify(n));
     const dims = parseDims(d.dimensions ?? d.land_area);
     cfg.villaConfiguration = {
       configurationVillaFloorsPerUnit: intOrNull(d.floors_per_unit),
@@ -565,11 +599,13 @@ function buildConfiguration(
       masterBedroomSizeSqft: strOrNull(d.master_bedroom_size),
     };
     cfg.mapping = {
-      supportClusterKey: clusterName ? (clusterKeyByName.get(clusterName) ?? slugify(clusterName)) : null,
+      supportClusterKey: clusterKeys[0] ?? null,
+      supportClusterKeys: clusterKeys,
       availableFacings: facingArr,
     };
   } else if (propertyType === 'PLOT') {
-    const clusterName = strOrNull(d.cluster);
+    const clusterNames = splitMulti(d.cluster);
+    const clusterKeys = clusterNames.map(n => clusterKeyByName.get(n) ?? slugify(n));
     const dims = parseDims(d.dimensions);
     cfg.plotConfiguration = {
       configurationPlotUnitAreaSqft: numOrNull(d.plot_area),
@@ -578,7 +614,8 @@ function buildConfiguration(
       configurationPlotLength: dims.length,
     };
     cfg.mapping = {
-      supportClusterKey: clusterName ? (clusterKeyByName.get(clusterName) ?? slugify(clusterName)) : null,
+      supportClusterKey: clusterKeys[0] ?? null,
+      supportClusterKeys: clusterKeys,
       availableFacings: facingArr,
     };
   }
