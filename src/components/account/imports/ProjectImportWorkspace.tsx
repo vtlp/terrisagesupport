@@ -513,14 +513,21 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     }
     if (propertyType === 'APARTMENT') {
       const towerNames = Array.isArray(project.tower_names_list) ? project.tower_names_list.filter(Boolean) : [];
-      const towersUsedByConfigs = new Set(
-        configs.map(c => String((c.data as Record<string, unknown>)?.tower ?? '').trim()).filter(Boolean)
-      );
+      // A single config may list multiple towers in one field (e.g. "Bellatrix & Delta", "A, B"). Split before checking.
+      const splitTowers = (raw: string) =>
+        raw.split(/\s*(?:&|,|\/|\band\b|\+)\s*/i).map(s => s.trim()).filter(Boolean);
+      const towersUsedByConfigs = new Set<string>();
+      configs.forEach(c => {
+        const raw = String((c.data as Record<string, unknown>)?.tower ?? '').trim();
+        if (!raw) return;
+        splitTowers(raw).forEach(t => towersUsedByConfigs.add(t));
+      });
+      const towerNamesNorm = new Set(towerNames.map(n => n.toLowerCase()));
       if (towerNames.length === 0 && towersUsedByConfigs.size > 0) {
         warnings.push({ field: 'tower_names_list', note: 'Configurations reference towers but no tower names are listed in Overview.' });
       }
       towersUsedByConfigs.forEach(t => {
-        if (towerNames.length > 0 && !towerNames.includes(t)) {
+        if (towerNames.length > 0 && !towerNamesNorm.has(t.toLowerCase())) {
           warnings.push({ field: 'tower_names_list', note: `Tower "${t}" used by a configuration is not listed in Overview.` });
         }
       });
