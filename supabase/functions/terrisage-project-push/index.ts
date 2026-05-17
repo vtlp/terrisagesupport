@@ -915,7 +915,7 @@ Deno.serve(async (req) => {
   await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', jobId);
   await supabase.from('import_activity').insert([{
     job_id: jobId, event: 'push_to_terrisage_failed',
-    detail: { error: lastErr, httpStatus, response } as never, actor_id: user.id,
+    detail: { error: lastErr, code: lastCode, message: lastMessage, httpStatus, response } as never, actor_id: user.id,
   }]);
-  return json({ ok: false, error: lastErr || 'PUSH_FAILED', httpStatus, response }, 502);
+  return json({ ok: false, error: lastCode || 'PUSH_FAILED', detail: lastMessage || lastErr, httpStatus, response }, 502);
 });
