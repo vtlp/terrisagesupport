@@ -417,10 +417,11 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     toast.success('File replaced');
   };
 
-  // VALIDATION
+  // VALIDATION — split into hard errors (block Terrisage push) and soft warnings.
   const validation = useMemo(() => {
     const missing: string[] = [];
     REQUIRED_FIELDS.forEach(k => { if (!project[k]) missing.push(k); });
+
     const rawWarnings = (job.extracted_data as { confidenceWarnings?: Array<Record<string, unknown>> })?.confidenceWarnings || [];
     const warnings: Array<{ field: string; note: string }> = rawWarnings.map(w => {
       const field = String((w.field ?? w.field_name ?? w.entity_type) ?? 'field');
@@ -434,11 +435,81 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     if (needsRecrop > 0) warnings.push({ field: 'media', note: `${needsRecrop} media item(s) marked for re-crop` });
     const incorrect = media.filter(m => m.review_state === 'INCORRECT').length;
     if (incorrect > 0) warnings.push({ field: 'media', note: `${incorrect} media item(s) marked incorrect` });
-    return { missing, warnings, configsCount: configs.length };
-  }, [project, media, configs, job.extracted_data]);
+
+    // ---- Terrisage-spec hard errors (only enforced when pushing globally) ----
+    const errors: Array<{ field: string; note: string }> = [];
+    const intOf = (v: unknown) => {
+      const n = Number(String(v ?? '').replace(/[^\d.\-]/g, ''));
+      return Number.isFinite(n) ? Math.round(n) : 0;
+    };
+
+    if (configs.length === 0) {
+      errors.push({ field: 'configurations', note: 'Add at least one configuration before pushing.' });
+    }
+
+    // Each configuration needs a name, units_planned > 0, and a building/cluster.
+    const groupKey: 'tower' | 'cluster' = propertyType === 'APARTMENT' ? 'tower' : 'cluster';
+    const groupLabel = propertyType === 'APARTMENT' ? 'tower' : 'cluster';
+    const perGroup = new Map<string, number>();
+    let configsSum = 0;
+    configs.forEach((c, i) => {
+      const d = (c.data ?? {}) as Record<string, unknown>;
+      const label = String(d.name ?? '').trim() || `#${i + 1}`;
+      if (!String(d.name ?? '').trim()) {
+        errors.push({ field: 'configuration', note: `Configuration ${label}: name is required.` });
+      }
+      const u = intOf(d.units_planned);
+      if (u <= 0) {
+        errors.push({ field: 'configuration', note: `Configuration "${label}": units planned must be greater than 0.` });
+      }
+      configsSum += u;
+      const g = String(d[groupKey] ?? '').trim();
+      if (!g) {
+        errors.push({ field: 'configuration', note: `Configuration "${label}": ${groupLabel} is required.` });
+      } else {
+        perGroup.set(g, (perGroup.get(g) ?? 0) + u);
+      }
+    });
+
+    // Project-level total_units must match sum across configs (Terrisage invariant).
+    const declaredTotal = intOf(project.total_units);
+    if (declaredTotal <= 0) {
+      errors.push({
+        field: 'total_units',
+        note: 'Project total units must be greater than 0. Set it in Overview or it will be derived from configurations.',
+      });
+    } else if (configsSum > 0 && declaredTotal !== configsSum) {
+      errors.push({
+        field: 'total_units',
+        note: `Project total units (${declaredTotal}) must equal sum of configuration units planned (${configsSum}).`,
+      });
+    }
+
+    // Per-tower/cluster: each group needs at least 1 unit.
+    perGroup.forEach((sum, name) => {
+      if (sum <= 0) {
+        errors.push({
+          field: groupLabel,
+          note: `${groupLabel.charAt(0).toUpperCase() + groupLabel.slice(1)} "${name}": total units must be greater than 0.`,
+        });
+      }
+    });
+
+    return {
+      missing,
+      warnings,
+      errors,
+      configsCount: configs.length,
+      configsSum,
+      declaredTotal,
+      perGroup: Array.from(perGroup.entries()).map(([name, units]) => ({ name, units })),
+      groupLabel,
+    };
+  }, [project, media, configs, job.extracted_data, propertyType]);
 
   const isGlobal = !job.account_id;
   const canImport = validation.missing.length === 0 && configs.length > 0 &&
+    (!isGlobal || validation.errors.length === 0) &&
     !['IMPORTED', 'IMPORTING'].includes(job.status as string);
 
   const finalImport = async () => {
