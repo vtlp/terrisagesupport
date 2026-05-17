@@ -170,17 +170,24 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       .then(({ data }) => setAmenityMaster(data ?? []));
   }, []);
 
-  // Amenities the user typed that don't exist in the Terrisage master for this property type.
-  const unmappedAmenities = useMemo(() => {
+  // Map typed amenities against the Terrisage master for the selected property type.
+  const { mappedAmenities, unmappedAmenities } = useMemo(() => {
     const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
-    const known = new Set<string>();
+    const lookup = new Map<string, { display_name: string; code: string | null }>();
     for (const m of amenityMaster) {
       if (m.property_type && m.property_type !== propertyType) continue;
-      known.add(norm(m.display_name));
-      if (m.code) known.add(norm(m.code));
+      lookup.set(norm(m.display_name), { display_name: m.display_name, code: m.code });
+      if (m.code) lookup.set(norm(m.code), { display_name: m.display_name, code: m.code });
     }
     const items = amenities.split(',').map(s => s.trim()).filter(Boolean);
-    return items.filter(a => !known.has(norm(a)));
+    const mapped: Array<{ input: string; display_name: string; code: string | null }> = [];
+    const unmapped: string[] = [];
+    for (const a of items) {
+      const hit = lookup.get(norm(a));
+      if (hit) mapped.push({ input: a, display_name: hit.display_name, code: hit.code });
+      else unmapped.push(a);
+    }
+    return { mappedAmenities: mapped, unmappedAmenities: unmapped };
   }, [amenities, amenityMaster, propertyType]);
   
   const [importing, setImporting] = useState(false);
