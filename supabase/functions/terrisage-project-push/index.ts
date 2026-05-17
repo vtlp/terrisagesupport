@@ -729,7 +729,7 @@ Deno.serve(async (req) => {
     id: c.id, sort_order: c.sort_order ?? 0, data: (c.data ?? {}) as Record<string, unknown>,
   }));
   const { buildings, streetClusters, buildingKeyByName, clusterKeyByName } =
-    synthesiseBuildings(configsRaw, propertyType);
+    synthesiseBuildings(configsRaw, propertyType, intOrNull(projectMaster.projectTotalUnits));
 
   const configurations = configsRaw.map(c =>
     buildConfiguration(c, propertyType, buildingKeyByName, clusterKeyByName)
