@@ -303,6 +303,31 @@ function resolveAmenities(
   return { amenities: out, unmapped };
 }
 
+// Parse strings like "40 floors in each tower; 36 floors in Block A note visible"
+// into { dominant: 40, exceptions: Map { 'a' => 36 } }. Exception keys are normalised
+// (lowercased, "Block "/"Tower " prefix stripped) so they match synthesised building names.
+function normaliseTowerKey(name: string): string {
+  return name.toLowerCase().replace(/^\s*(block|tower)\s+/i, '').trim();
+}
+function parseFloorsSpec(v: unknown): { dominant: number | null; exceptions: Map<string, number> } {
+  const out = { dominant: null as number | null, exceptions: new Map<string, number>() };
+  if (v == null) return out;
+  const s = String(v);
+  const first = s.match(/-?\d+/);
+  if (first) out.dominant = parseInt(first[0], 10);
+  // Pattern: "<N> floors in [Block|Tower]? <Name>"  — capture name up to ; , . or end.
+  const re = /(\d+)\s*floors?\s+in\s+(?:(?:block|tower)\s+)?([A-Za-z][\w &-]{0,30}?)(?=[;,.\n]|$| note| visible)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) {
+    const n = parseInt(m[1], 10);
+    const key = normaliseTowerKey(m[2]);
+    if (!key || key === 'each tower' || key === 'every tower') continue;
+    if (out.dominant != null && n === out.dominant) continue; // not an exception
+    out.exceptions.set(key, n);
+  }
+  return out;
+}
+
 function synthesiseBuildings(
   configs: Array<{ data: Record<string, unknown> }>,
   propertyType: string,
