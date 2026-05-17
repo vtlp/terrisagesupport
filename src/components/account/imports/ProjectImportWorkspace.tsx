@@ -593,14 +593,23 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         if (!p?.ok) continue;
         if (p.status === 'SUCCEEDED') {
           await supabase.from('import_jobs').update({ status: 'IMPORTED', imported_at: new Date().toISOString() }).eq('id', job.id);
+          await supabase.from('import_activity').insert([{
+            job_id: job.id, event: 'import_completed',
+            detail: { source: 'terrisage', projectId: p.data?.projectId ?? null, message: 'Terrisage accepted project' } as never,
+          }]);
           if (!silent) toast.success(`Terrisage accepted project${p.data?.projectId ? ` (id: ${p.data.projectId.slice(0, 8)})` : ''}`);
           onChange?.();
           return 'SUCCEEDED' as const;
         }
         if (p.status === 'FAILED') {
-          const msg = `${p.data?.failureCode ?? 'FAILED'}: ${p.data?.message ?? ''}`;
+          const shortMsg = (p.data?.message ?? '').toString().split('\n')[0].slice(0, 200);
+          const code = p.data?.failureCode ?? 'FAILED';
           await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
-          if (!silent) toast.error(`Terrisage rejected project: ${msg}`);
+          await supabase.from('import_activity').insert([{
+            job_id: job.id, event: 'import_failed',
+            detail: { source: 'terrisage', code, message: shortMsg } as never,
+          }]);
+          if (!silent) toast.error(`Terrisage rejected project: ${code}${shortMsg ? ` - ${shortMsg}` : ''}`);
           onChange?.();
           return 'FAILED' as const;
         }
