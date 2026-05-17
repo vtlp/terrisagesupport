@@ -144,6 +144,27 @@ export default function AdminData() {
     if (data) setJobs(j => j.map(x => x.id === data.id ? data as ImportJob : x));
   };
 
+  const confirmDelete = async () => {
+    if (!deleteJob) return;
+    setDeleting(true);
+    const jobId = deleteJob.id;
+    await Promise.all([
+      supabase.from('import_activity').delete().eq('job_id', jobId),
+      supabase.from('import_files').delete().eq('job_id', jobId),
+      supabase.from('import_project_configs').delete().eq('job_id', jobId),
+      supabase.from('import_project_media').delete().eq('job_id', jobId),
+      supabase.from('import_record_rows').delete().eq('job_id', jobId),
+      supabase.from('import_job_account_links').delete().eq('job_id', jobId),
+    ]);
+    const { error } = await supabase.from('import_jobs').delete().eq('id', jobId);
+    setDeleting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Import deleted');
+    setJobs(j => j.filter(x => x.id !== jobId));
+    if (selectedId === jobId) setSelectedId(null);
+    setDeleteJob(null);
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-4">
       <div>
