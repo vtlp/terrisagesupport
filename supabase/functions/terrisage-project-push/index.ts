@@ -825,13 +825,32 @@ Deno.serve(async (req) => {
     pushedBy: user.id,
   };
 
-  // POST with retry on network/5xx/401 only (once).
+  // POST with retry on network/5xx/401 only (once). Every attempt is logged with status, latency,
+  // and the parsed body so failures (and Terrisage's exact error code/message) are visible in Edge Function Logs.
+  const url = `${root}/api/integrations/projects`;
   let lastErr = '';
+  let lastCode = '';
+  let lastMessage = '';
   let response: Record<string, unknown> | null = null;
   let httpStatus = 0;
+  logTerrisage('push.request', {
+    url,
+    sourceJobId: job.id,
+    propertyType,
+    projectOwnerOrgId,
+    counts: {
+      buildings: buildings.length,
+      streetClusters: streetClusters.length,
+      configurations: configurations.length,
+      media: mediaPayload.length,
+      amenities: amenityPayload.length,
+    },
+    projectTotalUnits: projectMaster.projectTotalUnits,
+  });
   for (let attempt = 0; attempt < 2; attempt++) {
+    const t0 = Date.now();
     try {
-      const r = await fetch(`${root}/api/integrations/projects`, {
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
         body: JSON.stringify(payload),
@@ -839,12 +858,30 @@ Deno.serve(async (req) => {
       httpStatus = r.status;
       const text = await r.text();
       try { response = JSON.parse(text); } catch { response = { raw: text }; }
-      if (r.status === 202 || r.status === 200) break;
-      lastErr = `HTTP ${r.status}: ${text.slice(0, 300)}`;
+      const latency = Date.now() - t0;
+      const parsedErr = parseTerrisageError(response, r.status);
+      lastCode = parsedErr.code;
+      lastMessage = parsedErr.message;
+      if (r.status === 202 || r.status === 200) {
+        logTerrisage('push.accepted', { url, attempt, status: r.status, latency_ms: latency, body: response });
+        break;
+      }
+      // Log the full response body so 400/422 validation errors are visible verbatim.
+      console.error('[terrisage] push.failed', {
+        url, attempt, status: r.status, latency_ms: latency,
+        code: parsedErr.code, message: parsedErr.message, body: response,
+        // Echo top-level payload shape for cross-checking against spec.
+        payloadShape: {
+          buildings: buildings.length, streetClusters: streetClusters.length,
+          configurations: configurations.length, media: mediaPayload.length,
+        },
+      });
+      lastErr = `HTTP ${r.status}: ${parsedErr.code} ${parsedErr.message}`;
       // Only retry on 5xx / 401
       if (r.status < 500 && r.status !== 401) break;
     } catch (e) {
       lastErr = (e as Error).message;
+      console.error('[terrisage] push.exception', { url, attempt, error: lastErr });
     }
   }
 
