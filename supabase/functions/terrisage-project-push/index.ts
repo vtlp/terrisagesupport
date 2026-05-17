@@ -366,16 +366,23 @@ function synthesiseBuildings(
 
   // Sum config.units_planned per tower/cluster — Terrisage requires totalUnits on each
   // and the sum across buildings/clusters must equal projectTotalUnits (else 422).
+  // When a single config references multiple towers/clusters, split its units evenly across them.
   const unitsByName = new Map<string, number>();
   const nameKey = propertyType === 'APARTMENT' ? 'tower' : 'cluster';
   let assignedUnits = 0;
   let assignedCount = 0;
   for (const c of configs) {
-    const name = strOrNull(c.data[nameKey]);
-    if (!name) continue;
-    const u = intOrNull(c.data.units_planned) ?? 0;
-    unitsByName.set(name, (unitsByName.get(name) ?? 0) + u);
-    assignedUnits += u;
+    const names = splitMulti(c.data[nameKey]);
+    if (names.length === 0) continue;
+    const totalU = intOrNull(c.data.units_planned) ?? 0;
+    const per = Math.floor(totalU / names.length);
+    let leftover = totalU - per * names.length;
+    for (const name of names) {
+      const share = per + (leftover > 0 ? 1 : 0);
+      if (leftover > 0) leftover -= 1;
+      unitsByName.set(name, (unitsByName.get(name) ?? 0) + share);
+    }
+    assignedUnits += totalU;
     assignedCount += 1;
   }
   // If config-level units don't add up to projectTotalUnits, distribute the diff evenly across
@@ -409,10 +416,11 @@ function synthesiseBuildings(
   if (propertyType === 'APARTMENT') {
     const names: string[] = [];
     for (const c of configs) {
-      const name = strOrNull(c.data.tower);
-      if (!name || buildingKeyByName.has(name)) continue;
-      buildingKeyByName.set(name, slugify(name));
-      names.push(name);
+      for (const name of splitMulti(c.data.tower)) {
+        if (buildingKeyByName.has(name)) continue;
+        buildingKeyByName.set(name, slugify(name));
+        names.push(name);
+      }
     }
     const allocated = distribute(names);
     names.forEach((name, i) => {
@@ -432,10 +440,11 @@ function synthesiseBuildings(
   } else {
     const names: string[] = [];
     for (const c of configs) {
-      const name = strOrNull(c.data.cluster);
-      if (!name || clusterKeyByName.has(name)) continue;
-      clusterKeyByName.set(name, slugify(name));
-      names.push(name);
+      for (const name of splitMulti(c.data.cluster)) {
+        if (clusterKeyByName.has(name)) continue;
+        clusterKeyByName.set(name, slugify(name));
+        names.push(name);
+      }
     }
     const allocated = distribute(names);
     names.forEach((name, i) => {
