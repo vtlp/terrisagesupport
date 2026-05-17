@@ -598,9 +598,20 @@ Deno.serve(async (req) => {
           headers: { 'X-API-Key': apiKey },
         });
         if (!r.ok) { errors.push({ propertyType: pt, error: `HTTP ${r.status}` }); continue; }
-        const parsed = await r.json() as { amenities?: Array<{ amenityId: string; code?: string; displayName: string; category?: string }> };
-        const rows = (parsed.amenities ?? []).map(a => ({
-          amenity_id: a.amenityId,
+        // Spec response: { societyAmenities[], unitAmenities[], tags[] } each with { id, code, displayName, category, valueType }.
+        // Merge all three so a user-entered label like "Reserved parking" (unit amenity) still resolves.
+        const parsed = await r.json() as {
+          societyAmenities?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
+          unitAmenities?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
+          tags?: Array<{ id: string; code?: string; displayName: string; category?: string }>;
+        };
+        const all = [
+          ...(parsed.societyAmenities ?? []),
+          ...(parsed.unitAmenities ?? []),
+          ...(parsed.tags ?? []),
+        ];
+        const rows = all.map(a => ({
+          amenity_id: a.id,
           code: a.code ?? null,
           display_name: a.displayName,
           category: a.category ?? null,
