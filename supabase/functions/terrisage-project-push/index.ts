@@ -781,15 +781,32 @@ Deno.serve(async (req) => {
   const { buildings, streetClusters, buildingKeyByName, clusterKeyByName } =
     synthesiseBuildings(configsRaw, propertyType, intOrNull(projectMaster.projectTotalUnits));
 
-  // Terrisage requires: sum(buildings/clusters totalUnits) === projectTotalUnits.
-  // If our project total is null/0/mismatched, reconcile by setting it to the inventory sum.
+  // Invariant: project total_units MUST equal Σ(configs.units_planned).
+  // Terrisage also enforces Σ(buildings.totalUnits) === project.projectTotalUnits.
+  const configsSum = configsRaw.reduce(
+    (a, c) => a + (intOrNull(c.data.units_planned) ?? 0),
+    0,
+  );
   const inventorySum =
     buildings.reduce((a, b) => a + (Number(b.totalUnits) || 0), 0) +
     streetClusters.reduce((a, b) => a + (Number(b.totalUnits) || 0), 0);
-  const currentTotal = intOrNull(projectMaster.projectTotalUnits) ?? 0;
-  if (inventorySum > 0 && currentTotal !== inventorySum) {
+  const declaredTotal = intOrNull(projectMaster.projectTotalUnits);
+
+  if (declaredTotal == null || declaredTotal === 0) {
+    // No project-level total declared — derive from configs.
+    if (configsSum > 0) projectMaster.projectTotalUnits = configsSum;
+  } else if (configsSum > 0 && declaredTotal !== configsSum) {
+    // Hard mismatch — refuse to push so the user fixes the data.
+    return new Response(JSON.stringify({
+      ok: false,
+      error: 'UNIT_TOTAL_MISMATCH',
+      detail: `Project Overview total_units (${declaredTotal}) must equal sum of configuration units_planned (${configsSum}). Fix one side before pushing.`,
+    }), { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  } else if (declaredTotal !== inventorySum && inventorySum > 0) {
+    // Configs agree but per-tower distribution drifted (rounding) — align to declared.
     projectMaster.projectTotalUnits = inventorySum;
   }
+
 
   const configurations = configsRaw.map(c =>
     buildConfiguration(c, propertyType, buildingKeyByName, clusterKeyByName)
