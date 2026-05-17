@@ -1315,6 +1315,40 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   </ul>
                 </div>
               )}
+
+              {isGlobal && validation.errors.length > 0 && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                  <div className="flex items-center gap-2 text-destructive font-medium text-sm mb-1">
+                    <XCircle className="h-4 w-4" /> Terrisage pre-flight checks failed
+                  </div>
+                  <p className="text-[11px] text-destructive/80 mb-2">
+                    Fix these before pushing. Terrisage will reject the import otherwise.
+                  </p>
+                  <ul className="text-xs text-destructive list-disc pl-4 space-y-0.5">
+                    {validation.errors.map((e, i) => <li key={i}><span className="font-medium">{e.field}:</span> {e.note}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {isGlobal && validation.perGroup.length > 0 && (
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="text-xs font-medium mb-2">
+                    Unit totals · project {validation.declaredTotal || 0} = Σ configs {validation.configsSum}
+                    {validation.declaredTotal === validation.configsSum && validation.configsSum > 0 && (
+                      <CheckCircle2 className="inline h-3.5 w-3.5 ml-1 text-success" />
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {validation.perGroup.map(g => (
+                      <div key={g.name} className="flex items-center justify-between text-xs rounded border px-2 py-1 bg-background">
+                        <span className="truncate capitalize">{validation.groupLabel} {g.name}</span>
+                        <Badge variant={g.units > 0 ? 'outline' : 'destructive'} className="text-[10px] ml-2">{g.units}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {validation.warnings.length > 0 && (
                 <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
                   <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-medium text-sm mb-1"><AlertTriangle className="h-4 w-4" /> Warnings</div>
@@ -1333,6 +1367,9 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 </Button>
                 {!canImport && validation.missing.length === 0 && configs.length === 0 && (
                   <p className="text-xs text-muted-foreground mt-2">Add at least one configuration before import.</p>
+                )}
+                {isGlobal && !canImport && validation.errors.length > 0 && (
+                  <p className="text-xs text-destructive mt-2">Resolve the pre-flight checks above to enable the push.</p>
                 )}
               </div>
               {job.status === 'IMPORTED' && job.summary && (
