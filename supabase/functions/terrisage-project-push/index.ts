@@ -332,6 +332,7 @@ function synthesiseBuildings(
   configs: Array<{ data: Record<string, unknown> }>,
   propertyType: string,
   projectTotalUnits: number | null,
+  floorsSpec: { dominant: number | null; exceptions: Map<string, number> } = { dominant: null, exceptions: new Map() },
 ): {
   buildings: Array<Record<string, unknown>>;
   streetClusters: Array<Record<string, unknown>>;
