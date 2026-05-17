@@ -638,7 +638,9 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
 
   const finalImport = async () => {
     const confirmMsg = isGlobal
-      ? 'Push this project directly to Terrisage as an independent project?'
+      ? (isImported
+          ? 'Re-push this project to Terrisage as an upsert? Same sourceJobId will be reused, project fields will be updated in place, and project-level media (gallery, logo, floor plans) will be REPLACED with the current set. Continue?'
+          : 'Push this project directly to Terrisage as an independent project?')
       : 'Confirm final import to CRM?';
     if (!confirm(confirmMsg)) return;
     setImporting(true);
