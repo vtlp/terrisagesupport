@@ -550,9 +550,11 @@ Deno.serve(async (req) => {
   );
 
   const baseUrl = Deno.env.get('TERRISAGE_BASE_URL');
-  const apiKey = Deno.env.get('SEAT_SUPPORT_INTEGRATION_API_KEY');
+  // Spec: PROJECT_REQUEST_SUPPORT_INTEGRATION_API_KEY is preferred, falls back to SEAT_SUPPORT_INTEGRATION_API_KEY.
+  const apiKey = Deno.env.get('PROJECT_REQUEST_SUPPORT_INTEGRATION_API_KEY')
+    ?? Deno.env.get('SEAT_SUPPORT_INTEGRATION_API_KEY');
   if (!baseUrl || !apiKey) {
-    return json({ ok: false, error: 'TERRISAGE_NOT_CONFIGURED', detail: 'TERRISAGE_BASE_URL or SEAT_SUPPORT_INTEGRATION_API_KEY is not set' }, 500);
+    return json({ ok: false, error: 'TERRISAGE_NOT_CONFIGURED', detail: 'TERRISAGE_BASE_URL or integration API key is not set' }, 500);
   }
   const root = baseUrl.replace(/\/$/, '');
 
