@@ -114,6 +114,7 @@ const APARTMENT_FIELDS = [
   ['built_up_area', 'Built-up (sqft)'], ['balcony_area', 'Balcony area (sqft)'],
   ['common_area', 'Common area (sqft)'], ['utility_area', 'Utility area (sqft)'],
   ['wall_area', 'Wall area (sqft)'], ['balconies', 'Balconies'], ['bathrooms', 'Bathrooms'],
+  ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
   ['facing', 'Facing'], ['tower', 'Tower / Block'], ['floor_range', 'Floor range'],
   ['units_planned', 'Units planned'], ['unit_numbers', 'Unit numbers'],
   ['pricing_range', 'Pricing range'], ['floorplan_crop_file', 'Floor plan file'],
@@ -121,11 +122,13 @@ const APARTMENT_FIELDS = [
 const VILLA_FIELDS = [
   ['name', 'Configuration name'], ['bhk', 'BHK'], ['land_area', 'Land area'],
   ['built_up_area', 'Built-up (sqft)'], ['floors', 'Number of floors'], ['bathrooms', 'Bathrooms'],
+  ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
   ['facing', 'Facing'], ['units_planned', 'Units planned'], ['pricing_range', 'Pricing range'],
 ];
 const PLOT_FIELDS = [
   ['name', 'Plot family name'], ['plot_size_band', 'Size band'], ['plot_area', 'Plot area'],
   ['dimensions', 'Dimensions'], ['facing', 'Facing'], ['units_planned', 'Units planned'],
+  ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
   ['cluster', 'Cluster / Zone'], ['premium_marker', 'Premium marker'],
 ];
 
