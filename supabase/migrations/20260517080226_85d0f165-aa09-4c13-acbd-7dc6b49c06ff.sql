@@ -1,0 +1,1 @@
+ALTER TABLE public.terrisage_amenity_master ALTER COLUMN amenity_id TYPE text USING amenity_id::text;
