@@ -328,6 +328,26 @@ function parseFloorsSpec(v: unknown): { dominant: number | null; exceptions: Map
   return out;
 }
 
+// A configuration may reference multiple towers (apartment) or clusters (villa/plot).
+// Accept arrays or comma/slash/pipe/&/+ separated strings; trim + dedupe; preserve order.
+function splitMulti(v: unknown): string[] {
+  if (v == null) return [];
+  const raw = Array.isArray(v) ? v.map(x => String(x ?? '')) : [String(v)];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const s of raw) {
+    for (const part of s.split(/\s*(?:,|;|\/|\||&|\+| and )\s*/i)) {
+      const p = part.trim();
+      if (!p) continue;
+      const key = p.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
 function synthesiseBuildings(
   configs: Array<{ data: Record<string, unknown> }>,
   propertyType: string,
