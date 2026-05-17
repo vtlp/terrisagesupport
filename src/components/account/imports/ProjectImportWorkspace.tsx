@@ -573,9 +573,10 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   }, [project, media, configs, job.extracted_data, propertyType]);
 
   const isGlobal = !job.account_id;
+  const isImported = job.status === 'IMPORTED';
   const canImport = validation.missing.length === 0 && configs.length > 0 &&
     (!isGlobal || validation.errors.length === 0) &&
-    !['IMPORTED', 'IMPORTING'].includes(job.status as string);
+    job.status !== 'IMPORTING';
 
   // Reusable poller: queries Terrisage /api/integrations/projects/ingest-jobs?sourceJobId=<jobId>
   // until SUCCEEDED/FAILED or timeout. Updates the local import_jobs row accordingly.
