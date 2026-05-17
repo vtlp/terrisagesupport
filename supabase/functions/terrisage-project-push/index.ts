@@ -17,6 +17,25 @@ const corsHeaders = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
+// Terrisage standard error envelope per spec:
+//   { success: false, error: { message, code, statusCode } }
+// Extract code + message so toasts and import_activity show the real reason instead of just "HTTP 422".
+function parseTerrisageError(parsed: unknown, fallbackStatus: number): { code: string; message: string } {
+  const p = (parsed ?? {}) as Record<string, unknown>;
+  const err = (p.error ?? {}) as Record<string, unknown>;
+  const code = String(err.code ?? p.code ?? `HTTP_${fallbackStatus}`);
+  const message = String(err.message ?? p.message ?? p.raw ?? 'Unknown error');
+  return { code, message };
+}
+
+// Log every Terrisage call with method, path, status, latency, and (on failure) the parsed body.
+// These show up in the Edge Function Logs panel and make debugging push failures trivial.
+function logTerrisage(label: string, info: Record<string, unknown>) {
+  // eslint-disable-next-line no-console
+  console.log(`[terrisage] ${label}`, JSON.stringify(info));
+}
+
+
 // ---------- Enum maps (Support UI label → Terrisage enum) ----------
 // Confirmed by Terrisage 2026-05-16: only the values below are accepted; everything else falls back.
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
