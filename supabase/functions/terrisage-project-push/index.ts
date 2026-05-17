@@ -578,20 +578,27 @@ Deno.serve(async (req) => {
   const root = baseUrl.replace(/\/$/, '');
 
   // -------- POLL action --------
-  // Confirmed: poll by sourceJobId. projectId arrives in the poll JSON when status === 'SUCCEEDED'.
   if (action === 'poll') {
+    const url = `${root}/api/integrations/projects/ingest-jobs?sourceJobId=${encodeURIComponent(jobId)}`;
+    const t0 = Date.now();
     try {
-      const r = await fetch(`${root}/api/integrations/projects/ingest-jobs?sourceJobId=${encodeURIComponent(jobId)}`, {
-        method: 'GET',
-        headers: { 'X-API-Key': apiKey },
-      });
+      const r = await fetch(url, { method: 'GET', headers: { 'X-API-Key': apiKey } });
       const text = await r.text();
       let parsed: Record<string, unknown> = {};
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
-      if (!r.ok) return json({ ok: false, error: `HTTP ${r.status}`, detail: text.slice(0, 300) }, 502);
-      // Persist projectId on terminal SUCCEEDED.
+      const latency = Date.now() - t0;
+      logTerrisage('poll.response', { url, status: r.status, latency_ms: latency, body: parsed });
+      if (!r.ok) {
+        const { code, message } = parseTerrisageError(parsed, r.status);
+        console.error('[terrisage] poll.failed', { url, status: r.status, code, message, body: parsed });
+        return json({ ok: false, error: code, detail: message, httpStatus: r.status, response: parsed }, 502);
+      }
       const status = parsed.status as string | undefined;
       const projectId = (parsed.projectId as string) ?? null;
+      const failureCode = (parsed.failureCode as string) ?? null;
+      if (status === 'FAILED') {
+        console.error('[terrisage] poll.terminal_failed', { sourceJobId: jobId, failureCode, message: parsed.message, body: parsed });
+      }
       if (status === 'SUCCEEDED' && projectId) {
         const { data: jobRow } = await supabase.from('import_jobs').select('summary').eq('id', jobId).maybeSingle();
         await supabase.from('import_jobs').update({
@@ -600,6 +607,7 @@ Deno.serve(async (req) => {
       }
       return json({ ok: true, status, projectId, data: parsed });
     } catch (e) {
+      console.error('[terrisage] poll.exception', { url, error: (e as Error).message });
       return json({ ok: false, error: (e as Error).message }, 502);
     }
   }
