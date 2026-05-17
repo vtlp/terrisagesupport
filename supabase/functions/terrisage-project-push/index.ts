@@ -396,12 +396,18 @@ function synthesiseBuildings(
     }
     const allocated = distribute(names);
     names.forEach((name, i) => {
-      buildings.push({
+      // Per-tower floor count: use the exception if this building name matches one,
+      // else fall back to the project-level dominant value.
+      const floorKey = normaliseTowerKey(name);
+      const totalFloors = floorsSpec.exceptions.get(floorKey) ?? floorsSpec.dominant ?? null;
+      const b: Record<string, unknown> = {
         supportBuildingKey: buildingKeyByName.get(name)!,
         buildingName: name,
         totalUnits: allocated.get(name) ?? 1,
         sortOrder: i,
-      });
+      };
+      if (totalFloors != null) b.totalFloors = totalFloors;
+      buildings.push(b);
     });
   } else {
     const names: string[] = [];
