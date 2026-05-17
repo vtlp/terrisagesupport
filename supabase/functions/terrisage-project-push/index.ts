@@ -569,23 +569,28 @@ function buildConfiguration(
   })).filter(v => v.text);
 
   if (propertyType === 'APARTMENT') {
-    const towerName = strOrNull(d.tower);
+    // A config may reference multiple towers (e.g. "Tower A, Tower B" or ["A","B"]).
+    const towerNames = splitMulti(d.tower);
+    const buildingKeys = towerNames.map(n => buildingKeyByName.get(n) ?? slugify(n));
     cfg.apartmentConfiguration = {
-      projectTowerName: towerName,
+      projectTowerName: towerNames[0] ?? null,
+      projectTowerNames: towerNames,
       balconyCount: intOrNull(d.balconies),
       masterBedroomSizeSqft: strOrNull(d.master_bedroom_size),
       variations,
     };
     const range = parseFloorRange(d.floor_range);
     cfg.mapping = {
-      supportBuildingKey: towerName ? (buildingKeyByName.get(towerName) ?? slugify(towerName)) : null,
+      supportBuildingKey: buildingKeys[0] ?? null,
+      supportBuildingKeys: buildingKeys,
       floorFrom: range.from,
       floorTo: range.to,
       excludedFloors,
       availableFacings: facingArr,
     };
   } else if (propertyType === 'VILLA') {
-    const clusterName = strOrNull(d.cluster);
+    const clusterNames = splitMulti(d.cluster);
+    const clusterKeys = clusterNames.map(n => clusterKeyByName.get(n) ?? slugify(n));
     const dims = parseDims(d.dimensions ?? d.land_area);
     cfg.villaConfiguration = {
       configurationVillaFloorsPerUnit: intOrNull(d.floors_per_unit),
@@ -594,11 +599,13 @@ function buildConfiguration(
       masterBedroomSizeSqft: strOrNull(d.master_bedroom_size),
     };
     cfg.mapping = {
-      supportClusterKey: clusterName ? (clusterKeyByName.get(clusterName) ?? slugify(clusterName)) : null,
+      supportClusterKey: clusterKeys[0] ?? null,
+      supportClusterKeys: clusterKeys,
       availableFacings: facingArr,
     };
   } else if (propertyType === 'PLOT') {
-    const clusterName = strOrNull(d.cluster);
+    const clusterNames = splitMulti(d.cluster);
+    const clusterKeys = clusterNames.map(n => clusterKeyByName.get(n) ?? slugify(n));
     const dims = parseDims(d.dimensions);
     cfg.plotConfiguration = {
       configurationPlotUnitAreaSqft: numOrNull(d.plot_area),
@@ -607,7 +614,8 @@ function buildConfiguration(
       configurationPlotLength: dims.length,
     };
     cfg.mapping = {
-      supportClusterKey: clusterName ? (clusterKeyByName.get(clusterName) ?? slugify(clusterName)) : null,
+      supportClusterKey: clusterKeys[0] ?? null,
+      supportClusterKeys: clusterKeys,
       availableFacings: facingArr,
     };
   }
