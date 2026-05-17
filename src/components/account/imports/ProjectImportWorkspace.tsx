@@ -1368,6 +1368,36 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="space-y-1">
                 <Label>Amenities (comma separated)</Label>
                 <Textarea rows={2} value={amenities} onChange={e => setAmenities(e.target.value)} />
+                <p className="text-[11px] text-muted-foreground">
+                  {mappedAmenities.length} mapped · {unmappedAmenities.length} unmapped · {mappedAmenities.length + unmappedAmenities.length} total
+                </p>
+              </div>
+              {mappedAmenities.length > 0 && (
+                <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3">
+                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-medium text-sm mb-2">
+                    <CheckCircle2 className="h-4 w-4" /> Mapped amenities ({mappedAmenities.length})
+                  </div>
+                  <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mb-2">
+                    These will be sent to Terrisage with their resolved master IDs.
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {mappedAmenities.map(m => (
+                      <Badge
+                        key={m.input}
+                        variant="outline"
+                        className="border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                        title={m.input.toLowerCase() !== m.display_name.toLowerCase() ? `Input: ${m.input}` : undefined}
+                      >
+                        {m.display_name}
+                        {m.input.toLowerCase() !== m.display_name.toLowerCase() && (
+                          <span className="ml-1 opacity-60">← {m.input}</span>
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="hidden">
               </div>
               {unmappedAmenities.length > 0 && (
                 <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
