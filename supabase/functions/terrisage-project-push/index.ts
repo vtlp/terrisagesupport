@@ -481,7 +481,7 @@ function buildProjectMaster(pd: Record<string, unknown>, extracted: Record<strin
     project.apartmentDetail = {
       projectOpenSpacePercent: numOrNull(pd.open_space_pct),
       projectTotalTowers: Array.isArray(pd.tower_names_list) ? (pd.tower_names_list as unknown[]).length : null,
-      projectTotalFloorsPerTower: intOrNull(pd.floors_each_tower),
+      projectTotalFloorsPerTower: parseFloorsSpec(pd.floors_each_tower).dominant,
       projectUnitsPerFloor: null,
       projectUnitsPerLift: null,
     };
