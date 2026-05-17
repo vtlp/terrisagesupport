@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -58,6 +58,57 @@ export default function AdminData() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [load]);
+
+  // Resume polling Terrisage for any IMPORTING jobs whenever we land on the list,
+  // so rows self-heal to IMPORTED/FAILED even if the user navigated away mid-push.
+  const pollingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const candidates = jobs.filter(j => {
+      const s = (j.summary ?? {}) as { ingestJobId?: string };
+      return j.status === 'IMPORTING' && !!s.ingestJobId && !pollingRef.current.has(j.id);
+    });
+    candidates.forEach(j => {
+      pollingRef.current.add(j.id);
+      (async () => {
+        const start = Date.now();
+        const maxMs = 5 * 60 * 1000;
+        let interval = 5000;
+        try {
+          while (Date.now() - start < maxMs) {
+            await new Promise(r => setTimeout(r, interval));
+            if (Date.now() - start > 2 * 60 * 1000) interval = 15000;
+            const { data: poll } = await supabase.functions.invoke('terrisage-project-push', { body: { action: 'poll', jobId: j.id } });
+            const p = poll as { ok?: boolean; status?: string; data?: { projectId?: string; failureCode?: string; message?: string } } | null;
+            if (!p?.ok) continue;
+            if (p.status === 'SUCCEEDED') {
+              await supabase.from('import_jobs').update({ status: 'IMPORTED', imported_at: new Date().toISOString() }).eq('id', j.id);
+              await supabase.from('import_activity').insert([{
+                job_id: j.id, event: 'import_completed',
+                detail: { source: 'terrisage', projectId: p.data?.projectId ?? null, message: 'Terrisage accepted project' } as never,
+              }]);
+              toast.success(`${j.label ?? 'Project'}: Terrisage accepted`);
+              load();
+              return;
+            }
+            if (p.status === 'FAILED') {
+              const shortMsg = (p.data?.message ?? '').toString().split('\n')[0].slice(0, 200);
+              const code = p.data?.failureCode ?? 'FAILED';
+              await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', j.id);
+              await supabase.from('import_activity').insert([{
+                job_id: j.id, event: 'import_failed',
+                detail: { source: 'terrisage', code, message: shortMsg } as never,
+              }]);
+              toast.error(`${j.label ?? 'Project'}: ${code}${shortMsg ? ` - ${shortMsg}` : ''}`);
+              load();
+              return;
+            }
+          }
+        } finally {
+          pollingRef.current.delete(j.id);
+        }
+      })();
+    });
+  }, [jobs, load]);
 
   const selected = jobs.find(j => j.id === selectedId) ?? null;
 
