@@ -1,0 +1,1 @@
+DELETE FROM public.import_job_account_links WHERE id = 'f66544d0-4a7a-411b-b859-b07a972f1233';
