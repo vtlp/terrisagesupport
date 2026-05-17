@@ -653,7 +653,7 @@ Deno.serve(async (req) => {
           fetched_at: new Date().toISOString(),
         }));
         if (rows.length > 0) {
-          const { error: upsertErr } = await supabase.from('terrisage_amenity_master').upsert(rows as never, { onConflict: 'amenity_id' });
+          const { error: upsertErr } = await supabase.from('terrisage_amenity_master').upsert(rows as never, { onConflict: 'amenity_id,property_type' });
           if (upsertErr) {
             console.error('[terrisage] amenities.upsert_failed', { propertyType: pt, error: upsertErr.message });
             errors.push({ propertyType: pt, error: `upsert: ${upsertErr.message}` });
