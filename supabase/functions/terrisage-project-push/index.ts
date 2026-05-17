@@ -179,7 +179,12 @@ const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'
 // ---------- Coercion helpers ----------
 const numOrNull = (v: unknown): number | null => {
   if (v == null || v === '') return null;
-  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^\d.\-]/g, ''));
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  // Extract the FIRST numeric token only. Globally stripping non-digits
+  // concatenates separate numbers (e.g. "40 floors; 36 in Block A" -> 4036).
+  const m = String(v).match(/-?\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0]);
   return Number.isFinite(n) ? n : null;
 };
 const intOrNull = (v: unknown): number | null => {
