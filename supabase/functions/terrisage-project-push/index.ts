@@ -852,6 +852,22 @@ Deno.serve(async (req) => {
     pushedBy: user.id,
   };
 
+  // Dry-run: return the assembled payload without POSTing to Terrisage.
+  if (action === 'preview') {
+    return json({
+      ok: true,
+      payload,
+      warnings: { unmappedAmenities, amenityAutoRefresh: autoRefresh },
+      counts: {
+        buildings: buildings.length,
+        streetClusters: streetClusters.length,
+        configurations: configurations.length,
+        media: mediaPayload.length,
+        amenities: amenityPayload.length,
+      },
+    });
+  }
+
   // POST with retry on network/5xx/401 only (once). Every attempt is logged with status, latency,
   // and the parsed body so failures (and Terrisage's exact error code/message) are visible in Edge Function Logs.
   const url = `${root}/api/integrations/projects`;
