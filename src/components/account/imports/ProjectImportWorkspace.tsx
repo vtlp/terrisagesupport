@@ -1463,10 +1463,17 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 {validation.configsCount} configuration{validation.configsCount === 1 ? '' : 's'} · {media.length} media item{media.length === 1 ? '' : 's'}
               </div>
               <div className="border-t pt-3">
-                <Button onClick={finalImport} disabled={!canImport || importing}>
+                <Button onClick={finalImport} disabled={!canImport || importing} variant={isImported ? 'outline' : 'default'}>
                   {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {isGlobal ? 'Push to Terrisage' : 'Confirm and import to CRM'}
+                  {isGlobal
+                    ? (isImported ? 'Re-push to Terrisage (upsert)' : 'Push to Terrisage')
+                    : 'Confirm and import to CRM'}
                 </Button>
+                {isGlobal && isImported && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Re-uses the same sourceJobId. Project fields upsert in place; project-level media is replaced with the current set. Signed URLs and pushedAt are refreshed automatically.
+                  </p>
+                )}
                 {!canImport && validation.missing.length === 0 && configs.length === 0 && (
                   <p className="text-xs text-muted-foreground mt-2">Add at least one configuration before import.</p>
                 )}
