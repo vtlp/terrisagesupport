@@ -128,7 +128,6 @@ const VILLA_FIELDS = [
 const PLOT_FIELDS = [
   ['name', 'Plot family name'], ['plot_size_band', 'Size band'], ['plot_area', 'Plot area'],
   ['dimensions', 'Dimensions'], ['facing', 'Facing'], ['units_planned', 'Units planned'],
-  ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
   ['cluster', 'Cluster / Zone'], ['premium_marker', 'Premium marker'],
 ];
 
