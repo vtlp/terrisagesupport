@@ -9,12 +9,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProjectImportWorkspace } from '@/components/account/imports/ProjectImportWorkspace';
 import {
   ImportJob, STATUS_LABEL, STATUS_TONE, ImportStatus, PropertyType, PROPERTY_TYPE_LABEL,
 } from '@/components/account/imports/shared';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 function formatDate(s: string | null) {
   if (!s) return '—';
@@ -28,7 +32,7 @@ function projectNameFor(j: ImportJob): string {
 }
 
 export default function AdminData() {
-  const { currentUser } = useUser();
+  const { currentUser, isAdmin } = useUser();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -36,6 +40,8 @@ export default function AdminData() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newType, setNewType] = useState<PropertyType>('APARTMENT');
+  const [deleteJob, setDeleteJob] = useState<ImportJob | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,6 +144,27 @@ export default function AdminData() {
     if (data) setJobs(j => j.map(x => x.id === data.id ? data as ImportJob : x));
   };
 
+  const confirmDelete = async () => {
+    if (!deleteJob) return;
+    setDeleting(true);
+    const jobId = deleteJob.id;
+    await Promise.all([
+      supabase.from('import_activity').delete().eq('job_id', jobId),
+      supabase.from('import_files').delete().eq('job_id', jobId),
+      supabase.from('import_project_configs').delete().eq('job_id', jobId),
+      supabase.from('import_project_media').delete().eq('job_id', jobId),
+      supabase.from('import_record_rows').delete().eq('job_id', jobId),
+      supabase.from('import_job_account_links').delete().eq('job_id', jobId),
+    ]);
+    const { error } = await supabase.from('import_jobs').delete().eq('id', jobId);
+    setDeleting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Import deleted');
+    setJobs(j => j.filter(x => x.id !== jobId));
+    if (selectedId === jobId) setSelectedId(null);
+    setDeleteJob(null);
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-4">
       <div>
@@ -231,6 +258,17 @@ export default function AdminData() {
                             <Badge className={`text-[10px] ${STATUS_TONE[j.status as ImportStatus]}`}>
                               {STATUS_LABEL[j.status as ImportStatus]}
                             </Badge>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => { e.stopPropagation(); setDeleteJob(j); }}
+                                title="Delete import"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       );
@@ -242,6 +280,27 @@ export default function AdminData() {
           )}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!deleteJob} onOpenChange={(o) => !o && setDeleteJob(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this import?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the import job "{deleteJob ? projectNameFor(deleteJob) : ''}" along with its uploaded files, extracted configs, media, and activity log. The project already pushed to Terrisage (if any) is not affected. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
