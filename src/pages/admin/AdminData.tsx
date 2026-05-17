@@ -280,6 +280,27 @@ export default function AdminData() {
           )}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!deleteJob} onOpenChange={(o) => !o && setDeleteJob(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this import?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the import job "{deleteJob ? projectNameFor(deleteJob) : ''}" along with its uploaded files, extracted configs, media, and activity log. The project already pushed to Terrisage (if any) is not affected. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
