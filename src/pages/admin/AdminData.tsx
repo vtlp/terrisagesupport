@@ -258,6 +258,17 @@ export default function AdminData() {
                             <Badge className={`text-[10px] ${STATUS_TONE[j.status as ImportStatus]}`}>
                               {STATUS_LABEL[j.status as ImportStatus]}
                             </Badge>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => { e.stopPropagation(); setDeleteJob(j); }}
+                                title="Delete import"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       );
