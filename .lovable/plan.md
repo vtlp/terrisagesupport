@@ -1,71 +1,36 @@
-## Goal
+## Problem
 
-Align our project push to match the confirmed Terrisage spec answers. All changes are server-side in `supabase/functions/terrisage-project-push/index.ts` plus one schema column + a minimal UI surface for the amenity master cache. No new tables besides a cache of the amenity master.
+The push function already accepts multiple towers/clusters per configuration (comma/slash/&/+/"and"-separated, or arrays), but the **UI still forces a single choice**. In `ProjectImportWorkspace.tsx` the `tower` field is rendered as a Radix `Select` (one value), and the `cluster` field is just a plain text `Input`. That's why you can't pick A–K for one config in Home Boja.
 
-## Changes (grouped)
+## Fix
 
-### 1. Enums — replace existing maps with spec-exact values
-- **projectStatus** → only `UNDER_CONSTRUCTION` | `PHASE_1_COMPLETED` | `COMPLETED_WITH_OC`. Map `COMPLETED`/`READY_TO_MOVE` → `COMPLETED_WITH_OC`; `PRE_LAUNCH`/`LAUNCHED` → `UNDER_CONSTRUCTION`; unknown → `null`.
-- **projectCommunityType** → only `GATED` | `OPEN`. Map `STANDALONE` → `OPEN`; everything else → `GATED`; unknown → `null`.
-- **projectWaterSourceList[]** → `BORE_WELL` | `MUNICIPAL` | `TANKER` | `LAKE` | `OTHER`. BWSSB/water-board/corporation → `MUNICIPAL`. Drop `RAINWATER_HARVESTING` from water sources.
-- **utilities[]** → push as `{ utilityType, details? }` (not bare strings). Valid types: `ELECTRICITY`, `WATER`, `GAS`, `SEWAGE`, `STP`, `INTERCOM_SECURITY`, `RAIN_WATER_HARVESTING`, `STORM_WATER_DRAINS`. `SOLAR`/`Solar panels` → `{ utilityType: 'ELECTRICITY', details: 'Solar panels' }`. `POWER_BACKUP` → `{ ELECTRICITY, 'Power backup' }`. Drop unmappable.
-- **media.kind** → `LOGO` | `PHOTO` | `VIDEO` | `FLOORPLAN` | `TOUR_3D` | `OTHER`. Map `GALLERY`/`MASTER_PLAN` → `PHOTO`; `BROCHURE`/`DOCUMENT` → `OTHER` with `meta.mime: 'application/pdf'`. `FLOORPLAN` carries `configRef`.
+Replace those single-pick controls with multi-selects bound to the project's tower / cluster name list.
 
-### 2. Amenities — object shape + master fetch
-- New table `terrisage_amenity_master(amenity_id uuid pk, code text, display_name text, category text, property_type text, fetched_at timestamptz)`.
-- New action in push function: `action: 'refresh-amenities'` → calls `GET /api/integrations/amenities?propertyType=…` for `APARTMENT|VILLA|PLOT`, upserts the cache.
-- On push, look up each free-text amenity by normalised `displayName`/`code` against the cache (filtered by job's `property_type`). Build payload as `[{ amenityId, boolValue: true }]`. Unmapped amenities go into `push_warnings` on `import_jobs.summary` (don't fail the push).
-- Admin Data page: small "Refresh Terrisage amenity master" button calling the new action. Show last-refreshed timestamp.
+### 1. Tower field (Apartment) — `ProjectImportWorkspace.tsx` ~lines 1185-1203
 
-### 3. Buildings / clusters synthesis (Blocker)
-- Today we send `buildings: []` / `streetClusters: []`. Spec rejects empty when mappings reference tower/cluster keys.
-- Derive unique tower names from `configurations[].data.towerName` (and cluster names from `clusterName` for VILLA/PLOT).
-- Synthesise:
-  - `buildings: [{ supportBuildingKey: slug(name), buildingName: name, sortOrder }]` for APARTMENT.
-  - `streetClusters: [{ supportClusterKey: slug(name), clusterName: name, sortOrder }]` for VILLA/PLOT.
-- Rewrite each config's `mapping.supportBuildingKey` / `supportClusterKey` to match the slug.
-- `mapping.excludedFloors: string[]` passes through.
+Swap the `Select` for the existing `MultiSelect` (`src/components/shared/MultiSelect.tsx`), populated from `project.tower_names_list`.
 
-### 4. Proximity, banks, facings
-- Proximity: drop `category`; combine into `label` (`"School: DPS East"`). `distance` stringified with unit (`"2.1 km"`), `time` string (`"15 min"` or null), `sortOrder` int.
-- Approved banks: free-text array (already correct, just confirm).
-- Facings: free text array on `mapping.availableFacings` (already free text).
+- Read: parse `data.tower` with the same splitter used by validation (`splitTowers`) into `string[]`.
+- Write: join the chosen array back with `", "` and store on `data.tower` (keeps the stored shape unchanged, so the push function, validation, and the "Towers / Blocks" linkage card all keep working without further changes).
+- Fallback: if `tower_names_list` is empty, keep the free-text `Input` so users can still type names before they've filled Overview.
 
-### 5. Configurations
-- Make `configUnitPriceBaseValue` / `configurationUnitPricePerSqft` nullable in payload (no synthetic 0s). Free-text bands go into `configurationUnitDescription`.
-- `masterBedroomSizeSqft` accepted as string.
-- `variations[]` shape: `[{ text, sortOrder }]`.
+### 2. Cluster field (Villa / Plot) — same file, default field branch
 
-### 6. Async ingest contract
-- Poll by `sourceJobId`: change poll to `GET …/ingest-jobs?sourceJobId={jobId}` instead of using stored `ingestJobId`. Keep `ingestJobId` for logging.
-- Terminal: `SUCCEEDED` | `FAILED`. Running: `PENDING` | `RUNNING`. On `SUCCEEDED`, persist `summary.terrisage_project_id` from poll response.
-- UI poll cadence: 10s for first 2 min, then 30s, up to ~15 min then surface "still processing".
+Add a dedicated branch for `k === 'cluster'` mirroring the tower branch, bound to `project.cluster_names`. Same read/write convention (comma-joined string).
 
-### 7. Internal notes
-- Keep current JSON-stringified representative blob in `internalNotes`. Append office/email there. Move phone to `projectContactPhoneNo`.
+### 3. Validation & linkage card
 
-### 8. Agency access endpoint
-- Keep current `POST …/projects/{terrisageProjectId}/agency-access` placeholder but flag as `TODO: confirm path` in code comment (spec answer didn't include this endpoint — Terrisage said agency visibility is out-of-scope for this contract; it's `ChannelPartnerProject` in CRM app, no bulk API). Leave UI hidden if endpoint returns 404, with a clearer error.
+No changes needed. `splitTowers` already handles comma-separated lists, and the "Towers / Blocks" card at line ~1126 matches by substring, so a config with `"A, B, C"` will show up under each of A, B, and C automatically.
 
-## Files to touch
+### 4. Backend / push
 
-- `supabase/functions/terrisage-project-push/index.ts` — all enum maps, builders, payload assembly, poll-by-sourceJobId, amenity lookup, building/cluster synthesis, action `refresh-amenities`.
-- `supabase/migrations/...` — create `terrisage_amenity_master` table + RLS (staff read; service role write).
-- `src/pages/admin/AdminData.tsx` (or AdminIntegrations) — add "Refresh amenity master" button + last-refreshed display.
-- `src/components/account/imports/ProjectImportWorkspace.tsx` — surface `push_warnings` (unmapped amenities) after a push.
-- `docs/terrisage-mapping-questions.md` — mark all answered.
+No changes. `terrisage-project-push/index.ts` already calls `splitMulti(d.tower)` / `splitMulti(d.cluster)` and emits `supportBuildingKeys[]` / `supportClusterKeys[]`.
 
 ## Out of scope
 
-- Multi-builder co-ownership (Terrisage v1 picks one primary).
-- Agency-share bulk API (not in contract).
-- Auto-creating amenity master entries when missing — log only.
+- Changing the stored shape to a real array (would ripple through extraction worker, auto-map, CSV parsing, and existing jobs). Comma-joined string is the least invasive change and the push function already normalises both.
+- Multi-tower floor-range overrides (one range per tower). Today a config's `floor_range` applies to all its mapped towers; revisit only if Terrisage rejects that.
 
-## Validation plan
+## Files to touch
 
-1. Deploy edge function; call `refresh-amenities`; verify cache populated.
-2. Push a sample APARTMENT job with multi-tower configs; assert `buildings[]` synthesised and `mapping.supportBuildingKey` matches.
-3. Push with mixed-case amenities; assert mapped ones come back with UUIDs, unmapped land in `push_warnings`.
-4. Poll by `sourceJobId`; assert `projectId` appears once status reaches `SUCCEEDED`.
-
-Approve to proceed and I'll execute in this order: schema → edge function → admin refresh UI → push UX for warnings → doc update.
+- `src/components/account/imports/ProjectImportWorkspace.tsx` — tower branch + new cluster branch in the config field renderer.

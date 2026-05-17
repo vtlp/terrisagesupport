@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/shared/MultiSelect';
 import {
   Loader2, Save, Sparkles, PlayCircle, AlertTriangle, CheckCircle2, XCircle, Plus, Trash2, Upload, X,
   Image as ImageIcon, FileText,
@@ -1182,22 +1183,34 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                     </div>
                     <div className="grid gap-2 md:grid-cols-3">
                       {fieldsFor(propertyType).map(([k, l]) => {
-                        if (k === 'tower' && propertyType === 'APARTMENT') {
-                          const towerOpts = (project.tower_names_list || []).filter(Boolean);
-                          const cur = data[k] != null ? String(data[k]) : '';
+                        // Tower (Apartment) and Cluster (Villa/Plot) both support multi-select
+                        // bound to the project's name list. Stored as a comma-joined string so the
+                        // existing validator, linkage card, and Terrisage push (which already calls
+                        // splitMulti) all keep working without further changes.
+                        if ((k === 'tower' && propertyType === 'APARTMENT') || (k === 'cluster' && (propertyType === 'VILLA' || propertyType === 'PLOT'))) {
+                          const nameOpts = (k === 'tower'
+                            ? (project.tower_names_list || [])
+                            : (project.cluster_names || [])
+                          ).filter(Boolean);
+                          const raw = data[k] != null ? String(data[k]) : '';
+                          const selected = raw
+                            .split(/\s*(?:,|;|\/|\||&|\+| and )\s*/i)
+                            .map(s => s.trim())
+                            .filter(Boolean);
+                          const placeholder = k === 'tower' ? 'Select tower(s)' : 'Select cluster(s)';
                           return (
                             <div key={k} className="space-y-1">
                               <Label className="text-xs">{l}</Label>
-                              {towerOpts.length > 0 ? (
-                                <Select value={cur || '__none__'} onValueChange={v => updateConfig(c.id, { [k]: v === '__none__' ? '' : v })}>
-                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select tower" /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__none__">—</SelectItem>
-                                    {towerOpts.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
+                              {nameOpts.length > 0 ? (
+                                <MultiSelect
+                                  className="text-xs"
+                                  placeholder={placeholder}
+                                  options={nameOpts.map(t => ({ value: t, label: t }))}
+                                  selected={selected.filter(s => nameOpts.some(o => o.toLowerCase() === s.toLowerCase()))}
+                                  onChange={vals => updateConfig(c.id, { [k]: vals.join(', ') })}
+                                />
                               ) : (
-                                <Input className="h-8 text-sm" value={cur} onChange={e => updateConfig(c.id, { [k]: e.target.value })} />
+                                <Input className="h-8 text-sm" value={raw} onChange={e => updateConfig(c.id, { [k]: e.target.value })} />
                               )}
                             </div>
                           );
