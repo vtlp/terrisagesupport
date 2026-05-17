@@ -661,32 +661,8 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         const ingestId = res.ingestJobId;
         toast.success(`Submitted to Terrisage${ingestId ? ` (ingest ${ingestId.slice(0, 8)})` : ''}. Waiting for confirmation…`);
 
-        // Poll until terminal (max ~5 min)
-        const start = Date.now();
-        const maxMs = 5 * 60 * 1000;
-        let interval = 5000;
-        while (Date.now() - start < maxMs) {
-          await new Promise(r => setTimeout(r, interval));
-          if (Date.now() - start > 2 * 60 * 1000) interval = 15000;
-          try {
-            const { data: poll } = await supabase.functions.invoke('terrisage-project-push', { body: { action: 'poll', jobId: job.id } });
-            const p = poll as { ok?: boolean; status?: string; data?: { projectId?: string; failureCode?: string; message?: string; media?: { succeeded?: number; total?: number } } } | null;
-            if (!p?.ok) continue;
-            if (p.status === 'SUCCEEDED') {
-              await supabase.from('import_jobs').update({
-                status: 'IMPORTED', imported_at: new Date().toISOString(),
-              }).eq('id', job.id);
-              toast.success(`Terrisage accepted project${p.data?.projectId ? ` (id: ${p.data.projectId.slice(0, 8)})` : ''}`);
-              return;
-            }
-            if (p.status === 'FAILED') {
-              const msg = `${p.data?.failureCode ?? 'FAILED'}: ${p.data?.message ?? ''}`;
-              await supabase.from('import_jobs').update({ status: 'FAILED' }).eq('id', job.id);
-              throw new Error(msg);
-            }
-          } catch { /* keep polling */ }
-        }
-        toast.message('Terrisage push still processing - check Activity tab later.');
+        // Poll until terminal via shared helper (also writes concise activity log).
+        await pollUpstreamUntilTerminal({ silent: false });
       } else {
         const fullProject = {
           ...project,
