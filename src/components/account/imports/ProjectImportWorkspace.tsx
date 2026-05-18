@@ -76,6 +76,7 @@ const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed (w
 
 const WATER_SOURCE_OPTIONS = ['Borewell', 'Municipal', 'Tanker', 'Lake', 'Other'];
 const UTILITY_OPTIONS = ['Electricity', 'Water', 'Gas', 'Sewage', 'STP', 'Intercom', 'Rainwater harvesting', 'Storm water drains'];
+const INTERNAL_ROAD_OPTIONS = ['20 ft', '30 ft', '40 ft', '60 ft', 'Other'];
 
 // Parse "4.5", "4 acres 11 guntas", or numeric to {acres, guntas}
 function parseAcresGuntas(siteArea: unknown): { acres: number; guntas: number } {
