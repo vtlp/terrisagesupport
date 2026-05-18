@@ -1078,11 +1078,24 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                         <Plus className="h-3 w-3 mr-1" />Add
                       </Button>
                     </div>
-                    <div className="grid gap-2 md:grid-cols-3">
+                    <div className="grid gap-2 md:grid-cols-2">
                       {(project.cluster_names || []).map((t, i) => (
-                        <div key={i} className="flex gap-1">
-                          <Input className="h-8 text-sm" value={t} onChange={e => setProject(p => ({ ...p, cluster_names: (p.cluster_names || []).map((x, j) => j === i ? e.target.value : x) }))} />
-                          <Button size="sm" variant="ghost" onClick={() => setProject(p => ({ ...p, cluster_names: (p.cluster_names || []).filter((_, j) => j !== i) }))}>
+                        <div key={i} className="flex gap-1 items-center">
+                          <Input className="h-8 text-sm flex-1" placeholder="Cluster / street name" value={t}
+                            onChange={e => setProject(p => ({ ...p, cluster_names: (p.cluster_names || []).map((x, j) => j === i ? e.target.value : x) }))} />
+                          <Input className="h-8 text-sm w-24" type="number" min={0} placeholder="Units"
+                            value={(project.cluster_units_list?.[i] ?? '') as string | number}
+                            onChange={e => setProject(p => {
+                              const arr = [...(p.cluster_units_list || [])];
+                              while (arr.length <= i) arr.push('');
+                              arr[i] = e.target.value;
+                              return { ...p, cluster_units_list: arr };
+                            })} />
+                          <Button size="sm" variant="ghost" onClick={() => setProject(p => ({
+                            ...p,
+                            cluster_names: (p.cluster_names || []).filter((_, j) => j !== i),
+                            cluster_units_list: (p.cluster_units_list || []).filter((_, j) => j !== i),
+                          }))}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
                         </div>
