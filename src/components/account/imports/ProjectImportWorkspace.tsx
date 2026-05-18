@@ -19,6 +19,7 @@ import {
   ImportConfig, ImportMedia, MediaCategory, MediaReview, logActivity,
 } from './shared';
 import { SourceFiles } from './SourceFiles';
+import { FilePreviewDialog } from '@/components/shared/FilePreviewDialog';
 import { ActivityLog } from './ActivityLog';
 import { LinkedAccountsCard } from './LinkedAccountsCard';
 import { OwnerAccountCard } from './OwnerAccountCard';
@@ -178,6 +179,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [configs, setConfigs] = useState<ImportConfig[]>([]);
   const [media, setMedia] = useState<ImportMedia[]>([]);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const [previewMedia, setPreviewMedia] = useState<ImportMedia | null>(null);
   const [amenityMaster, setAmenityMaster] = useState<Array<{ display_name: string; code: string | null; property_type: string }>>([]);
 
   useEffect(() => {
@@ -1330,13 +1332,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                                         <Trash2 className="h-3 w-3" />
                                       </button>
                                     </div>
-                                    <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center">
+                                    <button type="button" onClick={() => setPreviewMedia(m)}
+                                      title="Click to preview"
+                                      className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center w-full hover:ring-2 hover:ring-primary/40 transition">
                                       {url ? (
                                         <img src={url} alt={m.caption ?? 'floor plan'} className="w-full h-full object-contain" loading="lazy" />
                                       ) : (
                                         <ImageIcon className="h-6 w-6 text-muted-foreground" />
                                       )}
-                                    </div>
+                                    </button>
                                     <Input className="h-7 text-xs" placeholder="Caption" value={m.caption ?? ''}
                                       onChange={e => updateMedia(m.id, { caption: e.target.value })} />
                                   </div>
@@ -1384,13 +1388,17 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                     return (
                       <div key={m.id} className="rounded-md border p-3 space-y-2">
                         <div className="relative aspect-video bg-muted rounded overflow-hidden flex items-center justify-center text-muted-foreground group">
-                          {isImg && url ? (
-                            <img src={url} alt={m.caption ?? 'media'} className="w-full h-full object-contain" loading="lazy" />
-                          ) : isImg ? (
-                            <ImageIcon className="h-8 w-8" />
-                          ) : (
-                            <FileText className="h-8 w-8" />
-                          )}
+                          <button type="button" onClick={() => setPreviewMedia(m)}
+                            title="Click to preview"
+                            className="absolute inset-0 flex items-center justify-center hover:ring-2 hover:ring-primary/40 transition">
+                            {isImg && url ? (
+                              <img src={url} alt={m.caption ?? 'media'} className="w-full h-full object-contain" loading="lazy" />
+                            ) : isImg ? (
+                              <ImageIcon className="h-8 w-8" />
+                            ) : (
+                              <FileText className="h-8 w-8" />
+                            )}
+                          </button>
                           <button type="button" onClick={() => removeMedia(m.id)}
                             title="Delete"
                             className="absolute top-1 right-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-destructive hover:text-destructive-foreground transition-colors">
@@ -1625,6 +1633,14 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           <Card><CardContent className="pt-4"><ActivityLog jobId={job.id} /></CardContent></Card>
         </TabsContent>
       </Tabs>
+      <FilePreviewDialog
+        open={!!previewMedia}
+        onOpenChange={v => { if (!v) setPreviewMedia(null); }}
+        bucket="import-files"
+        path={previewMedia?.storage_path ?? null}
+        name={previewMedia?.caption ?? previewMedia?.storage_path?.split('/').pop() ?? 'Media'}
+        mime={(previewMedia as unknown as { mime_type?: string | null })?.mime_type ?? null}
+      />
     </div>
   );
 }
