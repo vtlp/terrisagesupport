@@ -179,6 +179,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [configs, setConfigs] = useState<ImportConfig[]>([]);
   const [media, setMedia] = useState<ImportMedia[]>([]);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const [previewMedia, setPreviewMedia] = useState<ImportMedia | null>(null);
   const [amenityMaster, setAmenityMaster] = useState<Array<{ display_name: string; code: string | null; property_type: string }>>([]);
 
   useEffect(() => {
