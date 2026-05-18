@@ -19,6 +19,7 @@ import {
   ImportConfig, ImportMedia, MediaCategory, MediaReview, logActivity,
 } from './shared';
 import { SourceFiles } from './SourceFiles';
+import { FilePreviewDialog } from '@/components/shared/FilePreviewDialog';
 import { ActivityLog } from './ActivityLog';
 import { LinkedAccountsCard } from './LinkedAccountsCard';
 import { OwnerAccountCard } from './OwnerAccountCard';
