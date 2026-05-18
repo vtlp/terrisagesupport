@@ -1388,13 +1388,17 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                     return (
                       <div key={m.id} className="rounded-md border p-3 space-y-2">
                         <div className="relative aspect-video bg-muted rounded overflow-hidden flex items-center justify-center text-muted-foreground group">
-                          {isImg && url ? (
-                            <img src={url} alt={m.caption ?? 'media'} className="w-full h-full object-contain" loading="lazy" />
-                          ) : isImg ? (
-                            <ImageIcon className="h-8 w-8" />
-                          ) : (
-                            <FileText className="h-8 w-8" />
-                          )}
+                          <button type="button" onClick={() => setPreviewMedia(m)}
+                            title="Click to preview"
+                            className="absolute inset-0 flex items-center justify-center hover:ring-2 hover:ring-primary/40 transition">
+                            {isImg && url ? (
+                              <img src={url} alt={m.caption ?? 'media'} className="w-full h-full object-contain" loading="lazy" />
+                            ) : isImg ? (
+                              <ImageIcon className="h-8 w-8" />
+                            ) : (
+                              <FileText className="h-8 w-8" />
+                            )}
+                          </button>
                           <button type="button" onClick={() => removeMedia(m.id)}
                             title="Delete"
                             className="absolute top-1 right-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-destructive hover:text-destructive-foreground transition-colors">
