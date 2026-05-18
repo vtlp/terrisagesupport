@@ -1639,7 +1639,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         bucket="import-files"
         path={previewMedia?.storage_path ?? null}
         name={previewMedia?.caption ?? previewMedia?.storage_path?.split('/').pop() ?? 'Media'}
-        mime={previewMedia?.mime_type ?? null}
+        mime={(previewMedia as unknown as { mime_type?: string | null })?.mime_type ?? null}
       />
     </div>
   );
