@@ -1396,6 +1396,13 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                             className="absolute top-1 right-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-destructive hover:text-destructive-foreground transition-colors">
                             <X className="h-3.5 w-3.5" />
                           </button>
+                          {url && (
+                            <a href={url} download={m.caption || 'media'} target="_blank" rel="noreferrer"
+                              title="Download"
+                              className="absolute bottom-1 right-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-primary hover:text-primary-foreground transition-colors">
+                              <Download className="h-3.5 w-3.5" />
+                            </a>
+                          )}
                           <label
                             title={m.storage_path || m.external_url ? 'Replace file' : 'Upload file'}
                             className="absolute top-1 left-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-primary hover:text-primary-foreground cursor-pointer transition-colors">
