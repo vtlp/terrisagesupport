@@ -1153,6 +1153,29 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                   </div>
                 </div>
                 <div className="space-y-1">
+                  <Label>Internal road widths</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {INTERNAL_ROAD_OPTIONS.map(opt => {
+                      const active = (project.internal_road_widths || []).includes(opt);
+                      return (
+                        <button key={opt} type="button"
+                          onClick={() => setProject(p => {
+                            const cur = p.internal_road_widths || [];
+                            return { ...p, internal_road_widths: active ? cur.filter(x => x !== opt) : [...cur, opt] };
+                          })}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'}`}>
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(project.internal_road_widths || []).includes('Other') && (
+                    <Input className="h-8 text-sm mt-1" placeholder="Specify other width"
+                      value={project.internal_road_widths_other ?? ''}
+                      onChange={e => setProject(p => ({ ...p, internal_road_widths_other: e.target.value }))} />
+                  )}
+                </div>
+                <div className="space-y-1">
                   <Label>Key features (comma separated)</Label>
                   <Input value={(project.key_features || []).join(', ')}
                     onChange={e => setProject(p => ({ ...p, key_features: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} />
