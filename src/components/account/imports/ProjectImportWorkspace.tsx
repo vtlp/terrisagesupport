@@ -46,11 +46,16 @@ type ProjectExtract = {
   location?: string;
   // Apartment
   tower_names_list?: string[]; floors_each_tower?: string;
+  tower_units_list?: Array<number | string>;
   // Villa / Plot
   clusters_count?: number | string; cluster_names?: string[];
+  cluster_units_list?: Array<number | string>;
   // Villa
   floors_per_unit?: string;
   contact_phone?: string; contact_email?: string; office_address?: string;
+  // Internal road widths (chip multi-select, with optional free-text Other)
+  internal_road_widths?: string[];
+  internal_road_widths_other?: string;
   // Deprecated/hidden — auto-folded into overview where present
   possession_date?: string; project_type?: string;
   towers_count?: number | string; tower_names?: string;
