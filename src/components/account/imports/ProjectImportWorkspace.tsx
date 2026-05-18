@@ -1332,13 +1332,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                                         <Trash2 className="h-3 w-3" />
                                       </button>
                                     </div>
-                                    <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center">
+                                    <button type="button" onClick={() => setPreviewMedia(m)}
+                                      title="Click to preview"
+                                      className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center w-full hover:ring-2 hover:ring-primary/40 transition">
                                       {url ? (
                                         <img src={url} alt={m.caption ?? 'floor plan'} className="w-full h-full object-contain" loading="lazy" />
                                       ) : (
                                         <ImageIcon className="h-6 w-6 text-muted-foreground" />
                                       )}
-                                    </div>
+                                    </button>
                                     <Input className="h-7 text-xs" placeholder="Caption" value={m.caption ?? ''}
                                       onChange={e => updateMedia(m.id, { caption: e.target.value })} />
                                   </div>
