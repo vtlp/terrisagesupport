@@ -1317,10 +1317,19 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                                 const url = mediaUrls[m.id] || m.external_url || '';
                                 return (
                                   <div key={m.id} className="rounded border p-1.5 space-y-1 relative">
-                                    <button type="button" onClick={() => removeMedia(m.id)}
-                                      className="absolute top-1 right-1 z-10 rounded-full bg-background/90 border p-0.5 hover:bg-destructive hover:text-destructive-foreground">
-                                      <Trash2 className="h-3 w-3" />
-                                    </button>
+                                    <div className="absolute top-1 right-1 z-10 flex gap-1">
+                                      {url && (
+                                        <a href={url} download={m.caption || 'floor-plan'} target="_blank" rel="noreferrer"
+                                          title="Download"
+                                          className="rounded-full bg-background/90 border p-0.5 hover:bg-primary hover:text-primary-foreground">
+                                          <Download className="h-3 w-3" />
+                                        </a>
+                                      )}
+                                      <button type="button" onClick={() => removeMedia(m.id)}
+                                        className="rounded-full bg-background/90 border p-0.5 hover:bg-destructive hover:text-destructive-foreground">
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
                                     <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center">
                                       {url ? (
                                         <img src={url} alt={m.caption ?? 'floor plan'} className="w-full h-full object-contain" loading="lazy" />
