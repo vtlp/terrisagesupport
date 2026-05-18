@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect } from '@/components/shared/MultiSelect';
 import {
-  Loader2, Save, Sparkles, PlayCircle, AlertTriangle, CheckCircle2, XCircle, Plus, Trash2, Upload, X,
+  Loader2, Save, Sparkles, PlayCircle, AlertTriangle, CheckCircle2, XCircle, Plus, Trash2, Upload, X, Download,
   Image as ImageIcon, FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -46,11 +46,16 @@ type ProjectExtract = {
   location?: string;
   // Apartment
   tower_names_list?: string[]; floors_each_tower?: string;
+  tower_units_list?: Array<number | string>;
   // Villa / Plot
   clusters_count?: number | string; cluster_names?: string[];
+  cluster_units_list?: Array<number | string>;
   // Villa
   floors_per_unit?: string;
   contact_phone?: string; contact_email?: string; office_address?: string;
+  // Internal road widths (chip multi-select, with optional free-text Other)
+  internal_road_widths?: string[];
+  internal_road_widths_other?: string;
   // Deprecated/hidden — auto-folded into overview where present
   possession_date?: string; project_type?: string;
   towers_count?: number | string; tower_names?: string;
@@ -71,6 +76,7 @@ const STATUS_OPTIONS = ['Under Construction', 'Phase 1 completed', 'Completed (w
 
 const WATER_SOURCE_OPTIONS = ['Borewell', 'Municipal', 'Tanker', 'Lake', 'Other'];
 const UTILITY_OPTIONS = ['Electricity', 'Water', 'Gas', 'Sewage', 'STP', 'Intercom', 'Rainwater harvesting', 'Storm water drains'];
+const INTERNAL_ROAD_OPTIONS = ['20 ft', '30 ft', '40 ft', '60 ft', 'Other'];
 
 // Parse "4.5", "4 acres 11 guntas", or numeric to {acres, guntas}
 function parseAcresGuntas(siteArea: unknown): { acres: number; guntas: number } {
@@ -112,23 +118,30 @@ const APARTMENT_FIELDS = [
   ['type_no', 'Type no.'], ['name', 'Configuration name'], ['bhk', 'BHK'],
   ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
   ['built_up_area', 'Built-up (sqft)'], ['balcony_area', 'Balcony area (sqft)'],
-  ['common_area', 'Common area (sqft)'], ['utility_area', 'Utility area (sqft)'],
   ['wall_area', 'Wall area (sqft)'], ['balconies', 'Balconies'], ['bathrooms', 'Bathrooms'],
   ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
   ['facing', 'Facing'], ['tower', 'Tower / Block'], ['floor_range', 'Floor range'],
   ['units_planned', 'Units planned'], ['unit_numbers', 'Unit numbers'],
-  ['pricing_range', 'Pricing range'], ['floorplan_crop_file', 'Floor plan file'],
+  ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
+  ['floorplan_crop_file', 'Floor plan file'],
 ];
 const VILLA_FIELDS = [
-  ['name', 'Configuration name'], ['bhk', 'BHK'], ['land_area', 'Land area'],
+  ['name', 'Configuration name'], ['bhk', 'BHK'],
+  ['land_area', 'Plot size (sqft)'],
+  ['plot_length', 'Plot length (ft)'], ['plot_width', 'Plot width (ft)'],
+  ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
   ['built_up_area', 'Built-up (sqft)'], ['floors', 'Number of floors'], ['bathrooms', 'Bathrooms'],
   ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
-  ['facing', 'Facing'], ['units_planned', 'Units planned'], ['pricing_range', 'Pricing range'],
+  ['facing', 'Facing'], ['cluster', 'Cluster / Street'],
+  ['units_planned', 'Units planned'],
+  ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
 ];
 const PLOT_FIELDS = [
   ['name', 'Plot family name'], ['plot_size_band', 'Size band'], ['plot_area', 'Plot area'],
+  ['plot_length', 'Plot length (ft)'], ['plot_width', 'Plot width (ft)'],
   ['dimensions', 'Dimensions'], ['facing', 'Facing'], ['units_planned', 'Units planned'],
-  ['cluster', 'Cluster / Zone'], ['premium_marker', 'Premium marker'],
+  ['cluster', 'Cluster / Street'], ['premium_marker', 'Premium marker'],
+  ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
 ];
 
 /** Convert any string date (ISO, dd/mm/yyyy, "Dec 2026", etc.) into yyyy-mm-dd for <input type="date">. Returns '' when not parseable. */
@@ -1010,17 +1023,30 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       <Plus className="h-3 w-3 mr-1" />Add tower
                     </Button>
                   </div>
-                  <div className="grid gap-2 md:grid-cols-3">
+                  <div className="grid gap-2 md:grid-cols-2">
                     {(project.tower_names_list || []).map((t, i) => (
-                      <div key={i} className="flex gap-1">
-                        <Input className="h-8 text-sm" value={t} onChange={e => setProject(p => ({ ...p, tower_names_list: (p.tower_names_list || []).map((x, j) => j === i ? e.target.value : x) }))} />
-                        <Button size="sm" variant="ghost" onClick={() => setProject(p => ({ ...p, tower_names_list: (p.tower_names_list || []).filter((_, j) => j !== i) }))}>
+                      <div key={i} className="flex gap-1 items-center">
+                        <Input className="h-8 text-sm flex-1" placeholder="Tower name" value={t}
+                          onChange={e => setProject(p => ({ ...p, tower_names_list: (p.tower_names_list || []).map((x, j) => j === i ? e.target.value : x) }))} />
+                        <Input className="h-8 text-sm w-24" type="number" min={0} placeholder="Units"
+                          value={(project.tower_units_list?.[i] ?? '') as string | number}
+                          onChange={e => setProject(p => {
+                            const arr = [...(p.tower_units_list || [])];
+                            while (arr.length <= i) arr.push('');
+                            arr[i] = e.target.value;
+                            return { ...p, tower_units_list: arr };
+                          })} />
+                        <Button size="sm" variant="ghost" onClick={() => setProject(p => ({
+                          ...p,
+                          tower_names_list: (p.tower_names_list || []).filter((_, j) => j !== i),
+                          tower_units_list: (p.tower_units_list || []).filter((_, j) => j !== i),
+                        }))}>
                           <Trash2 className="h-3 w-3 text-destructive" />
                         </Button>
                       </div>
                     ))}
                     {(!project.tower_names_list || project.tower_names_list.length === 0) && (
-                      <p className="text-xs text-muted-foreground md:col-span-3">No towers yet. Add one or run mapping.</p>
+                      <p className="text-xs text-muted-foreground md:col-span-2">No towers yet. Add one or run mapping.</p>
                     )}
                   </div>
                   <div className="space-y-1">
@@ -1052,11 +1078,24 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                         <Plus className="h-3 w-3 mr-1" />Add
                       </Button>
                     </div>
-                    <div className="grid gap-2 md:grid-cols-3">
+                    <div className="grid gap-2 md:grid-cols-2">
                       {(project.cluster_names || []).map((t, i) => (
-                        <div key={i} className="flex gap-1">
-                          <Input className="h-8 text-sm" value={t} onChange={e => setProject(p => ({ ...p, cluster_names: (p.cluster_names || []).map((x, j) => j === i ? e.target.value : x) }))} />
-                          <Button size="sm" variant="ghost" onClick={() => setProject(p => ({ ...p, cluster_names: (p.cluster_names || []).filter((_, j) => j !== i) }))}>
+                        <div key={i} className="flex gap-1 items-center">
+                          <Input className="h-8 text-sm flex-1" placeholder="Cluster / street name" value={t}
+                            onChange={e => setProject(p => ({ ...p, cluster_names: (p.cluster_names || []).map((x, j) => j === i ? e.target.value : x) }))} />
+                          <Input className="h-8 text-sm w-24" type="number" min={0} placeholder="Units"
+                            value={(project.cluster_units_list?.[i] ?? '') as string | number}
+                            onChange={e => setProject(p => {
+                              const arr = [...(p.cluster_units_list || [])];
+                              while (arr.length <= i) arr.push('');
+                              arr[i] = e.target.value;
+                              return { ...p, cluster_units_list: arr };
+                            })} />
+                          <Button size="sm" variant="ghost" onClick={() => setProject(p => ({
+                            ...p,
+                            cluster_names: (p.cluster_names || []).filter((_, j) => j !== i),
+                            cluster_units_list: (p.cluster_units_list || []).filter((_, j) => j !== i),
+                          }))}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
                         </div>
@@ -1112,6 +1151,29 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       );
                     })}
                   </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Internal road widths</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {INTERNAL_ROAD_OPTIONS.map(opt => {
+                      const active = (project.internal_road_widths || []).includes(opt);
+                      return (
+                        <button key={opt} type="button"
+                          onClick={() => setProject(p => {
+                            const cur = p.internal_road_widths || [];
+                            return { ...p, internal_road_widths: active ? cur.filter(x => x !== opt) : [...cur, opt] };
+                          })}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'}`}>
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(project.internal_road_widths || []).includes('Other') && (
+                    <Input className="h-8 text-sm mt-1" placeholder="Specify other width"
+                      value={project.internal_road_widths_other ?? ''}
+                      onChange={e => setProject(p => ({ ...p, internal_road_widths_other: e.target.value }))} />
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Key features (comma separated)</Label>
@@ -1255,10 +1317,19 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                                 const url = mediaUrls[m.id] || m.external_url || '';
                                 return (
                                   <div key={m.id} className="rounded border p-1.5 space-y-1 relative">
-                                    <button type="button" onClick={() => removeMedia(m.id)}
-                                      className="absolute top-1 right-1 z-10 rounded-full bg-background/90 border p-0.5 hover:bg-destructive hover:text-destructive-foreground">
-                                      <Trash2 className="h-3 w-3" />
-                                    </button>
+                                    <div className="absolute top-1 right-1 z-10 flex gap-1">
+                                      {url && (
+                                        <a href={url} download={m.caption || 'floor-plan'} target="_blank" rel="noreferrer"
+                                          title="Download"
+                                          className="rounded-full bg-background/90 border p-0.5 hover:bg-primary hover:text-primary-foreground">
+                                          <Download className="h-3 w-3" />
+                                        </a>
+                                      )}
+                                      <button type="button" onClick={() => removeMedia(m.id)}
+                                        className="rounded-full bg-background/90 border p-0.5 hover:bg-destructive hover:text-destructive-foreground">
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
                                     <div className="aspect-video bg-muted rounded overflow-hidden flex items-center justify-center">
                                       {url ? (
                                         <img src={url} alt={m.caption ?? 'floor plan'} className="w-full h-full object-contain" loading="lazy" />
@@ -1325,6 +1396,13 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                             className="absolute top-1 right-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-destructive hover:text-destructive-foreground transition-colors">
                             <X className="h-3.5 w-3.5" />
                           </button>
+                          {url && (
+                            <a href={url} download={m.caption || 'media'} target="_blank" rel="noreferrer"
+                              title="Download"
+                              className="absolute bottom-1 right-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-primary hover:text-primary-foreground transition-colors">
+                              <Download className="h-3.5 w-3.5" />
+                            </a>
+                          )}
                           <label
                             title={m.storage_path || m.external_url ? 'Replace file' : 'Upload file'}
                             className="absolute top-1 left-1 h-6 w-6 inline-flex items-center justify-center rounded-full bg-background/90 border shadow-sm hover:bg-primary hover:text-primary-foreground cursor-pointer transition-colors">
