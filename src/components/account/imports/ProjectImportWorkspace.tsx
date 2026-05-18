@@ -117,23 +117,30 @@ const APARTMENT_FIELDS = [
   ['type_no', 'Type no.'], ['name', 'Configuration name'], ['bhk', 'BHK'],
   ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
   ['built_up_area', 'Built-up (sqft)'], ['balcony_area', 'Balcony area (sqft)'],
-  ['common_area', 'Common area (sqft)'], ['utility_area', 'Utility area (sqft)'],
   ['wall_area', 'Wall area (sqft)'], ['balconies', 'Balconies'], ['bathrooms', 'Bathrooms'],
   ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
   ['facing', 'Facing'], ['tower', 'Tower / Block'], ['floor_range', 'Floor range'],
   ['units_planned', 'Units planned'], ['unit_numbers', 'Unit numbers'],
-  ['pricing_range', 'Pricing range'], ['floorplan_crop_file', 'Floor plan file'],
+  ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
+  ['floorplan_crop_file', 'Floor plan file'],
 ];
 const VILLA_FIELDS = [
-  ['name', 'Configuration name'], ['bhk', 'BHK'], ['land_area', 'Land area'],
+  ['name', 'Configuration name'], ['bhk', 'BHK'],
+  ['land_area', 'Plot size (sqft)'],
+  ['plot_length', 'Plot length (ft)'], ['plot_width', 'Plot width (ft)'],
+  ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
   ['built_up_area', 'Built-up (sqft)'], ['floors', 'Number of floors'], ['bathrooms', 'Bathrooms'],
   ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
-  ['facing', 'Facing'], ['units_planned', 'Units planned'], ['pricing_range', 'Pricing range'],
+  ['facing', 'Facing'], ['cluster', 'Cluster / Street'],
+  ['units_planned', 'Units planned'],
+  ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
 ];
 const PLOT_FIELDS = [
   ['name', 'Plot family name'], ['plot_size_band', 'Size band'], ['plot_area', 'Plot area'],
+  ['plot_length', 'Plot length (ft)'], ['plot_width', 'Plot width (ft)'],
   ['dimensions', 'Dimensions'], ['facing', 'Facing'], ['units_planned', 'Units planned'],
-  ['cluster', 'Cluster / Zone'], ['premium_marker', 'Premium marker'],
+  ['cluster', 'Cluster / Street'], ['premium_marker', 'Premium marker'],
+  ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
 ];
 
 /** Convert any string date (ISO, dd/mm/yyyy, "Dec 2026", etc.) into yyyy-mm-dd for <input type="date">. Returns '' when not parseable. */
