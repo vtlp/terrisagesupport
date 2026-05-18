@@ -1633,6 +1633,14 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           <Card><CardContent className="pt-4"><ActivityLog jobId={job.id} /></CardContent></Card>
         </TabsContent>
       </Tabs>
+      <FilePreviewDialog
+        open={!!previewMedia}
+        onOpenChange={v => { if (!v) setPreviewMedia(null); }}
+        bucket="import-files"
+        path={previewMedia?.storage_path ?? null}
+        name={previewMedia?.caption ?? previewMedia?.storage_path?.split('/').pop() ?? 'Media'}
+        mime={previewMedia?.mime_type ?? null}
+      />
     </div>
   );
 }
