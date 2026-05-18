@@ -1023,17 +1023,30 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                       <Plus className="h-3 w-3 mr-1" />Add tower
                     </Button>
                   </div>
-                  <div className="grid gap-2 md:grid-cols-3">
+                  <div className="grid gap-2 md:grid-cols-2">
                     {(project.tower_names_list || []).map((t, i) => (
-                      <div key={i} className="flex gap-1">
-                        <Input className="h-8 text-sm" value={t} onChange={e => setProject(p => ({ ...p, tower_names_list: (p.tower_names_list || []).map((x, j) => j === i ? e.target.value : x) }))} />
-                        <Button size="sm" variant="ghost" onClick={() => setProject(p => ({ ...p, tower_names_list: (p.tower_names_list || []).filter((_, j) => j !== i) }))}>
+                      <div key={i} className="flex gap-1 items-center">
+                        <Input className="h-8 text-sm flex-1" placeholder="Tower name" value={t}
+                          onChange={e => setProject(p => ({ ...p, tower_names_list: (p.tower_names_list || []).map((x, j) => j === i ? e.target.value : x) }))} />
+                        <Input className="h-8 text-sm w-24" type="number" min={0} placeholder="Units"
+                          value={(project.tower_units_list?.[i] ?? '') as string | number}
+                          onChange={e => setProject(p => {
+                            const arr = [...(p.tower_units_list || [])];
+                            while (arr.length <= i) arr.push('');
+                            arr[i] = e.target.value;
+                            return { ...p, tower_units_list: arr };
+                          })} />
+                        <Button size="sm" variant="ghost" onClick={() => setProject(p => ({
+                          ...p,
+                          tower_names_list: (p.tower_names_list || []).filter((_, j) => j !== i),
+                          tower_units_list: (p.tower_units_list || []).filter((_, j) => j !== i),
+                        }))}>
                           <Trash2 className="h-3 w-3 text-destructive" />
                         </Button>
                       </div>
                     ))}
                     {(!project.tower_names_list || project.tower_names_list.length === 0) && (
-                      <p className="text-xs text-muted-foreground md:col-span-3">No towers yet. Add one or run mapping.</p>
+                      <p className="text-xs text-muted-foreground md:col-span-2">No towers yet. Add one or run mapping.</p>
                     )}
                   </div>
                   <div className="space-y-1">
