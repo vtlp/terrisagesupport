@@ -116,33 +116,36 @@ const MEDIA_REVIEWS: MediaReview[] = ['PENDING', 'CORRECT', 'INCORRECT', 'DUPLIC
 
 // 'tower' is rendered as a Select (Apartment only) wired to tower_names_list.
 const APARTMENT_FIELDS = [
-  ['type_no', 'Type no.'], ['name', 'Configuration name'], ['bhk', 'BHK'],
-  ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
-  ['built_up_area', 'Built-up (sqft)'], ['balcony_area', 'Balcony area (sqft)'],
-  ['wall_area', 'Wall area (sqft)'], ['balconies', 'Balconies'], ['bathrooms', 'Bathrooms'],
-  ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
-  ['facing', 'Facing'], ['tower', 'Tower / Block'], ['floor_range', 'Floor range'],
-  ['units_planned', 'Units planned'], ['unit_numbers', 'Unit numbers'],
+  ['name', 'Configuration name'],
   ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
+  ['bhk', 'Beds (BHK)'], ['bathrooms', 'Bathrooms'], ['balconies', 'Balcony count'],
+  ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Super Built-Up Area (sqft)'],
+  ['master_bedroom_size', 'Master bedroom size'],
+  ['tower', 'Mapped tower'], ['facing', 'Facing'],
+  ['units_planned', 'Total units planned'], ['variant', 'Variations (if any)'],
   ['floorplan_crop_file', 'Floor plan file'],
 ];
 const VILLA_FIELDS = [
-  ['name', 'Configuration name'], ['bhk', 'BHK'],
-  ['land_area', 'Plot size (sqft)'],
-  ['plot_length', 'Plot length (ft)'], ['plot_width', 'Plot width (ft)'],
-  ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Saleable / SBA (sqft)'],
-  ['built_up_area', 'Built-up (sqft)'], ['floors', 'Number of floors'], ['bathrooms', 'Bathrooms'],
-  ['master_bedroom_size', 'Master bedroom size'], ['variant', 'Variant'],
-  ['facing', 'Facing'], ['cluster', 'Cluster / Street'],
-  ['units_planned', 'Units planned'],
+  ['name', 'Configuration name'],
   ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
+  ['bhk', 'Beds (BHK)'], ['bathrooms', 'Bathrooms'],
+  ['land_area', 'Unit area (sq yd)'],
+  ['dimensions', 'Unit dimensions (e.g. 30 × 40 ft)'],
+  ['carpet_area', 'Carpet area (sqft)'], ['super_built_up_area', 'Super Built-Up Area (sqft)'],
+  ['master_bedroom_size', 'Master bedroom size'],
+  ['floors', 'Number of floors'],
+  ['cluster', 'Mapped cluster'], ['facing', 'Facing'],
+  ['units_planned', 'Total units planned'], ['variant', 'Variations (if any)'],
+  ['floorplan_crop_file', 'Floor plan file'],
 ];
 const PLOT_FIELDS = [
-  ['name', 'Plot family name'], ['plot_size_band', 'Size band'], ['plot_area', 'Plot area'],
-  ['plot_length', 'Plot length (ft)'], ['plot_width', 'Plot width (ft)'],
-  ['dimensions', 'Dimensions'], ['facing', 'Facing'], ['units_planned', 'Units planned'],
-  ['cluster', 'Cluster / Street'], ['premium_marker', 'Premium marker'],
+  ['name', 'Configuration name'],
+  ['plot_area_sqyd', 'Plot area (sq yd)'], ['plot_area_sqft', 'Plot area (sqft)'],
   ['unit_price', 'Unit price'], ['price_per_sqft', 'Price per sqft'],
+  ['plot_length', 'Plot length (ft)'], ['plot_width', 'Plot width (ft)'],
+  ['cluster', 'Mapped cluster'], ['facing', 'Facing'],
+  ['units_planned', 'Total units planned'], ['variant', 'Variations (if any)'],
+  ['floorplan_crop_file', 'Floor plan file'],
 ];
 
 /** Convert any string date (ISO, dd/mm/yyyy, "Dec 2026", etc.) into yyyy-mm-dd for <input type="date">. Returns '' when not parseable. */
