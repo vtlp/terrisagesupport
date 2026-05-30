@@ -1,53 +1,82 @@
-# Fix the Terrisage CRM push documentation
+# Terrisage project ingest — ChatGPT field reference
 
-## What's going on
+## Goal
 
-The CRM developer audited the doc I generated at `/mnt/documents/terrisage-crm-push-fields.md` and `.docx` and flagged 7 mismatches against the actual Terrisage contract. I re-read our own builder at `supabase/functions/terrisage-project-push/index.ts` and confirmed:
+Produce a single, self-contained field reference for the Terrisage **project ingest** endpoint that you can paste into ChatGPT as a system/context prompt. It must list every accepted field, its type, allowed values, and an example, organised by property type (APARTMENT / VILLA / PLOT). No code changes — pure documentation, derived line-by-line from `supabase/functions/terrisage-project-push/index.ts` (the authoritative builder) so there is zero hallucination this time.
 
-**Our code is correct in every case. The documentation is wrong.** I hallucinated several field names and enum values when writing the doc and didn't cross-check them against the builder.
+## What the doc will contain
 
-Below is the diff between what the doc claims and what our edge function actually emits.
+1. **§0 How to read this doc** — source of truth pointer (`terrisage-project-push/index.ts`), wire format = JSON, transport = `POST /api/integrations/projects` with `X-API-Key`, async response, all enums case-sensitive.
 
-## Doc errors vs. real code
+2. **§1 Top-level envelope** — every key actually sent by the builder (lines 921–934):
+   - `sourceJobId` (uuid), `propertyType` (`APARTMENT|VILLA|PLOT`), `category` (`RESIDENTIAL`), `projectOrigin` (`SUPPORT_ADDED`), `projectOwnerOrgId` (uuid|null), `project` (object), `buildings[]`, `streetClusters[]`, `configurations[]`, `media[]`, `pushedAt` (ISO), `pushedBy` (uuid).
 
-| # | Area | Doc said (wrong) | Code actually sends (correct) |
-|---|---|---|---|
-| 1 | Response | Synchronous `{ projectId, tenantsLinked, warnings }` | `202` + `{ ingestJobId, sourceJobId, status }`, then poll |
-| 2 | `projectCommunityType` | `GATED \| HIGH_RISE_GATED \| OPEN` | `GATED \| OPEN` only (see `mapCommunity`) |
-| 3 | `projectStatus` | `... \| COMPLETED` | `... \| COMPLETED_WITH_OC` (see `STATUS_LOOKUP`) |
-| 4 | `projectWaterSourceList` | `["BOREWELL", ...]` | `["BORE_WELL", ...]` (see `WATER_LOOKUP`) |
-| 5 | `utilities` | `string[]` like `["SOLAR","STP"]` | `{ utilityType, details? }[]` (see `mapUtilities`) |
-| 6 | `buildings[]` keys | `name`, `unitsCount` | `buildingName`, `totalUnits` (line 432-434) |
-| 6 | `streetClusters[]` keys | `name`, `unitsCount` | `clusterName`, `totalUnits` (line 452-454) |
-| 7 | `media.kind` | `LOGO \| GALLERY \| FLOOR_PLAN \| BROCHURE \| VIDEO \| DOCUMENT \| OTHER` | `LOGO \| PHOTO \| VIDEO \| FLOORPLAN \| TOUR_3D \| OTHER` (see `MEDIA_KIND_MAP` — GALLERY→PHOTO, FLOOR_PLAN→FLOORPLAN, BROCHURE/DOCUMENT→OTHER) |
-| 8 | `projectTotalUnits` rule | "must equal sum of config `units_planned`" | Must equal sum of `buildings[].totalUnits + streetClusters[].totalUnits` (line 866-873) |
+3. **§2 `project` master** — every field in `buildProjectMaster` (lines 465–527) with:
+   - Type, required/optional, example.
+   - Full enum tables sourced from the `*_LOOKUP` constants:
+     - `projectStatus`: `UNDER_CONSTRUCTION | PHASE_1_COMPLETED | COMPLETED_WITH_OC`
+     - `projectCommunityType`: `GATED | OPEN`
+     - `projectWaterSourceList[]`: `BORE_WELL | MUNICIPAL | TANKER | LAKE | OTHER`
+     - `utilities[].utilityType`: `ELECTRICITY | WATER | GAS | SEWAGE | STP | INTERCOM_SECURITY | RAIN_WATER_HARVESTING | STORM_WATER_DRAINS` (plus optional `details` string)
+   - Numeric coercion rules (ranges → upper bound; "1.2 Cr" → 12000000 INR).
+   - `proximityMetrics[]` shape `{ label, distance, time, sortOrder }`.
+   - `amenities[]` shape `{ amenityId (uuid from Terrisage master), boolValue: true }`.
 
-### Extra fields the doc included that are real but worth clarifying
-- `mapping.supportBuildingKeys` / `supportClusterKeys` (plural) — yes, our builder does send these (line 585, 603, 618) alongside the singular form, but Terrisage ignores them. Note it as "Support-only, ignored by CRM" rather than removing.
-- `apartmentConfiguration.projectTowerNames` — same: emitted by us at line 584-585 area, but not in Terrisage's accepted types. Same note.
+4. **§3 Property-type detail blocks** (sibling of `project`, written by the builder for the matching type):
+   - **APARTMENT** → `apartmentDetail`: `projectOpenSpacePercent`, `projectTotalTowers`, `projectTotalFloorsPerTower`, `projectUnitsPerFloor`, `projectUnitsPerLift`.
+   - **VILLA** → `villaDetail`: `configurationVillaFloorsPerUnit`, `projectRoadWidthAbutting`.
+   - **PLOT** → `plotDetail`: `{}` (empty object).
 
-## Fix
+5. **§4 Inventory arrays**
+   - `buildings[]` (APARTMENT only): `supportBuildingKey` (slug, Support-only — CRM ignores), `buildingName`, `totalUnits`, `sortOrder`, `totalFloors?`.
+   - `streetClusters[]` (VILLA + PLOT): `supportClusterKey`, `clusterName`, `totalUnits`, `sortOrder`.
+   - **Invariants**:
+     - Σ(`buildings[].totalUnits`) + Σ(`streetClusters[].totalUnits`) === `project.projectTotalUnits`
+     - `project.projectTotalUnits` === Σ(`configurations[].configurationUnitsTotalCount`) (else 422)
 
-Rewrite `/mnt/documents/terrisage-crm-push-fields.md` and `.docx` (call them `_v2`) section-by-section from the actual builder output rather than from memory:
+6. **§5 Configurations — per property type** (the part you most need ChatGPT to get right). One sub-section each:
 
-1. **§1 envelope** — keep as is, accurate.
-2. **§2 project** — correct the three enum tables (status, community type, water sources) to match the exact `*_LOOKUP` output values in the code; rewrite `utilities` row to show the object shape.
-3. **§3 inventory** — rename `name` → `buildingName`/`clusterName`, `unitsCount` → `totalUnits`. Add the cross-sum invariant explicitly.
-4. **§4 configurations** — keep, but mark `projectTowerNames`, `supportBuildingKeys`, `supportClusterKeys` as "Support-only, CRM ignores".
-5. **§5 media** — rewrite the kind table to `LOGO/PHOTO/VIDEO/FLOORPLAN/TOUR_3D/OTHER` with a mapping note showing how Support's internal categories (`GALLERY`, `FLOOR_PLAN`, `BROCHURE`, `DOCUMENT`) collapse to the wire enum.
-6. **§6 response contract** — replace synchronous response with the real async flow: `POST` → `202 { ingestJobId, sourceJobId, status:"QUEUED" }`, then `GET /api/integrations/projects/ingest-jobs/{ingestJobId}` polled by `upstreamPush.ts` `pollUntilTerminal`.
-7. **§7 end-to-end example** — regenerate by running a real payload assembly mentally against the builder (correct enum strings, object utilities, correct inventory keys).
-8. **§8 upsert** — accurate, keep.
-9. **§9 changelog** — add entry: "2026-05-28 — corrected enum values, inventory keys, media kinds, utilities shape, and response contract to match `terrisage-project-push/index.ts` after CRM developer audit."
+   **APARTMENT config** (from `buildConfiguration` lines 571–590):
+   - Common keys: `supportConfigRef`, `sortOrder`, `configurationUnitName`, `configurationUnitBedroomCount`, `configurationUnitBathroomCount`, `configurationUnitsTotalCount`, `configurationUnitCarpetAreaSqft`, `configurationUnitBuiltupAreaSqft`, `configurationUnitSuperBuiltupAreaSqft`, `configUnitPriceBaseValue` (INR), `configurationUnitPricePerSqft`, `configurationUnitDescription`.
+   - `apartmentConfiguration`: `projectTowerName` (first tower), `projectTowerNames[]` (Support-only echo), `balconyCount`, `masterBedroomSizeSqft` (string e.g. `"12x14"`), `variations[] { text, sortOrder }`.
+   - `mapping`: `supportBuildingKey`, `supportBuildingKeys[]` (Support-only echo), `floorFrom`, `floorTo`, `excludedFloors[]`, `availableFacings[]` (e.g. `["East","North-East"]`).
 
-Also add a new section **§0 "How to read this doc"** that says: source of truth is `supabase/functions/terrisage-project-push/index.ts`; this doc must be regenerated from that file, not the other way round.
+   **VILLA config** (lines 591–605):
+   - Same common keys above.
+   - `villaConfiguration`: `configurationVillaFloorsPerUnit`, `configurationVillaWidth` (ft), `configurationVillaLength` (ft), `masterBedroomSizeSqft`.
+   - `mapping`: `supportClusterKey`, `supportClusterKeys[]`, `availableFacings[]`.
+   - Note: villa dims in ft, area still sqft, plot/land area NOT in this block.
 
-## Out of scope
+   **PLOT config** (lines 606–620):
+   - Common keys minus bedroom/bathroom (which will be null).
+   - `plotConfiguration`: `configurationPlotUnitAreaSqft`, `configurationPlotUnitAreaSqYd` (currently always null from builder; Terrisage accepts), `configurationPlotWidth` (ft), `configurationPlotLength` (ft).
+   - `mapping`: `supportClusterKey`, `supportClusterKeys[]`, `availableFacings[]`.
 
-No edge function, validator, or builder code changes — the code already matches the CRM contract. This is purely a documentation correction so the CRM team has accurate reference material.
+7. **§6 `media[]`** (lines 896–919):
+   - Shape: `{ kind, url, caption, configRef, meta }`.
+   - `kind` enum on wire: `LOGO | PHOTO | VIDEO | FLOORPLAN | TOUR_3D | OTHER` only.
+   - Internal → wire mapping table (`MEDIA_KIND_MAP`): GALLERY/MASTER_PLAN/IMAGE/RENDER → PHOTO; FLOOR_PLAN → FLOORPLAN; WALKTHROUGH_VIDEO → VIDEO; VIRTUAL_TOUR → TOUR_3D; BROCHURE/DOCUMENT → OTHER (with `meta.mime = "application/pdf"`).
+   - `url` is a 24h signed URL.
+   - `configRef` ties FLOORPLAN to a specific configuration UUID.
+
+8. **§7 Support-only fields CRM ignores** — explicit list so ChatGPT doesn't treat them as required:
+   - `supportBuildingKey(s)`, `supportClusterKey(s)`, `projectTowerNames`, `internalNotes`.
+
+9. **§8 End-to-end JSON examples** — one realistic payload per property type, generated by mentally running the builder over plausible input (correct enums, correct keys, sums tied to invariants). About 30-50 lines each.
+
+10. **§9 Response & polling contract**
+    - `POST` → `202 { ingestJobId, sourceJobId, status: "QUEUED" }`
+    - `GET /api/integrations/projects/ingest-jobs?sourceJobId={sourceJobId}` → `{ status: QUEUED|RUNNING|SUCCEEDED|FAILED, projectId?, failureCode?, message? }`
+    - Standard error envelope: `{ success: false, error: { message, code, statusCode } }`.
+
+11. **§10 Quick "do/don't" cheat-sheet for ChatGPT** — 10–15 bullet points: case-sensitive enums; never invent kinds like `GALLERY`/`FLOOR_PLAN`/`BROCHURE` on the wire; utilities are objects not strings; dims in ft; areas in sqft; INR absolute integers; sums must tie out.
 
 ## Deliverables
 
-- `/mnt/documents/terrisage-crm-push-fields_v2.md`
-- `/mnt/documents/terrisage-crm-push-fields_v2.docx`
-- QA: convert docx pages to images and visually verify before handing over.
+- `/mnt/documents/terrisage-project-ingest-fields_chatgpt.md`
+- `/mnt/documents/terrisage-project-ingest-fields_chatgpt.docx`
+- QA: render docx pages to images, eyeball every page for table overflow / clipped enum cells before handing over.
+
+## Out of scope
+
+No code, schema, edge function, or UI changes. The builder already emits the correct shape — this is a fresh, code-grounded reference for ChatGPT to use when transforming raw brochure data into builder-ready input.
