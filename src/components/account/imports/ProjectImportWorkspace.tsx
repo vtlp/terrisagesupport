@@ -228,7 +228,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [savingConfigs, setSavingConfigs] = useState(false);
   const [savingMedia, setSavingMedia] = useState(false);
 
-  const saveAllConfigs = async () => {
+  const saveAllConfigs = async (silent = false) => {
     setSavingConfigs(true);
     const results = await Promise.all(configs.map(c =>
       supabase.from('import_project_configs')
@@ -237,13 +237,14 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     ));
     setSavingConfigs(false);
     const firstErr = results.find(r => r.error)?.error;
-    if (firstErr) { toast.error(firstErr.message); return; }
+    if (firstErr) { toast.error(firstErr.message); return false; }
     await logActivity(supabase, job.id, 'configurations_saved', { count: configs.length }, currentUser?.user_id);
-    toast.success(`Saved ${configs.length} configuration${configs.length === 1 ? '' : 's'}`);
+    if (!silent) toast.success(`Saved ${configs.length} configuration${configs.length === 1 ? '' : 's'}`);
     onChange?.();
+    return true;
   };
 
-  const saveAllMedia = async () => {
+  const saveAllMedia = async (silent = false) => {
     setSavingMedia(true);
     const results = await Promise.all(media.map(m =>
       supabase.from('import_project_media')
@@ -257,18 +258,23 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     ));
     setSavingMedia(false);
     const firstErr = results.find(r => r.error)?.error;
-    if (firstErr) { toast.error(firstErr.message); return; }
+    if (firstErr) { toast.error(firstErr.message); return false; }
     await logActivity(supabase, job.id, 'media_saved', { count: media.length }, currentUser?.user_id);
-    toast.success(`Saved ${media.length} media item${media.length === 1 ? '' : 's'}`);
+    if (!silent) toast.success(`Saved ${media.length} media item${media.length === 1 ? '' : 's'}`);
     onChange?.();
+    return true;
   };
 
   const isDirty = dirty;
 
   const saveAll = async () => {
-    await Promise.all([saveRep(), saveReview(), saveAllConfigs(), saveAllMedia()]);
-    setDirty(false);
+    const results = await Promise.all([saveRep(true), saveReview(true), saveAllConfigs(true), saveAllMedia(true)]);
+    if (results.every(Boolean)) {
+      setDirty(false);
+      toast.success('All changes saved');
+    }
   };
+
 
   const refresh = useCallback(async () => {
     const [{ data: cfg }, { data: m }] = await Promise.all([
@@ -362,14 +368,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     }
   }, [project.maps_url, project.location]);
 
-  const saveRep = async () => {
+  const saveRep = async (silent = false) => {
     setSavingRep(true);
     const { error } = await supabase.from('import_jobs').update({ representative_input: rep as never }).eq('id', job.id);
     setSavingRep(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); return false; }
     await logActivity(supabase, job.id, 'representative_input_saved', {}, currentUser?.user_id);
-    toast.success('Saved');
+    if (!silent) toast.success('Saved');
     onChange?.();
+    return true;
   };
 
   const [mapping, setMapping] = useState(false);
@@ -394,7 +401,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     }
   }, [job, currentUser?.user_id, refresh, onChange]);
 
-  const saveReview = async () => {
+  const saveReview = async (silent = false) => {
     setSavingReview(true);
     const merged = {
       ...((job.extracted_data as object) || {}),
@@ -405,10 +412,11 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     };
     const { error } = await supabase.from('import_jobs').update({ extracted_data: merged as never }).eq('id', job.id);
     setSavingReview(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); return false; }
     await logActivity(supabase, job.id, 'review_edited', {}, currentUser?.user_id);
-    toast.success('Review saved');
+    if (!silent) toast.success('Review saved');
     onChange?.();
+    return true;
   };
 
   const updateConfig = async (id: string, patch: Record<string, unknown>) => {
