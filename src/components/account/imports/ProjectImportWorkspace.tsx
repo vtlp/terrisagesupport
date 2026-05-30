@@ -368,14 +368,15 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     }
   }, [project.maps_url, project.location]);
 
-  const saveRep = async () => {
+  const saveRep = async (silent = false) => {
     setSavingRep(true);
     const { error } = await supabase.from('import_jobs').update({ representative_input: rep as never }).eq('id', job.id);
     setSavingRep(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); return false; }
     await logActivity(supabase, job.id, 'representative_input_saved', {}, currentUser?.user_id);
-    toast.success('Saved');
+    if (!silent) toast.success('Saved');
     onChange?.();
+    return true;
   };
 
   const [mapping, setMapping] = useState(false);
