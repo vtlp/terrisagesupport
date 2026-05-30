@@ -942,9 +942,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 <Label>Notes</Label>
                 <Textarea rows={2} value={rep.notes ?? ''} onChange={e => setRep(s => ({ ...s, notes: e.target.value }))} />
               </div>
-              <Button onClick={saveRep} disabled={savingRep}>
-                {savingRep && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" />Save representative input
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
