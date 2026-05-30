@@ -325,6 +325,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     setAmenities(((job.extracted_data as { amenities?: string[] })?.amenities || []).join(', '));
     setProximity((job.extracted_data as { proximityMatrix?: Array<{ name: string; distance_km: number | string }> })?.proximityMatrix || []);
     setBanks(((job.extracted_data as { approvedBanks?: string[] })?.approvedBanks || []).join(', '));
+    setDirty(false);
   }, [job.id, job.extracted_data, job.representative_input]);
 
   // Live-derive total_units = sum of units_planned across configurations.
@@ -336,7 +337,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
       const n = Number(String(v ?? '').replace(/[^\d.\-]/g, ''));
       return acc + (Number.isFinite(n) ? n : 0);
     }, 0);
-    setProject(prev => {
+    _setProject(prev => {
       const next = { ...prev };
       let changed = false;
       if (sum > 0 && Number(prev.total_units ?? 0) !== sum) {
@@ -357,7 +358,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     if (!url) return;
     const loc = deriveLocalityFromMapsUrl(url);
     if (loc && (!project.location || String(project.location).trim() === '')) {
-      setProject(p => ({ ...p, location: loc }));
+      _setProject(p => ({ ...p, location: loc }));
     }
   }, [project.maps_url, project.location]);
 
