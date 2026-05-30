@@ -1596,7 +1596,34 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         </TabsContent>
 
         {/* VALIDATE & IMPORT */}
-        <TabsContent value="validate">
+        <TabsContent value="validate" className="space-y-3">
+          <Card>
+            <CardContent className="pt-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 text-sm">
+                {isDirty ? (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <span className="text-amber-700 dark:text-amber-400 font-medium">You have unsaved work</span>
+                    <span className="text-xs text-muted-foreground">Overview, representative, amenities or proximity edits are not yet saved.</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    <span className="text-success font-medium">All changes saved</span>
+                  </>
+                )}
+              </div>
+              <Button
+                size="sm"
+                onClick={saveAll}
+                disabled={savingRep || savingReview || savingConfigs || savingMedia}
+                variant={isDirty ? 'default' : 'outline'}
+              >
+                {(savingRep || savingReview || savingConfigs || savingMedia) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Save className="h-4 w-4 mr-1" /> Save all import data
+              </Button>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader><CardTitle className="text-sm">Validation</CardTitle></CardHeader>
             <CardContent className="space-y-3">
