@@ -942,9 +942,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
                 <Label>Notes</Label>
                 <Textarea rows={2} value={rep.notes ?? ''} onChange={e => setRep(s => ({ ...s, notes: e.target.value }))} />
               </div>
-              <Button onClick={saveRep} disabled={savingRep}>
-                {savingRep && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" />Save representative input
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -955,12 +952,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         <TabsContent value="overview">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Project overview</CardTitle>
-                <Button size="sm" onClick={saveReview} disabled={savingReview}>
-                  {savingReview && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
-                </Button>
-              </div>
+              <CardTitle className="text-sm">Project overview</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {(() => {
@@ -1279,12 +1271,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Configurations · {PROPERTY_TYPE_LABEL[propertyType]}</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={saveAllConfigs} disabled={savingConfigs || configs.length === 0}>
-                    {savingConfigs && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
-                  </Button>
-                  <Button size="sm" onClick={addConfig}><Plus className="h-4 w-4 mr-1" />Add configuration</Button>
-                </div>
+                <Button size="sm" onClick={addConfig}><Plus className="h-4 w-4 mr-1" />Add configuration</Button>
               </div>
               {propertyType === 'PLOT' && (
                 <p className="text-xs text-muted-foreground">Group similar plots into families. Use the size band to consolidate dozens of unique plot sizes into a manageable set.</p>
@@ -1423,9 +1410,6 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Media & floor plans</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={saveAllMedia} disabled={savingMedia || media.length === 0}>
-                    {savingMedia && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
-                  </Button>
                   <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border bg-background hover:bg-muted cursor-pointer">
                     <Plus className="h-3 w-3" /> Bulk upload
                     <input type="file" accept="image/*,application/pdf" multiple className="hidden"
@@ -1519,12 +1503,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         <TabsContent value="extra">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Amenities & Proximity</CardTitle>
-                <Button size="sm" onClick={saveReview} disabled={savingReview}>
-                  {savingReview && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
-                </Button>
-              </div>
+              <CardTitle className="text-sm">Amenities & Proximity</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
