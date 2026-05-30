@@ -215,6 +215,43 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [hasOwner, setHasOwner] = useState<boolean>(!!(job as { owner_account_id?: string | null }).owner_account_id);
   const [savingRep, setSavingRep] = useState(false);
   const [savingReview, setSavingReview] = useState(false);
+  const [savingConfigs, setSavingConfigs] = useState(false);
+  const [savingMedia, setSavingMedia] = useState(false);
+
+  const saveAllConfigs = async () => {
+    setSavingConfigs(true);
+    const results = await Promise.all(configs.map(c =>
+      supabase.from('import_project_configs')
+        .update({ data: (c.data ?? {}) as never, sort_order: c.sort_order ?? 0 })
+        .eq('id', c.id)
+    ));
+    setSavingConfigs(false);
+    const firstErr = results.find(r => r.error)?.error;
+    if (firstErr) { toast.error(firstErr.message); return; }
+    await logActivity(supabase, job.id, 'configurations_saved', { count: configs.length }, currentUser?.user_id);
+    toast.success(`Saved ${configs.length} configuration${configs.length === 1 ? '' : 's'}`);
+    onChange?.();
+  };
+
+  const saveAllMedia = async () => {
+    setSavingMedia(true);
+    const results = await Promise.all(media.map(m =>
+      supabase.from('import_project_media')
+        .update({
+          caption: m.caption ?? null,
+          category: m.category,
+          review_state: m.review_state,
+          config_id: m.config_id ?? null,
+        } as never)
+        .eq('id', m.id)
+    ));
+    setSavingMedia(false);
+    const firstErr = results.find(r => r.error)?.error;
+    if (firstErr) { toast.error(firstErr.message); return; }
+    await logActivity(supabase, job.id, 'media_saved', { count: media.length }, currentUser?.user_id);
+    toast.success(`Saved ${media.length} media item${media.length === 1 ? '' : 's'}`);
+    onChange?.();
+  };
 
   const refresh = useCallback(async () => {
     const [{ data: cfg }, { data: m }] = await Promise.all([
@@ -1227,9 +1264,14 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           })()}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Configurations · {PROPERTY_TYPE_LABEL[propertyType]}</CardTitle>
-                <Button size="sm" onClick={addConfig}><Plus className="h-4 w-4 mr-1" />Add configuration</Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={saveAllConfigs} disabled={savingConfigs || configs.length === 0}>
+                    {savingConfigs && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
+                  </Button>
+                  <Button size="sm" onClick={addConfig}><Plus className="h-4 w-4 mr-1" />Add configuration</Button>
+                </div>
               </div>
               {propertyType === 'PLOT' && (
                 <p className="text-xs text-muted-foreground">Group similar plots into families. Use the size band to consolidate dozens of unique plot sizes into a manageable set.</p>
@@ -1368,6 +1410,9 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Media & floor plans</CardTitle>
                 <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={saveAllMedia} disabled={savingMedia || media.length === 0}>
+                    {savingMedia && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
+                  </Button>
                   <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border bg-background hover:bg-muted cursor-pointer">
                     <Plus className="h-3 w-3" /> Bulk upload
                     <input type="file" accept="image/*,application/pdf" multiple className="hidden"
