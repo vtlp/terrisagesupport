@@ -1,82 +1,80 @@
-# Terrisage project ingest — ChatGPT field reference
 
-## Goal
+## What this doc is (and isn't)
 
-Produce a single, self-contained field reference for the Terrisage **project ingest** endpoint that you can paste into ChatGPT as a system/context prompt. It must list every accepted field, its type, allowed values, and an example, organised by property type (APARTMENT / VILLA / PLOT). No code changes — pure documentation, derived line-by-line from `supabase/functions/terrisage-project-push/index.ts` (the authoritative builder) so there is zero hallucination this time.
+- **Audience:** ChatGPT, used to convert raw source material (brochures, PDFs, vendor JSONs, scraped text, spreadsheets) into a structure that drops cleanly into the **Project Import workspace** in the Console.
+- **Scope:** **Inbound to Console only.** This is the *upstream* of the pipeline (raw → Import workspace fields → auto-map). It is **not** the CRM push contract — that already lives in `terrisage-project-ingest-fields_chatgpt.docx` and stays untouched.
+- **Source of truth:** `src/components/account/imports/ProjectImportWorkspace.tsx`, `src/components/account/imports/autoMapProjectImport.ts`, `src/components/account/imports/shared.ts`, and the extraction worker's `extract_fields.py` / `normalize.py`.
 
-## What the doc will contain
+## Output
 
-1. **§0 How to read this doc** — source of truth pointer (`terrisage-project-push/index.ts`), wire format = JSON, transport = `POST /api/integrations/projects` with `X-API-Key`, async response, all enums case-sensitive.
+Two files, regenerated each time (no code, schema, or UI changes):
 
-2. **§1 Top-level envelope** — every key actually sent by the builder (lines 921–934):
-   - `sourceJobId` (uuid), `propertyType` (`APARTMENT|VILLA|PLOT`), `category` (`RESIDENTIAL`), `projectOrigin` (`SUPPORT_ADDED`), `projectOwnerOrgId` (uuid|null), `project` (object), `buildings[]`, `streetClusters[]`, `configurations[]`, `media[]`, `pushedAt` (ISO), `pushedBy` (uuid).
+- `/mnt/documents/terrisage-console-import-fields_chatgpt.md`
+- `/mnt/documents/terrisage-console-import-fields_chatgpt.docx`
 
-3. **§2 `project` master** — every field in `buildProjectMaster` (lines 465–527) with:
-   - Type, required/optional, example.
-   - Full enum tables sourced from the `*_LOOKUP` constants:
-     - `projectStatus`: `UNDER_CONSTRUCTION | PHASE_1_COMPLETED | COMPLETED_WITH_OC`
-     - `projectCommunityType`: `GATED | OPEN`
-     - `projectWaterSourceList[]`: `BORE_WELL | MUNICIPAL | TANKER | LAKE | OTHER`
-     - `utilities[].utilityType`: `ELECTRICITY | WATER | GAS | SEWAGE | STP | INTERCOM_SECURITY | RAIN_WATER_HARVESTING | STORM_WATER_DRAINS` (plus optional `details` string)
-   - Numeric coercion rules (ranges → upper bound; "1.2 Cr" → 12000000 INR).
-   - `proximityMetrics[]` shape `{ label, distance, time, sortOrder }`.
-   - `amenities[]` shape `{ amenityId (uuid from Terrisage master), boolValue: true }`.
+## Document structure
 
-4. **§3 Property-type detail blocks** (sibling of `project`, written by the builder for the matching type):
-   - **APARTMENT** → `apartmentDetail`: `projectOpenSpacePercent`, `projectTotalTowers`, `projectTotalFloorsPerTower`, `projectUnitsPerFloor`, `projectUnitsPerLift`.
-   - **VILLA** → `villaDetail`: `configurationVillaFloorsPerUnit`, `projectRoadWidthAbutting`.
-   - **PLOT** → `plotDetail`: `{}` (empty object).
+**§0 — How to read this doc**
+- Three accepted upload shapes the Console auto-mapper understands:
+  1. **JSON** (preferred) — `{ project: {...}, configurations: [...], missing_fields: [...] }` — single file, no header gymnastics.
+  2. **`project_summary.csv` / `.xlsx`** — wide (one data row) **or** key/value (col A = label, col B = value). Auto-detected by shape.
+  3. **`configurations.csv` / `.xlsx`** — one row per configuration; per-property-type columns.
+  4. Optional companions: `amenities.csv`, `proximity.csv`, image files (auto-attached as media), floor-plan crops (linked via `floorplan_crop_file` filename match).
+- Units & conventions to bake into ChatGPT output: **areas in sqft**, **plot area unit fixed to "sq yd"**, **plot dimensions in feet** (e.g. `30 × 40 ft`), **money in absolute INR** (no lakhs/crores), **dates ISO `YYYY-MM-DD`**, list fields use `|` or `,` separators, "Other" allowed where chips offer it.
+- What ChatGPT must **not** invent: enum values outside the lists below, banks list (ignored), and any global-editor metadata (ignored).
 
-5. **§4 Inventory arrays**
-   - `buildings[]` (APARTMENT only): `supportBuildingKey` (slug, Support-only — CRM ignores), `buildingName`, `totalUnits`, `sortOrder`, `totalFloors?`.
-   - `streetClusters[]` (VILLA + PLOT): `supportClusterKey`, `clusterName`, `totalUnits`, `sortOrder`.
-   - **Invariants**:
-     - Σ(`buildings[].totalUnits`) + Σ(`streetClusters[].totalUnits`) === `project.projectTotalUnits`
-     - `project.projectTotalUnits` === Σ(`configurations[].configurationUnitsTotalCount`) (else 422)
+**§1 — Project-level fields (shared)**
+For each, give: canonical key, accepted **header synonyms** (from `PROJECT_SYNONYMS` in `autoMapProjectImport.ts`), type, example, notes.
 
-6. **§5 Configurations — per property type** (the part you most need ChatGPT to get right). One sub-section each:
+Fields covered: `project_name`, `builder_name`, `city` (must map to known Indian city list — see `defaultMarkets`), `location`, `address`, `maps_url`, `rera_id`, `status`, `site_area` + `site_area_unit`, `site_area_acres`, `site_area_guntas`, `community_type`, `approach_road_width`, `total_units`, `expected_completion_date`, `website`, `open_space_pct`, `overview`, `water_sources[]`, `utilities[]`, `key_features[]`, `internal_road_widths[]` + `internal_road_widths_other`, `contact_phone`, `contact_email`, `office_address`.
 
-   **APARTMENT config** (from `buildConfiguration` lines 571–590):
-   - Common keys: `supportConfigRef`, `sortOrder`, `configurationUnitName`, `configurationUnitBedroomCount`, `configurationUnitBathroomCount`, `configurationUnitsTotalCount`, `configurationUnitCarpetAreaSqft`, `configurationUnitBuiltupAreaSqft`, `configurationUnitSuperBuiltupAreaSqft`, `configUnitPriceBaseValue` (INR), `configurationUnitPricePerSqft`, `configurationUnitDescription`.
-   - `apartmentConfiguration`: `projectTowerName` (first tower), `projectTowerNames[]` (Support-only echo), `balconyCount`, `masterBedroomSizeSqft` (string e.g. `"12x14"`), `variations[] { text, sortOrder }`.
-   - `mapping`: `supportBuildingKey`, `supportBuildingKeys[]` (Support-only echo), `floorFrom`, `floorTo`, `excludedFloors[]`, `availableFacings[]` (e.g. `["East","North-East"]`).
+**§2 — Enum dictionaries** (only values the Console accepts; anything else is silently dropped on push)
+- `status` ∈ `Under Construction | Phase 1 completed | Completed (with OC)`
+- `community_type` ∈ `Gated | Open`
+- `water_sources[]` ∈ `Borewell | Municipal | Tanker | Lake | Other`
+- `utilities[]` ∈ `Electricity | Water | Gas | Sewage | STP | Intercom | Rainwater harvesting | Storm water drains`
+- `internal_road_widths[]` ∈ `20 ft | 30 ft | 40 ft | 60 ft | Other` (free-text via `internal_road_widths_other`)
 
-   **VILLA config** (lines 591–605):
-   - Same common keys above.
-   - `villaConfiguration`: `configurationVillaFloorsPerUnit`, `configurationVillaWidth` (ft), `configurationVillaLength` (ft), `masterBedroomSizeSqft`.
-   - `mapping`: `supportClusterKey`, `supportClusterKeys[]`, `availableFacings[]`.
-   - Note: villa dims in ft, area still sqft, plot/land area NOT in this block.
+**§3 — Property-type-specific project fields**
+- **APARTMENT:** `tower_names_list[]`, `floors_each_tower` (e.g. `"G+12"` or `"12"`), `tower_units_list[]` (units count per tower, aligned by index with `tower_names_list`).
+- **VILLA:** `clusters_count`, `cluster_names[]`, `cluster_units_list[]`, **`floors_per_unit`** (kept per user spec).
+- **PLOT:** `clusters_count`, `cluster_names[]`, `cluster_units_list[]`. No floors.
 
-   **PLOT config** (lines 606–620):
-   - Common keys minus bedroom/bathroom (which will be null).
-   - `plotConfiguration`: `configurationPlotUnitAreaSqft`, `configurationPlotUnitAreaSqYd` (currently always null from builder; Terrisage accepts), `configurationPlotWidth` (ft), `configurationPlotLength` (ft).
-   - `mapping`: `supportClusterKey`, `supportClusterKeys[]`, `availableFacings[]`.
+**§4 — Configuration rows (`configurations` array / sheet)**
+Three sub-tables, one per property type, with canonical keys, synonyms (from `APARTMENT_CONFIG_SYNONYMS`, `VILLA_CONFIG_SYNONYMS`, `PLOT_CONFIG_SYNONYMS`), and examples:
+- **APARTMENT:** `type_no`, `name`, `bhk`, `carpet_area`, `built_up_area`, `super_built_up_area`, `balconies`, `balcony_area`, `common_area`, `utility_area`, `wall_area`, `bathrooms`, `facing`, `tower`, `floor_range`, `units_planned`, `unit_numbers`, `pricing_range`, `description`, `floorplan_crop_file`.
+- **VILLA:** apartment fields + `land_area`, `floors`.
+- **PLOT:** `type_no`, `name`, `plot_size_band`, `plot_area` (unit **`sq yd`** locked), `dimensions` (ft, e.g. `30 × 40`), `facing`, `units_planned`, `cluster`, `premium_marker`.
 
-7. **§6 `media[]`** (lines 896–919):
-   - Shape: `{ kind, url, caption, configRef, meta }`.
-   - `kind` enum on wire: `LOGO | PHOTO | VIDEO | FLOORPLAN | TOUR_3D | OTHER` only.
-   - Internal → wire mapping table (`MEDIA_KIND_MAP`): GALLERY/MASTER_PLAN/IMAGE/RENDER → PHOTO; FLOOR_PLAN → FLOORPLAN; WALKTHROUGH_VIDEO → VIDEO; VIRTUAL_TOUR → TOUR_3D; BROCHURE/DOCUMENT → OTHER (with `meta.mime = "application/pdf"`).
-   - `url` is a 24h signed URL.
-   - `configRef` ties FLOORPLAN to a specific configuration UUID.
+**§5 — Amenities, proximity, media companions**
+- `amenities.csv` → column `amenity_name` / `name` / `amenity`.
+- `proximity.csv` → `name` + `distance_km` (text like `"5 mins"` allowed). Also recognises embedded `proximity_highlights` / `proximity_matrix` `|`-separated lines, and per-category keys (`nearest_school`, `nearest_hospital`, `orr_access`, `metro_station`, `airport`, `key_business_district`, `nearest_leisure_landmark`) plus matching `*_travel_time` keys.
+- **Media files:** any image file is auto-attached. Filename matching: when a config row's `floorplan_crop_file` equals an uploaded image filename, the image is linked to that config as a FLOOR_PLAN.
 
-8. **§7 Support-only fields CRM ignores** — explicit list so ChatGPT doesn't treat them as required:
-   - `supportBuildingKey(s)`, `supportClusterKey(s)`, `projectTowerNames`, `internalNotes`.
+**§6 — Headers the Console silently ignores**
+- `field_review_note`, `review_note` (and any header that doesn't match a synonym is shown as "unmapped" — not an error, but ChatGPT should avoid inventing them).
+- Banks list, global-editor blobs (per user spec).
 
-9. **§8 End-to-end JSON examples** — one realistic payload per property type, generated by mentally running the builder over plausible input (correct enums, correct keys, sums tied to invariants). About 30-50 lines each.
+**§7 — JSON example payloads (one per property type)**
+Three compact `{ project, configurations, missing_fields }` examples — Apartment, Villa, Plot — using realistic Indian project data (~30-40 lines each) so ChatGPT has a literal template to mimic.
 
-10. **§9 Response & polling contract**
-    - `POST` → `202 { ingestJobId, sourceJobId, status: "QUEUED" }`
-    - `GET /api/integrations/projects/ingest-jobs?sourceJobId={sourceJobId}` → `{ status: QUEUED|RUNNING|SUCCEEDED|FAILED, projectId?, failureCode?, message? }`
-    - Standard error envelope: `{ success: false, error: { message, code, statusCode } }`.
+**§8 — ChatGPT do/don't cheat-sheet**
+- DO emit JSON in the shape of §7.
+- DO use only enum values from §2.
+- DO leave a field omitted (or list in `missing_fields[]`) when the source is silent — never guess.
+- DON'T invent banks, global editor blocks, or fields outside the synonym tables.
+- DON'T mix units: sqft for built area, sq yd for plot area, ft for plot dimensions.
 
-11. **§10 Quick "do/don't" cheat-sheet for ChatGPT** — 10–15 bullet points: case-sensitive enums; never invent kinds like `GALLERY`/`FLOOR_PLAN`/`BROCHURE` on the wire; utilities are objects not strings; dims in ft; areas in sqft; INR absolute integers; sums must tie out.
+## QA
 
-## Deliverables
+After writing the .docx I will render every page to image and eyeball for:
+- enum cells clipped or wrapping mid-word,
+- synonym tables overflowing the page,
+- JSON example blocks not breaking across pages cleanly.
 
-- `/mnt/documents/terrisage-project-ingest-fields_chatgpt.md`
-- `/mnt/documents/terrisage-project-ingest-fields_chatgpt.docx`
-- QA: render docx pages to images, eyeball every page for table overflow / clipped enum cells before handing over.
+Fix and re-render until clean, then emit two `<presentation-artifact>` tags (one .md, one .docx).
 
 ## Out of scope
 
-No code, schema, edge function, or UI changes. The builder already emits the correct shape — this is a fresh, code-grounded reference for ChatGPT to use when transforming raw brochure data into builder-ready input.
+- No edits to `terrisage-project-push` payload doc (CRM-bound, already correct).
+- No code changes anywhere — pure documentation derived from the Import workspace + auto-mapper.
