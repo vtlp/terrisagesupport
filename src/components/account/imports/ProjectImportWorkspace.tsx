@@ -228,7 +228,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [savingConfigs, setSavingConfigs] = useState(false);
   const [savingMedia, setSavingMedia] = useState(false);
 
-  const saveAllConfigs = async () => {
+  const saveAllConfigs = async (silent = false) => {
     setSavingConfigs(true);
     const results = await Promise.all(configs.map(c =>
       supabase.from('import_project_configs')
@@ -237,13 +237,14 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     ));
     setSavingConfigs(false);
     const firstErr = results.find(r => r.error)?.error;
-    if (firstErr) { toast.error(firstErr.message); return; }
+    if (firstErr) { toast.error(firstErr.message); return false; }
     await logActivity(supabase, job.id, 'configurations_saved', { count: configs.length }, currentUser?.user_id);
-    toast.success(`Saved ${configs.length} configuration${configs.length === 1 ? '' : 's'}`);
+    if (!silent) toast.success(`Saved ${configs.length} configuration${configs.length === 1 ? '' : 's'}`);
     onChange?.();
+    return true;
   };
 
-  const saveAllMedia = async () => {
+  const saveAllMedia = async (silent = false) => {
     setSavingMedia(true);
     const results = await Promise.all(media.map(m =>
       supabase.from('import_project_media')
@@ -257,18 +258,23 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     ));
     setSavingMedia(false);
     const firstErr = results.find(r => r.error)?.error;
-    if (firstErr) { toast.error(firstErr.message); return; }
+    if (firstErr) { toast.error(firstErr.message); return false; }
     await logActivity(supabase, job.id, 'media_saved', { count: media.length }, currentUser?.user_id);
-    toast.success(`Saved ${media.length} media item${media.length === 1 ? '' : 's'}`);
+    if (!silent) toast.success(`Saved ${media.length} media item${media.length === 1 ? '' : 's'}`);
     onChange?.();
+    return true;
   };
 
   const isDirty = dirty;
 
   const saveAll = async () => {
-    await Promise.all([saveRep(), saveReview(), saveAllConfigs(), saveAllMedia()]);
-    setDirty(false);
+    const results = await Promise.all([saveRep(true), saveReview(true), saveAllConfigs(true), saveAllMedia(true)]);
+    if (results.every(Boolean)) {
+      setDirty(false);
+      toast.success('All changes saved');
+    }
   };
+
 
   const refresh = useCallback(async () => {
     const [{ data: cfg }, { data: m }] = await Promise.all([
