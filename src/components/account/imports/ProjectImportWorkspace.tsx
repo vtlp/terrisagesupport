@@ -253,6 +253,34 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     onChange?.();
   };
 
+  // Dirty = local rep / overview / amenities / proximity / banks differ from saved job.
+  // Configs and media auto-persist per field, so they don't contribute to the indicator,
+  // but the "Save all" button still flushes them defensively.
+  const isDirty = useMemo(() => {
+    const savedRep = (job.representative_input as Rep) || {};
+    const savedExtracted = (job.extracted_data as {
+      projectData?: ProjectExtract;
+      amenities?: string[];
+      proximityMatrix?: Array<{ name: string; distance_km: number | string }>;
+      approvedBanks?: string[];
+    }) || {};
+    const savedProject = savedExtracted.projectData || {};
+    const savedAmenities = (savedExtracted.amenities || []).join(', ');
+    const savedProximity = savedExtracted.proximityMatrix || [];
+    const savedBanks = (savedExtracted.approvedBanks || []).join(', ');
+    return (
+      JSON.stringify(rep) !== JSON.stringify(savedRep) ||
+      JSON.stringify(project) !== JSON.stringify(savedProject) ||
+      amenities !== savedAmenities ||
+      JSON.stringify(proximity) !== JSON.stringify(savedProximity) ||
+      banks !== savedBanks
+    );
+  }, [rep, project, amenities, proximity, banks, job.representative_input, job.extracted_data]);
+
+  const saveAll = async () => {
+    await Promise.all([saveRep(), saveReview(), saveAllConfigs(), saveAllMedia()]);
+  };
+
   const refresh = useCallback(async () => {
     const [{ data: cfg }, { data: m }] = await Promise.all([
       supabase.from('import_project_configs').select('*').eq('job_id', job.id).order('sort_order'),
@@ -795,20 +823,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">{job.label || `Job ${job.id.slice(0, 8)}`} · {job.source_files_count} files</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={async () => {
-                  await Promise.all([saveRep(), saveReview(), saveAllConfigs(), saveAllMedia()]);
-                  toast.success('All import data saved');
-                }}
-                disabled={savingRep || savingReview || savingConfigs || savingMedia}
-              >
-                {(savingRep || savingReview || savingConfigs || savingMedia) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                <Save className="h-4 w-4 mr-1" /> Save all import data
-              </Button>
-              <Badge className={`text-[10px] ${STATUS_TONE[job.status as ImportStatus]}`}>{STATUS_LABEL[job.status as ImportStatus]}</Badge>
-            </div>
+            <Badge className={`text-[10px] ${STATUS_TONE[job.status as ImportStatus]}`}>{STATUS_LABEL[job.status as ImportStatus]}</Badge>
           </div>
         </CardHeader>
       </Card>
@@ -1581,7 +1596,34 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
         </TabsContent>
 
         {/* VALIDATE & IMPORT */}
-        <TabsContent value="validate">
+        <TabsContent value="validate" className="space-y-3">
+          <Card>
+            <CardContent className="pt-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 text-sm">
+                {isDirty ? (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <span className="text-amber-700 dark:text-amber-400 font-medium">You have unsaved work</span>
+                    <span className="text-xs text-muted-foreground">Overview, representative, amenities or proximity edits are not yet saved.</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    <span className="text-success font-medium">All changes saved</span>
+                  </>
+                )}
+              </div>
+              <Button
+                size="sm"
+                onClick={saveAll}
+                disabled={savingRep || savingReview || savingConfigs || savingMedia}
+                variant={isDirty ? 'default' : 'outline'}
+              >
+                {(savingRep || savingReview || savingConfigs || savingMedia) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Save className="h-4 w-4 mr-1" /> Save all import data
+              </Button>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader><CardTitle className="text-sm">Validation</CardTitle></CardHeader>
             <CardContent className="space-y-3">
