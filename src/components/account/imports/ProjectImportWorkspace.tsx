@@ -173,11 +173,21 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const { currentUser } = useUser();
   const propertyType = (job.property_type ?? 'APARTMENT') as PropertyType;
 
-  const [rep, setRep] = useState<Rep>(((job.representative_input as Rep) || {}));
-  const [project, setProject] = useState<ProjectExtract>(((job.extracted_data as { projectData?: ProjectExtract })?.projectData || {}));
-  const [amenities, setAmenities] = useState<string>(((job.extracted_data as { amenities?: string[] })?.amenities || []).join(', '));
-  const [proximity, setProximity] = useState<Array<{ name: string; distance_km: number | string }>>(((job.extracted_data as { proximityMatrix?: Array<{ name: string; distance_km: number | string }> })?.proximityMatrix || []));
-  const [banks, setBanks] = useState<string>(((job.extracted_data as { approvedBanks?: string[] })?.approvedBanks || []).join(', '));
+  const [rep, _setRep] = useState<Rep>(((job.representative_input as Rep) || {}));
+  const [project, _setProject] = useState<ProjectExtract>(((job.extracted_data as { projectData?: ProjectExtract })?.projectData || {}));
+  const [amenities, _setAmenities] = useState<string>(((job.extracted_data as { amenities?: string[] })?.amenities || []).join(', '));
+  const [proximity, _setProximity] = useState<Array<{ name: string; distance_km: number | string }>>(((job.extracted_data as { proximityMatrix?: Array<{ name: string; distance_km: number | string }> })?.proximityMatrix || []));
+  const [banks, _setBanks] = useState<string>(((job.extracted_data as { approvedBanks?: string[] })?.approvedBanks || []).join(', '));
+
+  // Explicit dirty flag — only flipped true by user interactions via the wrapper
+  // setters below. Effect-driven syncs and auto-derivations use the underscore
+  // setters so they don't falsely mark the form dirty on initial load.
+  const [dirty, setDirty] = useState(false);
+  const setRep: typeof _setRep = (v) => { _setRep(v); setDirty(true); };
+  const setProject: typeof _setProject = (v) => { _setProject(v); setDirty(true); };
+  const setAmenities: typeof _setAmenities = (v) => { _setAmenities(v); setDirty(true); };
+  const setProximity: typeof _setProximity = (v) => { _setProximity(v); setDirty(true); };
+  const setBanks: typeof _setBanks = (v) => { _setBanks(v); setDirty(true); };
 
   const [configs, setConfigs] = useState<ImportConfig[]>([]);
   const [media, setMedia] = useState<ImportMedia[]>([]);
