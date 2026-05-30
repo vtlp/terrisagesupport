@@ -215,6 +215,43 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
   const [hasOwner, setHasOwner] = useState<boolean>(!!(job as { owner_account_id?: string | null }).owner_account_id);
   const [savingRep, setSavingRep] = useState(false);
   const [savingReview, setSavingReview] = useState(false);
+  const [savingConfigs, setSavingConfigs] = useState(false);
+  const [savingMedia, setSavingMedia] = useState(false);
+
+  const saveAllConfigs = async () => {
+    setSavingConfigs(true);
+    const results = await Promise.all(configs.map(c =>
+      supabase.from('import_project_configs')
+        .update({ data: (c.data ?? {}) as never, sort_order: c.sort_order ?? 0 })
+        .eq('id', c.id)
+    ));
+    setSavingConfigs(false);
+    const firstErr = results.find(r => r.error)?.error;
+    if (firstErr) { toast.error(firstErr.message); return; }
+    await logActivity(supabase, job.id, 'configurations_saved', { count: configs.length }, currentUser?.user_id);
+    toast.success(`Saved ${configs.length} configuration${configs.length === 1 ? '' : 's'}`);
+    onChange?.();
+  };
+
+  const saveAllMedia = async () => {
+    setSavingMedia(true);
+    const results = await Promise.all(media.map(m =>
+      supabase.from('import_project_media')
+        .update({
+          caption: m.caption ?? null,
+          category: m.category,
+          review_state: m.review_state,
+          config_id: m.config_id ?? null,
+        } as never)
+        .eq('id', m.id)
+    ));
+    setSavingMedia(false);
+    const firstErr = results.find(r => r.error)?.error;
+    if (firstErr) { toast.error(firstErr.message); return; }
+    await logActivity(supabase, job.id, 'media_saved', { count: media.length }, currentUser?.user_id);
+    toast.success(`Saved ${media.length} media item${media.length === 1 ? '' : 's'}`);
+    onChange?.();
+  };
 
   const refresh = useCallback(async () => {
     const [{ data: cfg }, { data: m }] = await Promise.all([
