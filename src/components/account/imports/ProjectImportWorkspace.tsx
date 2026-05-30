@@ -263,32 +263,11 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     onChange?.();
   };
 
-  // Dirty = local rep / overview / amenities / proximity / banks differ from saved job.
-  // Configs and media auto-persist per field, so they don't contribute to the indicator,
-  // but the "Save all" button still flushes them defensively.
-  const isDirty = useMemo(() => {
-    const savedRep = (job.representative_input as Rep) || {};
-    const savedExtracted = (job.extracted_data as {
-      projectData?: ProjectExtract;
-      amenities?: string[];
-      proximityMatrix?: Array<{ name: string; distance_km: number | string }>;
-      approvedBanks?: string[];
-    }) || {};
-    const savedProject = savedExtracted.projectData || {};
-    const savedAmenities = (savedExtracted.amenities || []).join(', ');
-    const savedProximity = savedExtracted.proximityMatrix || [];
-    const savedBanks = (savedExtracted.approvedBanks || []).join(', ');
-    return (
-      JSON.stringify(rep) !== JSON.stringify(savedRep) ||
-      JSON.stringify(project) !== JSON.stringify(savedProject) ||
-      amenities !== savedAmenities ||
-      JSON.stringify(proximity) !== JSON.stringify(savedProximity) ||
-      banks !== savedBanks
-    );
-  }, [rep, project, amenities, proximity, banks, job.representative_input, job.extracted_data]);
+  const isDirty = dirty;
 
   const saveAll = async () => {
     await Promise.all([saveRep(), saveReview(), saveAllConfigs(), saveAllMedia()]);
+    setDirty(false);
   };
 
   const refresh = useCallback(async () => {
