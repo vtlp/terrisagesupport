@@ -1264,9 +1264,14 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
           })()}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm">Configurations · {PROPERTY_TYPE_LABEL[propertyType]}</CardTitle>
-                <Button size="sm" onClick={addConfig}><Plus className="h-4 w-4 mr-1" />Add configuration</Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={saveAllConfigs} disabled={savingConfigs || configs.length === 0}>
+                    {savingConfigs && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Save className="h-4 w-4 mr-1" /> Save
+                  </Button>
+                  <Button size="sm" onClick={addConfig}><Plus className="h-4 w-4 mr-1" />Add configuration</Button>
+                </div>
               </div>
               {propertyType === 'PLOT' && (
                 <p className="text-xs text-muted-foreground">Group similar plots into families. Use the size band to consolidate dozens of unique plot sizes into a manageable set.</p>
