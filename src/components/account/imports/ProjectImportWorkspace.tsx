@@ -401,7 +401,7 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     }
   }, [job, currentUser?.user_id, refresh, onChange]);
 
-  const saveReview = async () => {
+  const saveReview = async (silent = false) => {
     setSavingReview(true);
     const merged = {
       ...((job.extracted_data as object) || {}),
@@ -412,10 +412,11 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
     };
     const { error } = await supabase.from('import_jobs').update({ extracted_data: merged as never }).eq('id', job.id);
     setSavingReview(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); return false; }
     await logActivity(supabase, job.id, 'review_edited', {}, currentUser?.user_id);
-    toast.success('Review saved');
+    if (!silent) toast.success('Review saved');
     onChange?.();
+    return true;
   };
 
   const updateConfig = async (id: string, patch: Record<string, unknown>) => {
