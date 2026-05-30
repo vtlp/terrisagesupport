@@ -795,7 +795,20 @@ export function ProjectImportWorkspace({ job, onChange }: { job: ImportJob; onCh
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">{job.label || `Job ${job.id.slice(0, 8)}`} · {job.source_files_count} files</p>
             </div>
-            <Badge className={`text-[10px] ${STATUS_TONE[job.status as ImportStatus]}`}>{STATUS_LABEL[job.status as ImportStatus]}</Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  await Promise.all([saveRep(), saveReview(), saveAllConfigs(), saveAllMedia()]);
+                  toast.success('All import data saved');
+                }}
+                disabled={savingRep || savingReview || savingConfigs || savingMedia}
+              >
+                {(savingRep || savingReview || savingConfigs || savingMedia) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Save className="h-4 w-4 mr-1" /> Save all import data
+              </Button>
+              <Badge className={`text-[10px] ${STATUS_TONE[job.status as ImportStatus]}`}>{STATUS_LABEL[job.status as ImportStatus]}</Badge>
+            </div>
           </div>
         </CardHeader>
       </Card>
