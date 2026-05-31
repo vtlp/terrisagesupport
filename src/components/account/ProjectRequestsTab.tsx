@@ -222,6 +222,7 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
                         onReject={() => { setRejectFor(r); setRejectReason(''); }}
                         onStartImport={() => onStartImport(r)}
                         onCancel={() => onCancel(r)}
+                        onChangeStatus={(s) => onChangeStatus(r, s)}
                       />
                     ))}
                   </div>
