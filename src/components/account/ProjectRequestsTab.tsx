@@ -301,8 +301,8 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Approve/Reject removed — status is set via the dropdown below. */}
-          {/* Start import: available whenever no import has been created yet (and not in a final state). */}
-          {!r.import_job_id && r.status !== 'REJECTED' && r.status !== 'CANCELLED' && r.status !== 'LIVE' && (
+          {/* Start import: only available once status is set to Import in progress. */}
+          {!r.import_job_id && r.status === 'IMPORT_IN_PROGRESS' && (
             <Button size="sm" onClick={onStartImport} disabled={busy}>
               {busy && <Loader2 className="h-3 w-3 animate-spin mr-1" />}Start import
             </Button>
