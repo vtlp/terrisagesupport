@@ -42,4 +42,8 @@ verify_jwt = false
 [functions.terrisage-tenant-lookup]
 verify_jwt = false
 
+[functions.landing-enquiry-webhook]
+verify_jwt = false
+
+
 
