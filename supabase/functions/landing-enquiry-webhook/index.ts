@@ -57,6 +57,8 @@ Deno.serve(async (req) => {
   const extraPayload = (body.payload && typeof body.payload === 'object') ? body.payload as Record<string, unknown> : {};
 
   if (!fullName) return json({ ok: false, error: 'MISSING_FIELD', field: 'full_name' }, 400);
+  if (!email) return json({ ok: false, error: 'MISSING_FIELD', field: 'email' }, 400);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ ok: false, error: 'INVALID_EMAIL' }, 400);
   if (!phone || normalisePhone(phone).length < 6) return json({ ok: false, error: 'INVALID_PHONE' }, 400);
 
   const supabase = createClient(
