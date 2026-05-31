@@ -49,12 +49,24 @@ Deno.serve(async (req) => {
     return json({ ok: true, skipped: true });
   }
 
+  // Map our internal status enum to the vocabulary Terrisage expects on their side.
+  const STATUS_TO_TERRISAGE: Record<string, string> = {
+    PENDING_REVIEW: 'PENDING_REVIEW',
+    APPROVED: 'APPROVED',
+    REJECTED: 'REJECTED',
+    IMPORT_IN_PROGRESS: 'PENDING',
+    LIVE: 'LIVE',
+    CANCELLED: 'CANCELLED',
+  };
+  const outboundStatus = STATUS_TO_TERRISAGE[pr.status] ?? pr.status;
+
   const payload = {
     tenantId: acct.tenant_id,
     externalRequestId: pr.external_request_id,
     requestId: pr.id,
     projectName: pr.project_name,
-    status: pr.status,
+    status: outboundStatus,
+    internalStatus: pr.status,
     liveProjectId: pr.crm_project_id,
     rejectionReason: pr.rejection_reason,
     at: new Date().toISOString(),
