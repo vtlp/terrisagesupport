@@ -88,7 +88,7 @@ export async function setRequestStatus(
     patch.cancelled_at = nowIso;
     patch.cancelled_by = userId;
   }
-  const { error } = await supabase.from('project_requests').update(patch).eq('id', req.id);
+  const { error } = await supabase.from('project_requests').update(patch as never).eq('id', req.id);
   if (error) throw error;
   await logActivity(
     req.account_id,
