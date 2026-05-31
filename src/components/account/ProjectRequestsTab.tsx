@@ -19,6 +19,11 @@ import {
 
 interface Props { accountId: string; accountName?: string; }
 
+// Statuses allowed in the manual override / filter dropdowns.
+// Cancelled and Live are hidden — Live is reached automatically after import completes,
+// and Cancelled is not part of the Terrisage sync contract.
+const SELECTABLE_STATUSES: ProjectRequestStatus[] = ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'IMPORT_IN_PROGRESS'];
+
 export function ProjectRequestsTab({ accountId, accountName }: Props) {
   const { currentUser } = useUser();
   const [rows, setRows] = useState<ProjectRequest[]>([]);
@@ -192,7 +197,7 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
                 <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All statuses</SelectItem>
-                  {(Object.keys(STATUS_LABEL) as ProjectRequestStatus[]).map(s => (
+                  {SELECTABLE_STATUSES.map(s => (
                     <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
                   ))}
                 </SelectContent>
@@ -322,7 +327,7 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(STATUS_LABEL) as ProjectRequestStatus[]).map(s => (
+              {(SELECTABLE_STATUSES.includes(r.status) ? SELECTABLE_STATUSES : [r.status, ...SELECTABLE_STATUSES]).map(s => (
                 <SelectItem key={s} value={s}>Set: {STATUS_LABEL[s]}</SelectItem>
               ))}
             </SelectContent>
