@@ -14,7 +14,7 @@ import { useUser } from '@/context/UserContext';
 import {
   type ProjectRequest, type ProjectRequestStatus,
   STATUS_LABEL, STATUS_TONE,
-  approveRequest, rejectRequest, cancelRequest, startImportFromRequest,
+  approveRequest, rejectRequest, cancelRequest, startImportFromRequest, setRequestStatus,
 } from '@/lib/projectRequestsApi';
 
 interface Props { accountId: string; accountName?: string; }
