@@ -300,12 +300,7 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {r.status === 'PENDING_REVIEW' && (
-            <>
-              <Button size="sm" onClick={onApprove} disabled={busy}>{busy && <Loader2 className="h-3 w-3 animate-spin mr-1" />}Approve</Button>
-              <Button size="sm" variant="outline" onClick={onReject} disabled={busy}>Reject</Button>
-            </>
-          )}
+          {/* Approve/Reject removed — status is set via the dropdown below. */}
           {r.status === 'APPROVED' && (
             <Button size="sm" onClick={onStartImport} disabled={busy}>
               {busy && <Loader2 className="h-3 w-3 animate-spin mr-1" />}Start import
@@ -328,7 +323,7 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
             </SelectTrigger>
             <SelectContent>
               {(SELECTABLE_STATUSES.includes(r.status) ? SELECTABLE_STATUSES : [r.status, ...SELECTABLE_STATUSES]).map(s => (
-                <SelectItem key={s} value={s}>Set: {STATUS_LABEL[s]}</SelectItem>
+                <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
