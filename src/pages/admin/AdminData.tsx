@@ -45,10 +45,11 @@ export default function AdminData() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Include both global imports (account_id null) and account-seeded imports
+    // created from a project request, so staff can pick them up here.
     const { data, error } = await supabase
       .from('import_jobs')
       .select('*')
-      .is('account_id', null)
       .eq('kind', 'PROJECT')
       .order('updated_at', { ascending: false });
     if (error) toast.error(error.message);
@@ -57,6 +58,18 @@ export default function AdminData() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-select a job when the URL hash points at one (e.g. deep link from a
+  // project request's "Open import" button).
+  useEffect(() => {
+    const applyHash = () => {
+      const h = window.location.hash.replace(/^#/, '');
+      if (h && jobs.some(j => j.id === h)) setSelectedId(h);
+    };
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
+  }, [jobs]);
 
   useEffect(() => {
     const ch = supabase.channel('admin-data-imports')
