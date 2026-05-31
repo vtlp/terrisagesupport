@@ -127,6 +127,24 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
     } finally { setBusyId(null); }
   };
 
+  const onChangeStatus = async (r: ProjectRequest, next: ProjectRequestStatus) => {
+    if (next === r.status) return;
+    if (next === 'REJECTED') {
+      // Reuse the existing reject dialog so staff can capture a reason.
+      setRejectFor(r); setRejectReason('');
+      return;
+    }
+    if (!confirm(`Change status to "${STATUS_LABEL[next]}" and notify Terrisage?`)) return;
+    setBusyId(r.id);
+    try {
+      await setRequestStatus(r, next, currentUser?.user_id ?? null);
+      pushToast(toast.success(`Status set to ${STATUS_LABEL[next]} for ${accountName || 'account'}`));
+      await load();
+    } catch (e) {
+      pushToast(toast.error((e as Error).message));
+    } finally { setBusyId(null); }
+  };
+
   const onSync = async () => {
     setSyncing(true);
     try {
