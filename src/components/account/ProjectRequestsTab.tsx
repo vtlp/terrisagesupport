@@ -317,6 +317,16 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
           {!isFinal && r.status !== 'IMPORT_IN_PROGRESS' && (
             <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
           )}
+          <Select value={r.status} onValueChange={(v) => onChangeStatus(v as ProjectRequestStatus)} disabled={busy}>
+            <SelectTrigger className="h-8 w-44" title="Manually override status (syncs to Terrisage)">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(STATUS_LABEL) as ProjectRequestStatus[]).map(s => (
+                <SelectItem key={s} value={s}>Set: {STATUS_LABEL[s]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </div>
