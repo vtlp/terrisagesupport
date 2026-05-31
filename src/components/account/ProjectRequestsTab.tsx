@@ -307,10 +307,10 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
               {busy && <Loader2 className="h-3 w-3 animate-spin mr-1" />}Start import
             </Button>
           )}
-          {/* Open import: always available once a job exists. */}
+          {/* Open import: always available once a job exists. Primary projects are imported from Admin → Data. */}
           {r.import_job_id && (
             <Button size="sm" variant="outline" asChild>
-              <a href={`?tab=imports#${r.import_job_id}`}><ExternalLink className="h-3 w-3 mr-1" />Open import</a>
+              <a href={`/admin/data#${r.import_job_id}`}><ExternalLink className="h-3 w-3 mr-1" />Open import</a>
             </Button>
           )}
           {r.status === 'LIVE' && (
