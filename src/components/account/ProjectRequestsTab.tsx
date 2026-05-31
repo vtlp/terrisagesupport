@@ -314,9 +314,6 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
           {r.status === 'LIVE' && (
             <Badge variant="outline" className={STATUS_TONE.LIVE}>Project live</Badge>
           )}
-          {!isFinal && r.status !== 'IMPORT_IN_PROGRESS' && (
-            <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
-          )}
           <Select value={r.status} onValueChange={(v) => onChangeStatus(v as ProjectRequestStatus)} disabled={busy}>
             <SelectTrigger className="h-8 w-44" title="Manually override status (syncs to Terrisage)">
               <SelectValue />
