@@ -323,7 +323,7 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
             </SelectTrigger>
             <SelectContent>
               {(SELECTABLE_STATUSES.includes(r.status) ? SELECTABLE_STATUSES : [r.status, ...SELECTABLE_STATUSES]).map(s => (
-                <SelectItem key={s} value={s}>Set: {STATUS_LABEL[s]}</SelectItem>
+                <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
