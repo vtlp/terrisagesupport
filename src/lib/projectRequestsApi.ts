@@ -66,6 +66,40 @@ export async function cancelRequest(req: ProjectRequest, userId: string | null) 
 }
 
 /**
+ * Manually set a project request to any status and notify the CRM.
+ * Used for staff overrides (e.g. force-mark LIVE or revert to PENDING_REVIEW).
+ */
+export async function setRequestStatus(
+  req: ProjectRequest,
+  newStatus: ProjectRequestStatus,
+  userId: string | null,
+  reason?: string,
+) {
+  const patch: Record<string, unknown> = { status: newStatus };
+  const nowIso = new Date().toISOString();
+  if (newStatus === 'APPROVED' || newStatus === 'REJECTED') {
+    patch.reviewed_at = nowIso;
+    patch.reviewed_by = userId;
+  }
+  if (newStatus === 'REJECTED') {
+    patch.rejection_reason = reason?.trim() || req.rejection_reason || 'No reason provided';
+  }
+  if (newStatus === 'CANCELLED') {
+    patch.cancelled_at = nowIso;
+    patch.cancelled_by = userId;
+  }
+  const { error } = await supabase.from('project_requests').update(patch as never).eq('id', req.id);
+  if (error) throw error;
+  await logActivity(
+    req.account_id,
+    `Project request status changed manually to ${newStatus}: ${req.project_name}`,
+    { kind: 'PROJECT_REQUEST_STATUS_OVERRIDE', request_id: req.id, from: req.status, to: newStatus, reason: reason ?? null },
+  );
+  notifyCrm(req.id);
+}
+
+
+/**
  * Convert an APPROVED request into an import_jobs row (kind=PROJECT) and link them.
  * Returns the new import job id.
  */
