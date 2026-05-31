@@ -197,7 +197,7 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
                 <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All statuses</SelectItem>
-                  {(Object.keys(STATUS_LABEL) as ProjectRequestStatus[]).map(s => (
+                  {SELECTABLE_STATUSES.map(s => (
                     <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
                   ))}
                 </SelectContent>
