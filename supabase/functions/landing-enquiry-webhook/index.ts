@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
   const city = body.city ? String(body.city).trim() : null;
   let tenancyType = body.tenancy_type ? String(body.tenancy_type).toUpperCase() : null;
   if (tenancyType && !TENANCIES.has(tenancyType)) tenancyType = null;
-  const source = (body.source ? String(body.source).trim() : '') || 'Landing page';
+  const source = 'Landing page';
   const notes = body.notes ? String(body.notes).trim() : '';
   const whatsappEnabled = body.whatsapp_enabled === undefined ? true : Boolean(body.whatsapp_enabled);
   const extraPayload = (body.payload && typeof body.payload === 'object') ? body.payload as Record<string, unknown> : {};
