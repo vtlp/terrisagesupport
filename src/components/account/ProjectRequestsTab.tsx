@@ -253,9 +253,10 @@ export function ProjectRequestsTab({ accountId, accountName }: Props) {
   );
 }
 
-function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel }: {
+function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onChangeStatus }: {
   r: ProjectRequest; busy: boolean;
   onApprove: () => void; onReject: () => void; onStartImport: () => void; onCancel: () => void;
+  onChangeStatus: (s: ProjectRequestStatus) => void;
 }) {
   const isFinal = r.status === 'LIVE' || r.status === 'REJECTED' || r.status === 'CANCELLED';
 
