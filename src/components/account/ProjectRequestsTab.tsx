@@ -19,6 +19,11 @@ import {
 
 interface Props { accountId: string; accountName?: string; }
 
+// Statuses allowed in the manual override / filter dropdowns.
+// Cancelled and Live are hidden — Live is reached automatically after import completes,
+// and Cancelled is not part of the Terrisage sync contract.
+const SELECTABLE_STATUSES: ProjectRequestStatus[] = ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'IMPORT_IN_PROGRESS'];
+
 export function ProjectRequestsTab({ accountId, accountName }: Props) {
   const { currentUser } = useUser();
   const [rows, setRows] = useState<ProjectRequest[]>([]);
