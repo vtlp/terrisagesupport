@@ -301,12 +301,14 @@ function RequestRow({ r, busy, onApprove, onReject, onStartImport, onCancel, onC
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Approve/Reject removed — status is set via the dropdown below. */}
-          {r.status === 'APPROVED' && (
+          {/* Start import: available whenever no import has been created yet (and not in a final state). */}
+          {!r.import_job_id && r.status !== 'REJECTED' && r.status !== 'CANCELLED' && r.status !== 'LIVE' && (
             <Button size="sm" onClick={onStartImport} disabled={busy}>
               {busy && <Loader2 className="h-3 w-3 animate-spin mr-1" />}Start import
             </Button>
           )}
-          {r.status === 'IMPORT_IN_PROGRESS' && r.import_job_id && (
+          {/* Open import: always available once a job exists. */}
+          {r.import_job_id && (
             <Button size="sm" variant="outline" asChild>
               <a href={`?tab=imports#${r.import_job_id}`}><ExternalLink className="h-3 w-3 mr-1" />Open import</a>
             </Button>
