@@ -2,6 +2,7 @@
 // Uses the shared SEAT_SUPPORT_INTEGRATION_API_KEY. Paginates via cursor.
 // Dedupes by payload.terrisage_show_interest_id so re-runs are idempotent.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { requireStaffOrService } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,6 +47,9 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
+
+  const auth = await requireStaffOrService(req, supabase);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
 
   let fetched = 0, inserted = 0, duplicates = 0, skipped = 0, errors = 0;
   let cursor: string | null = null;

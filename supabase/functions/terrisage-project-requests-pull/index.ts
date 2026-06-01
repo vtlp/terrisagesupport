@@ -2,6 +2,7 @@
 // into public.project_requests, matching by accounts.tenant_id.
 // Runs on a schedule (pg_cron) and is also callable manually from the UI.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { requireStaffOrService } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,6 +40,9 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
+
+  const auth = await requireStaffOrService(req, supabase);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
 
   // Optional scoping: when called from an account page, only count/upsert
   // requests that belong to that account's tenant.

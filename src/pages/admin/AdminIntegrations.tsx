@@ -20,6 +20,7 @@ export default function AdminIntegrations() {
   const [exchanging, setExchanging] = useState(false);
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [hasClientSecret, setHasClientSecret] = useState(false);
   const [calendarId, setCalendarId] = useState('primary');
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [connectedAt, setConnectedAt] = useState<string | null>(null);
@@ -29,20 +30,35 @@ export default function AdminIntegrations() {
 
   const load = async () => {
     setLoading(true);
+    // SECURITY: never pull google_client_secret or google_refresh_token values into
+    // the browser. Select only non-sensitive metadata. Presence of a saved
+    // refresh token (hasRefreshToken) is derived server-side via a count below.
     const { data, error } = await supabase
       .from('integration_settings')
-      .select('*')
+      .select('google_client_id, google_calendar_id, google_account_email, connected_at')
       .eq('provider', 'google_calendar')
       .maybeSingle();
     if (error) toast.error('Failed to load settings');
     if (data) {
       setClientId(data.google_client_id ?? '');
-      setClientSecret(data.google_client_secret ?? '');
+      setClientSecret('');
       setCalendarId(data.google_calendar_id ?? 'primary');
       setConnectedEmail(data.google_account_email);
       setConnectedAt(data.connected_at);
-      setHasRefreshToken(!!data.google_refresh_token);
     }
+    // Boolean-only check for refresh token and secret presence (no values returned).
+    const { count: tokenCount } = await supabase
+      .from('integration_settings')
+      .select('provider', { count: 'exact', head: true })
+      .eq('provider', 'google_calendar')
+      .not('google_refresh_token', 'is', null);
+    setHasRefreshToken((tokenCount ?? 0) > 0);
+    const { count: secretCount } = await supabase
+      .from('integration_settings')
+      .select('provider', { count: 'exact', head: true })
+      .eq('provider', 'google_calendar')
+      .not('google_client_secret', 'is', null);
+    setHasClientSecret((secretCount ?? 0) > 0);
     setLoading(false);
   };
 
@@ -78,14 +94,31 @@ export default function AdminIntegrations() {
 
   const save = async () => {
     setSaving(true);
-    const { error } = await supabase.from('integration_settings').update({
+    // SECURITY: only persist a new client secret when the admin actually types one.
+    // The existing secret value is never loaded into the browser, so an empty
+    // input means "leave the saved secret untouched".
+    const payload: {
+      google_client_id: string | null;
+      google_calendar_id: string;
+      google_client_secret?: string;
+    } = {
       google_client_id: clientId.trim() || null,
-      google_client_secret: clientSecret.trim() || null,
       google_calendar_id: calendarId.trim() || 'primary',
-    }).eq('provider', 'google_calendar');
+    };
+    if (clientSecret.trim()) {
+      payload.google_client_secret = clientSecret.trim();
+    }
+    const { error } = await supabase
+      .from('integration_settings')
+      .update(payload)
+      .eq('provider', 'google_calendar');
     setSaving(false);
     if (error) toast.error(error.message);
-    else toast.success('Saved');
+    else {
+      toast.success('Saved');
+      setClientSecret('');
+      if (clientSecret.trim()) setHasClientSecret(true);
+    }
   };
 
   const connect = async () => {
@@ -188,10 +221,18 @@ export default function AdminIntegrations() {
                        placeholder="xxxx.apps.googleusercontent.com" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="csecret">Google OAuth Client Secret</Label>
+                <Label htmlFor="csecret" className="flex items-center gap-2">
+                  Google OAuth Client Secret
+                  {hasClientSecret && (
+                    <Badge variant="secondary" className="text-xs">Saved</Badge>
+                  )}
+                </Label>
                 <Input id="csecret" type="password" value={clientSecret}
                        onChange={(e) => setClientSecret(e.target.value)}
-                       placeholder="GOCSPX-..." />
+                       placeholder={hasClientSecret ? '•••••••• (leave blank to keep saved secret)' : 'GOCSPX-...'} />
+                <p className="text-xs text-muted-foreground">
+                  For security, the saved secret is never sent to the browser. Enter a new value only to replace it.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="calid">Calendar ID</Label>
@@ -207,7 +248,7 @@ export default function AdminIntegrations() {
                 <Button onClick={save} disabled={saving} variant="outline">
                   {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Save
                 </Button>
-                <Button onClick={connect} disabled={saving || exchanging || !clientId || !clientSecret}>
+                <Button onClick={connect} disabled={saving || exchanging || !clientId || (!clientSecret && !hasClientSecret)}>
                   {exchanging && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {hasRefreshToken ? 'Reconnect Google account' : 'Connect Google account'}
                 </Button>

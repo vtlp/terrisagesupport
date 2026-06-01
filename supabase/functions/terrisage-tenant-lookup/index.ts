@@ -1,6 +1,7 @@
 // Looks up a Terrisage tenant ID using the account's super-user (owner) email.
 // Called from AccountDetail "Sync" button next to the Tenant ID field.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { requireStaffOrService } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,6 +37,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    const auth = await requireStaffOrService(req, supabase);
+    if (!auth.ok) return json({ error: auth.error }, auth.status);
 
     const { data: acct, error: acctErr } = await supabase
       .from("accounts").select("id, owner_email, tenant_id").eq("id", accountId).maybeSingle();

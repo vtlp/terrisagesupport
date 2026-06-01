@@ -2,6 +2,7 @@
 // for all linked accounts (or one account if accountId is provided)
 // and upserts snapshots into account_usage_snapshots.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { requireStaffOrService } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,6 +45,9 @@ Deno.serve(async (req) => {
     const API_KEY = Deno.env.get("SEAT_SUPPORT_INTEGRATION_API_KEY");
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    const auth = await requireStaffOrService(req, supabase);
+    if (!auth.ok) return json({ error: auth.error }, auth.status);
 
     if (!BASE_URL || !API_KEY) {
       return json({ synced: 0, reason: "INTEGRATION_NOT_CONFIGURED" }, 200);
