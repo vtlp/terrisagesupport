@@ -1,6 +1,7 @@
 // Fetches live tenant team members from Terrisage CRM
 // GET /api/integrations/seats/tenant-agents?tenantId=<uuid>
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { requireStaffOrService } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
