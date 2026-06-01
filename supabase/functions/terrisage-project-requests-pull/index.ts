@@ -41,6 +41,9 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
+  const auth = await requireStaffOrService(req, supabase);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
+
   // Optional scoping: when called from an account page, only count/upsert
   // requests that belong to that account's tenant.
   let scopeAccountId: string | null = null;
