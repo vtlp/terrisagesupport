@@ -248,7 +248,7 @@ export default function AdminIntegrations() {
                 <Button onClick={save} disabled={saving} variant="outline">
                   {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Save
                 </Button>
-                <Button onClick={connect} disabled={saving || exchanging || !clientId || !clientSecret}>
+                <Button onClick={connect} disabled={saving || exchanging || !clientId || (!clientSecret && !hasClientSecret)}>
                   {exchanging && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {hasRefreshToken ? 'Reconnect Google account' : 'Connect Google account'}
                 </Button>
