@@ -2,6 +2,7 @@
 // Called from the Support Console (admin actions) or the import-completion path.
 // Best-effort: returns 200 even if upstream is unreachable, but logs the failure.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { requireStaffOrService } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
