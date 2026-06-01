@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
           const email = item.email ? String(item.email).trim() : null;
           const company = item.companyName ? String(item.companyName).trim() : null;
           const message = item.message ? String(item.message).trim() : '';
-          const upstreamSource = item.source === 'MOBILE' ? 'Terrisage Mobile' : 'Terrisage Website';
+          const upstreamSource = item.source === 'MOBILE' ? 'Terrisage Mobile' : 'Landing Page';
 
           if (!fullName || normalisePhone(phone).length < 6) { skipped++; continue; }
 
