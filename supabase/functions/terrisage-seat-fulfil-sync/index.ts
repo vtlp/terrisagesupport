@@ -10,6 +10,7 @@
 // Cycle metadata is pushed separately by `terrisage-seat-cycle-sync` whenever
 // the billing cycle dates are saved on the BillingTab.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { requireStaffOrService } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
