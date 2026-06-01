@@ -221,10 +221,18 @@ export default function AdminIntegrations() {
                        placeholder="xxxx.apps.googleusercontent.com" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="csecret">Google OAuth Client Secret</Label>
+                <Label htmlFor="csecret" className="flex items-center gap-2">
+                  Google OAuth Client Secret
+                  {hasClientSecret && (
+                    <Badge variant="secondary" className="text-xs">Saved</Badge>
+                  )}
+                </Label>
                 <Input id="csecret" type="password" value={clientSecret}
                        onChange={(e) => setClientSecret(e.target.value)}
-                       placeholder="GOCSPX-..." />
+                       placeholder={hasClientSecret ? '•••••••• (leave blank to keep saved secret)' : 'GOCSPX-...'} />
+                <p className="text-xs text-muted-foreground">
+                  For security, the saved secret is never sent to the browser. Enter a new value only to replace it.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="calid">Calendar ID</Label>
