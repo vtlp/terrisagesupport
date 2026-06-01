@@ -94,14 +94,27 @@ export default function AdminIntegrations() {
 
   const save = async () => {
     setSaving(true);
-    const { error } = await supabase.from('integration_settings').update({
+    // SECURITY: only persist a new client secret when the admin actually types one.
+    // The existing secret value is never loaded into the browser, so an empty
+    // input means "leave the saved secret untouched".
+    const payload: Record<string, string | null> = {
       google_client_id: clientId.trim() || null,
-      google_client_secret: clientSecret.trim() || null,
       google_calendar_id: calendarId.trim() || 'primary',
-    }).eq('provider', 'google_calendar');
+    };
+    if (clientSecret.trim()) {
+      payload.google_client_secret = clientSecret.trim();
+    }
+    const { error } = await supabase
+      .from('integration_settings')
+      .update(payload)
+      .eq('provider', 'google_calendar');
     setSaving(false);
     if (error) toast.error(error.message);
-    else toast.success('Saved');
+    else {
+      toast.success('Saved');
+      setClientSecret('');
+      if (clientSecret.trim()) setHasClientSecret(true);
+    }
   };
 
   const connect = async () => {
