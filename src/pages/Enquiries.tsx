@@ -156,7 +156,7 @@ export default function Enquiries() {
         {[
           { label: 'Total', value: total },
           { label: 'From Terrisage', value: terrisageCount, color: 'text-primary' },
-          { label: 'Manual', value: manualCount },
+          { label: 'Other sources', value: manualCount },
           { label: 'New since last visit', value: newSinceLastVisit, color: newSinceLastVisit > 0 ? 'text-success' : '' },
         ].map(c => (
           <Card key={c.label}><CardContent className="p-3 text-center">
