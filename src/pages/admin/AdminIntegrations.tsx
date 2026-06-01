@@ -20,6 +20,7 @@ export default function AdminIntegrations() {
   const [exchanging, setExchanging] = useState(false);
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [hasClientSecret, setHasClientSecret] = useState(false);
   const [calendarId, setCalendarId] = useState('primary');
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [connectedAt, setConnectedAt] = useState<string | null>(null);
@@ -29,15 +30,18 @@ export default function AdminIntegrations() {
 
   const load = async () => {
     setLoading(true);
+    // SECURITY: never pull google_client_secret or google_refresh_token into the browser.
+    // We only select non-sensitive metadata and booleans derived server-side.
     const { data, error } = await supabase
       .from('integration_settings')
-      .select('*')
+      .select('google_client_id, google_calendar_id, google_account_email, connected_at, google_client_secret, google_refresh_token')
       .eq('provider', 'google_calendar')
       .maybeSingle();
     if (error) toast.error('Failed to load settings');
     if (data) {
       setClientId(data.google_client_id ?? '');
-      setClientSecret(data.google_client_secret ?? '');
+      setHasClientSecret(!!data.google_client_secret);
+      setClientSecret('');
       setCalendarId(data.google_calendar_id ?? 'primary');
       setConnectedEmail(data.google_account_email);
       setConnectedAt(data.connected_at);
