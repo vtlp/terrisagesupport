@@ -242,8 +242,8 @@ export default function Enquiries() {
           <div className="md:hidden space-y-3">
             {filtered.map(r => {
               const kind = classifySource(r.source);
-              const badge = sourceBadge[kind];
-              const isNew = kind !== 'manual' && new Date(r.created_at) > lastSeenAtRef.current;
+              const badge = getSourceBadge(r.source);
+              const isNew = kind !== 'other' && new Date(r.created_at) > lastSeenAtRef.current;
               return (
                 <Card key={r.id} className="cursor-pointer" onClick={() => navigate(`/enquiries/${r.id}`)}>
                   <CardContent className="p-4">
