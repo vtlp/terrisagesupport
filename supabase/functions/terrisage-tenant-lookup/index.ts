@@ -1,6 +1,7 @@
 // Looks up a Terrisage tenant ID using the account's super-user (owner) email.
 // Called from AccountDetail "Sync" button next to the Tenant ID field.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { requireStaffOrService } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
