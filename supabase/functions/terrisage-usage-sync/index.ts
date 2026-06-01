@@ -46,6 +46,9 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    const auth = await requireStaffOrService(req, supabase);
+    if (!auth.ok) return json({ error: auth.error }, auth.status);
+
     if (!BASE_URL || !API_KEY) {
       return json({ synced: 0, reason: "INTEGRATION_NOT_CONFIGURED" }, 200);
     }
