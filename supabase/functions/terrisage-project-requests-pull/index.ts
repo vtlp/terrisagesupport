@@ -2,6 +2,7 @@
 // into public.project_requests, matching by accounts.tenant_id.
 // Runs on a schedule (pg_cron) and is also callable manually from the UI.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { requireStaffOrService } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
