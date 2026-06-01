@@ -177,7 +177,7 @@ export default function Enquiries() {
             <SelectItem value="all">All Sources</SelectItem>
             <SelectItem value="other">Other (WhatsApp, Referral, etc.)</SelectItem>
             <SelectItem value="terrisage">All Terrisage</SelectItem>
-            <SelectItem value="terrisage_website">Terrisage Web - Landing Page</SelectItem>
+            <SelectItem value="terrisage_website">Landing Page</SelectItem>
             <SelectItem value="terrisage_mobile">Terrisage Mobile</SelectItem>
           </SelectContent>
         </Select>
