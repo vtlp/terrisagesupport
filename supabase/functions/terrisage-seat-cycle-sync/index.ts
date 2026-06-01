@@ -2,6 +2,7 @@
 // Called after a seat request is fulfilled so the upstream CRM knows
 // the current cycle window + frequency for the additional seats.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { requireStaffOrService } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
