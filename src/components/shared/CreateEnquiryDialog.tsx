@@ -256,7 +256,9 @@ export function CreateEnquiryDialog({ open, onOpenChange, onCreated }: CreateEnq
               <Select value={source || undefined} onValueChange={setSource}>
                 <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
                 <SelectContent className="max-h-72">
-                  {sources.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                  {sources
+                    .filter(s => !/landing page|terrisage/i.test(s.name))
+                    .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
