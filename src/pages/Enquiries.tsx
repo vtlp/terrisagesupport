@@ -55,7 +55,7 @@ export default function Enquiries() {
   const [createOpen, setCreateOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const syncFromTerrisage = async () => {
+  const syncFromTerrisage = useCallback(async () => {
     setSyncing(true);
     const { data, error } = await supabase.functions.invoke('terrisage-show-interests-pull', { body: {} });
     setSyncing(false);
@@ -66,7 +66,7 @@ export default function Enquiries() {
     const { fetched = 0, inserted = 0, duplicates = 0 } = data as { fetched: number; inserted: number; duplicates: number };
     toast.success(`Synced ${fetched} leads — ${inserted} new, ${duplicates} already imported`);
     load();
-  };
+  }, [load]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,7 +79,10 @@ export default function Enquiries() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    syncFromTerrisage();
+  }, [load, syncFromTerrisage]);
 
   const filtered = rows.filter(r => {
     const term = search.toLowerCase();
