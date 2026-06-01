@@ -30,23 +30,35 @@ export default function AdminIntegrations() {
 
   const load = async () => {
     setLoading(true);
-    // SECURITY: never pull google_client_secret or google_refresh_token into the browser.
-    // We only select non-sensitive metadata and booleans derived server-side.
+    // SECURITY: never pull google_client_secret or google_refresh_token values into
+    // the browser. Select only non-sensitive metadata. Presence of a saved
+    // refresh token (hasRefreshToken) is derived server-side via a count below.
     const { data, error } = await supabase
       .from('integration_settings')
-      .select('google_client_id, google_calendar_id, google_account_email, connected_at, google_client_secret, google_refresh_token')
+      .select('google_client_id, google_calendar_id, google_account_email, connected_at')
       .eq('provider', 'google_calendar')
       .maybeSingle();
     if (error) toast.error('Failed to load settings');
     if (data) {
       setClientId(data.google_client_id ?? '');
-      setHasClientSecret(!!data.google_client_secret);
       setClientSecret('');
       setCalendarId(data.google_calendar_id ?? 'primary');
       setConnectedEmail(data.google_account_email);
       setConnectedAt(data.connected_at);
-      setHasRefreshToken(!!data.google_refresh_token);
     }
+    // Boolean-only check for refresh token and secret presence (no values returned).
+    const { count: tokenCount } = await supabase
+      .from('integration_settings')
+      .select('provider', { count: 'exact', head: true })
+      .eq('provider', 'google_calendar')
+      .not('google_refresh_token', 'is', null);
+    setHasRefreshToken((tokenCount ?? 0) > 0);
+    const { count: secretCount } = await supabase
+      .from('integration_settings')
+      .select('provider', { count: 'exact', head: true })
+      .eq('provider', 'google_calendar')
+      .not('google_client_secret', 'is', null);
+    setHasClientSecret((secretCount ?? 0) > 0);
     setLoading(false);
   };
 
