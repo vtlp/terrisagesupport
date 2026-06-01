@@ -28,6 +28,9 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
+  const auth = await requireStaffOrService(req, supabase);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
+
   const { data: pr, error } = await supabase
     .from('project_requests')
     .select('id, account_id, external_request_id, project_name, status, rejection_reason, crm_project_id')
