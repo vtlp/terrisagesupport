@@ -106,9 +106,15 @@ export default function Enquiries() {
           <h1 className="text-2xl font-semibold">Enquiry Pipeline</h1>
           <p className="text-sm text-muted-foreground mt-1">Capture and convert leads into accounts</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> New Enquiry
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={syncFromTerrisage} disabled={syncing}>
+            {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Sync from Terrisage
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> New Enquiry
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
