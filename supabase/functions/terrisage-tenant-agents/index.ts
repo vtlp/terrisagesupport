@@ -29,6 +29,9 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    const auth = await requireStaffOrService(req, supabase);
+    if (!auth.ok) return json({ error: auth.error }, auth.status);
+
     const { data: acct, error: acctErr } = await supabase
       .from("accounts")
       .select("id, tenant_id")
