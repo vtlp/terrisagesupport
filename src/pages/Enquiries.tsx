@@ -45,17 +45,19 @@ const stageColors: Record<Stage, string> = {
   LOST: 'bg-destructive/15 text-destructive',
 };
 
-type SourceKind = 'terrisage_website' | 'terrisage_mobile' | 'manual';
+type SourceKind = 'terrisage_website' | 'terrisage_mobile' | 'other';
 const classifySource = (source: string | null): SourceKind => {
   const s = (source ?? '').toLowerCase();
   if (s.includes('terrisage') && s.includes('mobile')) return 'terrisage_mobile';
   if (s.includes('terrisage')) return 'terrisage_website';
-  return 'manual';
+  return 'other';
 };
-const sourceBadge: Record<SourceKind, { label: string; cls: string }> = {
-  terrisage_website: { label: 'Terrisage · Web', cls: 'bg-primary/15 text-primary border-primary/20' },
-  terrisage_mobile:  { label: 'Terrisage · App', cls: 'bg-info/15 text-info border-info/20' },
-  manual:            { label: 'Manual',          cls: 'bg-muted text-muted-foreground border-border' },
+const getSourceBadge = (source: string | null): { label: string; cls: string } => {
+  const kind = classifySource(source);
+  if (kind === 'terrisage_website') return { label: 'Terrisage Web - Landing Page', cls: 'bg-primary/15 text-primary border-primary/20' };
+  if (kind === 'terrisage_mobile') return { label: 'Terrisage Mobile', cls: 'bg-info/15 text-info border-info/20' };
+  const label = (source ?? '').trim() || 'Unknown';
+  return { label, cls: 'bg-muted text-muted-foreground border-border' };
 };
 
 const LAST_SEEN_KEY = 'enquiries:lastSeenAt';
