@@ -38,6 +38,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    const auth = await requireStaffOrService(req, supabase);
+    if (!auth.ok) return json({ error: auth.error }, auth.status);
+
     const { data: acct, error: acctErr } = await supabase
       .from("accounts").select("id, owner_email, tenant_id").eq("id", accountId).maybeSingle();
     if (acctErr) return softError({ error: "ACCOUNT_LOOKUP_FAILED", detail: acctErr.message });
