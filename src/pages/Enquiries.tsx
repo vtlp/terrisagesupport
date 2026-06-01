@@ -55,6 +55,17 @@ export default function Enquiries() {
   const [createOpen, setCreateOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('enquiries')
+      .select('id, full_name, phone, email, city, company_name, tenancy_type, source, stage, created_at')
+      .order('created_at', { ascending: false });
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    setRows((data ?? []) as EnquiryRow[]);
+    setLoading(false);
+  }, []);
+
   const syncFromTerrisage = useCallback(async () => {
     setSyncing(true);
     const { data, error } = await supabase.functions.invoke('terrisage-show-interests-pull', { body: {} });
@@ -67,17 +78,6 @@ export default function Enquiries() {
     toast.success(`Synced ${fetched} leads — ${inserted} new, ${duplicates} already imported`);
     load();
   }, [load]);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('enquiries')
-      .select('id, full_name, phone, email, city, company_name, tenancy_type, source, stage, created_at')
-      .order('created_at', { ascending: false });
-    if (error) { toast.error(error.message); setLoading(false); return; }
-    setRows((data ?? []) as EnquiryRow[]);
-    setLoading(false);
-  }, []);
 
   useEffect(() => {
     load();
