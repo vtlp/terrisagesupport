@@ -214,8 +214,8 @@ export default function Enquiries() {
               <TableBody>
                 {filtered.map(r => {
                   const kind = classifySource(r.source);
-                  const badge = sourceBadge[kind];
-                  const isNew = kind !== 'manual' && new Date(r.created_at) > lastSeenAtRef.current;
+                  const badge = getSourceBadge(r.source);
+                  const isNew = kind !== 'other' && new Date(r.created_at) > lastSeenAtRef.current;
                   return (
                     <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/enquiries/${r.id}`)}>
                       <TableCell className="font-medium">
