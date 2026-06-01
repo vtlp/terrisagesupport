@@ -97,7 +97,11 @@ export default function AdminIntegrations() {
     // SECURITY: only persist a new client secret when the admin actually types one.
     // The existing secret value is never loaded into the browser, so an empty
     // input means "leave the saved secret untouched".
-    const payload: Record<string, string | null> = {
+    const payload: {
+      google_client_id: string | null;
+      google_calendar_id: string;
+      google_client_secret?: string;
+    } = {
       google_client_id: clientId.trim() || null,
       google_calendar_id: calendarId.trim() || 'primary',
     };
