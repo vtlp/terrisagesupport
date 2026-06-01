@@ -119,15 +119,15 @@ export default function Enquiries() {
     const matchTen = tenancyFilter === 'all' || r.tenancy_type === tenancyFilter;
     const kind = classifySource(r.source);
     const matchSource = sourceFilter === 'all'
-      || (sourceFilter === 'terrisage' ? kind !== 'manual' : kind === sourceFilter);
+      || (sourceFilter === 'terrisage' ? kind !== 'other' : kind === sourceFilter);
     return matchSearch && matchStage && matchTen && matchSource;
   });
 
   const total = rows.length;
-  const terrisageCount = useMemo(() => rows.filter(r => classifySource(r.source) !== 'manual').length, [rows]);
+  const terrisageCount = useMemo(() => rows.filter(r => classifySource(r.source) !== 'other').length, [rows]);
   const manualCount = total - terrisageCount;
   const newSinceLastVisit = useMemo(
-    () => rows.filter(r => classifySource(r.source) !== 'manual' && new Date(r.created_at) > lastSeenAtRef.current).length,
+    () => rows.filter(r => classifySource(r.source) !== 'other' && new Date(r.created_at) > lastSeenAtRef.current).length,
     [rows],
   );
 
