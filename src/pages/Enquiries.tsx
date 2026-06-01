@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Loader2 } from 'lucide-react';
+import { Search, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,20 @@ export default function Enquiries() {
   const [stageFilter, setStageFilter] = useState('all');
   const [tenancyFilter, setTenancyFilter] = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const syncFromTerrisage = async () => {
+    setSyncing(true);
+    const { data, error } = await supabase.functions.invoke('terrisage-show-interests-pull', { body: {} });
+    setSyncing(false);
+    if (error || !data?.ok) {
+      toast.error(error?.message ?? data?.error ?? 'Sync failed');
+      return;
+    }
+    const { fetched = 0, inserted = 0, duplicates = 0 } = data as { fetched: number; inserted: number; duplicates: number };
+    toast.success(`Synced ${fetched} leads — ${inserted} new, ${duplicates} already imported`);
+    load();
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,9 +106,15 @@ export default function Enquiries() {
           <h1 className="text-2xl font-semibold">Enquiry Pipeline</h1>
           <p className="text-sm text-muted-foreground mt-1">Capture and convert leads into accounts</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> New Enquiry
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={syncFromTerrisage} disabled={syncing}>
+            {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Sync from Terrisage
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> New Enquiry
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

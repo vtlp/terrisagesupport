@@ -45,5 +45,8 @@ verify_jwt = false
 [functions.landing-enquiry-webhook]
 verify_jwt = false
 
+[functions.terrisage-show-interests-pull]
+verify_jwt = false
+
 
 
