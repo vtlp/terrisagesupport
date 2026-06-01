@@ -45,17 +45,19 @@ const stageColors: Record<Stage, string> = {
   LOST: 'bg-destructive/15 text-destructive',
 };
 
-type SourceKind = 'terrisage_website' | 'terrisage_mobile' | 'manual';
+type SourceKind = 'terrisage_website' | 'terrisage_mobile' | 'other';
 const classifySource = (source: string | null): SourceKind => {
   const s = (source ?? '').toLowerCase();
   if (s.includes('terrisage') && s.includes('mobile')) return 'terrisage_mobile';
   if (s.includes('terrisage')) return 'terrisage_website';
-  return 'manual';
+  return 'other';
 };
-const sourceBadge: Record<SourceKind, { label: string; cls: string }> = {
-  terrisage_website: { label: 'Terrisage · Web', cls: 'bg-primary/15 text-primary border-primary/20' },
-  terrisage_mobile:  { label: 'Terrisage · App', cls: 'bg-info/15 text-info border-info/20' },
-  manual:            { label: 'Manual',          cls: 'bg-muted text-muted-foreground border-border' },
+const getSourceBadge = (source: string | null): { label: string; cls: string } => {
+  const kind = classifySource(source);
+  if (kind === 'terrisage_website') return { label: 'Terrisage Web - Landing Page', cls: 'bg-primary/15 text-primary border-primary/20' };
+  if (kind === 'terrisage_mobile') return { label: 'Terrisage Mobile', cls: 'bg-info/15 text-info border-info/20' };
+  const label = (source ?? '').trim() || 'Unknown';
+  return { label, cls: 'bg-muted text-muted-foreground border-border' };
 };
 
 const LAST_SEEN_KEY = 'enquiries:lastSeenAt';
@@ -117,15 +119,15 @@ export default function Enquiries() {
     const matchTen = tenancyFilter === 'all' || r.tenancy_type === tenancyFilter;
     const kind = classifySource(r.source);
     const matchSource = sourceFilter === 'all'
-      || (sourceFilter === 'terrisage' ? kind !== 'manual' : kind === sourceFilter);
+      || (sourceFilter === 'terrisage' ? kind !== 'other' : kind === sourceFilter);
     return matchSearch && matchStage && matchTen && matchSource;
   });
 
   const total = rows.length;
-  const terrisageCount = useMemo(() => rows.filter(r => classifySource(r.source) !== 'manual').length, [rows]);
+  const terrisageCount = useMemo(() => rows.filter(r => classifySource(r.source) !== 'other').length, [rows]);
   const manualCount = total - terrisageCount;
   const newSinceLastVisit = useMemo(
-    () => rows.filter(r => classifySource(r.source) !== 'manual' && new Date(r.created_at) > lastSeenAtRef.current).length,
+    () => rows.filter(r => classifySource(r.source) !== 'other' && new Date(r.created_at) > lastSeenAtRef.current).length,
     [rows],
   );
 
@@ -154,7 +156,7 @@ export default function Enquiries() {
         {[
           { label: 'Total', value: total },
           { label: 'From Terrisage', value: terrisageCount, color: 'text-primary' },
-          { label: 'Manual', value: manualCount },
+          { label: 'Other sources', value: manualCount },
           { label: 'New since last visit', value: newSinceLastVisit, color: newSinceLastVisit > 0 ? 'text-success' : '' },
         ].map(c => (
           <Card key={c.label}><CardContent className="p-3 text-center">
@@ -173,10 +175,10 @@ export default function Enquiries() {
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="manual">Manual only</SelectItem>
+            <SelectItem value="other">Other (WhatsApp, Referral, etc.)</SelectItem>
             <SelectItem value="terrisage">All Terrisage</SelectItem>
-            <SelectItem value="terrisage_website">Terrisage · Website</SelectItem>
-            <SelectItem value="terrisage_mobile">Terrisage · Mobile</SelectItem>
+            <SelectItem value="terrisage_website">Terrisage Web - Landing Page</SelectItem>
+            <SelectItem value="terrisage_mobile">Terrisage Mobile</SelectItem>
           </SelectContent>
         </Select>
         <Select value={stageFilter} onValueChange={setStageFilter}>
@@ -212,8 +214,8 @@ export default function Enquiries() {
               <TableBody>
                 {filtered.map(r => {
                   const kind = classifySource(r.source);
-                  const badge = sourceBadge[kind];
-                  const isNew = kind !== 'manual' && new Date(r.created_at) > lastSeenAtRef.current;
+                  const badge = getSourceBadge(r.source);
+                  const isNew = kind !== 'other' && new Date(r.created_at) > lastSeenAtRef.current;
                   return (
                     <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/enquiries/${r.id}`)}>
                       <TableCell className="font-medium">
@@ -240,8 +242,8 @@ export default function Enquiries() {
           <div className="md:hidden space-y-3">
             {filtered.map(r => {
               const kind = classifySource(r.source);
-              const badge = sourceBadge[kind];
-              const isNew = kind !== 'manual' && new Date(r.created_at) > lastSeenAtRef.current;
+              const badge = getSourceBadge(r.source);
+              const isNew = kind !== 'other' && new Date(r.created_at) > lastSeenAtRef.current;
               return (
                 <Card key={r.id} className="cursor-pointer" onClick={() => navigate(`/enquiries/${r.id}`)}>
                   <CardContent className="p-4">
